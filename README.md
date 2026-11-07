@@ -3,23 +3,39 @@
 An original, semi-cooperative survival board game set in a frozen zombie apocalypse, built for the browser with a 3D voxel look (Three.js).
 2–5 players play hot-seat, with optional bots for empty seats.
 
-> **Status: steps 1–3 of 6 are done.** The rules engine, the voxel board, and animated voxel survivors, zombies and dice are in place. The demo page plays a real game with bots so you can watch everything move. The playable UI comes in step 4.
+> **Status: steps 1–4 of 6 are done.** The game is playable in the browser: hot-seat for 2–5 players, with AI for any seat, in English or Thai. Step 5 adds crossroads, crisis and exposure reveal animations and the exile-vote UI. Step 6 adds polish, sound and a tutorial.
 
-![FROSTBOUND voxel board with pieces](docs/screenshots/board-overview.jpg)
+![Playing FROSTBOUND](docs/screenshots/play.jpg)
 
-| All 20 survivors + zombies | Around the campfire | Colony phase: zombies rise, barricades break |
+| Setup | ภาษาไทย | Crossroads |
+|---|---|---|
+| ![setup](docs/screenshots/setup.jpg) | ![thai](docs/screenshots/play-th.jpg) | ![crossroads](docs/screenshots/crossroads.jpg) |
+
+| All 20 survivors + zombies | Around the campfire | Colony phase |
 |---|---|---|
 | ![characters](docs/screenshots/characters.jpg) | ![colony](docs/screenshots/pieces-closeup.jpg) | ![rising](docs/screenshots/zombies-rising.jpg) |
 
-| Location panel | Phone |
-|---|---|
-| ![library](docs/screenshots/location-panel.jpg) | ![mobile](docs/screenshots/mobile.jpg) |
+## How to play (UI)
+1. **Setup:** choose 2–5 seats (Human or AI), a main objective, the betrayer mode, the language and sound.
+2. **Draft:** each human gets a *Pass to …* screen, then picks 2 of 4 survivors.
+3. **On your turn:**
+   - Select a survivor: click its card or the figure on the board.
+   - Click a location to see what's there.
+   - From the panel, **Move here** (tick *Use fuel* to skip the exposure roll), or use **Attack / Search / Barricade / Clean / Lure** for a survivor already there.
+   - Each action uses the cheapest die that works; click a die chip to force a specific one.
+4. **Cards:** click a card in your hand to **Play** it, **Add to crisis** (face down), or **Deposit for goal**.
+5. **Other controls:**
+   - **🔒 Objective:** press and hold to peek at your secret objective.
+   - **🤝 Request item:** ask another player for a card.
+   - **End turn:** pass to the next player.
+6. **Hot seat:** between human players a full-screen *Pass to …* screen hides every hand and objective until the next player taps it.
+7. **Saving:** the game autosaves after every action, and *Continue saved game* resumes it.
 
 ## Running
 
 ```bash
 npm install
-npm run dev           # http://localhost:5173: bots auto-play; drag to orbit, right-drag to pan, scroll to zoom, click a location
+npm run dev           # http://localhost:5173: drag to orbit, right-drag to pan, scroll to zoom
 npm test              # rules + render-helper tests, including ~130 full bot games checked after every action
 npm run build         # static bundle in dist/
 npm run balance       # bot-vs-bot outcome table per scenario and player count
@@ -27,8 +43,7 @@ npm run balance       # bot-vs-bot outcome table per scenario and player count
 
 Use Node 20 or later. URL options:
 - framing: `?focus=colony&zoom=2.5&azimuth=-30&select=police&snow=0`
-- demo: `?autoplay=0` (start paused), `?advance=40` (skip ahead N bot actions), `?seed=3`, `?scenario=beacon`
-- `?lineup`: every survivor and zombie variant side by side
+- quick start without the setup screen: `?play=HHA&scenario=beacon&seed=3&lang=th` (H = human seat, A = AI seat)
 
 ## Architecture
 
@@ -64,9 +79,17 @@ src/
                         barricades; snow-puff particles (zombies + barricades + puffs are instanced)
     dice.js             dice tray on its own small canvas; dice tumble and settle on the rolled face; used dice dim
     tween.js            frame-driven tween engine + easings
-  ui/style.css          frosted-glass overlay
-  ui/logText.js         temporary English event text for the demo ticker
-  main.js               boots stage/board/pieces/dice; bots play a seeded demo game with Auto-play / Step / New game
+  i18n/                 en.js + th.js UI strings, content.th.js (Thai content), format.js (log lines, effect text)
+  ui/
+    app.js              controller: dispatch -> reducer, AI seats, hot-seat pass screens, autosave, settings, toasts
+    options.js          pure: which actions are legal right now (asks the engine via tryReduce) + die picking
+    views/hud.js        top bar (morale, round, food, waste, crisis, goal, turn) + log panel
+    views/player.js     survivors, dice chips, hand + card actions, hold-to-peek objective, request, end turn
+    views/location.js   location details, who is here, move / die actions for the selected survivor
+    views/modals.js     setup, settings, pass screen, draft, crossroads, requests, vote, game over
+    style.css           frosted-glass overlay, responsive down to phone width
+  audio/sound.js        sound hooks (on/off works now; sounds arrive in step 6)
+  main.js               boots stage/board/pieces/dice, board picking, labels, and the UI controller
 index.html
 tests/                  node:test suites (rules + headless render helpers)
 ```

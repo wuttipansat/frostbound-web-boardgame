@@ -158,6 +158,16 @@ export function createPieces(board, tweens) {
   const barricades = new Map(LOCATION_IDS.map((id) => [id, []]));
   let pending = 0; // running piece animations
 
+  // Selection ring that follows the highlighted survivor.
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.85, 1.12, 28),
+    new THREE.MeshBasicMaterial({ color: 0xffc46b, transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false }),
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.1;
+  ring.visible = false;
+  let highlighted = null;
+
   // ---------------- positions
 
   function survivorSlotPos(locId, k) {
@@ -272,6 +282,7 @@ export function createPieces(board, tweens) {
 
   function kill(vis, animate) {
     vis.dying = true;
+    if (highlighted === vis.id) setHighlight(null);
     survivors.delete(vis.id);
     if (!animate) { root.remove(vis.group); return; }
     pending++;
@@ -404,6 +415,28 @@ export function createPieces(board, tweens) {
       if (!vis.moving && !vis.dying) vis.body.scale.y = 1 + Math.sin(t * 2 + vis.phase) * 0.025; // breathing
     }
     puffs.update(dt);
+    if (ring.visible) {
+      ring.scale.setScalar(1 + Math.sin(t * 4) * 0.06);
+      ring.material.opacity = 0.65 + Math.sin(t * 4) * 0.25;
+    }
+  }
+
+  function setHighlight(id) {
+    const vis = id ? survivors.get(id) : null;
+    highlighted = vis ? id : null;
+    ring.removeFromParent();
+    ring.visible = !!vis;
+    if (vis) vis.group.add(ring);
+  }
+
+  /** Survivor under the pointer ray, if any. */
+  function pick(raycaster) {
+    const groups = [...survivors.values()].filter((v) => !v.dying).map((v) => v.body);
+    const hit = raycaster.intersectObjects(groups, true)[0];
+    if (!hit) return null;
+    let o = hit.object;
+    while (o && !o.userData.survivorId) o = o.parent;
+    return o?.userData.survivorId ?? null;
   }
 
   return {
@@ -411,6 +444,9 @@ export function createPieces(board, tweens) {
     sync,
     update,
     get busy() { return pending > 0; },
+    setHighlight,
+    pick,
+    get highlighted() { return highlighted; },
     survivorObject: (id) => survivors.get(id)?.group ?? null,
     counts: () => ({
       survivors: survivors.size,
