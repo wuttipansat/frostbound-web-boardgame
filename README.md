@@ -3,16 +3,25 @@
 An original, semi-cooperative survival board game set in a frozen zombie apocalypse, built for the browser with a 3D voxel look (Three.js).
 2–5 players play hot-seat, with optional bots for empty seats.
 
-> **Status: step 1 of 6 is done.** The pure rules engine, all game content, a simple bot, and unit and fuzz tests are in place. There are no graphics yet.
+> **Status: steps 1–2 of 6 are done.** The rules engine, content and tests are in place, and the voxel board (camera, lighting, snow, the colony and all six locations) renders in the browser. Survivor and zombie models come next.
+
+![FROSTBOUND voxel board](docs/screenshots/board-overview.jpg)
+
+| Colony close-up | Location panel | Phone |
+|---|---|---|
+| ![colony](docs/screenshots/colony-closeup.jpg) | ![library](docs/screenshots/location-panel.jpg) | ![mobile](docs/screenshots/mobile.jpg) |
 
 ## Running
 
 ```bash
-npm test              # 57 tests, including ~130 full bot games checked for invariants after every action
+npm install
+npm run dev           # http://localhost:5173: drag to orbit, right-drag to pan, scroll to zoom, click a location
+npm test              # rules + render-helper tests, including ~130 full bot games checked after every action
+npm run build         # static bundle in dist/
 npm run balance       # bot-vs-bot outcome table per scenario and player count
 ```
 
-Step 1 needs Node 20 or later and has no dependencies.
+Use Node 20 or later. URL options for framing: `?focus=colony&zoom=2.5&azimuth=-30&select=police&snow=0`.
 
 ## Architecture
 
@@ -37,10 +46,24 @@ src/
   content/              all original cards and characters, as pure data
   ai/simpleBot.js       botAction(state, playerId) -> action
   ai/simulate.js        headless bot-vs-bot driver (tests + balance)
-tests/                  node:test suites
+  render/               Three.js only; reads state, never changes it
+    voxel.js            VoxelModel: sparse voxel grid -> ONE merged, face-culled BufferGeometry (+ a separate glow mesh)
+    palette.js          art-direction colours (cold night / warm light / muted danger)
+    buildings.js        voxel designs: colony, 6 locations, pine, rock
+    board.js            plateau terrain, roads, layout + slot anchors, instanced trees/slots, pick targets, warm lights
+    stage.js            renderer, orthographic orbit camera with limits, moonlight + shadows, exp fog, snowfall
+  ui/style.css          frosted-glass overlay
+  main.js               boots the stage and board, and shows location details from a demo GameState
+index.html
+tests/                  node:test suites (rules + headless render helpers)
 ```
 
-Later steps add `index.html`, `src/render/` (voxel scene), `src/ui/` (HTML overlay), and `src/i18n/` (EN/TH).
+Later steps add `src/ui/` panels and `src/i18n/` (EN/TH).
+
+### Rendering notes
+- **Models:** every model is built from voxels in code; there are no asset files. Each building merges into one mesh with hidden faces culled. Glowing voxels (windows, fire, signs) go into an unlit mesh that ignores fog.
+- **Instancing:** trees, rocks and slot markers are `InstancedMesh`es. The whole board renders in about 29 draw calls and about 105k triangles.
+- **Layout data:** `computeLayout()` gives each location its centre, facing, label anchor, and world positions for every survivor and zombie slot. Step 3 places models on these anchors.
 The UI only *reads* state through selectors and `viewFor`, and only *changes* it by dispatching actions to `reduce`.
 Because of that, networking or saving to localStorage only needs `serialize`/`deserialize` plus the action stream.
 

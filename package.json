@@ -5,8 +5,17 @@
   "description": "FROSTBOUND - a semi-cooperative voxel survival board game for the browser",
   "type": "module",
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "test": "node --test \"tests/**/*.test.js\"",
     "balance": "node scripts/balance.mjs"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.11"
+  }
 }

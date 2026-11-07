@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FROSTBOUND</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Inter:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/ui/style.css" />
+</head>
+<body>
+  <canvas id="scene"></canvas>
+  <div id="labels" aria-hidden="true"></div>
+  <header class="brand panel">
+    <h1>FROSTBOUND</h1>
+    <p>Step 2 · voxel board preview</p>
+  </header>
+  <aside id="info" class="panel hidden" aria-live="polite"></aside>
+  <footer class="hint panel"><span class="mouse">Drag to orbit · Right-drag to pan · Scroll to zoom · Click a location</span><span class="touch">Drag to orbit · Two fingers to pan &amp; zoom · Tap a location</span></footer>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
