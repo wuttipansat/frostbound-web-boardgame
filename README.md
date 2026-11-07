@@ -3,13 +3,17 @@
 An original, semi-cooperative survival board game set in a frozen zombie apocalypse, built for the browser with a 3D voxel look (Three.js).
 2–5 players play hot-seat, with optional bots for empty seats.
 
-> **Status: steps 1–4 of 6 are done.** The game is playable in the browser: hot-seat for 2–5 players, with AI for any seat, in English or Thai. Step 5 adds crossroads, crisis and exposure reveal animations and the exile-vote UI. Step 6 adds polish, sound and a tutorial.
+> **Status: steps 1–5 of 6 are done.** The game is fully playable in the browser: hot-seat for 2–5 players, with AI for any seat, in English or Thai. It includes animated crossroads, crisis, exposure and exile-vote reveals. Step 6 adds polish, sound and a first-round tutorial.
 
 ![Playing FROSTBOUND](docs/screenshots/play.jpg)
 
-| Setup | ภาษาไทย | Crossroads |
+| Setup | ภาษาไทย | Crossroads (card flip, TH) |
 |---|---|---|
 | ![setup](docs/screenshots/setup.jpg) | ![thai](docs/screenshots/play-th.jpg) | ![crossroads](docs/screenshots/crossroads.jpg) |
+
+| Colony phase: crisis cards revealed one by one | Exile vote result | Exposure die + floating result |
+|---|---|---|
+| ![colony phase](docs/screenshots/colony-phase.jpg) | ![vote](docs/screenshots/vote.jpg) | ![exposure](docs/screenshots/exposure.jpg) |
 
 | All 20 survivors + zombies | Around the campfire | Colony phase |
 |---|---|---|
@@ -27,9 +31,18 @@ An original, semi-cooperative survival board game set in a frozen zombie apocaly
 5. **Other controls:**
    - **🔒 Objective:** press and hold to peek at your secret objective.
    - **🤝 Request item:** ask another player for a card.
+   - **⚖ Call exile vote:** once per round. Every other player votes in secret (each human behind their own pass screen), then the ballots are revealed.
    - **End turn:** pass to the next player.
-6. **Hot seat:** between human players a full-screen *Pass to …* screen hides every hand and objective until the next player taps it.
-7. **Saving:** the game autosaves after every action, and *Continue saved game* resumes it.
+6. **Crossroads:** before your turn a card may flip up, showing *why* it triggered and both choices with their exact effects.
+7. **Colony phase:** after every round a public reveal walks through:
+   - food (or starvation)
+   - waste
+   - each face-down crisis card flipped one at a time, with a running score (+1 matching, −1 sabotage)
+   - the verdict
+   - the zombies that arrive
+8. **Exposure:** moving or attacking throws the voxel exposure die in the dice tray, and the result floats over the survivor on the board.
+9. **Hot seat:** between human players a full-screen *Pass to …* screen hides every hand and objective until the next player taps it.
+10. **Saving:** the game autosaves after every action, and *Continue saved game* resumes it.
 
 ## Running
 
@@ -77,7 +90,8 @@ src/
     characters.js       20 survivor looks (hats, gear, build), 3 hunched zombie variants, d6 die, barricade
     pieces.js           PieceManager: diffs GameState -> hop / pop-in / topple survivors; zombies rise, shuffle and sink;
                         barricades; snow-puff particles (zombies + barricades + puffs are instanced)
-    dice.js             dice tray on its own small canvas; dice tumble and settle on the rolled face; used dice dim
+    dice.js             dice tray on its own small canvas; dice tumble and settle on the rolled face; used dice dim;
+                        the exposure die (wound / frostbite / bite symbols) is thrown here too
     tween.js            frame-driven tween engine + easings
   i18n/                 en.js + th.js UI strings, content.th.js (Thai content), format.js (log lines, effect text)
   ui/
@@ -86,7 +100,8 @@ src/
     views/hud.js        top bar (morale, round, food, waste, crisis, goal, turn) + log panel
     views/player.js     survivors, dice chips, hand + card actions, hold-to-peek objective, request, end turn
     views/location.js   location details, who is here, move / die actions for the selected survivor
-    views/modals.js     setup, settings, pass screen, draft, crossroads, requests, vote, game over
+    views/modals.js     setup, settings, pass screen, draft, crossroads (flip), colony-phase reveal,
+                        call vote / secret ballot / vote result, requests, game over
     style.css           frosted-glass overlay, responsive down to phone width
   audio/sound.js        sound hooks (on/off works now; sounds arrive in step 6)
   main.js               boots stage/board/pieces/dice, board picking, labels, and the UI controller

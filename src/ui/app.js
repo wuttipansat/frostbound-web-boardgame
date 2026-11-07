@@ -15,8 +15,9 @@ import { renderPlayerPanel } from './views/player.js';
 import { renderLocationPanel } from './views/location.js';
 import {
   setupScreen, settingsModal, passScreen, draftModal, crossroadsModal, requestModal,
-  incomingRequestModal, voteModal, gameOverModal, toastLayer,
+  incomingRequestModal, voteModal, gameOverModal, toastLayer, colonyModal, voteResultModal, callVoteModal,
 } from './views/modals.js';
+import { crossChoice, c } from '../i18n/index.js';
 
 const SAVE_KEY = 'frostbound.save.v1';
 const SETTINGS_KEY = 'frostbound.settings.v1';
@@ -31,7 +32,7 @@ const storage = {
 
 const defaultSeats = () => Array.from({ length: 5 }, (_, i) => ({ name: t('setup.defaultName', { n: i + 1 }), isAI: i >= 2 }));
 
-export function createApp({ dom, pieces, diceTray, board }) {
+export function createApp({ dom, pieces, diceTray, board, fx = {} }) {
   const settings = storage.get(SETTINGS_KEY) ?? {};
   setLang(settings.lang ?? (navigator.language?.startsWith('th') ? 'th' : 'en'));
   sound.enabled = settings.sound ?? true;
@@ -39,12 +40,15 @@ export function createApp({ dom, pieces, diceTray, board }) {
   let state = null;
   let seat = null; // the human currently holding the device (hot seat)
   let aiTimer = 0;
+  let queueTimer = 0;
+  let modalKey = null;
   let aiRandom = mulberry(Date.now() >>> 0);
   let toasts = [];
   let lastActive = null;
   const ui = {
     setup: { count: 3, seats: defaultSeats(), scenarioId: 'beacon', betrayer: 'maybe' },
     modal: null, selSurvivor: null, selDie: null, selCard: null, selLoc: null, lureTo: null,
+    queue: [], // public reveal modals waiting to be shown: { type: 'colony' | 'vote', report }
     useFuel: false, logOpen: typeof window !== 'undefined' ? window.innerWidth > 900 : true, crisisOpen: false, peek: false, draftPicks: [], req: null,
     sound: sound.enabled,
   };
@@ -84,7 +88,7 @@ export function createApp({ dom, pieces, diceTray, board }) {
       state, ui, actor, viewer,
       canAct: !!viewer && viewer === actor && state?.phase === PHASES.TURN && !needsPass(),
       hasSave: !!storage.get(SAVE_KEY)?.state,
-      set, dispatch, selectSurvivor, selectLocation, takeSeat, startGame, continueGame, quitToSetup, setLanguage, setSound,
+      set, dispatch, dismissQueue, selectSurvivor, selectLocation, takeSeat, startGame, continueGame, quitToSetup, setLanguage, setSound,
     };
   }
 
@@ -105,6 +109,7 @@ export function createApp({ dom, pieces, diceTray, board }) {
     const before = state.log.length;
     state = res.state;
     for (const e of state.log.slice(before)) onLogEntry(e);
+    for (const q of ui.queue) if (q.type === 'colony' && q.morale == null) q.morale = state.morale;
     answerAiRequests();
     afterChange();
     return true;
@@ -112,7 +117,13 @@ export function createApp({ dom, pieces, diceTray, board }) {
 
   function onLogEntry(e) {
     sound.play(e.k);
-    if (TOAST_KEYS.has(e.k) || (e.k === 'exposure' && e.face !== 'blank')) {
+    if (e.k === 'exposure') fx.exposure?.(e.survivorId, e.face);
+    if (e.k === 'crisisResolved' && state.reports.colony) ui.queue.push({ type: 'colony', report: structuredClone(state.reports.colony), morale: null });
+    if (e.k === 'voteResult' && state.reports.vote) ui.queue.push({ type: 'vote', report: structuredClone(state.reports.vote) });
+    if (e.k === 'crossroadsChoice' && getPlayer(state, e.playerId).isAI) {
+      toast(t('cross.aiChose', { player: getPlayer(state, e.playerId).name, title: c('crossroads', e.cardId, 'title'), choice: crossChoice(e.cardId, e.choice) }));
+    }
+    if (TOAST_KEYS.has(e.k) && e.k !== 'crisisResolved') {
       const text = formatLog(e, state);
       if (text) toast(text, e.k === 'crisisResolved' && e.success ? 'good' : 'bad');
     }
@@ -162,6 +173,11 @@ export function createApp({ dom, pieces, diceTray, board }) {
 
   // ---------------------------------------------------------------- actions from views
 
+  function dismissQueue() {
+    ui.queue.shift();
+    render();
+  }
+
   function selectSurvivor(id) {
     ui.selSurvivor = id;
     if (id) ui.selLoc = state.survivors[id].location;
@@ -192,7 +208,7 @@ export function createApp({ dom, pieces, diceTray, board }) {
     aiRandom = mulberry((cfg.seed ?? Date.now()) >>> 0);
     seat = null;
     lastActive = null;
-    Object.assign(ui, { modal: null, selLoc: null });
+    Object.assign(ui, { modal: null, selLoc: null, queue: [] });
     sound.play('start');
     afterChange({ animate: false });
   }
@@ -204,13 +220,14 @@ export function createApp({ dom, pieces, diceTray, board }) {
     seat = save.seat ?? null;
     lastActive = null;
     ui.modal = null;
+    ui.queue = [];
     afterChange({ animate: false });
   }
 
   function quitToSetup() {
     if (state?.phase === PHASES.GAME_OVER) storage.del(SAVE_KEY);
     state = null;
-    Object.assign(ui, { modal: null, selLoc: null, selSurvivor: null });
+    Object.assign(ui, { modal: null, selLoc: null, selSurvivor: null, queue: [] });
     board.setSelected(null);
     render();
   }
@@ -238,10 +255,16 @@ export function createApp({ dom, pieces, diceTray, board }) {
       toasts = toasts.filter((x) => (x.ttl -= dt) > 0);
       if (toasts.length !== n) toastLayer(dom.toasts, toasts);
     }
-    if (!state || state.phase === PHASES.GAME_OVER || ui.modal === 'settings') return;
+    if (!state || ui.modal === 'settings') return;
+    if (ui.queue.length) {
+      // Reveal modals pause the game. With no humans at the table they dismiss themselves.
+      if (!humans().length && (queueTimer += dt) > 6) { queueTimer = 0; dismissQueue(); }
+      return;
+    }
+    if (state.phase === PHASES.GAME_OVER) return;
     const actor = currentActor();
     if (!actor || !getPlayer(state, actor).isAI) { aiTimer = 0; return; }
-    if (pieces.busy || diceTray.busy) { aiTimer = 0; return; }
+    if (pieces.busy || diceTray.busy || diceTray.exposureBusy) { aiTimer = 0; return; }
     aiTimer += dt;
     if (aiTimer < AI_DELAY) return;
     aiTimer = 0;
@@ -273,23 +296,35 @@ export function createApp({ dom, pieces, diceTray, board }) {
     renderPlayerPanel(dom.playerRefs, x);
     const shown = x.viewer ? getPlayer(state, x.viewer) : getPlayer(state, state.activePlayerId ?? state.players[0].id);
     if (shown && state.phase !== PHASES.DRAFT) diceTray.sync(shown.dice, `${shown.id}:${state.round}`);
-    mount(dom.modal, modalFor(x));
+    // Animated reveal modals keep their DOM while they stay on screen, so the animation isn't restarted.
+    const [key, build] = modalFor(x);
+    if (!key || key !== modalKey) mount(dom.modal, build ? build() : null);
+    modalKey = key;
     dom.onRender?.(state);
   }
 
+  /** Which modal to show: [stableKey | null, builder]. A stable key means "don't re-mount while unchanged". */
   function modalFor(x) {
-    if (ui.modal === 'settings') return settingsModal(x);
-    if (state.phase === PHASES.GAME_OVER) return gameOverModal(x);
+    if (ui.modal === 'settings') return [null, () => settingsModal(x)];
+    const q = ui.queue[0];
+    if (q?.type === 'colony') return [`colony:${q.report.round}:${getLangKey()}`, () => colonyModal(x, q)];
+    if (q?.type === 'vote') return [`vote:${state.log.length}:${getLangKey()}`, () => voteResultModal(x, q.report)];
+    if (state.phase === PHASES.GAME_OVER) return [null, () => gameOverModal(x)];
     const pass = needsPass();
-    if (pass) return passScreen(x, pass);
+    if (pass) return [null, () => passScreen(x, pass)];
     const incoming = x.viewer && state.requests.find((r) => r.to === x.viewer);
-    if (incoming) return incomingRequestModal(x, incoming);
-    if (state.phase === PHASES.DRAFT && x.viewer === x.actor && x.viewer) return draftModal(x);
-    if (state.phase === PHASES.CROSSROADS && x.viewer === x.actor && x.viewer) return crossroadsModal(x);
-    if (state.phase === PHASES.VOTE && x.viewer && pendingActors(state).includes(x.viewer)) return voteModal(x);
-    if (ui.modal === 'request' && x.canAct) return requestModal(x);
-    return null;
+    if (incoming) return [null, () => incomingRequestModal(x, incoming)];
+    if (state.phase === PHASES.DRAFT && x.viewer === x.actor && x.viewer) return [null, () => draftModal(x)];
+    if (state.phase === PHASES.CROSSROADS && x.viewer === x.actor && x.viewer) {
+      return [`cross:${state.pendingCrossroads.cardId}:${state.round}:${state.activePlayerId}:${getLangKey()}`, () => crossroadsModal(x)];
+    }
+    if (state.phase === PHASES.VOTE && x.viewer && pendingActors(state).includes(x.viewer)) return [null, () => voteModal(x)];
+    if (ui.modal === 'request' && x.canAct) return [null, () => requestModal(x)];
+    if (ui.modal === 'callVote' && x.canAct) return [null, () => callVoteModal(x)];
+    return [null, null];
   }
+
+  const getLangKey = () => getLang();
 
   /** Board clicks: a survivor of the viewer selects it; anything else selects the location. */
   function onBoardPick({ locationId, survivorId }) {

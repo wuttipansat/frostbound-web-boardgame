@@ -54,6 +54,12 @@ export function c(kind, id, field) {
   return SOURCES[kind]?.[id]?.[field] ?? id;
 }
 
+/** Localized label of a crossroads choice (choices are objects in English, strings in overrides). */
+export function crossChoice(cardId, i) {
+  const o = CONTENT_OVERRIDES[lang]?.crossroads?.[cardId]?.choices?.[i];
+  return o ?? CROSSROADS_BY_ID[cardId]?.choices[i]?.label ?? '';
+}
+
 /** Signed delta, e.g. +2 / −1. */
 export function signed(n) {
   return n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0';

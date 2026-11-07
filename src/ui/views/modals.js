@@ -1,8 +1,10 @@
 // Full-screen screens and dialogs: setup, settings, pass-the-device, draft, crossroads, requests, vote, game over.
 import { h, mount, ITEM_ICON, hex } from '../dom.js';
-import { t, c, LANGUAGES, getLang } from '../../i18n/index.js';
-import { describeEffects } from '../../i18n/format.js';
+import { t, c, LANGUAGES, getLang, crossChoice, signed } from '../../i18n/index.js';
+import { describeEffects, describeTrigger } from '../../i18n/format.js';
 import { SCENARIOS } from '../../content/scenarios.js';
+import { CRISES_BY_ID } from '../../content/crises.js';
+import { voteTargets } from '../options.js';
 import { CROSSROADS_BY_ID } from '../../content/crossroads.js';
 import { ITEM_TYPES, RULES } from '../../core/constants.js';
 import { getPlayer, survivorDef, itemOf, objectiveDef } from '../../core/selectors.js';
@@ -10,7 +12,7 @@ import { PLAYER_COLORS } from '../../render/pieces.js';
 import * as act from '../../core/actions.js';
 
 function dialog(cls, ...children) {
-  return h('div', { class: `backdrop ${cls}` }, h('div', { class: 'dialog panel', role: 'dialog', 'aria-modal': 'true' }, children));
+  return h('div', { class: `backdrop ${cls}` }, h('div', { class: `dialog panel ${cls}`, role: 'dialog', 'aria-modal': 'true' }, children));
 }
 
 // ---------------------------------------------------------------- setup
@@ -116,15 +118,20 @@ export function crossroadsModal(ctx) {
   const reader = getPlayer(ctx.state, pend.readerId);
   const active = getPlayer(ctx.state, pend.activePlayerId);
   const mine = ctx.viewer === pend.activePlayerId;
-  return dialog('crossroads',
-    h('small', { class: 'kicker' }, t('cross.title')),
-    h('h2', {}, c('crossroads', card.id, 'title')),
-    h('p', { class: 'muted small' }, t('cross.reads', { reader: reader.name, active: active.name })),
-    h('p', { class: 'story' }, c('crossroads', card.id, 'text')),
-    h('div', { class: 'choices' }, card.choices.map((ch, i) => h('button', {
-      class: 'choice', disabled: !mine,
-      onclick: () => ctx.dispatch(act.resolveCrossroads(pend.activePlayerId, i)),
-    }, h('b', {}, ch.label), h('small', {}, describeEffects(ch.effects))))));
+  return h('div', { class: 'backdrop crossroads' },
+    h('div', { class: 'flip-stage' },
+      h('div', { class: 'flip-card' },
+        h('div', { class: 'face back' }, h('span', { class: 'sigil' }, '✳'), h('b', {}, t('cross.title'))),
+        h('div', { class: 'face front dialog panel', role: 'dialog', 'aria-modal': 'true' },
+          h('small', { class: 'kicker' }, t('cross.title')),
+          h('h2', {}, c('crossroads', card.id, 'title')),
+          h('p', { class: 'muted small' }, t('cross.reads', { reader: reader.name, active: active.name })),
+          h('p', { class: 'trigger' }, `⚑ ${t('cross.because', { why: describeTrigger(card.trigger) })}`),
+          h('p', { class: 'story' }, c('crossroads', card.id, 'text')),
+          h('div', { class: 'choices' }, card.choices.map((ch, i) => h('button', {
+            class: 'choice', disabled: !mine,
+            onclick: () => ctx.dispatch(act.resolveCrossroads(pend.activePlayerId, i)),
+          }, h('b', {}, crossChoice(card.id, i)), h('small', {}, describeEffects(ch.effects)))))))));
 }
 
 export function requestModal(ctx) {
@@ -163,14 +170,105 @@ export function incomingRequestModal(ctx, req) {
     h('div', { class: 'row end' }, h('button', { class: 'btn ghost', onclick: () => ctx.dispatch(act.respondRequest(me.id, req.id, null)) }, t('act.decline'))));
 }
 
+export function callVoteModal(ctx) {
+  const s = ctx.state;
+  const targets = voteTargets(s, ctx.viewer);
+  const chosen = ctx.ui.voteTarget ?? targets[0];
+  return dialog('call-vote',
+    h('h2', {}, `⚖ ${t('vote.callTitle')}`),
+    h('p', { class: 'muted small' }, t('vote.callHelp')),
+    h('h4', {}, t('vote.target')),
+    h('div', { class: 'seg wrap' }, targets.map((id) => {
+      const p = getPlayer(s, id);
+      return h('button', { class: chosen === id ? 'on' : '', onclick: () => ctx.set({ voteTarget: id }) },
+        h('i', { class: 'dot', style: { background: hex(PLAYER_COLORS[s.players.indexOf(p)]), marginRight: '6px' } }), p.name);
+    })),
+    h('div', { class: 'row end' },
+      h('button', { class: 'btn ghost', onclick: () => ctx.set({ modal: null }) }, t('act.cancel')),
+      h('button', {
+        class: 'btn primary', disabled: !chosen,
+        onclick: () => { if (ctx.dispatch(act.callVote(ctx.viewer, chosen))) ctx.set({ modal: null }); },
+      }, t('vote.start'))));
+}
+
 export function voteModal(ctx) {
   const v = ctx.state.vote;
-  const target = getPlayer(ctx.state, v.targetId);
+  const s = ctx.state;
+  const target = getPlayer(s, v.targetId);
+  const caller = getPlayer(s, v.callerId);
+  const voters = s.players.filter((p) => p.id !== v.targetId);
   return dialog('vote',
-    h('h2', {}, `⚖ ${target.name}`),
+    h('small', { class: 'kicker' }, t('vote.callTitle')),
+    h('h2', {}, `⚖ ${t('vote.title', { name: target.name })}`),
+    h('p', { class: 'muted small' }, t('vote.calledBy', { name: caller.name })),
+    h('p', { class: 'small' }, t('vote.secret')),
+    h('div', { class: 'ballots' }, voters.map((p) => h('span', { class: `ballot${p.id in v.votes ? ' cast' : ''}` }, p.name))),
     h('div', { class: 'row end' },
-      h('button', { class: 'btn ghost', onclick: () => ctx.dispatch(act.castVote(ctx.viewer, false)) }, '✖'),
-      h('button', { class: 'btn primary', onclick: () => ctx.dispatch(act.castVote(ctx.viewer, true)) }, '✔')));
+      h('button', { class: 'btn ghost big', onclick: () => ctx.dispatch(act.castVote(ctx.viewer, false)) }, `✋ ${t('vote.no')}`),
+      h('button', { class: 'btn primary big', onclick: () => ctx.dispatch(act.castVote(ctx.viewer, true)) }, `🚪 ${t('vote.yes')}`)));
+}
+
+export function voteResultModal(ctx, report) {
+  const target = getPlayer(ctx.state, report.targetId);
+  return dialog('vote-result',
+    h('small', { class: 'kicker' }, t('vote.result', { name: target.name })),
+    h('div', { class: 'tally' },
+      Array.from({ length: report.yes }, (_, i) => h('span', { class: 'ballot-card yes', style: { animationDelay: `${0.25 + i * 0.3}s` } }, '🚪')),
+      Array.from({ length: report.no }, (_, i) => h('span', { class: 'ballot-card no', style: { animationDelay: `${0.25 + (report.yes + i) * 0.3}s` } }, '✋'))),
+    h('p', { class: 'muted reveal', style: { animationDelay: `${0.4 + (report.yes + report.no) * 0.3}s` } }, t('vote.tally', { yes: report.yes, no: report.no })),
+    h('h2', { class: `verdict reveal ${report.passed ? 'bad' : 'good'}`, style: { animationDelay: `${0.7 + (report.yes + report.no) * 0.3}s` } },
+      report.passed ? t('vote.passed', { name: target.name }) : t('vote.failed', { name: target.name })),
+    report.passed ? h('p', { class: 'small reveal', style: { animationDelay: `${0.9 + (report.yes + report.no) * 0.3}s` } }, t('vote.exileNote')) : null,
+    h('button', { class: 'btn primary wide reveal', style: { animationDelay: `${1 + (report.yes + report.no) * 0.3}s` }, onclick: ctx.dismissQueue }, t('colony.continue')));
+}
+
+/** The colony phase, revealed step by step: food, waste, the crisis cards one by one, verdict, new zombies. */
+export function colonyModal(ctx, item) {
+  const r = item.report;
+  const crisis = r.crisis;
+  const def = CRISES_BY_ID[crisis.crisisId];
+  let delay = 0.2;
+  const next = (step = 0.45) => { const d = delay; delay += step; return { animationDelay: `${d}s` }; };
+  const rows = [];
+  rows.push(h('p', { class: `step reveal ${r.fed ? '' : 'bad'}`, style: next() },
+    `${ITEM_ICON.food} ${r.fed ? t('colony.fed', { n: r.foodNeeded }) : t('colony.starve', { n: r.starvation })}`));
+  rows.push(h('p', { class: `step reveal ${r.wasteLoss ? 'bad' : 'muted'}`, style: next() },
+    `🗑 ${r.wasteLoss ? t('colony.waste', { n: r.wasteLoss }) : t('colony.noWaste')}`));
+  rows.push(h('h3', { class: 'reveal', style: next(0.3) }, t('colony.crisis', { name: c('crises', def.id, 'name') })));
+  rows.push(h('p', { class: 'muted small reveal', style: next(0.3) }, t('colony.needs', { n: crisis.required, item: t(`item.${def.item}`) })));
+  if (crisis.cards.length) {
+    let running = 0;
+    rows.push(h('div', { class: 'crisis-cards' }, crisis.cards.map((cd) => {
+      running += cd.delta;
+      const style = next(0.55);
+      return h('div', { class: 'cflip', style },
+        h('div', { class: 'cflip-inner', style },
+          h('div', { class: 'cface cback' }, '?'),
+          h('div', { class: `cface cfront t-${cd.type} ${cd.delta > 0 ? 'plus' : 'minus'}` },
+            h('span', { class: 'ico' }, ITEM_ICON[cd.type]),
+            h('span', { class: 'iname' }, c('items', cd.card, 'name')),
+            h('b', { class: 'delta' }, signed(cd.delta)),
+            h('small', { class: 'run' }, `Σ ${running}`))));
+    })));
+  } else {
+    rows.push(h('p', { class: 'muted reveal', style: next() }, t('colony.noCards')));
+  }
+  rows.push(h('p', { class: 'score reveal', style: next(0.4) }, t('colony.score', { score: crisis.score, required: crisis.required })));
+  rows.push(h('div', { class: `verdict-banner reveal ${crisis.success ? 'good' : 'bad'}`, style: next(0.5) },
+    h('b', {}, crisis.success ? t('colony.averted') : t('colony.failed')),
+    !crisis.success ? h('small', {}, describeEffects(def.fail)) : crisis.score >= crisis.required + 2 ? h('small', {}, t('colony.bonus')) : null));
+  const spawns = Object.entries(r.spawns ?? {});
+  rows.push(h('h3', { class: 'reveal', style: next(0.3) }, `🧟 ${t('colony.spawns')}`));
+  rows.push(spawns.length
+    ? h('div', { class: 'chips reveal', style: next() }, spawns.map(([loc, n]) => h('span', { class: 'chip danger' }, `${c('locations', loc, 'name')} +${n}`)))
+    : h('p', { class: 'muted reveal', style: next() }, t('colony.noSpawns')));
+  if (item.morale != null) rows.push(h('p', { class: 'step reveal', style: next() }, `❤ ${t('colony.morale', { n: item.morale })}`));
+  rows.push(h('button', { class: 'btn primary wide reveal', style: next(), onclick: ctx.dismissQueue }, t('colony.continue')));
+  return dialog('colony',
+    h('small', { class: 'kicker' }, t('colony.title', { n: r.round })),
+    h('h2', {}, c('crises', def.id, 'name')),
+    h('p', { class: 'muted small' }, c('crises', def.id, 'text')),
+    rows);
 }
 
 export function gameOverModal(ctx) {

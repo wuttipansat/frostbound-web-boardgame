@@ -1,5 +1,5 @@
 // Turns engine log entries and effect lists into localized text.
-import { t, c, signed } from './index.js';
+import { t, c, signed, crossChoice } from './index.js';
 
 const QUIET = new Set(['turnEnd', 'roll', 'draw']); // too noisy for the log panel
 
@@ -49,10 +49,9 @@ export function formatLog(e, state) {
     case 'give': return t('log.give', { ...p, to: n.player(e.to) });
     case 'decline': return t('log.decline', { ...p, to: n.player(e.to) });
     case 'lure': return t('log.lure', p);
-    case 'crossroadsChoice': {
-      const choices = c('crossroads', e.cardId, 'choices');
-      return t('log.crossroadsChoice', { ...p, choice: Array.isArray(choices) ? choices[e.choice]?.label : e.choice + 1 });
-    }
+    case 'crossroadsChoice': return t('log.crossroadsChoice', { ...p, choice: crossChoice(e.cardId, e.choice) });
+    case 'starvation': return t('log.starvation', { n: e.tokens });
+    case 'fed': return t('log.fed', { n: e.need });
     case 'draftDone': return t('log.draftDone', { player: n.player(e.leaderId) });
     case 'gameOver': return t('log.gameOver');
     default: {
@@ -72,6 +71,15 @@ export function describeEffect(e) {
     case 'discard': return t('eff.discard', { n: e.n, item: e.item ? t(`item.${e.item}`) : '' });
     default: return t(`eff.${e.type}`, { n: e.n, where });
   }
+}
+
+/** Why a crossroads card triggered, e.g. "You have a survivor at the School". */
+export function describeTrigger(cond) {
+  return t(`trig.${cond.type}`, {
+    n: cond.n,
+    loc: cond.location ? c('locations', cond.location, 'name') : '',
+    item: cond.item ? t(`item.${cond.item}`) : '',
+  });
 }
 
 export function describeEffects(list) {

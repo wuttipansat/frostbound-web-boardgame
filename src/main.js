@@ -6,8 +6,10 @@ import { createPieces } from './render/pieces.js';
 import { createDiceTray } from './render/dice.js';
 import { Tweens } from './render/tween.js';
 import { createApp } from './ui/app.js';
-import { c } from './i18n/index.js';
+import { c, t as tr } from './i18n/index.js';
 import { LOCATION_IDS } from './core/constants.js';
+import { ITEMS } from './content/items.js';
+import { tryReduce } from './core/reducer.js';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -45,8 +47,26 @@ function refreshLabels(state) {
 
 // ---------------------------------------------------------------- app
 
+// ---------------------------------------------------------------- exposure popups
+
+const FX_ICON = { blank: '✓', wound: '🩸', frostbite: '❄', bite: '☠' };
+const popups = [];
+function exposureFx(survivorId, face) {
+  const obj = pieces.survivorObject(survivorId);
+  const fallback = obj ? obj.position.clone() : new THREE.Vector3();
+  // The die tumbles in the tray first; the verdict then floats up over the survivor.
+  diceTray.rollExposure(face).then(() => {
+    const el = document.createElement('div');
+    el.className = `fx-pop f-${face}`;
+    el.textContent = `${FX_ICON[face]} ${c('survivors', survivorId, 'name')} · ${tr(`fx.${face}`)}`;
+    $('fx-layer').appendChild(el);
+    popups.push({ el, obj, fallback, ttl: 2.6 });
+  });
+}
+
 const app = createApp({
   board, pieces, diceTray,
+  fx: { exposure: exposureFx },
   dom: {
     topbar: $('topbar'), log: $('log'), loc: $('locpanel'), player: $('player'), modal: $('modal'), toasts: $('toasts'),
     playerRefs: { head: $('pp-head'), survivors: $('pp-survivors'), chips: $('pp-chips'), hand: $('pp-hand'), actions: $('pp-actions') },
@@ -66,6 +86,17 @@ stage.onFrame((t, dt) => {
 });
 
 const v = new THREE.Vector3();
+stage.onFrame((_t, dt) => {
+  const { clientWidth: cw, clientHeight: ch } = stage.renderer.domElement;
+  for (let i = popups.length - 1; i >= 0; i--) {
+    const p = popups[i];
+    if ((p.ttl -= dt) <= 0) { p.el.remove(); popups.splice(i, 1); continue; }
+    const pos = p.obj?.parent ? p.obj.position : p.fallback;
+    v.copy(pos).setY(3.1).project(stage.camera);
+    p.el.style.left = `${((v.x + 1) / 2) * cw}px`;
+    p.el.style.top = `${((1 - v.y) / 2) * ch}px`;
+  }
+});
 stage.onFrame(() => {
   const { clientWidth: w, clientHeight: h } = stage.renderer.domElement;
   for (const id of LOCATION_IDS) {
@@ -109,4 +140,4 @@ if (params.get('play')) {
     seed: Number(params.get('seed') ?? 1), lang: params.get('lang') ?? undefined,
   });
 }
-window.__frostbound = { stage, board, pieces, diceTray, tweens, app };
+window.__frostbound = { stage, board, pieces, diceTray, tweens, app, tryReduce, itemType: (defId) => ITEMS[defId]?.type };

@@ -82,3 +82,11 @@ export function cardOptions(state, playerId, uid, { survivorId = null, dieIndex 
 export function endTurnOption(state, playerId) {
   return check(state, act.endTurn(playerId));
 }
+
+/** Players this player may call an exile vote on right now (empty if a vote can't be called). */
+export function voteTargets(state, playerId) {
+  return state.players
+    .filter((p) => p.id !== playerId)
+    .filter((p) => tryReduce(state, act.callVote(playerId, p.id)).ok)
+    .map((p) => p.id);
+}

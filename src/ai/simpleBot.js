@@ -57,8 +57,14 @@ export function botAction(s, playerId, opts = {}) {
       return act.resolveCrossroads(playerId, choice);
     }
     case PHASES.VOTE: {
-      // Loyal bots vote yes only against a player who has visibly hurt crises (not tracked here): default no.
-      const yes = opts.chaos ? opts.random() < 0.5 : isBetrayer;
+      let yes;
+      if (opts.chaos) yes = opts.random() < 0.5;
+      else if (isBetrayer) yes = true; // any exile weakens the colony
+      else {
+        // Loyal bots read the public record: who keeps feeding cards into crises that then fail?
+        const sus = suspicion(s)[s.vote.targetId] ?? 0;
+        yes = sus >= 2 || (sus >= 1 && s.morale <= 4) || opts.random() < 0.15;
+      }
       return act.castVote(playerId, yes);
     }
     case PHASES.TURN:
@@ -66,6 +72,23 @@ export function botAction(s, playerId, opts = {}) {
     default:
       return null;
   }
+}
+
+/**
+ * Public suspicion score per player: contributions made in rounds whose crisis failed,
+ * minus those in rounds whose crisis succeeded. Uses only information every player can see.
+ */
+export function suspicion(s) {
+  const score = {};
+  let round = {};
+  for (const e of s.log) {
+    if (e.k === 'contribute') round[e.playerId] = (round[e.playerId] ?? 0) + 1;
+    if (e.k === 'crisisResolved') {
+      for (const [pid, n] of Object.entries(round)) score[pid] = (score[pid] ?? 0) + (e.success ? -n : n);
+      round = {};
+    }
+  }
+  return score;
 }
 
 function turnAction(s, p, isBetrayer, opts) {

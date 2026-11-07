@@ -2,7 +2,7 @@
 // Renders only while something moves, so it costs nothing when idle.
 import * as THREE from 'three';
 import { MATERIALS } from './voxel.js';
-import { dieModel, DIE_FACES, DIE_VOXELS } from './characters.js';
+import { dieModel, DIE_FACES, DIE_VOXELS, exposureDieModel, EXPOSURE_DIE_FACES } from './characters.js';
 import { Tweens, ease } from './tween.js';
 
 const DIE_SIZE = 1 / DIE_VOXELS; // the whole die is 1 world unit
@@ -22,6 +22,12 @@ export function valueFacingUp(quaternion) {
     if (!best || w.y > best.y) best = { v: Number(v), y: w.y };
   }
   return best.v;
+}
+
+/** Orientation that shows an exposure face on top (picks one of the duplicated faces for variety). */
+export function exposureUpQuaternion(face, alt = false) {
+  const key = alt && EXPOSURE_DIE_FACES[`${face}2`] ? `${face}2` : face;
+  return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(...EXPOSURE_DIE_FACES[key]), UP);
 }
 
 export function diceLayout(count, spacing = 1.35) {
@@ -51,6 +57,24 @@ export function createDiceTray(canvas) {
 
   const { lit } = dieModel().buildGeometries({ size: DIE_SIZE });
   lit.translate(0, -0.5, 0); // centre the cube on its origin so it spins around the middle
+  const expoGeo = exposureDieModel().buildGeometries({ size: DIE_SIZE });
+  expoGeo.lit.translate(0, -0.5, 0);
+  expoGeo.glow?.translate(0, -0.5, 0);
+  const expo = new THREE.Group();
+  const expoMat = MATERIALS.lit.clone();
+  expoMat.transparent = true;
+  const expoMesh = new THREE.Mesh(expoGeo.lit, expoMat);
+  expoMesh.castShadow = true;
+  expo.add(expoMesh);
+  if (expoGeo.glow) {
+    const gm = MATERIALS.glow.clone();
+    gm.transparent = true;
+    expo.add(new THREE.Mesh(expoGeo.glow, gm));
+  }
+  expo.visible = false;
+  scene.add(expo);
+  const expoQueue = [];
+  let expoRunning = false;
   const tweens = new Tweens();
   let dice = []; // { mesh, value, used }
   let currentKey = null;
@@ -147,7 +171,54 @@ export function createDiceTray(canvas) {
     return rolled;
   }
 
+  /** Throw the exposure die so it lands on `face`. Queued if one is already rolling. Resolves when shown. */
+  function rollExposure(face) {
+    return new Promise((resolve) => {
+      expoQueue.push({ face, resolve });
+      if (!expoRunning) nextExposure();
+    });
+  }
+
+  function setExpoOpacity(o) {
+    for (const m of expo.children) m.material.opacity = o;
+  }
+
+  function nextExposure() {
+    const job = expoQueue.shift();
+    if (!job) { expoRunning = false; return; }
+    expoRunning = true;
+    // Land in the middle of the tray, in front of the player's dice, so nothing hides it.
+    const x = 0;
+    const z = 0.6;
+    const final = new THREE.Quaternion().setFromAxisAngle(UP, (Math.random() - 0.5) * 0.4)
+      .multiply(exposureUpQuaternion(job.face, Math.random() < 0.5));
+    const axis = new THREE.Vector3(Math.random() - 0.5, 1, Math.random() - 0.5).normalize();
+    const spin = Math.PI * 2 * (2.5 + Math.random());
+    const from = new THREE.Vector3(x + 3, 3.5, z - 2);
+    const q = new THREE.Quaternion();
+    expo.visible = true;
+    setExpoOpacity(1);
+    expo.scale.setScalar(1.15);
+    tweens.add({
+      duration: 1.0, ease: ease.linear,
+      onUpdate: (_e, t) => {
+        const k = ease.outCubic(t);
+        expo.position.set(from.x + (x - from.x) * k, 0.575 + (1 - ease.outBounce(t)) * 3, from.z + (z - from.z) * k);
+        q.setFromAxisAngle(axis, spin * (1 - ease.outCubic(t)));
+        expo.quaternion.copy(final).multiply(q);
+      },
+      onComplete: () => job.resolve(job.face),
+    })
+      .then(() => tweens.add({ duration: 0.5, delay: 1.1, onUpdate: (e) => setExpoOpacity(1 - e) }))
+      .then(() => { expo.visible = false; nextExposure(); });
+    kick();
+  }
+
   window.addEventListener('resize', resize);
   resize();
-  return { sync, get busy() { return tweens.busy; }, values: () => dice.map((d) => valueFacingUp(d.mesh.quaternion)) };
+  return {
+    sync,
+    rollExposure,
+    get exposureBusy() { return expoRunning; },
+    get busy() { return tweens.busy; }, values: () => dice.map((d) => valueFacingUp(d.mesh.quaternion)) };
 }

@@ -3,7 +3,7 @@ import { h, mount, ITEM_ICON, DIE_GLYPH, hex } from '../dom.js';
 import { t, c } from '../../i18n/index.js';
 import { getPlayer, aliveSurvivorsOf, survivorDef, itemOf, woundLimit, objectiveDef } from '../../core/selectors.js';
 import { PLAYER_COLORS } from '../../render/pieces.js';
-import { cardOptions, endTurnOption } from '../options.js';
+import { cardOptions, endTurnOption, voteTargets } from '../options.js';
 import * as act from '../../core/actions.js';
 
 /**
@@ -115,6 +115,7 @@ export function renderPlayerPanel(refs, ctx) {
       oncontextmenu: (ev) => ev.preventDefault(),
     }, `🔒 ${t('panel.objectiveShort')}`) : null,
     isActor ? h('button', { class: 'btn ghost', onclick: () => ctx.set({ modal: 'request' }) }, `🤝 ${t('panel.request')}`) : null,
+    isActor && voteTargets(s, shown.id).length ? h('button', { class: 'btn ghost', onclick: () => ctx.set({ modal: 'callVote', voteTarget: null }) }, `⚖ ${t('vote.call')}`) : null,
     isActor ? h('button', {
       class: 'btn primary', disabled: !end.ok, onclick: () => ctx.dispatch(act.endTurn(shown.id)),
     }, t('panel.endTurn')) : null,
