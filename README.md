@@ -3,25 +3,32 @@
 An original, semi-cooperative survival board game set in a frozen zombie apocalypse, built for the browser with a 3D voxel look (Three.js).
 2–5 players play hot-seat, with optional bots for empty seats.
 
-> **Status: steps 1–2 of 6 are done.** The rules engine, content and tests are in place, and the voxel board (camera, lighting, snow, the colony and all six locations) renders in the browser. Survivor and zombie models come next.
+> **Status: steps 1–3 of 6 are done.** The rules engine, the voxel board, and animated voxel survivors, zombies and dice are in place. The demo page plays a real game with bots so you can watch everything move. The playable UI comes in step 4.
 
-![FROSTBOUND voxel board](docs/screenshots/board-overview.jpg)
+![FROSTBOUND voxel board with pieces](docs/screenshots/board-overview.jpg)
 
-| Colony close-up | Location panel | Phone |
+| All 20 survivors + zombies | Around the campfire | Colony phase: zombies rise, barricades break |
 |---|---|---|
-| ![colony](docs/screenshots/colony-closeup.jpg) | ![library](docs/screenshots/location-panel.jpg) | ![mobile](docs/screenshots/mobile.jpg) |
+| ![characters](docs/screenshots/characters.jpg) | ![colony](docs/screenshots/pieces-closeup.jpg) | ![rising](docs/screenshots/zombies-rising.jpg) |
+
+| Location panel | Phone |
+|---|---|
+| ![library](docs/screenshots/location-panel.jpg) | ![mobile](docs/screenshots/mobile.jpg) |
 
 ## Running
 
 ```bash
 npm install
-npm run dev           # http://localhost:5173: drag to orbit, right-drag to pan, scroll to zoom, click a location
+npm run dev           # http://localhost:5173: bots auto-play; drag to orbit, right-drag to pan, scroll to zoom, click a location
 npm test              # rules + render-helper tests, including ~130 full bot games checked after every action
 npm run build         # static bundle in dist/
 npm run balance       # bot-vs-bot outcome table per scenario and player count
 ```
 
-Use Node 20 or later. URL options for framing: `?focus=colony&zoom=2.5&azimuth=-30&select=police&snow=0`.
+Use Node 20 or later. URL options:
+- framing: `?focus=colony&zoom=2.5&azimuth=-30&select=police&snow=0`
+- demo: `?autoplay=0` (start paused), `?advance=40` (skip ahead N bot actions), `?seed=3`, `?scenario=beacon`
+- `?lineup`: every survivor and zombie variant side by side
 
 ## Architecture
 
@@ -52,8 +59,14 @@ src/
     buildings.js        voxel designs: colony, 6 locations, pine, rock
     board.js            plateau terrain, roads, layout + slot anchors, instanced trees/slots, pick targets, warm lights
     stage.js            renderer, orthographic orbit camera with limits, moonlight + shadows, exp fog, snowfall
+    characters.js       20 survivor looks (hats, gear, build), 3 hunched zombie variants, d6 die, barricade
+    pieces.js           PieceManager: diffs GameState -> hop / pop-in / topple survivors; zombies rise, shuffle and sink;
+                        barricades; snow-puff particles (zombies + barricades + puffs are instanced)
+    dice.js             dice tray on its own small canvas; dice tumble and settle on the rolled face; used dice dim
+    tween.js            frame-driven tween engine + easings
   ui/style.css          frosted-glass overlay
-  main.js               boots the stage and board, and shows location details from a demo GameState
+  ui/logText.js         temporary English event text for the demo ticker
+  main.js               boots stage/board/pieces/dice; bots play a seeded demo game with Auto-play / Step / New game
 index.html
 tests/                  node:test suites (rules + headless render helpers)
 ```
@@ -63,7 +76,11 @@ Later steps add `src/ui/` panels and `src/i18n/` (EN/TH).
 ### Rendering notes
 - **Models:** every model is built from voxels in code; there are no asset files. Each building merges into one mesh with hidden faces culled. Glowing voxels (windows, fire, signs) go into an unlit mesh that ignores fog.
 - **Instancing:** trees, rocks and slot markers are `InstancedMesh`es. The whole board renders in about 29 draw calls and about 105k triangles.
-- **Layout data:** `computeLayout()` gives each location its centre, facing, label anchor, and world positions for every survivor and zombie slot. Step 3 places models on these anchors.
+- **Layout data:** `computeLayout()` gives each location its centre, facing, label anchor, and world positions for every survivor and zombie slot.
+- **State-driven animation:** the renderer never decides what happens. `pieces.sync(state)` compares the new state with what's on screen and animates the difference:
+  - Survivors keep their slot when possible and hop along a route through the nearest colony gate.
+  - Zombies fill colony gates round-robin, and barricades fill slots from the far end so the two never overlap.
+  - `pieces.busy` tells the game loop when it's safe to show the next action.
 The UI only *reads* state through selectors and `viewFor`, and only *changes* it by dispatching actions to `reduce`.
 Because of that, networking or saving to localStorage only needs `serialize`/`deserialize` plus the action stream.
 

@@ -254,12 +254,12 @@ export function colony(radius = 18) {
   m.box(-11, 0, 10, 1, 1, 1, P.woodLight); m.box(-9, 0, 10, 1, 2, 1, P.woodLight);
   for (const [x, z] of [[-5, 8], [-5, 10], [-4, 9]]) m.box(x, 0, z, 1, 2, 1, 0x8a5a2b);
   m.box(-6, 0, 12, 2, 1, 1, 0xc9b38a);
-  // Watchtower
-  for (const [x, z] of [[8, 7], [11, 7], [8, 10], [11, 10]]) m.box(x, 0, z, 1, 8, 1, P.woodDark);
-  m.box(7, 8, 6, 6, 1, 6, P.wood);
-  m.walls(7, 9, 6, 6, 1, 6, P.woodLight);
-  m.box(8, 12, 7, 4, 1, 4, P.woodDark);
-  m.set(9, 9, 6, P.fire, true); // lantern
+  // Watchtower: on the far (north-west) side so it never hides the campfire from the default camera.
+  for (const [x, z] of [[-15, -5], [-12, -5], [-15, -2], [-12, -2]]) m.box(x, 0, z, 1, 8, 1, P.woodDark);
+  m.box(-16, 8, -6, 6, 1, 6, P.wood);
+  m.walls(-16, 9, -6, 6, 1, 6, P.woodLight);
+  m.box(-15, 12, -5, 4, 1, 4, P.woodDark);
+  m.set(-11, 9, -4, P.fire, true); // lantern facing the fire
   // Tents
   for (const [x, z, c] of [[-2, -14, 0x5b6f8a], [2, 12, 0x7a5b4a]]) {
     m.box(x - 2, 0, z, 5, 1, 3, c); m.box(x - 1, 1, z, 3, 1, 3, c); m.box(x, 2, z, 1, 1, 3, c);

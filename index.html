@@ -13,8 +13,21 @@
   <div id="labels" aria-hidden="true"></div>
   <header class="brand panel">
     <h1>FROSTBOUND</h1>
-    <p>Step 2 · voxel board preview</p>
+    <p>Step 3 · pieces &amp; animation demo</p>
   </header>
+  <section id="turn" class="panel" aria-live="polite">
+    <div class="turn-line"><span id="turn-text">Setting up…</span></div>
+    <div id="ticker"></div>
+    <div class="controls">
+      <button id="btn-play" type="button">▶ Auto-play</button>
+      <button id="btn-step" type="button">Step</button>
+      <button id="btn-new" type="button">New game</button>
+    </div>
+  </section>
+  <section id="dice-panel" class="panel">
+    <div class="dice-title"><span id="dice-owner">Dice</span><button id="btn-roll" type="button" title="Re-roll for show">🎲</button></div>
+    <canvas id="dice"></canvas>
+  </section>
   <aside id="info" class="panel hidden" aria-live="polite"></aside>
   <footer class="hint panel"><span class="mouse">Drag to orbit · Right-drag to pan · Scroll to zoom · Click a location</span><span class="touch">Drag to orbit · Two fingers to pan &amp; zoom · Tap a location</span></footer>
   <script type="module" src="/src/main.js"></script>
