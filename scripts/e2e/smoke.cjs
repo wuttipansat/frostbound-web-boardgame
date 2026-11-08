@@ -53,10 +53,10 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
       await click('.dialog.colony .btn.primary, .dialog.vote-result .btn.primary, .dialog.cross-result .btn.primary'); counts.colony++; continue;
     }
     if (await page.locator('.backdrop.pass').count()) { await click('.backdrop.pass'); counts.pass++; continue; }
-    if (await page.locator('.draft-card').count()) {
-      const cards = page.locator('.draft-card');
+    if (await page.locator('.draft-screen .sv-pick').count()) {
+      const cards = page.locator('.draft-screen .sv-pick');
       if (VP.hasTouch) { await cards.nth(0).tap(); await cards.nth(2).tap(); } else { await cards.nth(0).click(); await cards.nth(2).click(); }
-      await click('.dialog .btn.primary'); counts.draft++; continue;
+      await click('.draft-actions .btn.primary'); counts.draft++; continue;
     }
     if (await page.locator('.dialog.confirm-end').count()) { await click('.dialog.confirm-end .btn.primary'); counts.confirm++; continue; }
     if (await page.locator('.backdrop.incoming').count()) { await click('.backdrop.incoming .btn.ghost'); counts.incoming++; continue; }

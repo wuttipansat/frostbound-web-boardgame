@@ -89,3 +89,21 @@ test('log diffing finds the new entries, even when the log is capped', () => {
   assert.deepEqual(newLogEntries([{ k: 1 }, { k: 2 }, { k: 3 }], [{ k: 2 }, { k: 3 }, { k: 4 }]), [{ k: 4 }]);
   assert.deepEqual(newLogEntries([], [{ k: 1 }]), [{ k: 1 }]);
 });
+
+test('draft: both players pick at once, in any order, and nobody sees the other picks until everyone is done', () => {
+  const r = room(2);
+  r.join('Ana'); r.join('Ben'); r.start(0);
+  const opts = (seat) => r.state.players[seat].draftOptions.slice(0, 2);
+  const benPicks = opts(1);
+  // Ben (seat 1) picks first: no waiting for Ana's turn.
+  assert.ok(r.act(1, A.draftPick('p1', benPicks)).ok);
+  const anaView = r.view(0);
+  assert.equal(anaView.phase, 'draft');
+  assert.equal(anaView.players[1].drafted, true, 'Ana sees THAT Ben has picked');
+  assert.deepEqual(anaView.players[1].survivors, [], '…but not whom');
+  assert.ok(!JSON.stringify(anaView).includes(benPicks[0]) || anaView.players[0].draftOptions.includes(benPicks[0]), 'Ben\'s pick is nowhere in Ana\'s view');
+  assert.ok(r.act(0, A.draftPick('p0', opts(0))).ok);
+  const after = r.view(0);
+  assert.notEqual(after.phase, 'draft');
+  assert.deepEqual(after.players[1].survivors, benPicks, 'revealed once everyone is done');
+});

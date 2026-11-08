@@ -8,7 +8,7 @@ import { CRISES_BY_ID } from '../../content/crises.js';
 import { voteTargets } from '../options.js';
 import { CROSSROADS_BY_ID } from '../../content/crossroads.js';
 import { ITEM_TYPES, RULES } from '../../core/constants.js';
-import { getPlayer, survivorDef, itemOf, objectiveDef } from '../../core/selectors.js';
+import { getPlayer, survivorDef, itemOf, objectiveDef, woundLimit } from '../../core/selectors.js';
 import { PLAYER_COLORS } from '../../render/pieces.js';
 import * as act from '../../core/actions.js';
 
@@ -18,73 +18,100 @@ function dialog(cls, ...children) {
 
 // ---------------------------------------------------------------- setup
 
+/** A scenario as a card: goal art, name, short goal, rounds / morale / difficulty; full text in the tooltip. */
+function scenarioCard(ctx, sc, { on = false, onclick = null } = {}) {
+  return h(onclick ? 'button' : 'div', {
+    class: `scenario-card diff-${sc.difficulty}${on ? ' on' : ''}`, 'aria-pressed': onclick ? String(on) : null,
+    tip: c('scenarios', sc.id, 'goalText'), dataset: { scenario: sc.id }, onclick,
+  },
+  h('span', { class: 'sc-art' }, sc.goal.type === 'kills' ? ctx.art.zombie(0, 'l', { alt: '' })
+    : ctx.art.item(sc.goal.type === 'deposit' ? 'jerry-can' : 'rice-sack', 'l', { alt: '' })),
+  h('b', {}, c('scenarios', sc.id, 'name')),
+  h('span', { class: 'sc-goal' }, c('scenarios', sc.id, 'goalText')),
+  h('span', { class: 'sc-meta' },
+    h('span', { class: `diff ${sc.difficulty}` }, t(`difficulty.${sc.difficulty}`)),
+    h('span', {}, icon('round'), sc.rounds),
+    h('span', {}, icon('morale'), sc.morale)));
+}
+
+/** New game: 1. mode, 2. scenario (cards), 3. players, 4. options (folded). The main button stays bottom right. */
 export function setupScreen(ctx) {
   const cfg = ctx.ui.setup;
   const update = (patch) => ctx.set({ setup: { ...cfg, ...patch } });
   const seats = cfg.seats.slice(0, cfg.count);
   const online = cfg.mode === 'online';
-  return h('div', { class: 'backdrop setup' }, h('div', { class: 'dialog panel wide' },
-    h('h1', { class: 'logo' }, 'FROSTBOUND'),
-    h('p', { class: 'tagline' }, t('app.tagline')),
-    ctx.hasSave && !online ? h('button', { class: 'btn primary wide', onclick: ctx.continueGame }, t('setup.continue')) : null,
-    h('div', { class: 'seg mode-seg', role: 'tablist' },
-      h('button', { class: online ? '' : 'on', role: 'tab', 'aria-selected': online ? 'false' : 'true', tip: t('tip.modeLocal'), onclick: () => update({ mode: 'local' }) }, t('setup.local')),
-      h('button', { class: online ? 'on' : '', role: 'tab', 'aria-selected': online ? 'true' : 'false', tip: t('tip.modeOnline'), onclick: () => update({ mode: 'online' }) }, t('setup.online'))),
-    online ? h('div', { class: 'join-row' },
-      h('input', {
-        class: 'code-input', value: cfg.joinCode ?? '', placeholder: t('online.codePh'), 'aria-label': t('online.code'), maxlength: 4,
-        oninput: (ev) => { cfg.joinCode = ev.target.value.toUpperCase(); ev.target.value = cfg.joinCode; },
-      }),
-      h('button', { class: 'btn', tip: t('tip.join'), onclick: () => (cfg.joinCode?.length === 4 ? ctx.joinRoom(cfg.joinCode) : null) }, t('online.join'))) : null,
-    h('h2', {}, online ? t('online.newRoom') : t('setup.title')),
-    h('div', { class: 'row' },
-      h('span', { class: 'lbl' }, t('setup.players')),
-      h('div', { class: 'seg' }, [2, 3, 4, 5].map((n) => h('button', { class: cfg.count === n ? 'on' : '', onclick: () => update({ count: n }) }, n)))),
-    h('div', { class: 'seats' }, seats.map((seat, i) => h('div', { class: 'seat' },
-      h('i', { class: 'dot', style: { background: hex(PLAYER_COLORS[i]) } }),
-      online && i > 0 ? h('span', { class: 'open-seat' }, seat.isAI ? t('online.botSeat') : t('online.openSeat')) : h('input', {
-        value: seat.name, 'aria-label': t('setup.name'), maxlength: 14,
-        oninput: (ev) => { cfg.seats[i] = { ...seat, name: ev.target.value }; },
-        onchange: () => update({ seats: [...cfg.seats] }),
-      }),
-      h('div', { class: 'seg small' },
-        h('button', { class: seat.isAI ? '' : 'on', onclick: () => { cfg.seats[i] = { ...seat, isAI: false }; update({ seats: [...cfg.seats] }); } }, t('setup.human')),
-        h('button', { class: seat.isAI ? 'on' : '', onclick: () => { cfg.seats[i] = { ...seat, isAI: true }; update({ seats: [...cfg.seats] }); } }, t('setup.ai')))))),
-    h('h3', {}, t('setup.scenario')),
-    h('div', { class: 'scenarios' }, SCENARIOS.map((sc) => h('button', {
-      class: `scenario${cfg.scenarioId === sc.id ? ' on' : ''}`, onclick: () => update({ scenarioId: sc.id }),
-    },
-    sc.goal.type === 'kills' ? ctx.art.zombie(0, 'l', { cls: 'goal-art', alt: '' })
-      : ctx.art.item(sc.goal.type === 'deposit' ? 'jerry-can' : 'rice-sack', 'l', { cls: 'goal-art', alt: '' }),
-    h('b', {}, c('scenarios', sc.id, 'name')),
-    h('small', { class: `diff ${sc.difficulty}` }, `${t(`difficulty.${sc.difficulty}`)} · ${t('setup.rounds', { n: sc.rounds })} · ${t('setup.morale', { n: sc.morale })}`),
-    h('span', {}, c('scenarios', sc.id, 'goalText'))))),
-    h('div', { class: 'row' },
-      h('span', { class: 'lbl' }, t('setup.betrayer')),
-      h('div', { class: 'seg small' }, ['maybe', 'always', 'never'].map((m) => h('button', { class: cfg.betrayer === m ? 'on' : '', onclick: () => update({ betrayer: m }) }, t(`setup.betrayer.${m}`))))),
-    settingsRows(ctx),
-    online ? null : h('div', { class: 'row' },
-      h('span', { class: 'lbl' }, t('setup.tutorial')),
-      h('div', { class: 'seg small' },
-        h('button', { class: ctx.ui.tutorial ? 'on' : '', onclick: () => ctx.setTutorial(true) }, t('settings.on')),
-        h('button', { class: ctx.ui.tutorial ? '' : 'on', onclick: () => ctx.setTutorial(false) }, t('settings.off')))),
-    online
-      ? h('button', { class: 'btn primary wide big', onclick: ctx.createRoom }, t('online.create'))
-      : h('button', { class: 'btn primary wide big', onclick: ctx.startGame }, t('setup.start'))));
+  const setSeat = (i, patch) => { cfg.seats[i] = { ...cfg.seats[i], ...patch }; update({ seats: [...cfg.seats] }); };
+  const join = () => (cfg.joinCode?.length === 4 ? ctx.joinRoom(cfg.joinCode) : null);
+  const step = (n, title, ...body) => h('section', { class: 'setup-step' }, h('h3', {}, h('i', { class: 'step-n' }, n), title), ...body);
+  return h('div', { class: 'backdrop setup' }, h('div', { class: 'dialog panel wide setup-v2' },
+    h('header', { class: 'setup-head' },
+      h('h1', { class: 'logo' }, 'FROSTBOUND'),
+      h('p', { class: 'tagline' }, t('app.tagline'))),
+    step(1, t('setup.modeTitle'),
+      h('div', { class: 'mode-cards', role: 'radiogroup' }, ['local', 'online'].map((m) => h('button', {
+        class: `mode-card${(online ? 'online' : 'local') === m ? ' on' : ''}`, role: 'radio', 'aria-checked': String((online ? 'online' : 'local') === m),
+        dataset: { mode: m }, onclick: () => update({ mode: m }),
+      }, icon(m === 'local' ? 'person' : 'request'), h('b', {}, t(`setup.${m}`)), h('small', {}, t(m === 'local' ? 'tip.modeLocal' : 'tip.modeOnline'))))),
+      online ? h('div', { class: 'join-box' },
+        h('span', { class: 'lbl' }, t('setup.joinTitle')),
+        h('input', {
+          class: 'code-input big', value: cfg.joinCode ?? '', placeholder: t('online.codePh'), 'aria-label': t('online.code'), maxlength: 4, autocomplete: 'off',
+          oninput: (ev) => { cfg.joinCode = ev.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4); ev.target.value = cfg.joinCode; },
+          onkeydown: (ev) => { if (ev.key === 'Enter') join(); },
+        }),
+        h('button', { class: 'btn', tip: t('tip.join'), onclick: join }, t('online.join'))) : null),
+    step(2, t('setup.scenario'),
+      h('div', { class: 'scenario-cards' }, SCENARIOS.map((sc) => scenarioCard(ctx, sc, { on: cfg.scenarioId === sc.id, onclick: () => update({ scenarioId: sc.id }) })))),
+    step(3, online ? t('online.newRoom') : t('setup.players'),
+      h('div', { class: 'seg count-seg', 'aria-label': t('setup.players') }, [2, 3, 4, 5].map((n) => h('button', { class: cfg.count === n ? 'on' : '', onclick: () => update({ count: n }) }, n))),
+      h('div', { class: 'seats' }, seats.map((seat, i) => h('div', { class: 'seat' },
+        h('i', { class: 'dot', style: { background: hex(PLAYER_COLORS[i]) } }),
+        online && i > 0 ? h('span', { class: 'open-seat' }, seat.isAI ? t('online.botSeat') : t('online.openSeat')) : h('input', {
+          value: seat.name, 'aria-label': t('setup.name'), maxlength: 14,
+          oninput: (ev) => { cfg.seats[i] = { ...seat, name: ev.target.value }; },
+          onchange: () => update({ seats: [...cfg.seats] }),
+        }),
+        online && i === 0 ? null : h('div', { class: 'seg small' },
+          h('button', { class: seat.isAI ? '' : 'on', onclick: () => setSeat(i, { isAI: false }) }, online ? t('online.openSeat') : t('setup.human')),
+          h('button', { class: seat.isAI ? 'on' : '', onclick: () => setSeat(i, { isAI: true }) }, t('setup.ai'))))))),
+    h('details', { class: 'setup-more' },
+      h('summary', {}, t('setup.more')),
+      h('div', { class: 'row' },
+        h('span', { class: 'lbl' }, t('setup.betrayer')),
+        h('div', { class: 'seg small' }, ['maybe', 'always', 'never'].map((m) => h('button', { class: cfg.betrayer === m ? 'on' : '', onclick: () => update({ betrayer: m }) }, t(`setup.betrayer.${m}`))))),
+      online ? null : h('div', { class: 'row' },
+        h('span', { class: 'lbl' }, t('setup.tutorial')),
+        h('div', { class: 'seg small' },
+          h('button', { class: ctx.ui.tutorial ? 'on' : '', onclick: () => ctx.setTutorial(true) }, t('settings.on')),
+          h('button', { class: ctx.ui.tutorial ? '' : 'on', onclick: () => ctx.setTutorial(false) }, t('settings.off')))),
+      settingsRows(ctx)),
+    h('footer', { class: 'setup-actions' },
+      ctx.hasSave && !online ? h('button', { class: 'btn ghost', onclick: ctx.continueGame }, t('setup.continue')) : null,
+      online
+        ? h('button', { class: 'btn primary big', onclick: ctx.createRoom }, t('online.create'))
+        : h('button', { class: 'btn primary big', onclick: ctx.startGame }, t('setup.start')))));
 }
 
-/** Online lobby: the room code to share, who has joined, and Start for the host. */
+/** Online lobby: the scenario, the room code (with Copy), seats as small cards, and Start for the host. */
 export function lobbyScreen(ctx) {
   const o = ctx.online;
   const lobby = o.lobby;
   const ready = lobby?.seats.every((x) => x.taken);
+  const sc = SCENARIOS.find((x) => x.id === lobby?.scenarioId);
+  const copy = (ev) => {
+    const btn = ev.currentTarget;
+    navigator.clipboard?.writeText(o.code).then(() => { btn.classList.add('done'); setTimeout(() => btn.classList.remove('done'), 1200); }, () => {});
+  };
   return h('div', { class: 'backdrop setup' }, h('div', { class: 'dialog panel lobby' },
     h('small', { class: 'kicker' }, t('online.room')),
-    h('div', { class: 'room-code', tip: t('tip.roomCode') }, o.code),
+    h('div', { class: 'code-row' },
+      h('div', { class: 'room-code', tip: t('tip.roomCode') }, o.code),
+      h('button', { class: 'icon-btn round copy', 'aria-label': t('online.copy'), tip: t('online.copy'), onclick: copy }, icon('check'))),
     h('p', { class: 'muted small' }, t('online.share')),
-    h('ul', { class: 'lobby-seats' }, (lobby?.seats ?? []).map((x) => h('li', { class: `${x.taken ? 'taken' : 'open'}${`p${x.seat}` === o.playerId ? ' me' : ''}` },
+    sc ? scenarioCard(ctx, sc) : null,
+    h('ul', { class: 'lobby-seats cards' }, (lobby?.seats ?? []).map((x) => h('li', { class: `${x.taken ? 'taken' : 'open'}${`p${x.seat}` === o.playerId ? ' me' : ''}`, style: { '--seat': hex(PLAYER_COLORS[x.seat]) } },
       h('i', { class: 'dot', style: { background: hex(PLAYER_COLORS[x.seat]) } }),
-      h('span', {}, x.isAI ? t('online.botSeat') : x.name ?? t('online.waiting')),
+      h('span', { class: 'who' }, x.isAI ? t('online.botSeat') : x.name ?? t('online.waiting')),
       `p${x.seat}` === o.playerId ? h('small', { class: 'tag' }, t('online.you')) : null,
       !x.isAI && x.taken && !x.connected ? h('small', { class: 'muted' }, t('online.away')) : null))),
     o.status !== 'open' ? h('p', { class: 'warn small' }, t('online.connecting')) : null,
@@ -145,32 +172,99 @@ export function passScreen(ctx, playerId) {
       h('p', { class: 'tap' }, t('pass.tap'))));
 }
 
+/** Who has picked so far: a dot, the name, picked ✓ / choosing… (never whom they picked). */
+function draftStatus(ctx) {
+  const s = ctx.state;
+  return h('ul', { class: 'draft-status', 'aria-live': 'polite' }, s.players.map((p, i) => h('li', { class: p.drafted ? 'done' : 'busy', dataset: { player: p.id } },
+    h('i', { class: 'dot', style: { background: hex(PLAYER_COLORS[i]) } }),
+    h('span', {}, p.name),
+    p.drafted ? h('small', {}, icon('check'), t('draft.picked')) : h('small', {}, icon('hourglass'), t('draft.choosing')))));
+}
+
+let dealtFor = null; // the draft the cards were dealt in for (deal once, not on every pick)
+
+/** One survivor as a separate vertical card. */
+function survivorCard(ctx, id, { order = 0, color = '#888', dim = false, pop = false, onclick } = {}) {
+  const d = survivorDef(id);
+  const hp = woundLimit(id);
+  return h('button', {
+    class: `sv-pick${order ? ' on' : ''}${dim ? ' dim' : ''}${pop ? ' pop' : ''}`, style: { '--accent': d.accent, '--glow': color },
+    'aria-pressed': order ? 'true' : 'false', dataset: { sv: id }, onclick,
+  },
+  order ? h('span', { class: 'order' }, order) : null,
+  h('span', { class: 'svp-art' }, ctx.art.portrait(id, 'l', { alt: '' })),
+  h('b', {}, d.name),
+  h('small', {}, c('survivors', id, 'occupation')),
+  h('span', { class: 'sv-stats' },
+    h('span', { class: 'need', tip: t('act.attack') }, icon('attack'), dieFace(d.attack, 'mini'), '+'),
+    h('span', { class: 'need', tip: t('act.search') }, icon('search'), dieFace(d.search, 'mini'), '+'),
+    h('span', { class: 'need', tip: t('draft.influence') }, icon('star'), d.influence),
+    h('span', { class: 'need', tip: t('draft.health') }, icon('heal'), hp)),
+  h('p', { class: 'svp-ability' }, c('survivors', id, 'abilityText')));
+}
+
+/** The chosen cards fly down to where the survivor tokens live. */
+function flyPicks() {
+  if (matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  for (const [k, el] of [...document.querySelectorAll('.sv-pick.on')].entries()) {
+    const r = el.getBoundingClientRect();
+    const g = el.cloneNode(true);
+    Object.assign(g.style, { position: 'fixed', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`, margin: 0, zIndex: 60, pointerEvents: 'none' });
+    document.body.append(g);
+    const dx = 40 + k * 64 - (r.left + r.width / 2);
+    const dy = innerHeight - 110 - (r.top + r.height / 2);
+    g.animate([{ transform: 'none', opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(0.22)`, opacity: 0.2 }], { duration: 600, easing: 'cubic-bezier(.5,0,.3,1)', delay: k * 80 })
+      .finished.then(() => g.remove(), () => g.remove());
+  }
+}
+
+/** Draft: the options as separate cards; pick two (order badges, player-colour glow), then recruit. */
 export function draftModal(ctx) {
-  const p = getPlayer(ctx.state, ctx.viewer);
+  const s = ctx.state;
+  const p = getPlayer(s, ctx.viewer);
+  const color = hex(PLAYER_COLORS[s.players.indexOf(p)]);
   const picks = ctx.ui.draftPicks ?? [];
   const need = RULES.SURVIVORS_PER_PLAYER - picks.length;
-  return dialog('draft',
-    h('h2', {}, t('draft.title', { name: p.name })),
-    h('div', { class: 'draft-grid' }, p.draftOptions.map((id) => {
-      const d = survivorDef(id);
-      const on = picks.includes(id);
-      return h('button', {
-        class: `draft-card${on ? ' on' : ''}`, style: { '--accent': d.accent },
-        onclick: () => ctx.set({ draftPicks: on ? picks.filter((x) => x !== id) : [...picks, id].slice(-RULES.SURVIVORS_PER_PLAYER) }),
-      },
-      ctx.art.portrait(id, 'l', { cls: 'draft-face', alt: '' }),
-      h('b', {}, d.name),
-      h('small', {}, c('survivors', id, 'occupation')),
-      h('div', { class: 'sv-stats' },
-        h('span', { class: 'need' }, icon('attack'), dieFace(d.attack, 'mini'), '+'),
-        h('span', { class: 'need' }, icon('search'), dieFace(d.search, 'mini'), '+'),
-        h('span', { class: 'need' }, icon('star'), d.influence)),
-      h('p', {}, c('survivors', id, 'abilityText')));
+  const dealKey = `${p.id}:${p.draftOptions.join()}`;
+  const deal = dealtFor !== dealKey;
+  dealtFor = dealKey;
+  return h('div', { class: `backdrop draft-screen${deal ? ' deal' : ''}`, role: 'dialog', 'aria-label': t('draft.title', { name: p.name }) },
+    h('h2', {}, h('i', { class: 'dot', style: { background: color } }), t('draft.title', { name: p.name })),
+    s.players.length > 1 ? draftStatus(ctx) : null,
+    h('div', { class: 'sv-pick-row' }, p.draftOptions.map((id, i) => {
+      const order = picks.indexOf(id) + 1;
+      const card = survivorCard(ctx, id, {
+        order, color, dim: !order && need === 0, pop: order && id === ctx.ui.draftLast,
+        onclick: () => ctx.set({ draftPicks: order ? picks.filter((x) => x !== id) : [...picks, id].slice(-RULES.SURVIVORS_PER_PLAYER), draftLast: order ? null : id }),
+      });
+      card.style.setProperty('--i', i);
+      return card;
     })),
-    h('button', {
-      class: 'btn primary wide', disabled: need > 0,
-      onclick: () => { if (ctx.dispatch(act.draftPick(p.id, picks))) ctx.set({ draftPicks: [] }); },
-    }, need > 0 ? t('draft.pick', { n: need }) : t('draft.confirm')));
+    h('div', { class: 'draft-actions' },
+      h('button', {
+        class: 'btn primary big', disabled: need > 0, 'data-autofocus': need === 0 ? '' : null,
+        onclick: () => { flyPicks(); if (ctx.dispatch(act.draftPick(p.id, picks))) ctx.set({ draftPicks: [], draftLast: null }); },
+      }, need > 0 ? t('draft.pick', { n: need }) : t('draft.confirm'))));
+}
+
+/** You have picked; others are still choosing. */
+export function draftWaitModal(ctx) {
+  const left = ctx.state.players.filter((p) => !p.drafted).length;
+  return h('div', { class: 'backdrop draft-screen wait', role: 'dialog', 'aria-label': t('draft.waitTitle') },
+    h('h2', {}, icon('hourglass'), t('draft.waitTitle')),
+    h('p', { class: 'muted' }, t('draft.waitText', { n: left })),
+    draftStatus(ctx));
+}
+
+/** Everyone has picked: all teams at once, briefly (auto-continues; click to skip). */
+export function teamsModal(ctx) {
+  const s = ctx.state;
+  return h('div', { class: 'backdrop teams-reveal', role: 'dialog', 'aria-label': t('draft.teams'), onclick: () => ctx.dismissQueue() },
+    h('h2', {}, t('draft.teams')),
+    h('div', { class: 'teams' }, s.players.map((p, i) => h('div', { class: 'team', style: { '--i': i, '--glow': hex(PLAYER_COLORS[i]) } },
+      h('span', { class: 'team-name' }, h('i', { class: 'dot', style: { background: hex(PLAYER_COLORS[i]) } }), p.name),
+      h('span', { class: 'team-faces' }, p.survivors.map((id) => ctx.art.portrait(id, 's', { alt: survivorDef(id).name, cls: 'team-face' })))))),
+    h('p', { class: 'muted small' }, t('draft.teamsSkip')));
 }
 
 export function crossroadsModal(ctx) {

@@ -22,7 +22,7 @@ const URL = `http://localhost:${PORT}/?snow=0`;
     await page.goto(URL, { waitUntil: 'networkidle' });
     // Two pages of software-rendered WebGL starve the CPU; the 3D view is not under test here.
     await page.evaluate(() => window.__frostbound.stage.stop());
-    await page.locator('.mode-seg button').nth(1).click(F).catch(async (e) => { await page.screenshot({ path: `${process.env.SHOT_DIR || '.'}/online-${name}.png` }); throw e; });
+    await page.locator('.mode-card[data-mode="online"]').click(F).catch(async (e) => { await page.screenshot({ path: `${process.env.SHOT_DIR || '.'}/online-${name}.png` }); throw e; });
     await page.locator('.seat input').first().fill(name, F);
     await page.locator('.seat input').first().dispatchEvent('change');
     return page;
@@ -36,9 +36,12 @@ const URL = `http://localhost:${PORT}/?snow=0`;
   const code = (await host.locator('.room-code').textContent()).trim(); console.log('room', code);
   const guest = await open('Guest');
   await guest.locator('.code-input').fill(code, F);
-  await guest.locator('.join-row .btn').click(F);
+  await guest.locator('.join-box .btn').click(F);
   await guest.locator('.lobby-seats li.me').waitFor();
   console.log('guest joined'); await host.locator('.lobby .btn.primary:not([disabled])').click(F); console.log('started');
+  // Step 16: both players see their draft at the same time (nobody waits for a turn to pick).
+  await Promise.all([host.locator('.draft-screen .sv-pick').first().waitFor(), guest.locator('.draft-screen .sv-pick').first().waitFor()]);
+  console.log('both drafting at once');
 
   const counts = { draft: 0, choice: 0, reveal: 0, end: 0, confirm: 0, colony: 0, incoming: 0, leakChecks: 0 };
   const leak = (page) => page.evaluate(() => {
@@ -62,10 +65,10 @@ const URL = `http://localhost:${PORT}/?snow=0`;
       await page.locator('.dialog.colony .btn.primary, .dialog.vote-result .btn.primary, .dialog.cross-result .btn.primary').first().click(F);
       counts[(await sel('.dialog.cross-result')) ? 'reveal' : 'colony']++; return true;
     }
-    if (await sel('.draft-card')) {
-      if (await sel('.draft-card.on')) return false; // already picked, waiting for others
-      await page.locator('.draft-card').nth(0).click(F); await page.locator('.draft-card').nth(1).click(F);
-      await page.locator('.dialog .btn.primary').click(F); counts.draft++; return true;
+    if (await sel('.draft-screen .sv-pick')) {
+      if (await sel('.draft-screen .sv-pick.on')) return false; // already picked, waiting for others
+      await page.locator('.draft-screen .sv-pick').nth(0).click(F); await page.locator('.draft-screen .sv-pick').nth(1).click(F);
+      await page.locator('.draft-actions .btn.primary').click(F); counts.draft++; return true;
     }
     if (await sel('.dialog.confirm-end')) { await page.locator('.dialog.confirm-end .btn.primary').click(F); counts.confirm++; return true; }
     if (await sel('.backdrop.incoming')) { await page.locator('.backdrop.incoming .btn.ghost').click(F); counts.incoming++; return true; }

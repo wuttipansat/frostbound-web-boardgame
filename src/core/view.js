@@ -13,6 +13,8 @@ export function viewFor(state, playerId) {
       p.objectiveId = null;
       p.draftOptions = [];
       p.pick = null;
+      // While drafting, others only learn THAT you have picked (drafted), not whom.
+      if (state.phase === PHASES.DRAFT) p.survivors = [];
     }
   }
   if (v.crisis) {

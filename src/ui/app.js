@@ -23,6 +23,7 @@ import { createDirector, eventsFromLog } from './director.js';
 import {
   setupScreen, settingsModal, passScreen, draftModal, crossroadsModal, requestModal,
   incomingRequestModal, voteModal, gameOverModal, toastLayer, colonyModal, voteResultModal, callVoteModal, confirmEndModal, pickModal, lobbyScreen, crossResultModal,
+  draftWaitModal, teamsModal,
 } from './views/modals.js';
 import { currentActor as actorOf, whoMustHold } from './seat.js';
 import { moveTargets, lureTargets, actingSurvivors } from './options.js';
@@ -163,6 +164,13 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
 
   function onLogEntry(e) {
     sound.play(soundForLog(e));
+    // Everyone's team is shown at once when the last player has picked.
+    // A timer, not frames: it must also move on in a background tab.
+    if (e.k === 'draftDone') {
+      const item = { type: 'teams' };
+      ui.queue.push(item);
+      setTimeout(() => { if (ui.queue[0] === item) dismissQueue(); }, 2600);
+    }
     if (e.k === 'crisisResolved' && state.reports.colony) ui.queue.push({ type: 'colony', report: structuredClone(state.reports.colony), morale: null });
     if (e.k === 'voteResult' && state.reports.vote) ui.queue.push({ type: 'vote', report: structuredClone(state.reports.vote) });
     // Everyone sees what was chosen and what it did (the chooser only saw the options).
@@ -220,6 +228,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
   // ---------------------------------------------------------------- actions from views
 
   function dismissQueue() {
+    queueTimer = 0;
     const was = ui.queue.shift();
     if (was?.type === 'colony') tutorialEvent('colonyDone');
     render();
@@ -415,6 +424,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     if (!state || ui.modal === 'settings') return;
     if (ui.queue.length) {
       // Reveal modals pause the game. With no humans at the table they dismiss themselves.
+      // Reveals wait for a human (or 6 s with no humans at the table). The team reveal has its own timer.
       if (!humans().length && (queueTimer += dt) > 6) { queueTimer = 0; dismissQueue(); }
       return;
     }
@@ -455,6 +465,8 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     dom.player.classList.remove('hidden');
     // While the device is being handed over, nothing private may be visible underneath.
     document.body.classList.toggle('passing', !!needsPass());
+    // While drafting, the draft cards own the screen (no HUD underneath).
+    document.body.classList.toggle('drafting', state.phase === PHASES.DRAFT);
     renderTopbar(dom.topbar, x);
     if (dom.phase) renderPhase(dom.phase, x);
     renderLog(dom.log, x);
@@ -501,13 +513,19 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     const q = ui.queue[0];
     if (q?.type === 'colony') return [`colony:${q.report.round}:${getLangKey()}`, () => colonyModal(x, q)];
     if (q?.type === 'cross') return [`cross:${state.log.length}:${q.cardId}:${getLangKey()}`, () => crossResultModal(x, q)];
+    if (q?.type === 'teams') return [`teams:${getLangKey()}`, () => teamsModal(x)];
     if (q?.type === 'vote') return [`vote:${state.log.length}:${getLangKey()}`, () => voteResultModal(x, q.report)];
     if (state.phase === PHASES.GAME_OVER) return [null, () => gameOverModal(x)];
     const pass = needsPass();
     if (pass) return [null, () => passScreen(x, pass)];
     const incoming = x.viewer && state.requests.find((r) => r.to === x.viewer);
     if (incoming) return [null, () => incomingRequestModal(x, incoming)];
-    if (state.phase === PHASES.DRAFT && x.viewer === x.actor && x.viewer) return [null, () => draftModal(x)];
+    if (state.phase === PHASES.DRAFT && x.viewer) {
+      // Online everyone drafts at once; hot seat goes one by one (the pass screen above hands over).
+      const me = getPlayer(state, x.viewer);
+      if (!me.drafted && (online || x.viewer === x.actor)) return [`draft:${x.viewer}:${(ui.draftPicks ?? []).join()}:${getLangKey()}`, () => draftModal(x)];
+      if (me.drafted) return [`draftWait:${state.players.map((p) => +p.drafted).join('')}:${getLangKey()}`, () => draftWaitModal(x)];
+    }
     if (state.phase === PHASES.CROSSROADS && x.viewer === x.actor && x.viewer) {
       return [`cross:${state.pendingCrossroads.cardId}:${state.round}:${state.activePlayerId}:${getLangKey()}`, () => crossroadsModal(x)];
     }
