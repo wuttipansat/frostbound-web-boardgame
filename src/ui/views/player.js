@@ -175,6 +175,8 @@ export function renderPlayerPanel(refs, ctx) {
     }, icon('lock'), h('span', {}, t('panel.objectiveShort')), h('small', {}, t('panel.hold'))) : null,
     isActor ? h('button', { class: 'menu-item', role: 'menuitem', onclick: () => ctx.set({ modal: 'request', moreOpen: false }) }, icon('request'), h('span', {}, t('panel.request'))) : null,
     canVote ? h('button', { class: 'menu-item', role: 'menuitem', onclick: () => ctx.set({ modal: 'callVote', voteTarget: null, moreOpen: false }) }, icon('vote'), h('span', {}, t('vote.call'))) : null,
+    // Quick rules are also here (on phones the top bar has no room for the ? button).
+    h('button', { class: 'menu-item rules-item', role: 'menuitem', onclick: () => ctx.set({ modal: 'rules', moreOpen: false }) }, icon('log'), h('span', {}, t('hud.rules'))),
   ].filter(Boolean);
   mount(refs.actions,
     menu.length ? h('button', {

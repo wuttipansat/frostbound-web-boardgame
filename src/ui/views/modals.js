@@ -253,6 +253,60 @@ export function draftModal(ctx) {
       }, need > 0 ? t('draft.pick', { n: need }) : t('draft.confirm'))));
 }
 
+// ---------------------------------------------------------------- step 19: secret objective reveal
+
+/** A press-and-hold button (1 s) so the reveal isn't dismissed by a stray tap. */
+function holdButton(label, onDone) {
+  let timer = null;
+  const start = (ev) => {
+    ev.preventDefault();
+    const b = ev.currentTarget;
+    b.classList.add('holding');
+    timer = setTimeout(() => { timer = null; b.classList.remove('holding'); onDone(); }, 1000);
+  };
+  const stop = (ev) => { clearTimeout(timer); timer = null; ev.currentTarget.classList.remove('holding'); };
+  return h('button', {
+    class: 'btn primary big hold-btn', onpointerdown: start, onpointerup: stop, onpointerleave: stop, onpointercancel: stop,
+    onkeydown: (ev) => { if ((ev.key === 'Enter' || ev.key === ' ') && !timer && !ev.repeat) start(ev); },
+    onkeyup: stop, oncontextmenu: (ev) => ev.preventDefault(),
+  }, h('span', { class: 'hold-fill', 'aria-hidden': 'true' }), h('span', { class: 'hold-label' }, label));
+}
+
+/** Your secret objective, face down: tap to flip, then hold "Got it". Nobody else sees it. */
+export function objectiveRevealModal(ctx) {
+  const p = getPlayer(ctx.state, ctx.viewer);
+  const obj = objectiveDef(p.objectiveId);
+  const bad = obj?.kind === 'betrayer';
+  const flipped = !!ctx.ui.objFlipped;
+  return h('div', { class: 'backdrop obj-reveal', role: 'dialog', 'aria-label': t('obj.title') },
+    h('h2', {}, t('obj.title', { name: p.name })),
+    ctx.ui.tutStep < 99 && ctx.ui.tutorial ? h('p', { class: 'muted obj-tut' }, t('obj.tut')) : null,
+    h('button', {
+      class: `obj-card${flipped ? ' flipped' : ''}${bad ? ' betrayer bloodied-card' : ' good'}`, 'aria-pressed': String(flipped),
+      'aria-label': flipped ? `${t(`kind.${obj.kind}`)}: ${c('objectives', obj.id, 'name')}` : t('obj.tap'),
+      onclick: () => !flipped && ctx.set({ objFlipped: true }),
+    },
+    h('span', { class: 'obj-inner' },
+      h('span', { class: 'obj-back' }, icon('lock'), h('b', {}, t('obj.secret')), h('small', {}, t('obj.tap'))),
+      h('span', { class: 'obj-front' },
+        h('small', { class: 'obj-kind' }, bad ? t('obj.betrayer') : t(`kind.${obj.kind}`)),
+        h('b', {}, c('objectives', obj.id, 'name')),
+        h('span', { class: 'obj-text' }, c('objectives', obj.id, 'text')),
+        h('span', { class: 'obj-foot' }, bad ? t('obj.badFoot') : t('obj.goodFoot'))))),
+    flipped ? holdButton(t('obj.gotIt'), () => ctx.markObjectiveSeen()) : h('p', { class: 'muted small' }, t('obj.private')));
+}
+
+/** Online: you've seen yours; who is still looking. */
+export function objectiveWaitModal(ctx) {
+  const seats = ctx.online?.lobby?.seats ?? [];
+  return h('div', { class: 'backdrop draft-screen wait obj-wait', role: 'dialog', 'aria-label': t('obj.waitTitle') },
+    h('h2', {}, icon('hourglass'), t('obj.waitTitle')),
+    h('ul', { class: 'draft-status' }, seats.map((x) => h('li', { class: x.seen ? 'done' : 'busy' },
+      h('i', { class: 'dot', style: { background: hex(PLAYER_COLORS[x.seat]) } }),
+      h('span', {}, x.isAI ? t('online.botSeat') : x.name),
+      x.seen ? h('small', {}, icon('check'), t('obj.seen')) : h('small', {}, icon('hourglass'), t('obj.looking'))))));
+}
+
 /** You have picked; others are still choosing. */
 export function draftWaitModal(ctx) {
   const left = ctx.state.players.filter((p) => !p.drafted).length;

@@ -70,6 +70,7 @@ test('a whole online game: two humans (driven by the bot logic) and a bot, to th
   const random = mulberry(5);
   let steps = 0;
   while (r.state.phase !== 'gameOver' && steps++ < 4000) {
+    if (r.state.phase !== 'draft') for (const seat of [0, 1]) r.markSeen(seat); // both looked at their objective
     if (r.nextBotAction()) { assert.ok(r.botStep(), 'bots always make progress'); continue; }
     const s = r.state;
     const req = s.requests.find((q) => !s.players.find((p) => p.id === q.to).isAI);
@@ -106,4 +107,27 @@ test('draft: both players pick at once, in any order, and nobody sees the other 
   const after = r.view(0);
   assert.notEqual(after.phase, 'draft');
   assert.deepEqual(after.players[1].survivors, benPicks, 'revealed once everyone is done');
+});
+
+test('after the draft, nothing moves until every human has read their secret objective', () => {
+  const r = room(3, [false, false, true]);
+  r.join('Ana'); r.join('Ben'); r.start(0);
+  for (const seat of [0, 1]) r.act(seat, A.draftPick(`p${seat}`, r.state.players[seat].draftOptions.slice(0, 2)));
+  while (r.state.phase === 'draft' && r.botStep()); // the bot drafts
+  assert.notEqual(r.state.phase, 'draft');
+  assert.equal(r.ready, false);
+  assert.equal(r.nextBotAction(), null, 'bots wait too');
+  const who = pendingActors(r.state)[0];
+  assert.equal(r.act(Number(who.slice(1)) < 2 ? Number(who.slice(1)) : 0, A.endTurn(who)).error, who === 'p2' ? 'notYourSeat' : 'waitingObjectives');
+  r.markSeen(0);
+  assert.equal(r.lobby().seats[0].seen, true);
+  assert.equal(r.lobby().seats[1].seen, false);
+  assert.equal(r.ready, false);
+  r.markSeen(1);
+  assert.equal(r.ready, true);
+  // Each view only carries its own objective.
+  const v = r.view(0);
+  assert.ok(v.players[0].objectiveId);
+  assert.equal(v.players[1].objectiveId, null);
+  assert.equal(v.players[2].objectiveId, null);
 });

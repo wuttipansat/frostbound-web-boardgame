@@ -1555,3 +1555,39 @@ body:not(.in-game) #hint, body.passing #hint, body.drafting #hint { display: non
 }
 @media (prefers-reduced-motion: reduce) { #hint, .btn.end-turn.nudge { animation: none; } }
 @media (max-width: 760px) { body.loc-open #hint { display: none; } }
+
+/* ================================================================ step 19: objective reveal, peek fix */
+/* the secret-objective peek floats above everything in the HUD (it was clipped by the hand / hint / edges) */
+.objective-peek { position: fixed; left: 50%; top: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%); width: min(320px, calc(100vw - 32px)); z-index: 40; }
+body.peeking #pp-actions { z-index: 30; }
+body.peeking #hint, body.peeking #tip { display: none !important; }
+
+.obj-reveal { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+.obj-reveal h2 { margin: 0; text-align: center; }
+.obj-tut { max-width: 420px; text-align: center; margin: -6px 0 0; }
+.obj-card { width: 240px; height: 340px; padding: 0; border: 0; background: none; cursor: pointer; perspective: 900px; }
+.obj-inner { position: relative; display: block; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.7s cubic-bezier(.2,.8,.2,1); }
+.obj-card.flipped .obj-inner { transform: rotateY(180deg); }
+.obj-back, .obj-front { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: var(--radius-card);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 18px; text-align: center; overflow: hidden; isolation: isolate;
+  box-shadow: 0 0 0 1px var(--frost-line), inset 0 1px 0 var(--frost-glint), 0 18px 36px rgba(0,0,0,0.55); }
+.obj-back { background: var(--rime-tl) left top / 120px no-repeat, var(--rime-br) right bottom / 120px no-repeat, repeating-linear-gradient(45deg, #2a2f33 0 8px, #24282b 8px 16px); color: var(--muted); }
+.obj-back .icon { width: 40px; height: 40px; color: var(--ice); }
+.obj-back b { font-family: var(--head); font-weight: 600; font-size: 20px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text); }
+.obj-front { transform: rotateY(180deg); color: var(--text); }
+.obj-card.good .obj-front { background: var(--rime-tl) left top / 120px no-repeat, var(--rime-br) right bottom / 120px no-repeat, linear-gradient(to bottom, #2b3a47, #1f2830); }
+.obj-card.betrayer .obj-front { background: var(--blood-tex) right -10px top -6px / 170px no-repeat, var(--blood-drip) left 18px top / 54px no-repeat, linear-gradient(to bottom, #3a1715, #200d0c);
+  box-shadow: 0 0 0 1px #7a2a22, 0 0 32px rgba(160, 30, 20, 0.45), 0 18px 36px rgba(0,0,0,0.6); }
+.obj-kind { font-family: var(--head); font-weight: 600; font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--good); }
+.obj-card.betrayer .obj-kind { font-size: 26px; color: #ff6a55; text-shadow: 0 0 14px rgba(255, 70, 50, 0.5); }
+.obj-front b { font-family: var(--head); font-weight: 600; font-size: 20px; }
+html[lang='th'] .obj-front b, html[lang='th'] .obj-back b { font-family: var(--font); font-weight: 700; }
+.obj-text { font-size: 13px; line-height: 1.45; color: #d8d2c4; }
+.obj-foot { margin-top: auto; font-size: 11.5px; color: var(--muted); }
+.hold-btn { position: relative; overflow: hidden; min-width: 220px; }
+.hold-btn .hold-fill { position: absolute; inset: 0; transform-origin: left; transform: scaleX(0); background: rgba(255,255,255,0.28); }
+.hold-btn.holding .hold-fill { transform: scaleX(1); transition: transform 1s linear; }
+.hold-btn .hold-label { position: relative; }
+@media (prefers-reduced-motion: reduce) { .obj-inner { transition: none; } }
+/* phones: the top bar grid has no slot for ?, the rules live in the ⋯ menu */
+@media (max-width: 760px) { #topbar .rules-btn { display: none; } }

@@ -81,6 +81,7 @@ export function connect({ url = socketUrl(), onMessage, onStatus = () => {} } = 
     join: (code, name) => send({ t: 'join', code, name }),
     start: () => send({ t: 'start' }),
     act: (action) => send({ t: 'act', action }),
+    seen: () => send({ t: 'seen' }),
     leave: () => { send({ t: 'leave' }); saveSession(null); },
     close: () => { closedByUser = true; ws?.close(); },
   };

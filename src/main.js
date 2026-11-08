@@ -17,6 +17,7 @@ import { sound } from './audio/sound.js';
 import { c, t as tr } from './i18n/index.js';
 import { LOCATION_IDS } from './core/constants.js';
 import { ITEMS } from './content/items.js';
+import { SECRET_OBJECTIVES } from './content/objectives.js';
 import { tryReduce } from './core/reducer.js';
 
 const params = new URLSearchParams(location.search);
@@ -321,4 +322,4 @@ if (params.get('play')) {
 window.addEventListener('pointerdown', () => sound.unlock());
 document.addEventListener('click', (ev) => { if (ev.target.closest?.('button')) sound.play('ui'); });
 
-window.__frostbound = { rig, stage, board, pieces, diceTray, tweens, app, art, tryReduce, itemType: (defId) => ITEMS[defId]?.type };
+window.__frostbound = { OBJECTIVES: SECRET_OBJECTIVES, rig, stage, board, pieces, diceTray, tweens, app, art, tryReduce, itemType: (defId) => ITEMS[defId]?.type };

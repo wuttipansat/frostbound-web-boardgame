@@ -84,6 +84,22 @@ function boxes() {
       }
       if (out) await p.screenshot({ path: `${out}/after-${name}-${state}.jpg`, type: 'jpeg', quality: 82 });
     }
+    // Step 19: the secret-objective peek is whole on screen and nothing covers it.
+    await p.evaluate(() => window.__frostbound.app.set({ peek: true, handCompact: false }));
+    await p.waitForTimeout(300);
+    const peek = await p.evaluate(() => {
+      const el = document.querySelector('.objective-peek');
+      if (!el) return 'missing';
+      const r = el.getBoundingClientRect();
+      if (r.left < 0 || r.top < 0 || r.right > innerWidth || r.bottom > innerHeight) return 'off screen';
+      for (const [x, y] of [[r.left + 6, r.top + 6], [r.right - 6, r.top + 6], [r.left + r.width / 2, r.top + r.height / 2], [r.left + 6, r.bottom - 6], [r.right - 6, r.bottom - 6]]) {
+        const hit = document.elementFromPoint(x, y);
+        if (!el.contains(hit)) return `covered by ${hit?.id || hit?.className}`;
+      }
+      return null;
+    });
+    if (peek) problems.push(`${name}: objective peek ${peek}`);
+    await p.evaluate(() => window.__frostbound.app.set({ peek: false }));
     const actions = await p.evaluate(() => document.querySelectorAll('#locpanel .btn.icon-act').length);
     if (actions < 5) problems.push(`${name}: only ${actions} icon actions in the location panel`);
     if (errors.length) problems.push(`${name}: page errors ${errors.join(' | ')}`);

@@ -32,6 +32,7 @@ const out = process.argv[2] || null;
         // Reveal dialogs (crossroads, colony) pause the bot: continue them. Never start a new game.
         document.querySelector('.dialog.cross-result .btn.primary, .dialog.colony .btn.primary')?.click();
         document.querySelector('button.choice:not([disabled])')?.click();
+        if (s.phase !== 'draft' && document.querySelector('.obj-reveal')) { a.markObjectiveSeen(); return null; }
         if (!endedTurn && s.phase === 'turn' && s.activePlayerId === 'p0') { a.dispatch({ type: 'END_TURN', playerId: 'p0' }); return 'ended'; }
         return null;
       }, ended);

@@ -139,6 +139,13 @@ wss.on('connection', (ws) => {
         broadcastState(entry);
         return scheduleBots(entry);
       }
+      case 'seen': {
+        if (!entry) return;
+        const r = entry.room.markSeen(seat);
+        if (r.error) return undefined;
+        broadcastState(entry);
+        return scheduleBots(entry);
+      }
       case 'leave': {
         if (!entry) return;
         entry.room.leave(seat);

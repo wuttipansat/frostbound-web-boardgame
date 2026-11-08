@@ -18,7 +18,8 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
   const leaks = async () => page.evaluate(() => {
     const f = window.__frostbound; const a = f.app; const s = a.state;
     const out = [];
-    const passing = !!document.querySelector('.backdrop.pass');
+    // The pass screen and the secret-objective reveal both hide the HUD underneath.
+    const passing = !!document.querySelector('.backdrop.pass, .obj-reveal');
     if (passing && getComputedStyle(document.getElementById('player')).visibility !== 'hidden') out.push('player panel visible behind the pass screen');
     const shownUids = [...document.querySelectorAll('.item-card[data-uid]')].map((e) => e.dataset.uid);
     if (shownUids.length && !passing) {
@@ -61,6 +62,14 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
     if (await page.locator('.dialog.confirm-end').count()) { await click('.dialog.confirm-end .btn.primary'); counts.confirm++; continue; }
     if (await page.locator('.backdrop.incoming').count()) { await click('.backdrop.incoming .btn.ghost'); counts.incoming++; continue; }
     if (await page.locator('button.choice:not([disabled])').count()) { await click('button.choice:not([disabled])'); counts.choice++; continue; }
+    // Step 19: turn the secret objective over, then hold "Got it".
+    if (await page.locator('.obj-reveal .obj-card:not(.flipped)').count()) { await click('.obj-reveal .obj-card'); counts.objective = (counts.objective ?? 0) + 1; continue; }
+    if (await page.locator('.obj-reveal .hold-btn').count()) {
+      await page.locator('.obj-reveal .hold-btn').dispatchEvent('pointerdown');
+      await page.waitForTimeout(1150);
+      await page.locator('.obj-reveal .hold-btn').dispatchEvent('pointerup').catch(() => {});
+      continue;
+    }
     // Moving (step 15): tap a location, then one of your survivors' round faces by it.
     if (!counts.move && await page.locator('#pp-actions .btn.end-turn').count()) {
       const target = await page.evaluate(() => {
@@ -85,7 +94,7 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
       if (!target) continue;
     }
     // The hand (step 14): open the pile into a fan once, open a card's sheet, close it again.
-    if (!counts.fan && await page.locator('#pp-hand .pile-btn').count()) {
+    if (!counts.fan && await page.locator('body:not(.passing) #pp-hand .pile-btn').count()) {
       await click('#pp-hand .pile-btn'); await page.waitForTimeout(600);
       if (!(await page.locator('#pp-hand .hand-fan.fanned').count())) errors.push('the pile did not open into a fan');
       counts.fan = 1; continue;

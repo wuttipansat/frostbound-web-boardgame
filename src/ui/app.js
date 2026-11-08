@@ -24,7 +24,7 @@ import { createDirector, eventsFromLog } from './director.js';
 import {
   setupScreen, settingsModal, passScreen, draftModal, crossroadsModal, requestModal,
   incomingRequestModal, voteModal, gameOverModal, toastLayer, colonyModal, voteResultModal, callVoteModal, confirmEndModal, pickModal, lobbyScreen, crossResultModal,
-  draftWaitModal, teamsModal,
+  draftWaitModal, teamsModal, objectiveRevealModal, objectiveWaitModal,
 } from './views/modals.js';
 import { currentActor as actorOf, whoMustHold } from './seat.js';
 import { moveTargets, lureTargets, actingSurvivors } from './options.js';
@@ -69,6 +69,8 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     skipEndConfirm: false,
     moreOpen: false, // the "more actions" menu next to End turn
     // Hand shown as compact faces (remembered per device); phones and short screens start compact.
+    objSeen: [], // step 19: humans who have looked at their secret objective (this device)
+    objFlipped: false,
     hints: settings.hints ?? true, // step 18: next-move hint bar
     cameraFollow: settings.cameraFollow ?? 'others', // step 15: who the camera follows
     playSpeed: settings.playSpeed ?? 'normal',
@@ -101,15 +103,42 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     return seat;
   }
 
+  /** Step 19: after the draft, play waits until every human has looked at their secret objective. */
+  function objectivePending() {
+    if (!state || state.phase === PHASES.DRAFT || state.phase === PHASES.GAME_OVER) return null;
+    if (online) {
+      const seats = online.lobby?.seats ?? [];
+      const me = seats.find((x) => `p${x.seat}` === online.playerId);
+      return seats.some((x) => !x.seen) ? { me: me && !me.seen, seats } : null;
+    }
+    const h = humans().find((p) => !ui.objSeen.includes(p.id));
+    return h ? { playerId: h.id } : null;
+  }
+
+  function markObjectiveSeen() {
+    ui.objFlipped = false;
+    if (online) { online.client.seen(); render(); return; }
+    const v = viewerId();
+    if (v && !ui.objSeen.includes(v)) ui.objSeen = [...ui.objSeen, v];
+    render();
+  }
+
   /** Human who must take the device now (active player, a voter, or someone asked for an item). */
-  const needsPass = () => (online ? null : whoMustHold(state, { seat }));
+  const needsPass = () => {
+    if (online) return null;
+    // Hand the device to whoever still has to look at their objective (hot seat).
+    const pend = objectivePending();
+    if (pend && humans().length > 1) return seat !== pend.playerId ? pend.playerId : null;
+    return whoMustHold(state, { seat });
+  };
 
   function ctx() {
     const actor = currentActor();
     const viewer = viewerId();
     return {
       state, ui, actor, viewer, art,
-      canAct: !!viewer && viewer === actor && state?.phase === PHASES.TURN && !needsPass(),
+      canAct: !!viewer && viewer === actor && state?.phase === PHASES.TURN && !needsPass() && !objectivePending(),
+      markObjectiveSeen, objectivePending: objectivePending(),
       hasSave: !!storage.get(SAVE_KEY)?.state,
       online: online ? { code: online.code, lobby: online.lobby, playerId: online.playerId, status: online.status, host: online.playerId === 'p0' } : null,
       set, dispatch, dismissQueue, tutorialEvent, setTutorial, sfx: (name, delay) => sound.play(name, delay), selectSurvivor, selectLocation, takeSeat, startGame, continueGame, quitToSetup, setLanguage, setSound,
@@ -271,7 +300,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     aiRandom = mulberry((cfg.seed ?? Date.now()) >>> 0);
     seat = null;
     lastActive = null;
-    Object.assign(ui, { modal: null, selLoc: null, queue: [] });
+    Object.assign(ui, { modal: null, selLoc: null, queue: [], objSeen: [], objFlipped: false });
     tutPlayer = state.players.find((p) => !p.isAI)?.id ?? null;
     ui.tutStep = ui.tutorial && tutPlayer ? 0 : DONE;
     sound.unlock();
@@ -289,6 +318,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     ui.modal = null;
     ui.queue = [];
     ui.tutStep = DONE; // a resumed game skips the tutorial
+    ui.objSeen = state.phase === PHASES.DRAFT ? [] : state.players.map((p) => p.id); // already seen before the reload
     sound.setAmbient(true);
     afterChange({ animate: false });
   }
@@ -433,7 +463,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     }
     if (state.phase === PHASES.GAME_OVER || online) return;
     const actor = currentActor();
-    if (!actor || !getPlayer(state, actor).isAI) { aiTimer = 0; return; }
+    if (!actor || !getPlayer(state, actor).isAI || objectivePending()) { aiTimer = 0; return; }
     if (!aiFast) {
       // Let the table see each AI action land before the next one.
       // Wait for animations, but never forever: after 5 s the AI plays on regardless.
@@ -467,9 +497,10 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     }
     dom.player.classList.remove('hidden');
     // While the device is being handed over, nothing private may be visible underneath.
-    document.body.classList.toggle('passing', !!needsPass());
     // While drafting, the draft cards own the screen (no HUD underneath).
     document.body.classList.toggle('drafting', state.phase === PHASES.DRAFT);
+    document.body.classList.toggle('peeking', !!ui.peek);
+    document.body.classList.toggle('passing', !!needsPass() || !!objectivePending());
     renderTopbar(dom.topbar, x);
     if (dom.phase) renderPhase(dom.phase, x);
     renderLog(dom.log, x);
@@ -521,6 +552,12 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     if (q?.type === 'teams') return [`teams:${getLangKey()}`, () => teamsModal(x)];
     if (q?.type === 'vote') return [`vote:${state.log.length}:${getLangKey()}`, () => voteResultModal(x, q.report)];
     if (state.phase === PHASES.GAME_OVER) return [null, () => gameOverModal(x)];
+    const pend = objectivePending();
+    if (pend && !needsPass()) {
+      const mine = online ? pend.me : pend.playerId === x.viewer;
+      if (mine) return [`objective:${x.viewer}:${ui.objFlipped}:${getLangKey()}`, () => objectiveRevealModal(x)];
+      if (online) return [`objWait:${pend.seats.map((s) => +s.seen).join('')}:${getLangKey()}`, () => objectiveWaitModal(x)];
+    }
     const pass = needsPass();
     if (pass) return [null, () => passScreen(x, pass)];
     const incoming = x.viewer && state.requests.find((r) => r.to === x.viewer);
@@ -581,6 +618,8 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     state = next;
     seat = nextSeat;
     lastActive = null;
+    // A loaded state (tests, debugging) counts as already past the objective reveal.
+    ui.objSeen = next.phase === PHASES.DRAFT ? [] : next.players.map((p) => p.id);
     afterChange({ animate: false });
   }
 
@@ -614,6 +653,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
   return {
     get watching() { return director.watching; },
     sceneHold: (on) => director.setHold(on),
+    markObjectiveSeen,
     director,
     loadState, set, tutorialEvent, continueGame, tick, render, onBoardPick, quickStart, dispatch, get state() { return state; }, get ui() { return ui; }, takeSeat, selectSurvivor, selectLocation };
 }

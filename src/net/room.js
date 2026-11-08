@@ -37,10 +37,23 @@ export class Room {
     this.state = null;
     this.botRandom = mulberry(this.config.seed >>> 0);
     this.touched = Date.now();
+    this.seen = new Set(); // seats whose humans have looked at their secret objective (step 19)
   }
 
   get started() { return !!this.state; }
   get host() { return 0; }
+
+  /** After the draft, play waits until every human has looked at their secret objective. */
+  get ready() {
+    if (!this.state || this.state.phase === PHASES.DRAFT) return true;
+    return this.seats.every((s, i) => s.isAI || this.seen.has(i));
+  }
+
+  markSeen(seat) {
+    if (!this.state || this.state.phase === PHASES.DRAFT || this.seats[seat]?.isAI) return { error: 'notNow' };
+    this.seen.add(seat);
+    return { ok: true };
+  }
 
   /** Take the first free human seat. Returns { seat, token } or { error }. */
   join(name) {
@@ -75,7 +88,7 @@ export class Room {
       started: this.started,
       scenarioId: this.config.scenarioId,
       betrayer: this.config.betrayer,
-      seats: this.seats.map((s, i) => ({ seat: i, isAI: s.isAI, name: s.isAI ? null : s.name, taken: s.isAI || !!s.token, connected: s.isAI || s.connected })),
+      seats: this.seats.map((s, i) => ({ seat: i, isAI: s.isAI, name: s.isAI ? null : s.name, taken: s.isAI || !!s.token, connected: s.isAI || s.connected, seen: s.isAI || this.seen.has(i) })),
     };
   }
 
@@ -98,6 +111,7 @@ export class Room {
     if (!this.started) return { ok: false, error: 'notStarted' };
     if (!action || typeof action !== 'object' || action.playerId !== this.playerIdOf(seat)) return { ok: false, error: 'notYourSeat' };
     if (this.seats[seat]?.isAI) return { ok: false, error: 'notYourSeat' };
+    if (!this.ready) return { ok: false, error: 'waitingObjectives' };
     const res = tryReduce(this.state, action);
     if (!res.ok) return { ok: false, error: res.error };
     this.state = res.state;
@@ -108,7 +122,7 @@ export class Room {
   /** The next thing a bot should do (answer a request, draft, choose, vote, take its turn), or null. */
   nextBotAction() {
     const s = this.state;
-    if (!s || s.phase === PHASES.GAME_OVER) return null;
+    if (!s || s.phase === PHASES.GAME_OVER || !this.ready) return null;
     const req = s.requests.find((r) => getPlayer(s, r.to).isAI);
     if (req) {
       const a = botAction(s, req.to, { random: this.botRandom });

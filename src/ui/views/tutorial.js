@@ -11,7 +11,8 @@ export function renderTutorial(el, ctx, index, visible) {
   el.dataset.lang = document.documentElement.lang;
   mount(el,
     h('div', { class: `tut-spot${step.target ? '' : ' none'}` }),
-    h('div', { class: `tut-bubble panel${step.target ? '' : ' center'}${step.placement === 'top' ? ' top' : ''}`, role: 'dialog', 'aria-live': 'polite' },
+    // No target on screen yet (e.g. the move picker before a building is tapped): start centred.
+    h('div', { class: `tut-bubble panel${step.target && document.querySelector(step.target)?.getClientRects().length ? '' : ' center'}${step.placement === 'top' ? ' top' : ''}`, role: 'dialog', 'aria-live': 'polite' },
       h('small', { class: 'kicker' }, t('tut.of', { i: index + 1, n: TUTORIAL.length })),
       h('h3', {}, t(`tut.${step.id}.title`)),
       h('p', {}, t(`tut.${step.id}.text`)),

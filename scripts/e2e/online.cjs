@@ -70,6 +70,14 @@ const URL = `http://localhost:${PORT}/?snow=0`;
       await page.locator('.draft-screen .sv-pick').nth(0).click(F); await page.locator('.draft-screen .sv-pick').nth(1).click(F);
       await page.locator('.draft-actions .btn.primary').click(F); counts.draft++; return true;
     }
+    if (await sel('.obj-reveal .obj-card:not(.flipped)')) { await page.locator('.obj-reveal .obj-card').click(F); counts.objective = (counts.objective ?? 0) + 1; return true; }
+    if (await sel('.obj-reveal .hold-btn')) {
+      await page.locator('.obj-reveal .hold-btn').dispatchEvent('pointerdown');
+      await page.waitForTimeout(1150);
+      await page.locator('.obj-reveal .hold-btn').dispatchEvent('pointerup').catch(() => {});
+      return true;
+    }
+    if (await sel('.obj-wait')) return false;
     if (await sel('.dialog.confirm-end')) { await page.locator('.dialog.confirm-end .btn.primary').click(F); counts.confirm++; return true; }
     if (await sel('.backdrop.incoming')) { await page.locator('.backdrop.incoming .btn.ghost').click(F); counts.incoming++; return true; }
     if (await sel('button.choice:not([disabled])')) {
