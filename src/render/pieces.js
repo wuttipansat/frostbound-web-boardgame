@@ -446,6 +446,13 @@ export function createPieces(board, tweens) {
     get busy() { return pending > 0; },
     setHighlight,
     pick,
+    /** Coloured burst at a survivor (exposure results etc.). */
+    burstAt(survivorId, colors, n = 18, power = 1.1) {
+      const vis = survivors.get(survivorId);
+      if (!vis) return;
+      const p = vis.group.position.clone().setY(1.2);
+      colors.forEach((c) => puffs.burst(p, Math.ceil(n / colors.length), c, power));
+    },
     get highlighted() { return highlighted; },
     survivorObject: (id) => survivors.get(id)?.group ?? null,
     counts: () => ({

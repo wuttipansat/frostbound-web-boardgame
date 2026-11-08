@@ -28,7 +28,11 @@ export function renderPlayerPanel(refs, ctx) {
     h('b', { class: 'pname' }, shown.name),
     shown.isAI ? h('span', { class: 'tag' }, t('panel.aiTag')) : null,
     shown.exiled ? h('span', { class: 'tag bad' }, t('panel.exiled')) : null,
-    h('span', { class: `status${isActor ? ' go' : ''}` }, status));
+    h('span', { class: `status${isActor ? ' go' : ''}` }, status),
+    h('button', {
+      class: 'icon-btn collapse', 'aria-label': ui.ppCollapsed ? 'expand' : 'collapse', 'aria-expanded': ui.ppCollapsed ? 'false' : 'true',
+      onclick: () => ctx.set({ ppCollapsed: !ui.ppCollapsed }),
+    }, ui.ppCollapsed ? '▴' : '▾'));
 
   // ---- survivors
   const survivors = aliveSurvivorsOf(s, shown.id);

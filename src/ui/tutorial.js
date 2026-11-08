@@ -1,0 +1,53 @@
+// First-round tutorial as a pure state machine. The app feeds it events; it says which step to show.
+//   target: CSS selector of the element to spotlight (null = centred card)
+//   when:   'turn'  -> only while the tutorial player is taking their turn
+//           'colony'-> only while the colony-phase reveal is on screen
+//   on:     events that complete the step (besides pressing Next when `next` is true)
+
+export const TUTORIAL = [
+  { id: 'welcome', target: null, when: 'turn', next: true, on: [] },
+  { id: 'topbar', target: '#topbar', when: 'turn', next: true, on: [] },
+  { id: 'crisis', target: '#topbar .stat-block.crisis', when: 'turn', next: true, on: [] },
+  { id: 'survivors', target: '#pp-survivors', when: 'turn', next: false, on: ['selectSurvivor'] },
+  { id: 'board', target: null, when: 'turn', next: false, on: ['selectLocation'], placement: 'top' },
+  { id: 'move', target: '#locpanel', when: 'turn', next: true, on: ['move'] },
+  { id: 'actions', target: '#locpanel', when: 'turn', next: true, on: ['dieAction'] },
+  { id: 'hand', target: '#pp-hand', when: 'turn', next: true, on: [] },
+  { id: 'objective', target: '#pp-actions .hold', when: 'turn', next: true, on: [] },
+  { id: 'endTurn', target: '#pp-actions .btn.primary', when: 'turn', next: false, on: ['endTurn'] },
+  { id: 'colony', target: '.dialog.colony', when: 'colony', next: true, on: ['colonyDone'] },
+];
+
+export const DONE = TUTORIAL.length;
+const COLONY = TUTORIAL.findIndex((s) => s.id === 'colony');
+
+/** Feed an event; returns the new step index (DONE when finished). */
+export function advanceTutorial(index, event) {
+  if (index >= DONE) return DONE;
+  if (event === 'skip') return DONE;
+  const step = TUTORIAL[index];
+  if ((event === 'next' && step.next) || step.on.includes(event)) return index + 1;
+  // Ending the turn early jumps straight to the colony explanation.
+  if (event === 'endTurn' && index < COLONY) return COLONY;
+  // If the round ends without the colony step being seen (e.g. it was dismissed), finish.
+  if (event === 'colonyDone' && index <= COLONY) return DONE;
+  return index;
+}
+
+/** Map a dispatched action to a tutorial event. */
+export function eventForAction(action) {
+  switch (action.type) {
+    case 'MOVE': return 'move';
+    case 'ATTACK': case 'SEARCH': case 'BARRICADE': case 'CLEAN': case 'LURE': return 'dieAction';
+    case 'END_TURN': return 'endTurn';
+    default: return null;
+  }
+}
+
+/** Should the current step be on screen right now? */
+export function tutorialVisible(index, { canAct, colonyShowing }) {
+  const step = TUTORIAL[index];
+  if (!step) return false;
+  if (step.when === 'colony') return colonyShowing;
+  return canAct && !colonyShowing;
+}

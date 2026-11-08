@@ -50,6 +50,11 @@ export function setupScreen(ctx) {
       h('span', { class: 'lbl' }, t('setup.betrayer')),
       h('div', { class: 'seg small' }, ['maybe', 'always', 'never'].map((m) => h('button', { class: cfg.betrayer === m ? 'on' : '', onclick: () => update({ betrayer: m }) }, t(`setup.betrayer.${m}`))))),
     settingsRows(ctx),
+    h('div', { class: 'row' },
+      h('span', { class: 'lbl' }, t('setup.tutorial')),
+      h('div', { class: 'seg small' },
+        h('button', { class: ctx.ui.tutorial ? 'on' : '', onclick: () => ctx.setTutorial(true) }, t('settings.on')),
+        h('button', { class: ctx.ui.tutorial ? '' : 'on', onclick: () => ctx.setTutorial(false) }, t('settings.off')))),
     h('button', { class: 'btn primary wide big', onclick: ctx.startGame }, t('setup.start'))));
 }
 
@@ -241,6 +246,7 @@ export function colonyModal(ctx, item) {
     rows.push(h('div', { class: 'crisis-cards' }, crisis.cards.map((cd) => {
       running += cd.delta;
       const style = next(0.55);
+      ctx.sfx?.('flip', Number.parseFloat(style.animationDelay) + 0.25);
       return h('div', { class: 'cflip', style },
         h('div', { class: 'cflip-inner', style },
           h('div', { class: 'cface cback' }, '?'),
@@ -254,7 +260,9 @@ export function colonyModal(ctx, item) {
     rows.push(h('p', { class: 'muted reveal', style: next() }, t('colony.noCards')));
   }
   rows.push(h('p', { class: 'score reveal', style: next(0.4) }, t('colony.score', { score: crisis.score, required: crisis.required })));
-  rows.push(h('div', { class: `verdict-banner reveal ${crisis.success ? 'good' : 'bad'}`, style: next(0.5) },
+  const verdictStyle = next(0.5);
+  ctx.sfx?.(crisis.success ? 'crisis:ok' : 'crisis:fail', Number.parseFloat(verdictStyle.animationDelay));
+  rows.push(h('div', { class: `verdict-banner reveal ${crisis.success ? 'good' : 'bad'}`, style: verdictStyle },
     h('b', {}, crisis.success ? t('colony.averted') : t('colony.failed')),
     !crisis.success ? h('small', {}, describeEffects(def.fail)) : crisis.score >= crisis.required + 2 ? h('small', {}, t('colony.bonus')) : null));
   const spawns = Object.entries(r.spawns ?? {});

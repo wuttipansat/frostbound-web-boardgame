@@ -376,3 +376,38 @@ body.passing #player, body.passing #locpanel, body.passing .popover { visibility
   .reveal, .cflip, .ballot-card, .flip-card .choices { animation-duration: 0.01s !important; animation-delay: 0s !important; }
   .flip-card, .cflip-inner { animation: none; transform: none; }
 }
+
+/* ---------------------------------------------------------------- step 6: tutorial */
+#tutorial { position: fixed; inset: 0; pointer-events: none; z-index: 40; }
+.tut-spot {
+  position: fixed; border-radius: 14px; pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(4, 8, 16, 0.5), 0 0 0 2px var(--warm), 0 0 28px 6px rgba(255, 179, 71, 0.55);
+  transition: left 0.2s, top 0.2s, width 0.2s, height 0.2s;
+  animation: tut-pulse 1.8s ease-in-out infinite;
+}
+.tut-spot.none { left: 50% !important; top: 50% !important; width: 0 !important; height: 0 !important; animation: none;
+  box-shadow: 0 0 0 9999px rgba(4, 8, 16, 0.45); }
+@keyframes tut-pulse { 50% { box-shadow: 0 0 0 9999px rgba(4, 8, 16, 0.5), 0 0 0 2px var(--warm), 0 0 40px 12px rgba(255, 179, 71, 0.35); } }
+.tut-bubble {
+  position: fixed; width: min(360px, calc(100vw - 24px)); padding: 14px 16px; pointer-events: auto;
+  background: var(--panel-solid); border-color: rgba(255, 179, 71, 0.45); animation: tut-fade 0.3s ease-out;
+}
+@keyframes tut-fade { from { opacity: 0; } }
+.tut-bubble.center { left: 50% !important; top: 50% !important; transform: translate(-50%, -50%); }
+.tut-bubble.center.top { top: calc(var(--top-h) + 20px) !important; transform: translateX(-50%); }
+.tut-bubble h3 { margin: 4px 0 6px; font-size: 17px; }
+.tut-bubble p { margin: 0 0 10px; font-size: 13.5px; line-height: 1.5; color: #d6e3f5; }
+.tut-bubble .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.small-btn { font-size: 12px; padding: 6px 10px; }
+/* While the "pick a building" step shows, let the board receive clicks through the dim layer. */
+@media (prefers-reduced-motion: reduce) { .tut-spot { animation: none; transition: none; } }
+
+/* ---------------------------------------------------------------- collapsible player panel */
+#pp-head .collapse { width: 30px; height: 30px; font-size: 14px; margin-left: 4px; }
+body.pp-collapsed { --player-h: 52px; }
+body.pp-collapsed #player .pp-body { display: none; }
+body.pp-collapsed #player { height: auto; }
+@media (max-width: 760px) {
+  #locpanel { max-height: 34vh; }
+  body.pp-collapsed #locpanel { max-height: 46vh; }
+}

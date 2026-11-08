@@ -257,12 +257,26 @@ export function createBoard() {
     lights.push({ light: lamp, base: 45, flicker: 0.08 });
   }
 
+  // World anchors for ambient particles (match the voxel colony model, 0.6 world units per voxel).
+  const s = BOARD.buildingScale;
+  const fx = {
+    fire: new THREE.Vector3(0, 1.2 * s, 0),
+    chimneys: [new THREE.Vector3(-8 * s, 8.6 * s, -10 * s), new THREE.Vector3(11 * s, 8.6 * s, -11 * s)],
+    // Gate posts stand at the palisade (18 voxels out), 3 voxels either side of each opening.
+    torches: layout.colony.gates.flatMap((g) => {
+      const dir = g.clone().normalize();
+      const along = Math.abs(dir.x) < 0.01 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
+      return [-1, 1].map((k) => dir.clone().multiplyScalar(18 * s).addScaledVector(along, 3 * s * k).setY(7 * s));
+    }),
+  };
+
   let hovered = null;
   let selected = null;
 
   return {
     root,
     layout,
+    fx,
     pickTargets,
     locationGroups,
     setHovered(id) { hovered = id; },

@@ -5,7 +5,9 @@ import { createBoard } from './render/board.js';
 import { createPieces } from './render/pieces.js';
 import { createDiceTray } from './render/dice.js';
 import { Tweens } from './render/tween.js';
+import { createAmbientParticles } from './render/particles.js';
 import { createApp } from './ui/app.js';
+import { sound } from './audio/sound.js';
 import { c, t as tr } from './i18n/index.js';
 import { LOCATION_IDS } from './core/constants.js';
 import { ITEMS } from './content/items.js';
@@ -21,6 +23,8 @@ const tweens = new Tweens();
 const pieces = createPieces(board, tweens);
 stage.scene.add(pieces.root);
 const diceTray = createDiceTray($('dice'));
+const particles = createAmbientParticles(board.fx);
+stage.scene.add(particles.group);
 
 // ---------------------------------------------------------------- location labels
 
@@ -50,12 +54,19 @@ function refreshLabels(state) {
 // ---------------------------------------------------------------- exposure popups
 
 const FX_ICON = { blank: '✓', wound: '🩸', frostbite: '❄', bite: '☠' };
+const FX_BURST = {
+  blank: [0xf2f6fc],
+  wound: [0xb3202a, 0xe0605a],
+  frostbite: [0x9fd4ff, 0xe8f6ff],
+  bite: [0x5a0f12, 0x8e1b1b, 0x6f8a4e],
+};
 const popups = [];
 function exposureFx(survivorId, face) {
   const obj = pieces.survivorObject(survivorId);
   const fallback = obj ? obj.position.clone() : new THREE.Vector3();
   // The die tumbles in the tray first; the verdict then floats up over the survivor.
   diceTray.rollExposure(face).then(() => {
+    pieces.burstAt(survivorId, FX_BURST[face], face === 'bite' ? 30 : 18, face === 'bite' ? 1.5 : 1.1);
     const el = document.createElement('div');
     el.className = `fx-pop f-${face}`;
     el.textContent = `${FX_ICON[face]} ${c('survivors', survivorId, 'name')} · ${tr(`fx.${face}`)}`;
@@ -66,9 +77,10 @@ function exposureFx(survivorId, face) {
 
 const app = createApp({
   board, pieces, diceTray,
+  aiFast: params.get('ai') === 'fast', // debug/testing: AI doesn't wait for animations
   fx: { exposure: exposureFx },
   dom: {
-    topbar: $('topbar'), log: $('log'), loc: $('locpanel'), player: $('player'), modal: $('modal'), toasts: $('toasts'),
+    topbar: $('topbar'), log: $('log'), loc: $('locpanel'), player: $('player'), modal: $('modal'), toasts: $('toasts'), tutorial: $('tutorial'),
     playerRefs: { head: $('pp-head'), survivors: $('pp-survivors'), chips: $('pp-chips'), hand: $('pp-hand'), actions: $('pp-actions') },
     onRender: (state) => {
       refreshLabels(state);
@@ -82,6 +94,7 @@ stage.onFrame((t, dt) => {
   tweens.update(dt);
   board.update(t);
   pieces.update(t, dt);
+  particles.update(dt, stage.renderer.getPixelRatio() * stage.camera.zoom);
   app.tick(dt);
 });
 
@@ -140,4 +153,8 @@ if (params.get('play')) {
     seed: Number(params.get('seed') ?? 1), lang: params.get('lang') ?? undefined,
   });
 }
+// Browsers only allow audio after a user gesture; UI buttons give a soft click.
+window.addEventListener('pointerdown', () => sound.unlock());
+document.addEventListener('click', (ev) => { if (ev.target.closest?.('button')) sound.play('ui'); });
+
 window.__frostbound = { stage, board, pieces, diceTray, tweens, app, tryReduce, itemType: (defId) => ITEMS[defId]?.type };

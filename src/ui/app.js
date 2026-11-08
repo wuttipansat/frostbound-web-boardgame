@@ -8,8 +8,10 @@ import { botAction } from '../ai/simpleBot.js';
 import { mulberry } from '../ai/simulate.js';
 import { t, setLang, getLang } from '../i18n/index.js';
 import { formatLog } from '../i18n/format.js';
-import { sound } from '../audio/sound.js';
+import { sound, soundForLog } from '../audio/sound.js';
 import { mount } from './dom.js';
+import { advanceTutorial, eventForAction, tutorialVisible, DONE } from './tutorial.js';
+import { renderTutorial, positionTutorial } from './views/tutorial.js';
 import { renderTopbar, renderLog } from './views/hud.js';
 import { renderPlayerPanel } from './views/player.js';
 import { renderLocationPanel } from './views/location.js';
@@ -32,7 +34,7 @@ const storage = {
 
 const defaultSeats = () => Array.from({ length: 5 }, (_, i) => ({ name: t('setup.defaultName', { n: i + 1 }), isAI: i >= 2 }));
 
-export function createApp({ dom, pieces, diceTray, board, fx = {} }) {
+export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = false }) {
   const settings = storage.get(SETTINGS_KEY) ?? {};
   setLang(settings.lang ?? (navigator.language?.startsWith('th') ? 'th' : 'en'));
   sound.enabled = settings.sound ?? true;
@@ -51,7 +53,11 @@ export function createApp({ dom, pieces, diceTray, board, fx = {} }) {
     queue: [], // public reveal modals waiting to be shown: { type: 'colony' | 'vote', report }
     useFuel: false, logOpen: typeof window !== 'undefined' ? window.innerWidth > 900 : true, crisisOpen: false, peek: false, draftPicks: [], req: null,
     sound: sound.enabled,
+    tutorial: settings.tutorial ?? !settings.tutorialDone,
+    tutStep: DONE,
+    ppCollapsed: false,
   };
+  let tutPlayer = null; // the human the first-round tutorial follows
 
   // ---------------------------------------------------------------- derived
 
@@ -88,7 +94,7 @@ export function createApp({ dom, pieces, diceTray, board, fx = {} }) {
       state, ui, actor, viewer,
       canAct: !!viewer && viewer === actor && state?.phase === PHASES.TURN && !needsPass(),
       hasSave: !!storage.get(SAVE_KEY)?.state,
-      set, dispatch, dismissQueue, selectSurvivor, selectLocation, takeSeat, startGame, continueGame, quitToSetup, setLanguage, setSound,
+      set, dispatch, dismissQueue, tutorialEvent, setTutorial, sfx: (name, delay) => sound.play(name, delay), selectSurvivor, selectLocation, takeSeat, startGame, continueGame, quitToSetup, setLanguage, setSound,
     };
   }
 
@@ -97,6 +103,23 @@ export function createApp({ dom, pieces, diceTray, board, fx = {} }) {
   function set(patch) {
     Object.assign(ui, patch);
     render();
+  }
+
+  function saveSettings(extra = {}) {
+    const prev = storage.get(SETTINGS_KEY) ?? {};
+    storage.set(SETTINGS_KEY, { ...prev, lang: getLang(), sound: ui.sound, tutorial: ui.tutorial, ...extra });
+  }
+
+  function tutorialEvent(event) {
+    if (ui.tutStep >= DONE) return;
+    const before = ui.tutStep;
+    ui.tutStep = advanceTutorial(ui.tutStep, event);
+    if (ui.tutStep >= DONE && before < DONE) {
+      // Finished (or skipped): don't offer it again by default.
+      ui.tutorial = false;
+      saveSettings({ tutorialDone: true, tutorial: false });
+    }
+    if (ui.tutStep !== before) render();
   }
 
   function dispatch(action) {
@@ -111,12 +134,14 @@ export function createApp({ dom, pieces, diceTray, board, fx = {} }) {
     for (const e of state.log.slice(before)) onLogEntry(e);
     for (const q of ui.queue) if (q.type === 'colony' && q.morale == null) q.morale = state.morale;
     answerAiRequests();
+    const tev = action.playerId === tutPlayer ? eventForAction(action) : null;
+    if (tev) ui.tutStep = advanceTutorial(ui.tutStep, tev);
     afterChange();
     return true;
   }
 
   function onLogEntry(e) {
-    sound.play(e.k);
+    sound.play(soundForLog(e));
     if (e.k === 'exposure') fx.exposure?.(e.survivorId, e.face);
     if (e.k === 'crisisResolved' && state.reports.colony) ui.queue.push({ type: 'colony', report: structuredClone(state.reports.colony), morale: null });
     if (e.k === 'voteResult' && state.reports.vote) ui.queue.push({ type: 'vote', report: structuredClone(state.reports.vote) });
@@ -174,12 +199,14 @@ export function createApp({ dom, pieces, diceTray, board, fx = {} }) {
   // ---------------------------------------------------------------- actions from views
 
   function dismissQueue() {
-    ui.queue.shift();
+    const was = ui.queue.shift();
+    if (was?.type === 'colony') tutorialEvent('colonyDone');
     render();
   }
 
   function selectSurvivor(id) {
     ui.selSurvivor = id;
+    if (id) tutorialEvent('selectSurvivor');
     if (id) ui.selLoc = state.survivors[id].location;
     board.setSelected(ui.selLoc);
     pieces.setHighlight?.(id);
@@ -188,6 +215,7 @@ export function createApp({ dom, pieces, diceTray, board, fx = {} }) {
 
   function selectLocation(id) {
     ui.selLoc = id;
+    if (id) tutorialEvent('selectLocation');
     board.setSelected(id);
     render();
   }
@@ -209,7 +237,11 @@ export function createApp({ dom, pieces, diceTray, board, fx = {} }) {
     seat = null;
     lastActive = null;
     Object.assign(ui, { modal: null, selLoc: null, queue: [] });
+    tutPlayer = state.players.find((p) => !p.isAI)?.id ?? null;
+    ui.tutStep = ui.tutorial && tutPlayer ? 0 : DONE;
+    sound.unlock();
     sound.play('start');
+    sound.setAmbient(true);
     afterChange({ animate: false });
   }
 
@@ -221,10 +253,13 @@ export function createApp({ dom, pieces, diceTray, board, fx = {} }) {
     lastActive = null;
     ui.modal = null;
     ui.queue = [];
+    ui.tutStep = DONE; // a resumed game skips the tutorial
+    sound.setAmbient(true);
     afterChange({ animate: false });
   }
 
   function quitToSetup() {
+    sound.setAmbient(false);
     if (state?.phase === PHASES.GAME_OVER) storage.del(SAVE_KEY);
     state = null;
     Object.assign(ui, { modal: null, selLoc: null, selSurvivor: null, queue: [] });
@@ -234,22 +269,29 @@ export function createApp({ dom, pieces, diceTray, board, fx = {} }) {
 
   function setLanguage(lang) {
     setLang(lang);
-    storage.set(SETTINGS_KEY, { lang: getLang(), sound: ui.sound });
+    saveSettings();
     // Default seat names follow the language until edited.
     ui.setup.seats = ui.setup.seats.map((s, i) => (/^(Player|ผู้เล่น) \d$/.test(s.name) ? { ...s, name: t('setup.defaultName', { n: i + 1 }) } : s));
     render();
   }
 
   function setSound(on) {
-    sound.enabled = on;
+    sound.setEnabled(on);
     ui.sound = on;
-    storage.set(SETTINGS_KEY, { lang: getLang(), sound: on });
+    saveSettings();
+    render();
+  }
+
+  function setTutorial(on) {
+    ui.tutorial = on;
+    saveSettings();
     render();
   }
 
   // ---------------------------------------------------------------- per-frame
 
   function tick(dt) {
+    positionTutorial(dom.tutorial);
     if (toasts.length) {
       const n = toasts.length;
       toasts = toasts.filter((x) => (x.ttl -= dt) > 0);
@@ -264,9 +306,12 @@ export function createApp({ dom, pieces, diceTray, board, fx = {} }) {
     if (state.phase === PHASES.GAME_OVER) return;
     const actor = currentActor();
     if (!actor || !getPlayer(state, actor).isAI) { aiTimer = 0; return; }
-    if (pieces.busy || diceTray.busy || diceTray.exposureBusy) { aiTimer = 0; return; }
-    aiTimer += dt;
-    if (aiTimer < AI_DELAY) return;
+    if (!aiFast) {
+      // Let the table see each AI action land before the next one.
+      if (pieces.busy || diceTray.busy || diceTray.exposureBusy) { aiTimer = 0; return; }
+      aiTimer += dt;
+      if (aiTimer < AI_DELAY) return;
+    }
     aiTimer = 0;
     const action = botAction(state, actor, { random: aiRandom });
     if (!action || !dispatch(action)) {
@@ -285,11 +330,13 @@ export function createApp({ dom, pieces, diceTray, board, fx = {} }) {
       dom.player.classList.add('hidden');
       dom.loc.classList.add('hidden');
       mount(dom.modal, ui.modal === 'settings' ? settingsModal(x) : setupScreen(x));
+      renderTutorial(dom.tutorial, x, DONE, false);
       return;
     }
     dom.player.classList.remove('hidden');
     // While the device is being handed over, nothing private may be visible underneath.
     document.body.classList.toggle('passing', !!needsPass());
+    document.body.classList.toggle('pp-collapsed', !!ui.ppCollapsed);
     renderTopbar(dom.topbar, x);
     renderLog(dom.log, x);
     renderLocationPanel(dom.loc, x);
@@ -300,6 +347,11 @@ export function createApp({ dom, pieces, diceTray, board, fx = {} }) {
     const [key, build] = modalFor(x);
     if (!key || key !== modalKey) mount(dom.modal, build ? build() : null);
     modalKey = key;
+    const tutVisible = ui.tutStep < DONE && tutorialVisible(ui.tutStep, {
+      canAct: x.canAct && x.viewer === tutPlayer && !build,
+      colonyShowing: ui.queue[0]?.type === 'colony',
+    });
+    renderTutorial(dom.tutorial, x, ui.tutStep, tutVisible);
     dom.onRender?.(state);
   }
 
@@ -354,5 +406,5 @@ export function createApp({ dom, pieces, diceTray, board, fx = {} }) {
   }
 
   render();
-  return { loadState, tick, render, onBoardPick, quickStart, dispatch, get state() { return state; }, get ui() { return ui; }, takeSeat, selectSurvivor, selectLocation };
+  return { loadState, set, tutorialEvent, tick, render, onBoardPick, quickStart, dispatch, get state() { return state; }, get ui() { return ui; }, takeSeat, selectSurvivor, selectLocation };
 }

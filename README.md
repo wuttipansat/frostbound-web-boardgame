@@ -3,7 +3,7 @@
 An original, semi-cooperative survival board game set in a frozen zombie apocalypse, built for the browser with a 3D voxel look (Three.js).
 2–5 players play hot-seat, with optional bots for empty seats.
 
-> **Status: steps 1–5 of 6 are done.** The game is fully playable in the browser: hot-seat for 2–5 players, with AI for any seat, in English or Thai. It includes animated crossroads, crisis, exposure and exile-vote reveals. Step 6 adds polish, sound and a first-round tutorial.
+> **Status: all 6 build steps are done.** The game is fully playable in the browser: hot-seat for 2–5 players, with AI for any seat, in English or Thai. It has animated crossroads, crisis, exposure and exile-vote reveals, procedural sound, ambient particles and a guided first-round tutorial.
 
 ![Playing FROSTBOUND](docs/screenshots/play.jpg)
 
@@ -15,12 +15,16 @@ An original, semi-cooperative survival board game set in a frozen zombie apocaly
 |---|---|---|
 | ![colony phase](docs/screenshots/colony-phase.jpg) | ![vote](docs/screenshots/vote.jpg) | ![exposure](docs/screenshots/exposure.jpg) |
 
+| First-round tutorial (TH) | Campfire embers, chimney smoke, torch sparks |
+|---|---|
+| ![tutorial](docs/screenshots/tutorial.jpg) | ![particles](docs/screenshots/particles.jpg) |
+
 | All 20 survivors + zombies | Around the campfire | Colony phase |
 |---|---|---|
 | ![characters](docs/screenshots/characters.jpg) | ![colony](docs/screenshots/pieces-closeup.jpg) | ![rising](docs/screenshots/zombies-rising.jpg) |
 
 ## How to play (UI)
-1. **Setup:** choose 2–5 seats (Human or AI), a main objective, the betrayer mode, the language and sound.
+1. **Setup:** choose 2–5 seats (Human or AI), a main objective, the betrayer mode, the language, sound, and the **first-round tutorial**. The tutorial is on until you finish it once. It spotlights each part of the screen and moves on when you actually do the thing it asks.
 2. **Draft:** each human gets a *Pass to …* screen, then picks 2 of 4 survivors.
 3. **On your turn:**
    - Select a survivor: click its card or the figure on the board.
@@ -42,7 +46,8 @@ An original, semi-cooperative survival board game set in a frozen zombie apocaly
    - the zombies that arrive
 8. **Exposure:** moving or attacking throws the voxel exposure die in the dice tray, and the result floats over the survivor on the board.
 9. **Hot seat:** between human players a full-screen *Pass to …* screen hides every hand and objective until the next player taps it.
-10. **Saving:** the game autosaves after every action, and *Continue saved game* resumes it.
+10. **Phones:** the ▾ button collapses the player panel so the board gets the screen back.
+11. **Saving:** the game autosaves after every action, and *Continue saved game* resumes it.
 
 ## Running
 
@@ -57,6 +62,7 @@ npm run balance       # bot-vs-bot outcome table per scenario and player count
 Use Node 20 or later. URL options:
 - framing: `?focus=colony&zoom=2.5&azimuth=-30&select=police&snow=0`
 - quick start without the setup screen: `?play=HHA&scenario=beacon&seed=3&lang=th` (H = human seat, A = AI seat)
+- `?ai=fast`: AI seats don't wait for animations (testing on slow machines)
 
 ## Architecture
 
@@ -93,6 +99,7 @@ src/
     dice.js             dice tray on its own small canvas; dice tumble and settle on the rolled face; used dice dim;
                         the exposure die (wound / frostbite / bite symbols) is thrown here too
     tween.js            frame-driven tween engine + easings
+    particles.js        campfire embers, chimney smoke, gate-torch sparks (per-particle size/colour/alpha shader)
   i18n/                 en.js + th.js UI strings, content.th.js (Thai content), format.js (log lines, effect text)
   ui/
     app.js              controller: dispatch -> reducer, AI seats, hot-seat pass screens, autosave, settings, toasts
@@ -103,7 +110,10 @@ src/
     views/modals.js     setup, settings, pass screen, draft, crossroads (flip), colony-phase reveal,
                         call vote / secret ballot / vote result, requests, game over
     style.css           frosted-glass overlay, responsive down to phone width
-  audio/sound.js        sound hooks (on/off works now; sounds arrive in step 6)
+  audio/sound.js        procedural WebAudio: a sound per game event (dice, hops, hits, groans, card flips, chords),
+                        ambient wind + campfire crackle; unlocks on first click; safe no-op without audio
+  ui/tutorial.js        pure first-round tutorial state machine (steps, events, visibility)
+  ui/views/tutorial.js  spotlight + coach bubble that follow the highlighted element
   main.js               boots stage/board/pieces/dice, board picking, labels, and the UI controller
 index.html
 tests/                  node:test suites (rules + headless render helpers)
@@ -207,4 +217,5 @@ A survivor dies at 3 wounds. Every death costs 1 morale. A player who loses ever
 
 ## Known open items
 - **Balance:** the simple bot still loses most games. It sends everyone out scavenging and rarely deposits, so the bot win rate says more about the bot than the game. Tune these numbers in human playtests: crisis requirement, spawn rates, starting morale.
-- The bot is intentionally simple. A smarter seat AI comes with the UI work.
+- The bot is intentionally simple. It reads public suspicion when voting, but it doesn't plan around the main objective.
+- Sound is synthesised, not recorded. Swapping in real samples only means changing `src/audio/sound.js`.
