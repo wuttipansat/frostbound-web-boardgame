@@ -13,7 +13,7 @@ export const TUTORIAL = [
   { id: 'move', target: '#locpanel', when: 'turn', next: true, on: ['move'] },
   { id: 'actions', target: '#locpanel', when: 'turn', next: true, on: ['dieAction'] },
   { id: 'hand', target: '#pp-hand', when: 'turn', next: true, on: [] },
-  { id: 'objective', target: '#pp-actions .hold', when: 'turn', next: true, on: [] },
+  { id: 'objective', target: '#pp-actions .more', when: 'turn', next: true, on: [] },
   { id: 'endTurn', target: '#pp-actions .btn.primary', when: 'turn', next: false, on: ['endTurn'] },
   { id: 'colony', target: '.dialog.colony', when: 'colony', next: true, on: ['colonyDone'] },
 ];

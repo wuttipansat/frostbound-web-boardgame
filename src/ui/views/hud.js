@@ -4,7 +4,7 @@ import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
 import { formatLog, describeEffects } from '../../i18n/format.js';
 import {
-  foodNeeded, crisisDef, crisisRequirement, scenarioProgress, scenarioTarget, getPlayer, aliveSurvivorsOf, freeZombieSlots,
+  foodNeeded, crisisDef, crisisRequirement, scenarioProgress, scenarioTarget, getPlayer,
 } from '../../core/selectors.js';
 import { RULES } from '../../core/constants.js';
 import { PLAYER_COLORS } from '../../render/pieces.js';
@@ -74,24 +74,91 @@ export function renderTopbar(el, ctx) {
   }
 }
 
-export function renderLog(el, ctx) {
-  const { state: s, ui, art } = ctx;
-  el.classList.toggle('hidden', !ui.logOpen);
-  if (!ui.logOpen) return;
-  const lines = [];
-  for (let i = s.log.length - 1; i >= 0 && lines.length < 80; i--) {
-    const e = s.log[i];
-    const text = formatLog(e, s);
-    if (!text) continue;
-    const cls = e.k === 'roundStart' ? 'round' : ['death', 'overrun', 'infectionSpreads'].includes(e.k) ? 'bad'
-      : e.k === 'exposure' && e.face !== 'blank' ? 'warn' : e.k === 'turnStart' ? 'turn' : '';
-    const who = e.survivorId && s.survivors[e.survivorId] ? art.portrait(e.survivorId, 's', { cls: `log-face${e.k === 'death' ? ' dead' : ''}` }) : null;
-    lines.push(h('li', { class: cls }, who, h('span', {}, text)));
-  }
-  mount(el, h('h3', {}, t('hud.log')), h('ol', {}, lines));
+// ---------------------------------------------------------------- step 13: floating action feed
+
+const FEED_MS = 6000;
+const FEED_MAX = 3;
+const feed = { last: null, first: null, items: [] }; // items: { e, at }
+
+// Entries the colony / round produce on their own: never attributed to a player.
+const SYSTEM_KEYS = new Set(['roundStart', 'crisisResolved', 'fed', 'starvation', 'spawn', 'zombies', 'overrun', 'crisisDrawn', 'gameOver', 'voteResult']);
+
+/**
+ * Who did each log entry: its playerId, the owner of its survivor, or else whoever's turn it was
+ * (a barricade or a card draw has no playerId of its own). Colony-phase and system entries: null.
+ */
+function attribute(log, s) {
+  let turnOf = null;
+  return log.map((e) => {
+    if (e.k === 'turnStart') turnOf = e.playerId;
+    if (e.k === 'roundStart' || e.k === 'turnEnd' || e.k === 'crisisResolved') { const was = e.k === 'turnEnd' ? e.playerId : null; turnOf = null; if (was) return was; }
+    if (e.playerId) return e.playerId;
+    if (e.survivorId) return s.survivors[e.survivorId]?.owner ?? null;
+    return SYSTEM_KEYS.has(e.k) ? null : turnOf;
+  });
 }
 
-// ---------------------------------------------------------------- step 11: phase banner + colony status
+/** Track entries as they arrive (client side), so the feed can fade them after a few seconds. */
+function trackFeed(s, now) {
+  const first = s.log[0] ? JSON.stringify(s.log[0]) : null;
+  if (feed.first !== null && first !== feed.first && s.log.length < 200) { feed.items = []; feed.last = null; } // a new game
+  feed.first = first;
+  if (feed.last === null) { feed.last = s.log.length ? JSON.stringify(s.log.at(-1)) : ''; return; } // first sight: no flood
+  let i = s.log.length - 1;
+  while (i >= 0 && JSON.stringify(s.log[i]) !== feed.last) i--;
+  const who = attribute(s.log, s);
+  for (let k = i + 1; k < s.log.length; k++) feed.items.push({ e: s.log[k], at: now, pid: who[k] });
+  feed.last = s.log.length ? JSON.stringify(s.log.at(-1)) : '';
+  feed.items = feed.items.filter((x) => now - x.at < FEED_MS).slice(-12);
+}
+
+function feedLine(e, s, ctx, { age = null, pid = null } = {}) {
+  const text = formatLog(e, s);
+  if (!text) return null;
+  const p = pid ? s.players.find((x) => x.id === pid) : null;
+  const idx = p ? s.players.indexOf(p) : -1;
+  const cls = e.k === 'roundStart' ? 'round' : e.k === 'turnStart' ? 'turn'
+    : ['death', 'overrun', 'infectionSpreads'].includes(e.k) ? 'bad' : e.k === 'exposure' && e.face !== 'blank' ? 'warn' : '';
+  const mine = pid && pid === s.activePlayerId;
+  return h('li', {
+    class: `feed-item ${cls}${mine ? ' actor' : pid ? '' : ' system'}`,
+    style: age != null ? { animationDelay: `${-Math.round(age)}ms`, '--accent-p': p ? hex(PLAYER_COLORS[idx]) : 'transparent' } : { '--accent-p': p ? hex(PLAYER_COLORS[idx]) : 'transparent' },
+  },
+  // The acting player leads every line (turn-start lines already say who, so just the colour dot).
+  p ? h('span', { class: 'who' }, h('i', { class: 'dot', style: { background: hex(PLAYER_COLORS[idx]) } }), e.k === 'turnStart' ? null : p.name) : null,
+  e.survivorId && s.survivors[e.survivorId] ? ctx.art.portrait(e.survivorId, 's', { cls: `log-face${e.k === 'death' ? ' dead' : ''}` }) : null,
+  h('span', { class: 'txt' }, text));
+}
+
+/**
+ * Top-centre feed: the last few actions fade in and out; hovering, focusing or pinning (log button)
+ * opens the history. Only public information (formatLog) is ever shown.
+ */
+export function renderLog(el, ctx) {
+  const { state: s, ui } = ctx;
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  trackFeed(s, now);
+  el.classList.remove('hidden');
+  el.classList.toggle('pinned', !!ui.logOpen);
+  el.tabIndex = 0;
+  el.setAttribute('aria-label', t('hud.log'));
+  const recent = feed.items.slice(-FEED_MAX).reverse()
+    .map((x) => feedLine(x.e, s, ctx, { age: now - x.at, pid: x.pid })).filter(Boolean);
+  const history = [];
+  const who = attribute(s.log, s);
+  for (let i = s.log.length - 1; i >= 0 && history.length < 40; i--) {
+    const li = feedLine(s.log[i], s, ctx, { pid: who[i] });
+    if (li) history.push(li);
+  }
+  mount(el,
+    h('ol', { class: 'feed-recent' }, recent),
+    h('div', { class: 'feed-history' },
+      h('div', { class: 'feed-head' }, h('span', {}, t('hud.log')),
+        h('button', { class: `icon-btn pin${ui.logOpen ? ' on' : ''}`, tip: t('tip.logPin'), 'aria-label': t('tip.logPin'), 'aria-pressed': ui.logOpen ? 'true' : 'false', onclick: () => ctx.set({ logOpen: !ui.logOpen }) }, icon('log'))),
+      h('ol', {}, history)));
+}
+
+// ---------------------------------------------------------------- step 11: phase banner
 
 const PHASE_STEPS = ['draft', 'crossroads', 'turn', 'colony'];
 
@@ -112,35 +179,3 @@ export function renderPhase(el, ctx) {
       idx >= 0 && s.phase !== PHASES.DRAFT ? h('span', { class: 'dot', style: { background: hex(PLAYER_COLORS[idx]) } }) : null, who));
 }
 
-/** Public colony overview: who is alive, health, the colony gate, and what the colony phase will do next. */
-export function renderColony(el, ctx) {
-  const s = ctx.state;
-  if (s.phase === PHASES.DRAFT) { mount(el); return; }
-  const alive = Object.values(s.survivors).filter((sv) => sv.alive);
-  const wounds = alive.reduce((n, sv) => n + sv.wounds, 0);
-  const frost = alive.filter((sv) => sv.frostbite).length;
-  const col = s.locations.colony;
-  const cap = col.zombies + freeZombieSlots(s, 'colony');
-  const need = foodNeeded(s);
-  const crisis = crisisDef(s);
-  const wastePenalty = Math.floor(s.waste / RULES.WASTE_PER_MORALE);
-  const bar = (v, max, cls = '') => h('span', { class: `bar ${cls}` }, h('i', { style: { width: `${Math.min(100, (v / Math.max(1, max)) * 100)}%` } }));
-  const row = (ico, label, value, extra = null, cls = '') => h('li', { class: cls }, icon(ico), h('span', { class: 'k' }, label), h('b', {}, value), extra);
-  mount(el,
-    h('h3', {}, t('colony.status')),
-    h('ul', { class: 'cs-players' }, s.players.map((p, i) => h('li', { class: p.exiled ? 'exiled' : '' },
-      h('span', { class: 'dot', style: { background: hex(PLAYER_COLORS[i]) } }),
-      h('span', { class: 'k' }, p.name),
-      h('b', { tip: t('colony.aliveFallen') }, `${aliveSurvivorsOf(s, p.id).length}`, h('small', {}, ` / ${p.fallen.length}†`))))),
-    h('ul', { class: 'cs-rows' },
-      row('heal', t('colony.health'), t('colony.healthVal', { w: wounds, f: frost }), null, wounds + frost ? 'warn' : ''),
-      row('skull', t('colony.gate'), `${col.zombies}/${cap}`, bar(col.zombies, cap, col.zombies >= cap - 1 ? 'bad' : ''), col.zombies >= cap - 1 ? 'bad' : ''),
-      row('barricade', t('colony.barricades'), String(col.barricades))),
-    h('h4', {}, t('colony.next')),
-    h('ul', { class: 'cs-rows next' },
-      row('food', t('colony.nextFood'), s.food >= need ? t('colony.eats', { n: need }) : t('colony.short', { n: need - s.food }), null, s.food >= need ? '' : 'bad'),
-      row('waste', t('colony.nextWaste'), wastePenalty ? `−${wastePenalty}` : '0', null, wastePenalty ? 'bad' : ''),
-      crisis ? h('li', { class: 'warn', tip: t('colony.failTip', { fx: describeEffects(crisis.fail) }) }, icon('crisis'), h('span', { class: 'k' }, t('colony.nextCrisis')),
-        h('b', {}, t('hud.crisisShort', { n: crisisRequirement(s), item: t(`item.${crisis.item}`), k: s.crisis.contributions.length }))) : null,
-      s.starvation ? row('food', t('colony.starving'), String(s.starvation), null, 'bad') : null));
-}

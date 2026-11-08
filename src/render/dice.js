@@ -132,7 +132,7 @@ export function createDiceTray(canvas) {
     d.mesh.position.copy(from);
     d.mesh.visible = false;
     return tweens.add({
-      duration: 1.15, delay, ease: ease.linear,
+      duration: 1.6, delay, ease: ease.linear, // long enough to read as a real throw
       onStart: () => { d.mesh.visible = true; },
       onUpdate: (_e, t) => {
         const k = ease.outCubic(t);

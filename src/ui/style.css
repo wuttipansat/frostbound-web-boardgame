@@ -23,7 +23,6 @@
   --gap: 8px;
   --top-h: 64px;
   --player-h: 236px;
-  --colony-h: 0px;
   --font: 'IBM Plex Sans Thai', system-ui, sans-serif;
   --head: 'Oswald', 'IBM Plex Sans Thai', sans-serif;
   --pixel: var(--head);
@@ -736,29 +735,6 @@ body:not(.in-game) #phase, body.passing #phase { display: none; }
 html[lang='th'] .phase-steps li, html[lang='th'] .phase-round { font-family: var(--font); letter-spacing: 0; text-transform: none; }
 .phase-who { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
 
-/* ---- B. colony status (left column; the log replaces it while open) */
-#colony { position: fixed; left: 12px; top: calc(var(--top-h) + 12px); width: 270px; z-index: 3; padding: 10px 12px; font-size: 12px;
-  max-height: calc(100vh - var(--top-h) - var(--player-h) - 40px); overflow: auto; }
-#colony:empty, body:not(.in-game) #colony { display: none; }
-/* the log stacks under the colony status (its height is measured after each render) */
-#log { top: calc(var(--top-h) + 20px + var(--colony-h)); max-height: calc(100vh - var(--top-h) - var(--player-h) - 48px - var(--colony-h)); min-height: 0; }
-#colony h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 500; }
-#colony h4 { margin: 8px 0 4px; font-family: var(--head); font-weight: 500; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
-#colony ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
-#colony li { display: flex; align-items: center; gap: 6px; min-width: 0; }
-#colony li .icon { color: var(--muted); }
-#colony li .k { flex: 1; min-width: 0; color: #c9c4b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#colony li b { font-variant-numeric: tabular-nums; }
-#colony li b small { color: var(--muted); font-weight: 500; }
-#colony li.exiled .k { text-decoration: line-through; color: var(--muted); }
-#colony li.warn b, #colony li.warn .icon { color: var(--warn); }
-#colony li.bad b, #colony li.bad .icon { color: #d07a6d; }
-#colony .cs-rows.next li { flex-wrap: wrap; }
-#colony .fail { flex-basis: 100%; padding-left: 20px; color: var(--muted); font-size: 11px; }
-#colony .bar { width: 48px; height: 4px; background: #3a3f3e; border-radius: 1px; overflow: hidden; }
-#colony .bar i { display: block; height: 100%; background: #8a8d86; }
-#colony .bar.bad i { background: var(--danger); }
-#colony .cs-players { padding-bottom: 6px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
 
 /* ---- player panel */
 #player { border-radius: var(--radius); }
@@ -890,9 +866,7 @@ html[lang='th'] .loc-label { font-family: var(--font); letter-spacing: 0; text-t
 }
 /* phones: no colony column (its numbers are in the top bar and crisis popover); a one-line phase banner */
 @media (max-width: 760px) {
-  #colony { display: none; }
   #topbar .stat-block.helpless { display: none; }
-  #log { top: calc(var(--top-h) + 12px); }
   #phase { top: calc(var(--top-h) + 52px); padding: 3px 8px; font-size: 11px; gap: 8px; }
   .phase-steps { display: none; }
   .item-card { flex-basis: 96px; height: 150px; }
@@ -925,3 +899,137 @@ html[lang='th'] .loc-label { font-family: var(--font); letter-spacing: 0; text-t
 .cross-result .choice.chosen { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
 .cross-result .outcome { margin: 12px 0 4px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
 .cross-result .outcome .icon { color: var(--good); }
+
+/* ================================================================ step 13: minimal player HUD */
+:root { --player-h: 150px; }
+body.hand-full { --player-h: 236px; }
+@media (max-height: 800px) and (min-width: 761px) { body.hand-full { --player-h: 214px; } }
+.pp-body { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; }
+
+/* head: name + a small "your turn" light */
+.turn-light { width: 9px; height: 9px; border-radius: 50%; background: #4a4f4d; flex: none; }
+.turn-light.go { background: var(--accent); box-shadow: 0 0 0 3px rgba(178,138,84,0.25); }
+#pp-head .collapse { margin-left: auto; }
+
+/* survivors: round tokens floating above the panel */
+#pp-survivors.sv-tokens { overflow: visible; padding: 0; }
+.sv-tokens { position: fixed; left: 16px; bottom: calc(var(--player-h) + 26px); z-index: 4; display: flex; gap: 12px; align-items: flex-end; pointer-events: none; }
+body:not(.in-game) .sv-tokens, body.passing .sv-tokens { display: none; }
+.sv-token { position: relative; width: 58px; height: 58px; padding: 0; border-radius: 50%; border: 0; cursor: pointer; pointer-events: auto;
+  background: #1b1d1e; box-shadow: 0 0 0 3px var(--ring, #888), 0 6px 14px rgba(0,0,0,0.55); transition: transform 0.12s, box-shadow 0.12s; }
+.sv-token:hover { transform: translateY(-3px); }
+.sv-token.selected { box-shadow: 0 0 0 3px var(--ring, #888), 0 0 0 6px var(--accent), 0 8px 18px rgba(0,0,0,0.6); }
+.sv-token img.tok-face { width: 100%; height: 100%; border-radius: 50%; image-rendering: pixelated; box-shadow: none; background: #2f5a86; }
+.sv-token.moved img.tok-face { filter: grayscale(0.85) brightness(0.65); }
+.sv-token.frosty img.tok-face { filter: saturate(0.6) hue-rotate(-12deg); }
+.tok-hp { position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); display: flex; gap: 2px; }
+.tok-hp i { width: 9px; height: 4px; border-radius: 1px; background: #3a3f3e; box-shadow: 0 0 0 1px #111; }
+.tok-hp i.on { background: #b5554a; }
+.tok-frost { position: absolute; left: -4px; bottom: -2px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: #1b1d1e; color: var(--ice); box-shadow: 0 0 0 1px #000; }
+.tok-frost .icon { width: 12px; height: 12px; }
+.tok-ready { position: absolute; right: 0; top: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--good); border: 2px solid #1b1d1e; }
+.tok-card { position: absolute; left: 0; bottom: calc(100% + 14px); width: 250px; padding: 10px 12px; display: none; flex-direction: column; gap: 4px; text-align: left;
+  background: var(--panel-solid); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); color: var(--text); font-size: 12px; pointer-events: none; z-index: 5; }
+.sv-token:hover .tok-card, .sv-token:focus .tok-card { display: flex; }
+.tok-card b { font-family: var(--head); font-weight: 600; font-size: 15px; }
+html[lang='th'] .tok-card b { font-family: var(--font); font-weight: 700; }
+.tok-card small { color: var(--muted); }
+.tok-card .sv-stats { display: flex; gap: 10px; }
+.tok-ability { display: flex; gap: 6px; align-items: flex-start; color: #c9c4b8; line-height: 1.4; }
+.tok-ability .icon { color: var(--accent); flex: none; margin-top: 2px; }
+
+/* dice: 2D chips + a small count badge; the 3D tray floats only while rolling */
+.pp-dice { flex-direction: row; align-items: center; }
+#pp-chips { flex-wrap: nowrap; gap: 6px; }
+.dice-badge { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; display: inline-grid; place-items: center; font-family: var(--head); font-weight: 600; font-size: 12px;
+  background: #1b1d1e; border: 1px solid var(--line); color: var(--text); margin-left: 4px; }
+#dice-stage { position: fixed; left: 50%; bottom: calc(var(--player-h) + 30px); width: min(420px, calc(100vw - 32px)); height: 150px; transform: translateX(-50%) translateY(10px) scale(0.96);
+  z-index: 7; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.35s, transform 0.35s, visibility 0s 0.35s;
+  background: radial-gradient(ellipse at center, rgba(23,25,26,0.82) 0, rgba(23,25,26,0.55) 55%, transparent 75%); }
+#dice-stage.on { opacity: 1; visibility: visible; pointer-events: auto; cursor: pointer; transform: translateX(-50%); transition: opacity 0.25s, transform 0.25s; }
+#dice-stage canvas, #dice { width: 100%; height: 100%; display: block; }
+body:not(.in-game) #dice-stage, body.passing #dice-stage { display: none; }
+
+/* hand: compact faces or full cards, with a toggle */
+#pp-hand { flex-direction: row; align-items: center; gap: 8px; }
+#pp-hand .scroll-row { flex: 1; min-width: 0; }
+.hand-toggle { position: relative; flex: none; width: 40px; height: 40px; }
+.hand-toggle .count { position: absolute; right: -6px; top: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; font-size: 10.5px; font-weight: 700;
+  background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; }
+.item-card.mini { flex: 0 0 60px; height: 76px; padding: 4px; gap: 0; justify-content: center; border-top-width: 3px; }
+.item-card.mini > :not(.ic-art):not(.ic-head) { display: none; }
+.item-card.mini .ic-head { position: absolute; top: 2px; right: 3px; }
+.item-card.mini .ic-type { display: none; }
+.item-card.mini .ic-art { height: 60px; border: 0; box-shadow: none; background: none; }
+.item-card.mini .ic-art img.art-s { width: 48px; height: 48px; }
+.hand-cards.compact { gap: 8px; padding-top: 8px; }
+
+/* actions: End turn + a "more" menu */
+#pp-actions { flex-direction: row; align-items: center; gap: 8px; min-width: 0; justify-content: flex-end; }
+#pp-actions .btn.primary { padding: 10px 18px; font-size: 13px; }
+.icon-btn.more { width: 40px; height: 40px; }
+.more-menu { position: absolute; right: 0; bottom: calc(100% + 10px); min-width: 210px; padding: 6px; display: flex; flex-direction: column; gap: 2px; z-index: 6; }
+.menu-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: var(--radius); background: transparent; color: var(--text); cursor: pointer; text-align: left; font-size: 13px; }
+.menu-item:hover, .menu-item:focus-visible { background: #34302a; }
+.menu-item .icon { color: var(--accent); }
+.menu-item small { margin-left: auto; color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; }
+.menu-item.hold { user-select: none; -webkit-user-select: none; touch-action: none; }
+
+/* log: a floating feed at the top centre; hover / focus / pin opens a light, airy history */
+#log.feed { position: fixed; top: calc(var(--top-h) + 46px); left: 50%; transform: translateX(-50%); width: min(560px, calc(100vw - 32px)); z-index: 3;
+  background: none; border: 0; box-shadow: none; padding: 0; max-height: none; overflow: visible; outline: none; pointer-events: none; }
+body:not(.in-game) #log.feed, body.passing #log.feed { display: none; }
+.feed-recent { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: auto; }
+.feed-item { display: flex; align-items: center; gap: 7px; max-width: 100%; padding: 4px 10px; border-radius: 14px; font-size: 12.5px; line-height: 1.35; color: #d8d2c4;
+  background: rgba(23, 25, 26, 0.72); box-shadow: 0 2px 8px rgba(0,0,0,0.35); }
+.feed-recent .feed-item { animation: feed-life 6s ease-out both; }
+@keyframes feed-life { 0% { opacity: 0; transform: translateY(-6px); } 6% { opacity: 1; transform: none; } 82% { opacity: 1; } 100% { opacity: 0; } }
+.feed-item .who { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; color: var(--text); white-space: nowrap; }
+.feed-item.actor { background: rgba(43, 38, 30, 0.85); box-shadow: inset 0 0 0 1px rgba(178,138,84,0.45), 0 2px 8px rgba(0,0,0,0.35); }
+.feed-item.system { color: var(--muted); }
+.feed-item.bad .txt { color: #e2a399; }
+.feed-item.warn .txt { color: #d9b07a; }
+.feed-item .txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feed-item img.log-face { width: 20px; height: 20px; border-radius: 50%; flex: none; }
+.feed-history { display: none; pointer-events: auto; margin-top: 6px; padding: 8px 10px; border-radius: 8px;
+  background: rgba(23, 25, 26, 0.62); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border: 1px solid rgba(229,224,213,0.08); }
+#log.feed:hover .feed-history, #log.feed:focus-within .feed-history, #log.feed.pinned .feed-history { display: block; }
+#log.feed:hover .feed-recent, #log.feed:focus-within .feed-recent, #log.feed.pinned .feed-recent { display: none; }
+.feed-head { display: flex; align-items: center; justify-content: space-between; font-family: var(--head); font-weight: 500; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.feed-head .pin { width: 26px; height: 26px; }
+.feed-history ol { list-style: none; margin: 0; padding: 0 4px 0 0; max-height: 38vh; overflow-y: auto; display: flex; flex-direction: column; gap: 3px;
+  scrollbar-width: thin; scrollbar-color: rgba(229,224,213,0.18) transparent; }
+.feed-history ol::-webkit-scrollbar { width: 6px; }
+.feed-history ol::-webkit-scrollbar-track { background: transparent; }
+.feed-history ol::-webkit-scrollbar-thumb { background: rgba(229,224,213,0.18); border-radius: 3px; }
+.feed-history .feed-item { background: transparent; box-shadow: none; padding: 2px 4px; border-radius: 4px; }
+.feed-history .feed-item .txt { white-space: normal; }
+.feed-history .feed-item.round { color: var(--accent); font-weight: 700; margin-top: 6px; border-top: 1px solid rgba(229,224,213,0.08); padding-top: 6px; }
+.feed-history .feed-item.turn { color: var(--text); font-weight: 600; }
+.feed-history .feed-item.actor { background: rgba(178,138,84,0.10); box-shadow: none; }
+
+/* location panel: icon-only stats and portrait chips */
+.chip.person.face-only { padding: 2px; border-radius: 50%; box-shadow: 0 0 0 2px var(--owner, #888); }
+.chip.person.face-only img.art-s { width: 30px; height: 30px; }
+.chip.person.face-only.selected { box-shadow: 0 0 0 2px var(--owner, #888), 0 0 0 4px var(--accent); }
+.act-box h4 img.h4-face { width: 28px; height: 28px; }
+
+/* phones */
+@media (max-width: 760px) {
+  :root { --player-h: 176px; }
+  body.hand-full { --player-h: 270px; }
+  .sv-tokens { left: 10px; gap: 10px; }
+  .sv-token { width: 48px; height: 48px; }
+  .tok-card { width: min(240px, calc(100vw - 30px)); }
+  #locpanel { bottom: calc(var(--player-h) + 84px); }
+  #log.feed { top: calc(var(--top-h) + 82px); }
+  .feed-recent .feed-item:nth-child(n+3) { display: none; }
+  .feed-item { font-size: 11.5px; }
+  .pp-body { display: flex; flex-direction: column; gap: 6px; }
+  #pp-actions { justify-content: space-between; }
+  #dice-stage { height: 120px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .feed-recent .feed-item { animation: none; }
+  #dice-stage, #dice-stage.on { transition: none; }
+}

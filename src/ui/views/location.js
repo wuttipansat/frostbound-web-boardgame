@@ -28,21 +28,23 @@ export function renderLocationPanel(el, ctx) {
   const ownerIdx = (pid) => s.players.findIndex((p) => p.id === pid);
 
   const stats = h('div', { class: 'stats' },
-    h('div', { class: 'stat warm', tip: t('loc.survivors') }, icon('person'), h('b', {}, `${here.length}/${def.survivorSlots ?? '∞'}`), h('span', {}, t('loc.survivors'))),
-    h('div', { class: 'stat danger', tip: t('tip.zombies', { n: loc.zombies }) },
+    // Icon + number; the label is in the tooltip.
+    h('div', { class: 'stat warm', tip: t('loc.survivors'), tabindex: '0' }, icon('person'), h('b', {}, `${here.length}/${def.survivorSlots ?? '∞'}`)),
+    h('div', { class: 'stat danger', tip: `${t('loc.zombies')} — ${t('tip.zombies', { n: loc.zombies })}`, tabindex: '0' },
       loc.zombies ? art.zombie((id.length + loc.zombies) % 5, 's', { cls: 'stat-art', alt: '' }) : icon('skull'),
-      h('b', {}, `${loc.zombies}/${def.zombieSlots}`), h('span', {}, t('loc.zombies'))),
-    h('div', { class: 'stat' }, icon('barricade'), h('b', {}, loc.barricades), h('span', {}, t('loc.barricades'))),
-    loc.deck ? h('div', { class: 'stat' }, icon('search'), h('b', {}, loc.deck.length), h('span', {}, t('loc.cards'))) : null);
+      h('b', {}, `${loc.zombies}/${def.zombieSlots}`)),
+    h('div', { class: 'stat', tip: t('loc.barricades'), tabindex: '0' }, icon('barricade'), h('b', {}, loc.barricades)),
+    loc.deck ? h('div', { class: 'stat', tip: t('loc.cards'), tabindex: '0' }, icon('search'), h('b', {}, loc.deck.length)) : null);
 
   const people = h('div', { class: 'here' },
-    h('h4', {}, t('loc.here')),
     here.length ? h('div', { class: 'chips' }, here.map((sv) => h('button', {
-      class: `chip person${ui.selSurvivor === sv.id ? ' selected' : ''}`,
+      class: `chip person face-only${ui.selSurvivor === sv.id ? ' selected' : ''}`,
       style: { '--owner': hex(PLAYER_COLORS[ownerIdx(sv.owner)]) },
+      tip: `${survivorDef(sv.id).name} · ${s.players.find((p) => p.id === sv.owner)?.name ?? ''}`,
+      'aria-label': survivorDef(sv.id).name,
       onclick: () => sv.owner === ctx.viewer && ctx.selectSurvivor(sv.id),
-    }, art.portrait(sv.id, 's', { alt: '', cls: `${sv.wounds ? 'wounded' : ''}${sv.frostbite ? ' frosty' : ''}` }), survivorDef(sv.id).name,
-    s.players.find((p) => p.id === sv.owner)?.exiled ? h('span', { class: 'exile-badge inline', tip: t('panel.exiled') }, icon('door')) : null))) : h('p', { class: 'muted small' }, t('loc.nobody')));
+    }, art.portrait(sv.id, 's', { alt: '', cls: `${sv.wounds ? 'wounded' : ''}${sv.frostbite ? ' frosty' : ''}` }),
+    s.players.find((p) => p.id === sv.owner)?.exiled ? h('span', { class: 'exile-badge inline', tip: t('panel.exiled') }, icon('door')) : null))) : null);
 
   const actions = [];
   if (ctx.canAct) {
@@ -84,7 +86,7 @@ export function renderLocationPanel(el, ctx) {
         const opts = survivorOptions(s, me, sv.id, { dieIndex: ui.selDie });
         const risky = (o) => o.id === 'attack' && survivorDef(sv.id).ability.type !== 'noAttackExposure';
         actions.push(h('div', { class: 'act-box' },
-          h('h4', {}, art.portrait(sv.id, 's', { cls: 'h4-face', alt: '' }), t('loc.actionsFor', { name: survivorDef(sv.id).name })),
+          h('h4', { tip: t('loc.actionsFor', { name: survivorDef(sv.id).name }) }, art.portrait(sv.id, 's', { cls: 'h4-face', alt: survivorDef(sv.id).name })),
           h('div', { class: 'act-grid' }, opts.map((o) => {
             const isLure = o.id === 'lure';
             const die = o.die != null ? getPlayer(s, me).dice[o.die] : null;

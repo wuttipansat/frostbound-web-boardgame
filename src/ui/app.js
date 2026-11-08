@@ -12,7 +12,7 @@ import { sound, soundForLog } from '../audio/sound.js';
 import { mount } from './dom.js';
 import { advanceTutorial, eventForAction, tutorialVisible, DONE } from './tutorial.js';
 import { renderTutorial, positionTutorial } from './views/tutorial.js';
-import { renderTopbar, renderLog, renderPhase, renderColony } from './views/hud.js';
+import { renderTopbar, renderLog, renderPhase } from './views/hud.js';
 import { resetTicker } from './ticker.js';
 import { connect, hydrateView, newLogEntries, savedSession } from '../net/client.js';
 import { RuleError } from '../core/errors.js';
@@ -57,13 +57,16 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     setup: { count: 3, seats: defaultSeats(), scenarioId: 'beacon', betrayer: 'maybe' },
     modal: null, selSurvivor: null, selDie: null, selCard: null, selLoc: null, lureTo: null,
     queue: [], // public reveal modals waiting to be shown: { type: 'colony' | 'vote', report }
-    useFuel: false, logOpen: typeof window !== 'undefined' ? window.innerWidth > 900 : true, crisisOpen: false, peek: false, draftPicks: [], req: null,
+    useFuel: false, logOpen: false, // pins the log history open (the feed itself always shows) crisisOpen: false, peek: false, draftPicks: [], req: null,
     sound: sound.enabled,
     tutorial: settings.tutorial ?? !settings.tutorialDone,
     tutStep: DONE,
     ppCollapsed: false,
     picking: null, // { type: 'lure', survivorId, dieIndex } while choosing a destination on the board
     skipEndConfirm: false,
+    moreOpen: false, // the "more actions" menu next to End turn
+    // Hand shown as compact faces (remembered per device); phones and short screens start compact.
+    handCompact: settings.handCompact ?? (typeof window !== 'undefined' && (window.innerWidth <= 760 || window.innerHeight <= 800)),
   };
   let tutPlayer = null; // the human the first-round tutorial follows
   // Online play: { client, playerId, code, lobby, status } while connected to a room server.
@@ -96,6 +99,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
       online: online ? { code: online.code, lobby: online.lobby, playerId: online.playerId, status: online.status, host: online.playerId === 'p0' } : null,
       set, dispatch, dismissQueue, tutorialEvent, setTutorial, sfx: (name, delay) => sound.play(name, delay), selectSurvivor, selectLocation, takeSeat, startGame, continueGame, quitToSetup, setLanguage, setSound,
       createRoom, joinRoom, startRoom, leaveRoom,
+      setHandCompact: (on) => { ui.handCompact = on; saveSettings({ handCompact: on }); render(); },
     };
   }
 
@@ -419,7 +423,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     const x = ctx();
     document.body.classList.toggle('in-game', !!state);
     if (!state) {
-      for (const el of [dom.topbar, dom.log, dom.loc, dom.phase, dom.colony]) if (el) mount(el);
+      for (const el of [dom.topbar, dom.log, dom.loc, dom.phase, dom.playerRefs.survivors]) if (el) mount(el);
       dom.player.classList.add('hidden');
       dom.loc.classList.add('hidden');
       mount(dom.modal, ui.modal === 'settings' ? settingsModal(x) : online?.code ? lobbyScreen(x) : setupScreen(x));
@@ -427,20 +431,21 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
       return;
     }
     dom.player.classList.remove('hidden');
+    document.body.classList.toggle('hand-full', !ui.handCompact);
     // While the device is being handed over, nothing private may be visible underneath.
     document.body.classList.toggle('passing', !!needsPass());
     document.body.classList.toggle('pp-collapsed', !!ui.ppCollapsed);
     renderTopbar(dom.topbar, x);
     if (dom.phase) renderPhase(dom.phase, x);
-    if (dom.colony) {
-      renderColony(dom.colony, x);
-      document.documentElement.style.setProperty('--colony-h', `${dom.colony.offsetHeight}px`);
-    }
     renderLog(dom.log, x);
     renderLocationPanel(dom.loc, x);
     renderPlayerPanel(dom.playerRefs, x);
-    const shown = x.viewer ? getPlayer(state, x.viewer) : getPlayer(state, state.activePlayerId ?? state.players[0].id);
-    if (shown && state.phase !== PHASES.DRAFT) diceTray.sync(shown.dice, `${shown.id}:${state.round}`);
+    // The tray throws the active player's dice when their turn starts (dice are public); the panel
+    // then shows them as 2D chips. Everyone watches the roll, online too.
+    const roller = state.activePlayerId ? getPlayer(state, state.activePlayerId) : null;
+    if (roller && state.phase !== PHASES.DRAFT && state.phase !== PHASES.GAME_OVER) {
+      if (diceTray.sync(roller.dice, `${roller.id}:${state.round}`)) fx.diceRoll?.();
+    }
     // Animated reveal modals keep their DOM while they stay on screen, so the animation isn't restarted.
     const [key, build] = modalFor(x);
     if (!key || key !== modalKey) {
@@ -534,6 +539,8 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
   window.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Escape' || !state) return;
     if (ui.crisisOpen) set({ crisisOpen: false });
+    else if (ui.moreOpen) set({ moreOpen: false });
+    else if (ui.logOpen) set({ logOpen: false });
     else if (ui.picking) set({ picking: null });
     else if (ui.selCard) set({ selCard: null });
     else if (ui.modal) set({ modal: null });
@@ -542,6 +549,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
   // Clicking anywhere outside the crisis popover closes it.
   document.addEventListener('click', (ev) => {
     if (ui.crisisOpen && !ev.target.closest?.('.crisis-pop, .stat-block.crisis')) set({ crisisOpen: false });
+    if (ui.moreOpen && !ev.target.closest?.('.more-menu, .icon-btn.more')) set({ moreOpen: false });
   });
 
   render();

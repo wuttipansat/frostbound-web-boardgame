@@ -32,35 +32,6 @@ export function scrollRow(cls, children) {
   return wrap;
 }
 
-function survivorCard(ctx, sv, { selectable = true, canAct = false } = {}) {
-  const { ui, art } = ctx;
-  const d = survivorDef(sv.id);
-  const limit = woundLimit(sv.id);
-  const selected = ui.selSurvivor === sv.id;
-  const left = limit - sv.wounds;
-  return h('button', {
-    class: `sv-card${selected ? ' selected' : ''}${sv.moved ? ' moved' : ''}${canAct ? ' can-act' : ''}`,
-    style: { '--accent': d.accent },
-    'aria-pressed': selected ? 'true' : 'false',
-    onclick: selectable ? () => ctx.selectSurvivor(selected ? null : sv.id) : null,
-  },
-  h('div', { class: 'sv-face' },
-    art.portrait(sv.id, 's', { alt: d.name, cls: `${sv.wounds ? 'wounded' : ''}${sv.frostbite ? ' frosty' : ''}` }),
-    sv.moved ? h('span', { class: 'moved-ribbon' }, t('panel.moved')) : null,
-    canAct ? h('span', { class: 'ready-mark', tip: t('panel.canAct'), 'aria-label': t('panel.canAct') }) : null,
-    ctx.state.players.find((p) => p.id === sv.owner)?.exiled ? h('span', { class: 'exile-badge', tip: t('panel.exiled') }, icon('door')) : null),
-  h('div', { class: 'sv-info' },
-    h('div', { class: 'sv-top' }, h('b', { tip: c('survivors', sv.id, 'occupation') }, d.name), h('span', { class: 'loc-chip' }, c('locations', sv.location, 'name'))),
-    h('div', { class: 'sv-stats' },
-      h('span', { class: 'need', tip: t('tip.attack', { n: d.attack }) }, icon('attack'), dieFace(d.attack, 'mini'), '+'),
-      h('span', { class: 'need', tip: t('tip.search', { n: d.search }) }, icon('search'), dieFace(d.search, 'mini'), '+'),
-      h('span', { class: 'need', tip: t('tip.influence') }, icon('star'), d.influence)),
-    h('div', { class: 'sv-health', tip: t('tip.health', { n: left }) },
-      Array.from({ length: limit }, (_, i) => heart(i < left)),
-      sv.frostbite ? h('span', { class: 'frost', tip: t('tip.frostbite') }, icon('snowflake')) : null),
-    h('div', { class: 'sv-ability', tip: c('survivors', sv.id, 'abilityText') }, icon('ability'), h('span', {}, c('survivors', sv.id, 'abilityText')))));
-}
-
 /** The big card sheet: art, full text, explicit target/die choice, and the card's actions. */
 function cardDetail(ctx, shown, uid) {
   const { state: s, art } = ctx;
@@ -132,7 +103,7 @@ export function renderPlayerPanel(refs, ctx) {
   const isActor = ctx.canAct;
   const actorP = actor ? getPlayer(s, actor) : null;
 
-  // ---- head
+  // ---- head: name, a small "your turn" light, collapse
   const status = isActor || (viewer && viewer === actor) ? t('panel.yourTurn')
     : !viewer ? t('panel.spectating', { name: shown.name })
       : actorP?.isAI ? t('waitingAi', { name: actorP.name })
@@ -140,46 +111,55 @@ export function renderPlayerPanel(refs, ctx) {
   mount(refs.head,
     h('span', { class: 'dot', style: { background: hex(PLAYER_COLORS[idx]) } }),
     h('b', { class: 'pname' }, shown.name),
+    h('span', { class: `turn-light${isActor ? ' go' : ''}`, tip: status, 'aria-label': status, role: 'status' }),
     shown.isAI ? h('span', { class: 'tag' }, t('panel.aiTag')) : null,
     shown.exiled ? h('span', { class: 'tag bad' }, t('panel.exiled')) : null,
-    isActor ? h('span', { class: 'dice-left', tip: t('tip.diceLeft') }, icon('dice'), t('panel.diceLeft', { n: unusedDice(s, shown.id) })) : null,
-    h('span', { class: `status${isActor ? ' go' : ''}` }, status),
     h('button', {
       class: 'icon-btn collapse', 'aria-label': ui.ppCollapsed ? 'expand' : 'collapse', 'aria-expanded': ui.ppCollapsed ? 'false' : 'true',
       onclick: () => ctx.set({ ppCollapsed: !ui.ppCollapsed }),
     }, icon(ui.ppCollapsed ? 'up' : 'down')));
 
-  // ---- survivors
+  // ---- survivors: round tokens floating above the panel
   const acting = new Set(isActor ? actingSurvivors(s, shown.id) : []);
-  mount(refs.survivors, scrollRow('sv-row', aliveSurvivorsOf(s, shown.id).map((sv) => survivorCard(ctx, sv, { canAct: acting.has(sv.id) }))));
+  mount(refs.survivors, aliveSurvivorsOf(s, shown.id).map((sv) => survivorToken(ctx, sv, { canAct: acting.has(sv.id), color: hex(PLAYER_COLORS[idx]) })));
 
-  // ---- dice (drawn faces; the tray above shows them in 3D)
-  mount(refs.chips, shown.dice.map((d, i) => h('button', {
-    class: `die-chip${d.used ? ' used' : ''}${ui.selDie === i ? ' selected' : ''}`,
-    dataset: { die: String(i) },
-    disabled: d.used || !isActor,
-    'aria-label': t('tip.die', { v: d.v }),
-    onclick: () => ctx.set({ selDie: ui.selDie === i ? null : i }),
-  }, dieFace(d.v))),
-  isActor ? h('span', { class: 'muted small' }, ui.selDie == null ? t('panel.dieAuto') : '') : null);
+  // ---- dice: 2D chips only (the 3D tray shows the roll, then hides)
+  const left = unusedDice(s, shown.id);
+  mount(refs.chips,
+    shown.dice.map((d, i) => h('button', {
+      class: `die-chip${d.used ? ' used' : ''}${ui.selDie === i ? ' selected' : ''}`,
+      dataset: { die: String(i) },
+      disabled: d.used || !isActor,
+      'aria-label': t('tip.die', { v: d.v }),
+      tip: isActor ? t('tip.dieChip') : null,
+      onclick: () => ctx.set({ selDie: ui.selDie === i ? null : i }),
+    }, dieFace(d.v))),
+    isActor ? h('span', { class: 'dice-badge', tip: t('tip.diceLeft'), 'aria-label': t('panel.diceLeft', { n: left }) }, String(left)) : null);
 
-  // ---- hand (only ever the viewer's own)
+  // ---- hand (only ever the viewer's own): compact faces or full cards
   const hand = viewer ? shown.hand : [];
-  const cards = hand.map((uid) => itemCard(ctx, shown, uid, { isActor }));
+  const compact = ui.handCompact;
+  const cards = hand.map((uid) => itemCard(ctx, shown, uid, { isActor, compact }));
   mount(refs.hand,
-    cards.length ? scrollRow('hand-cards', cards) : h('span', { class: 'muted small' }, viewer ? t('panel.handEmpty') : ''),
+    hand.length ? h('button', {
+      class: `icon-btn hand-toggle${compact ? '' : ' on'}`, tip: t(compact ? 'panel.handExpand' : 'panel.handCompact'),
+      'aria-label': t(compact ? 'panel.handExpand' : 'panel.handCompact'), 'aria-pressed': compact ? 'false' : 'true',
+      onclick: () => ctx.setHandCompact(!compact),
+    }, icon('hand'), h('span', { class: 'count' }, String(hand.length))) : null,
+    cards.length ? scrollRow(`hand-cards${compact ? ' compact' : ''}`, cards) : h('span', { class: 'muted small' }, viewer ? t('panel.handEmpty') : ''),
     isActor && ui.selCard && hand.includes(ui.selCard) ? cardDetail(ctx, shown, ui.selCard) : null);
 
-  // ---- actions
+  // ---- actions: End turn, everything else behind "more"
   const objective = viewer ? objectiveDef(getPlayer(s, viewer).objectiveId) : null;
   const end = isActor ? endTurnOption(s, shown.id) : null;
   const endTurn = () => {
     if (shouldConfirmEndTurn(s, shown.id, { skip: ui.skipEndConfirm })) ctx.set({ modal: 'confirmEnd' });
     else ctx.dispatch(act.endTurn(shown.id));
   };
-  mount(refs.actions,
+  const canVote = isActor && voteTargets(s, shown.id).length > 0;
+  const menu = [
     objective ? h('button', {
-      class: 'btn ghost hold', tip: t('panel.objective'),
+      class: 'menu-item hold', role: 'menuitem',
       onpointerdown: (ev) => { ev.preventDefault(); ctx.set({ peek: true }); },
       onpointerup: () => ctx.set({ peek: false }),
       onpointerleave: () => ui.peek && ctx.set({ peek: false }),
@@ -187,10 +167,18 @@ export function renderPlayerPanel(refs, ctx) {
       onkeydown: (ev) => { if (ev.key === ' ' || ev.key === 'Enter') { ev.preventDefault(); if (!ui.peek) ctx.set({ peek: true }); } },
       onkeyup: () => ctx.set({ peek: false }),
       oncontextmenu: (ev) => ev.preventDefault(),
-    }, icon('lock'), ` ${t('panel.objectiveShort')}`) : null,
-    isActor ? h('button', { class: 'btn ghost', onclick: () => ctx.set({ modal: 'request' }) }, icon('request'), ` ${t('panel.request')}`) : null,
-    isActor && voteTargets(s, shown.id).length ? h('button', { class: 'btn ghost', onclick: () => ctx.set({ modal: 'callVote', voteTarget: null }) }, icon('vote'), ` ${t('vote.call')}`) : null,
+    }, icon('lock'), h('span', {}, t('panel.objectiveShort')), h('small', {}, t('panel.hold'))) : null,
+    isActor ? h('button', { class: 'menu-item', role: 'menuitem', onclick: () => ctx.set({ modal: 'request', moreOpen: false }) }, icon('request'), h('span', {}, t('panel.request'))) : null,
+    canVote ? h('button', { class: 'menu-item', role: 'menuitem', onclick: () => ctx.set({ modal: 'callVote', voteTarget: null, moreOpen: false }) }, icon('vote'), h('span', {}, t('vote.call'))) : null,
+  ].filter(Boolean);
+  mount(refs.actions,
+    menu.length ? h('button', {
+      class: `icon-btn more${ui.moreOpen ? ' on' : ''}`, tip: t('panel.more'), 'aria-label': t('panel.more'),
+      'aria-haspopup': 'menu', 'aria-expanded': ui.moreOpen ? 'true' : 'false',
+      onclick: (ev) => { ev.stopPropagation(); ctx.set({ moreOpen: !ui.moreOpen }); },
+    }, icon('more')) : null,
     isActor ? h('button', { class: 'btn primary', disabled: !end.ok, onclick: endTurn }, t('panel.endTurn')) : null,
+    ui.moreOpen && menu.length ? h('div', { class: 'more-menu panel', role: 'menu', onclick: (ev) => ev.stopPropagation() }, menu) : null,
     ui.peek && objective ? h('div', { class: `objective-peek panel k-${objective.kind}` },
       h('small', {}, t(`kind.${objective.kind}`)),
       h('h3', {}, c('objectives', objective.id, 'name')),
@@ -210,18 +198,19 @@ function cardFooter(item, used) {
 }
 
 /** A vertical playing card: header (name, type, tier), sprite plate, effect line, flavour, footer. */
-export function itemCard(ctx, shown, uid, { isActor = false } = {}) {
+export function itemCard(ctx, shown, uid, { isActor = false, compact = false } = {}) {
   const { state: s, ui, art } = ctx;
   const item = itemOf(s, uid);
   const selected = ui.selCard === uid;
   const used = (shown.usedCards ?? []).includes(uid);
   const usable = isActor ? cardUsable(s, shown.id, uid) : { ok: true };
   return h('button', {
-    class: `item-card t-${item.type} tier-${item.tier}${selected ? ' selected' : ''}${used ? ' spent' : ''}${usable.ok ? '' : ' unusable'}`,
+    class: `item-card t-${item.type} tier-${item.tier}${compact ? ' mini' : ''}${selected ? ' selected' : ''}${used ? ' spent' : ''}${usable.ok ? '' : ' unusable'}`,
+    'aria-label': c('items', item.id, 'name'),
     dataset: { uid },
     'aria-pressed': selected ? 'true' : 'false',
     // The card face stays short; the full rule and the flavour text are in the tooltip.
-    tip: usable.ok ? `${t(...itemPlay(item))} — ${c('items', item.id, 'text')}` : t(`err.${usable.reason}`),
+    tip: `${compact ? `${c('items', item.id, 'name')} · ${t(`tier.${item.tier}`)} — ` : ''}${usable.ok ? `${t(...itemPlay(item))} — ${c('items', item.id, 'text')}` : t(`err.${usable.reason}`)}${compact ? ` · ${cardFooter(item, used)}` : ''}`,
     onclick: () => ctx.set({ selCard: selected ? null : uid, ppCollapsed: false }),
   },
   h('span', { class: 'ic-head' },
@@ -253,4 +242,38 @@ export function flyCard(uid, kind) {
     { transform: `translate(${dx * 0.55}px, ${dy * 0.55 - 30}px) scale(0.8) rotate(-6deg)`, opacity: 0.95, offset: 0.55 },
     { transform: `translate(${dx}px, ${dy}px) scale(0.3) rotate(-10deg)`, opacity: 0 },
   ], { duration: 520, easing: 'cubic-bezier(.3,.7,.3,1)' }).finished.then(() => ghost.remove(), () => ghost.remove());
+}
+
+// ---------------------------------------------------------------- step 13: survivor tokens
+
+/** A round portrait token: ring in the owner's colour, health pips, frostbite, "can act" and moved marks.
+ * No text on it; hovering or focusing shows a small card with the details. */
+function survivorToken(ctx, sv, { canAct = false, color = '#888' } = {}) {
+  const { ui, art } = ctx;
+  const d = survivorDef(sv.id);
+  const limit = woundLimit(sv.id);
+  const left = limit - sv.wounds;
+  const selected = ui.selSurvivor === sv.id;
+  const where = c('locations', sv.location, 'name');
+  return h('button', {
+    class: `sv-token${selected ? ' selected' : ''}${sv.moved ? ' moved' : ''}${canAct ? ' can-act' : ''}${sv.frostbite ? ' frosty' : ''}`,
+    dataset: { sv: sv.id },
+    style: { '--ring': color },
+    'aria-pressed': selected ? 'true' : 'false',
+    'aria-label': t('panel.tokenLabel', { name: d.name, place: where, hp: left, max: limit }),
+    onclick: () => ctx.selectSurvivor(selected ? null : sv.id),
+  },
+  art.portrait(sv.id, 's', { alt: '', cls: 'tok-face' }),
+  h('span', { class: 'tok-hp', 'aria-hidden': 'true' }, Array.from({ length: limit }, (_, i) => h('i', { class: i < left ? 'on' : '' }))),
+  sv.frostbite ? h('span', { class: 'tok-frost', 'aria-hidden': 'true' }, icon('snowflake')) : null,
+  canAct ? h('span', { class: 'tok-ready', 'aria-hidden': 'true' }) : null,
+  h('span', { class: 'tok-card', 'aria-hidden': 'true' },
+    h('b', {}, d.name),
+    h('small', {}, `${c('survivors', sv.id, 'occupation')} · ${where}`),
+    h('span', { class: 'sv-stats' },
+      h('span', { class: 'need' }, icon('attack'), dieFace(d.attack, 'mini'), '+'),
+      h('span', { class: 'need' }, icon('search'), dieFace(d.search, 'mini'), '+'),
+      h('span', { class: 'need' }, icon('star'), d.influence)),
+    h('span', { class: 'sv-health' }, Array.from({ length: limit }, (_, i) => heart(i < left)), sv.moved ? h('small', {}, ` · ${t('panel.moved')}`) : null),
+    h('span', { class: 'tok-ability' }, icon('ability'), c('survivors', sv.id, 'abilityText'))));
 }

@@ -81,7 +81,7 @@ async function audit(browser, device, vp) {
   f.emojiInUi = await page.evaluate(() => {
     const re = /\p{Extended_Pictographic}|[⚀-⚅☠⚔★❄⚖✋]/u;
     const hits = new Set();
-    for (const el of document.querySelectorAll('#player *, #topbar *, #locpanel *, #labels *')) {
+    for (const el of document.querySelectorAll('#player *, #topbar *, #locpanel *, #labels *, #log *, .sv-tokens *')) {
       for (const n of el.childNodes) if (n.nodeType === 3 && re.test(n.textContent)) hits.add(n.textContent.trim().slice(0, 12));
     }
     return [...hits].slice(0, 20);

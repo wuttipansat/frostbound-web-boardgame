@@ -29,6 +29,7 @@ const PATHS = {
   skull: S(`<path ${st} d="M12 3a8 8 0 0 0-6 13v3h3v-2h2v2h2v-2h2v2h3v-3a8 8 0 0 0-6-13z"/><circle cx="9" cy="11" r="1.6" fill="currentColor"/><circle cx="15" cy="11" r="1.6" fill="currentColor"/>`),
   star: S(`<path fill="currentColor" d="M12 3l2.5 6L21 9.5l-5 4.2L17.5 20 12 16.7 6.5 20 8 13.7l-5-4.2L9.5 9z"/>`),
   check: S(`<path ${st} d="M5 12l5 5L20 7"/>`),
+  more: S(`<circle fill="currentColor" cx="5" cy="12" r="1.8"/><circle fill="currentColor" cx="12" cy="12" r="1.8"/><circle fill="currentColor" cx="19" cy="12" r="1.8"/>`),
   close: S(`<path ${st} d="M6 6l12 12M18 6L6 18"/>`),
   left: S(`<path ${st} d="M15 5l-7 7 7 7"/>`),
   right: S(`<path ${st} d="M9 5l7 7-7 7"/>`),

@@ -4,7 +4,10 @@ export function h(tag, props = {}, ...children) {
   for (const [k, v] of Object.entries(props ?? {})) {
     if (v == null || v === false) continue;
     if (k === 'class') el.className = v;
-    else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+    else if (k === 'style' && typeof v === 'object') {
+      // CSS custom properties (--x) need setProperty; Object.assign silently drops them.
+      for (const [sk, sv] of Object.entries(v)) if (sk.startsWith('--')) el.style.setProperty(sk, sv); else el.style[sk] = sv;
+    }
     else if (k === 'dataset') Object.assign(el.dataset, v);
     else if (k === 'tip') el.dataset.tip = v; // shared tooltip (hover, focus and tap) instead of title=
     else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);

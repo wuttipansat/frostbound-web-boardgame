@@ -70,7 +70,28 @@ const FX_BURST = {
   bite: [0x5a0f12, 0x8e1b1b, 0x6f8a4e],
 };
 const popups = [];
+// The dice stage floats over the board while dice roll, holds the result, then fades away.
+const diceStage = $('dice-stage');
+let diceTimer = null;
+let diceStarted = 0;
+// Timers, not frames: the stage must also go away if rendering is paused. Never longer than 6 s.
+function watchDice() {
+  clearTimeout(diceTimer);
+  diceTimer = setTimeout(() => {
+    // Still rolling: keep watching. Settled: hold the result ~1.6 s so it can be read, then fade.
+    if ((diceTray.busy || diceTray.exposureBusy) && performance.now() - diceStarted < 6000) watchDice();
+    else diceTimer = setTimeout(() => diceStage.classList.remove('on'), 1600);
+  }, 200);
+}
+function showDice() {
+  diceStage.classList.add('on');
+  diceStarted = performance.now();
+  watchDice();
+}
+diceStage.addEventListener('click', () => { clearTimeout(diceTimer); diceStage.classList.remove('on'); });
+
 function exposureFx(survivorId, face) {
+  showDice();
   const obj = pieces.survivorObject(survivorId);
   const fallback = obj ? obj.position.clone() : new THREE.Vector3();
   // The die tumbles in the tray first; the verdict then floats up over the survivor.
@@ -87,9 +108,9 @@ function exposureFx(survivorId, face) {
 const app = createApp({
   board, pieces, diceTray, art,
   aiFast: params.get('ai') === 'fast', // debug/testing: AI doesn't wait for animations
-  fx: { exposure: exposureFx },
+  fx: { exposure: exposureFx, diceRoll: showDice },
   dom: {
-    topbar: $('topbar'), phase: $('phase'), colony: $('colony'), log: $('log'), loc: $('locpanel'), player: $('player'), modal: $('modal'), toasts: $('toasts'), tutorial: $('tutorial'),
+    topbar: $('topbar'), phase: $('phase'), log: $('log'), diceStage: $('dice-stage'), loc: $('locpanel'), player: $('player'), modal: $('modal'), toasts: $('toasts'), tutorial: $('tutorial'),
     playerRefs: { head: $('pp-head'), survivors: $('pp-survivors'), chips: $('pp-chips'), hand: $('pp-hand'), actions: $('pp-actions') },
     onRender: (state) => {
       refreshLabels(state);
@@ -119,7 +140,7 @@ stage.onFrame((_t, dt) => {
     p.el.style.top = `${((1 - v.y) / 2) * ch}px`;
   }
 });
-const PANELS = ['topbar', 'player', 'locpanel', 'log', 'colony'].map((id) => document.getElementById(id));
+const PANELS = ['topbar', 'player', 'locpanel', 'log', 'pp-survivors'].map((id) => document.getElementById(id));
 stage.onFrame(() => {
   const { clientWidth: w, clientHeight: h } = stage.renderer.domElement;
   const rects = PANELS.filter((el) => el && !el.classList.contains('hidden') && el.offsetWidth).map((el) => el.getBoundingClientRect());
