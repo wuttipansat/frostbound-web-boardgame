@@ -22,7 +22,7 @@
   --radius-card: 5px;
   --gap: 8px;
   --top-h: 64px;
-  --player-h: 252px;
+  --player-h: 236px;
   --colony-h: 0px;
   --font: 'IBM Plex Sans Thai', system-ui, sans-serif;
   --head: 'Oswald', 'IBM Plex Sans Thai', sans-serif;
@@ -805,7 +805,7 @@ html[lang='th'] .sv-card .sv-top b, html[lang='th'] .draft-card b { font-family:
 .t-weapon { --type: #9a4a40; } .t-junk { --type: #7a6650; } .t-survivor { --type: #b9ab8e; } .t-book { --type: #a8894a; }
 .hand-cards { gap: 10px; padding: 10px 4px 4px; }
 .item-card {
-  position: relative; flex: 0 0 108px; height: 174px; padding: 6px 7px 5px; gap: 2px;
+  position: relative; flex: 0 0 108px; height: 158px; padding: 6px 7px 5px; gap: 2px;
   display: flex; flex-direction: column; align-items: stretch; text-align: left; cursor: pointer;
   background: var(--grain), linear-gradient(to bottom, #303433, #262928); color: var(--text);
   border: 1px solid #4a504e; border-top: 3px solid var(--type); border-radius: var(--radius-card);
@@ -828,7 +828,6 @@ html[lang='th'] .ic-type { font-family: var(--font); letter-spacing: 0; text-tra
 .ic-art { display: grid; place-items: center; height: 70px; border-radius: 2px; background: var(--grain), radial-gradient(circle at 50% 45%, #3b3f3d, #232625); border: 1px solid #1b1d1e; box-shadow: inset 0 1px 3px rgba(0,0,0,0.6); }
 .item-card .ic-art img.art-s { width: 64px; height: 64px; background: none; border-radius: 0; }
 .item-card .ishort { margin: 1px 0 0; font-size: 10.5px; font-weight: 700; line-height: 1.15; color: color-mix(in srgb, var(--type) 60%, white); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ic-text { font-size: 9.5px; line-height: 1.2; color: var(--muted); font-style: italic; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ic-foot { margin-top: auto; padding-top: 2px; border-top: 1px dashed #4a504e; display: flex; align-items: center; gap: 3px; font-size: 8.5px; letter-spacing: 0.06em; text-transform: uppercase; color: #8a8a82; white-space: nowrap; overflow: hidden; }
 .ic-foot .icon { width: 9px; height: 9px; }
 .item-card.unusable { filter: saturate(0.35) brightness(0.72); }
@@ -885,7 +884,6 @@ html[lang='th'] .loc-label { font-family: var(--font); letter-spacing: 0; text-t
 @media (max-height: 800px) and (min-width: 761px) {
   :root { --player-h: 214px; }
   .item-card { height: 150px; }
-  .ic-text { display: none; }
   #locpanel .stat { padding: 3px 2px; gap: 0; }
   #locpanel .stat img.stat-art { width: 22px; height: 22px; }
   #locpanel h4 { margin: 8px 0 4px; }
@@ -898,7 +896,6 @@ html[lang='th'] .loc-label { font-family: var(--font); letter-spacing: 0; text-t
   #phase { top: calc(var(--top-h) + 52px); padding: 3px 8px; font-size: 11px; gap: 8px; }
   .phase-steps { display: none; }
   .item-card { flex-basis: 96px; height: 150px; }
-  .ic-text { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .item-card, .item-card:hover { transition: none; transform: none; }
@@ -906,5 +903,25 @@ html[lang='th'] .loc-label { font-family: var(--font); letter-spacing: 0; text-t
   .res-delta { display: none; }
 }
 .item-card > * { flex: none; }
-.ic-text { max-height: 2.4em; }
 .item-card .iname { max-height: 2.3em; }
+
+/* ---- step 12: online lobby, crossroads reveal */
+.mode-seg { display: flex; width: max-content; margin: 4px auto 14px; }
+.mode-seg button { padding: 7px 18px; font-size: 13px; }
+.join-row { display: flex; gap: 8px; justify-content: center; margin: -4px 0 12px; }
+.code-input { width: 120px; text-align: center; font-family: var(--head); font-weight: 600; font-size: 18px; letter-spacing: 0.3em; text-transform: uppercase;
+  background: #1b1d1e; color: var(--text); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 8px; }
+.open-seat { flex: 1; min-width: 0; padding: 7px 10px; border: 1px dashed var(--line); border-radius: var(--radius); color: var(--muted); font-size: 13px; }
+.dialog.lobby { width: min(420px, 100%); text-align: center; }
+.room-code { font-family: var(--head); font-weight: 600; font-size: 54px; letter-spacing: 0.25em; color: var(--accent); margin: 2px 0 0 0.25em; user-select: all; }
+.lobby-seats { list-style: none; padding: 0; margin: 14px 0; display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.lobby-seats li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--radius); background: #282b2a; border: 1px solid var(--line); }
+.lobby-seats li.open { border-style: dashed; color: var(--muted); }
+.lobby-seats li.me { box-shadow: inset 3px 0 0 var(--accent); }
+.lobby-seats li .tag { margin-left: auto; background: var(--accent); color: var(--accent-ink); }
+.read-aloud { display: flex; align-items: center; gap: 6px; }
+.cross-result .choice { cursor: default; }
+.cross-result .choice.other { opacity: 0.5; }
+.cross-result .choice.chosen { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.cross-result .outcome { margin: 12px 0 4px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.cross-result .outcome .icon { color: var(--good); }

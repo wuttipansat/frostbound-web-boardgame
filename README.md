@@ -1,7 +1,7 @@
 # FROSTBOUND
 
 An original, semi-cooperative survival board game set in a frozen zombie apocalypse, built for the browser with a 3D voxel look (Three.js).
-2–5 players play hot-seat, with optional bots for empty seats.
+2–5 players play online (each on their own device, with a room code) or hot-seat on one screen, with optional bots for empty seats.
 
 > **Status: all 8 build steps are done.** The game is fully playable in the browser: hot-seat for 2–5 players, with AI for any seat, in English or Thai. It has animated crossroads, crisis, exposure and exile-vote reveals, procedural sound, ambient particles and a guided first-round tutorial. Step 7 adds an HD graphics overhaul with Low / Medium / High quality tiers. Step 8 adds generated portraits and item art, a more visual UI, and a UI bug-fix pass.
 
@@ -61,7 +61,23 @@ An original, semi-cooperative survival board game set in a frozen zombie apocaly
 10. **Phones:** the ▾ button collapses the player panel so the board gets the screen back.
 11. **Saving:** the game autosaves after every action, and *Continue saved game* resumes it.
 
-## Running
+## Online play (step 12)
+
+```bash
+npm run build
+npm start             # http://localhost:8787: serves the game and the room server (WebSocket /ws)
+```
+
+- **Create:** on the start screen choose **Online**, set the seats (open seats for friends, bots for the rest) and press **Create room**.
+- **Join:** friends open the same address, choose **Online**, type the 4-letter code and press **Join**.
+- **Start:** the host starts once every human seat is filled.
+- **Server:** the server is authoritative. It runs the same reducer and the bots, and sends each player only `viewFor(state, seat)`. Other hands, objectives, face-down crisis cards, deck order and the RNG never leave it.
+- **Reconnecting:** a reload, or a dropped connection, rejoins the same seat.
+- **Crossroads:** the player it happens to reads the card aloud and picks an option without seeing what the options do. Then every player sees the choice and its effects.
+- **Dev mode:** `npm run dev` proxies `/ws` to `npm start`, so run both.
+- **Hosting:** host it anywhere that runs Node and allows WebSockets. Set `PORT` if needed.
+- **Tests:** `npm run e2e:online` plays a 3-seat game (host, friend, bot) in two browsers to round 3 and checks that each browser only ever shows its own hand.
+
 
 ```bash
 npm install

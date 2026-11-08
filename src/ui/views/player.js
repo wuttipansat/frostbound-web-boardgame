@@ -50,8 +50,7 @@ function survivorCard(ctx, sv, { selectable = true, canAct = false } = {}) {
     canAct ? h('span', { class: 'ready-mark', tip: t('panel.canAct'), 'aria-label': t('panel.canAct') }) : null,
     ctx.state.players.find((p) => p.id === sv.owner)?.exiled ? h('span', { class: 'exile-badge', tip: t('panel.exiled') }, icon('door')) : null),
   h('div', { class: 'sv-info' },
-    h('div', { class: 'sv-top' }, h('b', {}, d.name), h('span', { class: 'loc-chip' }, c('locations', sv.location, 'name'))),
-    h('div', { class: 'sv-occ' }, c('survivors', sv.id, 'occupation')),
+    h('div', { class: 'sv-top' }, h('b', { tip: c('survivors', sv.id, 'occupation') }, d.name), h('span', { class: 'loc-chip' }, c('locations', sv.location, 'name'))),
     h('div', { class: 'sv-stats' },
       h('span', { class: 'need', tip: t('tip.attack', { n: d.attack }) }, icon('attack'), dieFace(d.attack, 'mini'), '+'),
       h('span', { class: 'need', tip: t('tip.search', { n: d.search }) }, icon('search'), dieFace(d.search, 'mini'), '+'),
@@ -221,7 +220,8 @@ export function itemCard(ctx, shown, uid, { isActor = false } = {}) {
     class: `item-card t-${item.type} tier-${item.tier}${selected ? ' selected' : ''}${used ? ' spent' : ''}${usable.ok ? '' : ' unusable'}`,
     dataset: { uid },
     'aria-pressed': selected ? 'true' : 'false',
-    tip: usable.ok ? null : t(`err.${usable.reason}`),
+    // The card face stays short; the full rule and the flavour text are in the tooltip.
+    tip: usable.ok ? `${t(...itemPlay(item))} — ${c('items', item.id, 'text')}` : t(`err.${usable.reason}`),
     onclick: () => ctx.set({ selCard: selected ? null : uid, ppCollapsed: false }),
   },
   h('span', { class: 'ic-head' },
@@ -230,7 +230,6 @@ export function itemCard(ctx, shown, uid, { isActor = false } = {}) {
   h('span', { class: 'iname' }, c('items', item.id, 'name')),
   h('span', { class: 'ic-art' }, art.item(item.id, 's', { alt: '' })),
   h('span', { class: 'ishort' }, t(...itemShort(item))),
-  h('span', { class: 'ic-text' }, c('items', item.id, 'text')),
   h('span', { class: 'ic-foot' }, isPermanent(item) ? icon('lock') : null, cardFooter(item, used)));
 }
 

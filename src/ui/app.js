@@ -14,15 +14,17 @@ import { advanceTutorial, eventForAction, tutorialVisible, DONE } from './tutori
 import { renderTutorial, positionTutorial } from './views/tutorial.js';
 import { renderTopbar, renderLog, renderPhase, renderColony } from './views/hud.js';
 import { resetTicker } from './ticker.js';
+import { connect, hydrateView, newLogEntries, savedSession } from '../net/client.js';
+import { RuleError } from '../core/errors.js';
 import { renderPlayerPanel } from './views/player.js';
 import { renderLocationPanel } from './views/location.js';
 import {
   setupScreen, settingsModal, passScreen, draftModal, crossroadsModal, requestModal,
-  incomingRequestModal, voteModal, gameOverModal, toastLayer, colonyModal, voteResultModal, callVoteModal, confirmEndModal, pickModal,
+  incomingRequestModal, voteModal, gameOverModal, toastLayer, colonyModal, voteResultModal, callVoteModal, confirmEndModal, pickModal, lobbyScreen, crossResultModal,
 } from './views/modals.js';
 import { currentActor as actorOf, whoMustHold } from './seat.js';
 import { moveTargets, lureTargets, actingSurvivors } from './options.js';
-import { crossChoice, c } from '../i18n/index.js';
+import { c } from '../i18n/index.js';
 
 const SAVE_KEY = 'frostbound.save.v1';
 const SETTINGS_KEY = 'frostbound.settings.v1';
@@ -64,6 +66,8 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     skipEndConfirm: false,
   };
   let tutPlayer = null; // the human the first-round tutorial follows
+  // Online play: { client, playerId, code, lobby, status } while connected to a room server.
+  let online = null;
 
   // ---------------------------------------------------------------- derived
 
@@ -72,6 +76,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
   const currentActor = () => actorOf(state);
 
   function viewerId() {
+    if (online) return online.playerId;
     const hs = humans();
     if (!hs.length) return null;
     if (hs.length === 1) return hs[0].id;
@@ -79,7 +84,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
   }
 
   /** Human who must take the device now (active player, a voter, or someone asked for an item). */
-  const needsPass = () => whoMustHold(state, { seat });
+  const needsPass = () => (online ? null : whoMustHold(state, { seat }));
 
   function ctx() {
     const actor = currentActor();
@@ -88,7 +93,9 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
       state, ui, actor, viewer, art,
       canAct: !!viewer && viewer === actor && state?.phase === PHASES.TURN && !needsPass(),
       hasSave: !!storage.get(SAVE_KEY)?.state,
+      online: online ? { code: online.code, lobby: online.lobby, playerId: online.playerId, status: online.status, host: online.playerId === 'p0' } : null,
       set, dispatch, dismissQueue, tutorialEvent, setTutorial, sfx: (name, delay) => sound.play(name, delay), selectSurvivor, selectLocation, takeSeat, startGame, continueGame, quitToSetup, setLanguage, setSound,
+      createRoom, joinRoom, startRoom, leaveRoom,
     };
   }
 
@@ -117,6 +124,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
   }
 
   function dispatch(action) {
+    if (online) return sendOnline(action);
     const res = tryReduce(state, action);
     if (!res.ok) {
       toast(t(`err.${res.error}`) === `err.${res.error}` ? t('err.unknown') : t(`err.${res.error}`), 'bad');
@@ -139,9 +147,8 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     if (e.k === 'exposure') fx.exposure?.(e.survivorId, e.face);
     if (e.k === 'crisisResolved' && state.reports.colony) ui.queue.push({ type: 'colony', report: structuredClone(state.reports.colony), morale: null });
     if (e.k === 'voteResult' && state.reports.vote) ui.queue.push({ type: 'vote', report: structuredClone(state.reports.vote) });
-    if (e.k === 'crossroadsChoice' && getPlayer(state, e.playerId).isAI) {
-      toast(t('cross.aiChose', { player: getPlayer(state, e.playerId).name, card: c('crossroads', e.cardId, 'title'), choice: crossChoice(e.cardId, e.choice) }));
-    }
+    // Everyone sees what was chosen and what it did (the chooser only saw the options).
+    if (e.k === 'crossroadsChoice') ui.queue.push({ type: 'cross', cardId: e.cardId, choice: e.choice, playerId: e.playerId });
     if (TOAST_KEYS.has(e.k) && e.k !== 'crisisResolved') {
       const text = formatLog(e, state);
       if (text) toast(text, 'bad', { survivorId: e.survivorId ?? (e.k === 'infectionSpreads' ? e.to : null) });
@@ -162,7 +169,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
   function afterChange({ animate = true } = {}) {
     if (!animate) resetTicker(); // a new or loaded game: its numbers are not changes
     // AI seats draft instantly (nothing to watch).
-    for (let i = 0; i < 10 && state.phase === PHASES.DRAFT; i++) {
+    for (let i = 0; i < 10 && !online && state.phase === PHASES.DRAFT; i++) {
       const a = currentActor();
       if (!a || !getPlayer(state, a).isAI) break;
       const res = tryReduce(state, botAction(state, a, { random: aiRandom }));
@@ -182,7 +189,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     if (ui.selDie != null && me?.dice[ui.selDie]?.used) ui.selDie = null;
     pieces.sync(state, { animate });
     pieces.setHighlight?.(ui.selSurvivor);
-    storage.set(SAVE_KEY, { state, seat });
+    if (!online) storage.set(SAVE_KEY, { state, seat });
     render();
   }
 
@@ -259,6 +266,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
   }
 
   function quitToSetup() {
+    if (online) leaveRoom();
     sound.setAmbient(false);
     if (state?.phase === PHASES.GAME_OVER) storage.del(SAVE_KEY);
     state = null;
@@ -288,6 +296,89 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     render();
   }
 
+  // ---------------------------------------------------------------- online play
+
+  function goOnline() {
+    if (online) return online;
+    online = { client: null, playerId: null, code: null, lobby: null, status: 'connecting' };
+    online.client = connect({
+      onMessage: onServerMessage,
+      onStatus: (st) => { if (online) { online.status = st; render(); } },
+    });
+    return online;
+  }
+
+  function onServerMessage(msg) {
+    if (!online) return;
+    if (msg.t === 'joined') { online.code = msg.code; online.playerId = msg.playerId; }
+    if (msg.t === 'lobby' || msg.lobby) online.lobby = msg.lobby ?? online.lobby;
+    if (msg.t === 'error') {
+      toast(t(`err.${msg.code}`) === `err.${msg.code}` ? t('err.unknown') : t(`err.${msg.code}`), 'bad');
+      sound.play('error');
+      if (['noRoom', 'roomFull', 'roomStarted', 'rejoinFailed'].includes(msg.code) && !state) { online.client.close(); online = null; }
+    }
+    if (msg.t === 'state' && msg.view) return applyRemote(msg.view);
+    return render();
+  }
+
+  /** A new view from the server: replay its new log entries (sounds, dice, reveals), then redraw. */
+  function applyRemote(view) {
+    const next = hydrateView(view);
+    if (!state) {
+      state = next;
+      seat = null; lastActive = null;
+      Object.assign(ui, { modal: null, queue: [], tutStep: DONE });
+      sound.unlock(); sound.play('start'); sound.setAmbient(true);
+      afterChange({ animate: false });
+      return;
+    }
+    const added = newLogEntries(state.log, next.log);
+    state = next;
+    for (const e of added) onLogEntry(e);
+    for (const q of ui.queue) if (q.type === 'colony' && q.morale == null) q.morale = state.morale;
+    afterChange();
+  }
+
+  /** Check a move against our own view (a hint only), then send it; the server's state follows. */
+  function sendOnline(action) {
+    try {
+      const res = tryReduce(state, action);
+      if (!res.ok) {
+        toast(t(`err.${res.error}`) === `err.${res.error}` ? t('err.unknown') : t(`err.${res.error}`), 'bad');
+        sound.play('error');
+        return false;
+      }
+    } catch (e) { if (e instanceof RuleError) return false; /* hidden data: the server decides */ }
+    online.client.act(action);
+    return true;
+  }
+
+  function createRoom() {
+    const cfg = ui.setup;
+    const o = goOnline();
+    o.client.create(cfg.seats[0].name, {
+      count: cfg.count, ai: cfg.seats.slice(0, cfg.count).map((x, i) => i > 0 && x.isAI), scenarioId: cfg.scenarioId, betrayer: cfg.betrayer,
+    });
+    render();
+  }
+
+  function joinRoom(code) {
+    const o = goOnline();
+    o.client.join(String(code).trim().toUpperCase(), ui.setup.seats[0].name);
+    render();
+  }
+
+  const startRoom = () => online?.client.start();
+
+  function leaveRoom() {
+    if (!online) return;
+    online.client.leave();
+    online.client.close();
+    online = null;
+    if (state) { state = null; sound.setAmbient(false); }
+    render();
+  }
+
   // ---------------------------------------------------------------- per-frame
 
   function tick(dt) {
@@ -303,7 +394,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
       if (!humans().length && (queueTimer += dt) > 6) { queueTimer = 0; dismissQueue(); }
       return;
     }
-    if (state.phase === PHASES.GAME_OVER) return;
+    if (state.phase === PHASES.GAME_OVER || online) return;
     const actor = currentActor();
     if (!actor || !getPlayer(state, actor).isAI) { aiTimer = 0; return; }
     if (!aiFast) {
@@ -331,7 +422,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
       for (const el of [dom.topbar, dom.log, dom.loc, dom.phase, dom.colony]) if (el) mount(el);
       dom.player.classList.add('hidden');
       dom.loc.classList.add('hidden');
-      mount(dom.modal, ui.modal === 'settings' ? settingsModal(x) : setupScreen(x));
+      mount(dom.modal, ui.modal === 'settings' ? settingsModal(x) : online?.code ? lobbyScreen(x) : setupScreen(x));
       renderTutorial(dom.tutorial, x, DONE, false);
       return;
     }
@@ -383,6 +474,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     if (ui.modal === 'settings') return [null, () => settingsModal(x)];
     const q = ui.queue[0];
     if (q?.type === 'colony') return [`colony:${q.report.round}:${getLangKey()}`, () => colonyModal(x, q)];
+    if (q?.type === 'cross') return [`cross:${state.log.length}:${q.cardId}:${getLangKey()}`, () => crossResultModal(x, q)];
     if (q?.type === 'vote') return [`vote:${state.log.length}:${getLangKey()}`, () => voteResultModal(x, q.report)];
     if (state.phase === PHASES.GAME_OVER) return [null, () => gameOverModal(x)];
     const pass = needsPass();
@@ -453,5 +545,8 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
   });
 
   render();
+  // A reload during an online game: reconnect to the same seat.
+  if (savedSession()?.token) goOnline();
+
   return { loadState, set, tutorialEvent, continueGame, tick, render, onBoardPick, quickStart, dispatch, get state() { return state; }, get ui() { return ui; }, takeSeat, selectSurvivor, selectLocation };
 }

@@ -37,7 +37,7 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
       for (const c of s.crisis.contributions) {
         if (holder && c.playerId === holder.id) continue; // you may know your own
         const def = s.cards[c.uid];
-        if ([...document.querySelectorAll('img.art[data-art]')].some((im) => im.dataset.art.includes(`:${def}:`) && im.closest('.item-card, .card-detail'))) out.push(`face-down ${def} visible`);
+        if ([...document.querySelectorAll('img.art-item')].some((im) => im.getAttribute('src')?.endsWith(`/items/${def}.png`) && im.closest('.item-card, .card-detail') && !holder?.hand.some((u) => s.cards[u] === def))) out.push(`face-down ${def} visible`);
       }
     }
     return out;
@@ -48,9 +48,9 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
     if (st.phase === 'gameOver' || st.round >= 4) { console.log('stop at', JSON.stringify(st)); break; }
     const l = await leaks(); counts.leakChecks++;
     if (l.length) { errors.push(...l); break; }
-    if (await page.locator('.dialog.colony .btn.primary, .dialog.vote-result .btn.primary').count()) {
+    if (await page.locator('.dialog.colony .btn.primary, .dialog.vote-result .btn.primary, .dialog.cross-result .btn.primary').count()) {
       await page.waitForTimeout(400);
-      await click('.dialog.colony .btn.primary, .dialog.vote-result .btn.primary'); counts.colony++; continue;
+      await click('.dialog.colony .btn.primary, .dialog.vote-result .btn.primary, .dialog.cross-result .btn.primary'); counts.colony++; continue;
     }
     if (await page.locator('.backdrop.pass').count()) { await click('.backdrop.pass'); counts.pass++; continue; }
     if (await page.locator('.draft-card').count()) {
@@ -60,7 +60,7 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
     }
     if (await page.locator('.dialog.confirm-end').count()) { await click('.dialog.confirm-end .btn.primary'); counts.confirm++; continue; }
     if (await page.locator('.backdrop.incoming').count()) { await click('.backdrop.incoming .btn.ghost'); counts.incoming++; continue; }
-    if (await page.locator('.choice:not([disabled])').count()) { await click('.choice:not([disabled])'); counts.choice++; continue; }
+    if (await page.locator('button.choice:not([disabled])').count()) { await click('button.choice:not([disabled])'); counts.choice++; continue; }
     // On a phone the panel may be folded: open it to reach End turn.
     if (VP.hasTouch && await page.locator('body.pp-collapsed').count()) { await click('#pp-head .collapse'); continue; }
     const end = page.locator('#pp-actions .btn.primary:not([disabled])');

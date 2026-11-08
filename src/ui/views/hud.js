@@ -47,11 +47,10 @@ export function renderTopbar(el, ctx) {
   art.item(TYPE_REP[crisis.item], 's', { cls: 'crisis-art', alt: t(`item.${crisis.item}`) }),
   h('span', { class: 'lbl' }, t('hud.crisis')),
   h('b', {}, c('crises', crisis.id, 'name')),
-  h('small', {}, `${t('hud.crisisNeed', { n: crisisRequirement(s), item: t(`item.${crisis.item}`) })} · ${t('hud.facedown', { n: s.crisis.contributions.length })}`)) : null;
+  h('small', {}, t('hud.crisisShort', { n: crisisRequirement(s), item: t(`item.${crisis.item}`), k: s.crisis.contributions.length }))) : null;
 
   const goal = block('goal', t('tip.goal', { text: c('scenarios', s.scenario.id, 'goalText') }), 'goal', t('hud.goal'),
-    counter('goal', scenarioProgress(s), { text: (v) => `${v}/${scenarioTarget(s)}` }),
-    h('small', {}, c('scenarios', s.scenario.id, 'name')));
+    counter('goal', scenarioProgress(s), { text: (v) => `${v}/${scenarioTarget(s)}` }));
 
   const turn = active ? h('div', { class: 'stat-block turn' },
     h('span', { class: 'dot', style: { background: hex(PLAYER_COLORS[activeIdx]) } }),
@@ -141,6 +140,7 @@ export function renderColony(el, ctx) {
     h('ul', { class: 'cs-rows next' },
       row('food', t('colony.nextFood'), s.food >= need ? t('colony.eats', { n: need }) : t('colony.short', { n: need - s.food }), null, s.food >= need ? '' : 'bad'),
       row('waste', t('colony.nextWaste'), wastePenalty ? `−${wastePenalty}` : '0', null, wastePenalty ? 'bad' : ''),
-      crisis ? row('crisis', t('colony.nextCrisis'), t('hud.crisisNeed', { n: crisisRequirement(s), item: t(`item.${crisis.item}`) }), h('small', { class: 'fail' }, describeEffects(crisis.fail)), 'warn') : null,
+      crisis ? h('li', { class: 'warn', tip: t('colony.failTip', { fx: describeEffects(crisis.fail) }) }, icon('crisis'), h('span', { class: 'k' }, t('colony.nextCrisis')),
+        h('b', {}, t('hud.crisisShort', { n: crisisRequirement(s), item: t(`item.${crisis.item}`), k: s.crisis.contributions.length }))) : null,
       s.starvation ? row('food', t('colony.starving'), String(s.starvation), null, 'bad') : null));
 }

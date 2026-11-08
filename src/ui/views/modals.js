@@ -22,17 +22,27 @@ export function setupScreen(ctx) {
   const cfg = ctx.ui.setup;
   const update = (patch) => ctx.set({ setup: { ...cfg, ...patch } });
   const seats = cfg.seats.slice(0, cfg.count);
+  const online = cfg.mode === 'online';
   return h('div', { class: 'backdrop setup' }, h('div', { class: 'dialog panel wide' },
     h('h1', { class: 'logo' }, 'FROSTBOUND'),
     h('p', { class: 'tagline' }, t('app.tagline')),
-    ctx.hasSave ? h('button', { class: 'btn primary wide', onclick: ctx.continueGame }, `↻ ${t('setup.continue')}`) : null,
-    h('h2', {}, t('setup.title')),
+    ctx.hasSave && !online ? h('button', { class: 'btn primary wide', onclick: ctx.continueGame }, t('setup.continue')) : null,
+    h('div', { class: 'seg mode-seg', role: 'tablist' },
+      h('button', { class: online ? '' : 'on', role: 'tab', 'aria-selected': online ? 'false' : 'true', tip: t('tip.modeLocal'), onclick: () => update({ mode: 'local' }) }, t('setup.local')),
+      h('button', { class: online ? 'on' : '', role: 'tab', 'aria-selected': online ? 'true' : 'false', tip: t('tip.modeOnline'), onclick: () => update({ mode: 'online' }) }, t('setup.online'))),
+    online ? h('div', { class: 'join-row' },
+      h('input', {
+        class: 'code-input', value: cfg.joinCode ?? '', placeholder: t('online.codePh'), 'aria-label': t('online.code'), maxlength: 4,
+        oninput: (ev) => { cfg.joinCode = ev.target.value.toUpperCase(); ev.target.value = cfg.joinCode; },
+      }),
+      h('button', { class: 'btn', tip: t('tip.join'), onclick: () => (cfg.joinCode?.length === 4 ? ctx.joinRoom(cfg.joinCode) : null) }, t('online.join'))) : null,
+    h('h2', {}, online ? t('online.newRoom') : t('setup.title')),
     h('div', { class: 'row' },
       h('span', { class: 'lbl' }, t('setup.players')),
       h('div', { class: 'seg' }, [2, 3, 4, 5].map((n) => h('button', { class: cfg.count === n ? 'on' : '', onclick: () => update({ count: n }) }, n)))),
     h('div', { class: 'seats' }, seats.map((seat, i) => h('div', { class: 'seat' },
       h('i', { class: 'dot', style: { background: hex(PLAYER_COLORS[i]) } }),
-      h('input', {
+      online && i > 0 ? h('span', { class: 'open-seat' }, seat.isAI ? t('online.botSeat') : t('online.openSeat')) : h('input', {
         value: seat.name, 'aria-label': t('setup.name'), maxlength: 14,
         oninput: (ev) => { cfg.seats[i] = { ...seat, name: ev.target.value }; },
         onchange: () => update({ seats: [...cfg.seats] }),
@@ -53,12 +63,36 @@ export function setupScreen(ctx) {
       h('span', { class: 'lbl' }, t('setup.betrayer')),
       h('div', { class: 'seg small' }, ['maybe', 'always', 'never'].map((m) => h('button', { class: cfg.betrayer === m ? 'on' : '', onclick: () => update({ betrayer: m }) }, t(`setup.betrayer.${m}`))))),
     settingsRows(ctx),
-    h('div', { class: 'row' },
+    online ? null : h('div', { class: 'row' },
       h('span', { class: 'lbl' }, t('setup.tutorial')),
       h('div', { class: 'seg small' },
         h('button', { class: ctx.ui.tutorial ? 'on' : '', onclick: () => ctx.setTutorial(true) }, t('settings.on')),
         h('button', { class: ctx.ui.tutorial ? '' : 'on', onclick: () => ctx.setTutorial(false) }, t('settings.off')))),
-    h('button', { class: 'btn primary wide big', onclick: ctx.startGame }, t('setup.start'))));
+    online
+      ? h('button', { class: 'btn primary wide big', onclick: ctx.createRoom }, t('online.create'))
+      : h('button', { class: 'btn primary wide big', onclick: ctx.startGame }, t('setup.start'))));
+}
+
+/** Online lobby: the room code to share, who has joined, and Start for the host. */
+export function lobbyScreen(ctx) {
+  const o = ctx.online;
+  const lobby = o.lobby;
+  const ready = lobby?.seats.every((x) => x.taken);
+  return h('div', { class: 'backdrop setup' }, h('div', { class: 'dialog panel lobby' },
+    h('small', { class: 'kicker' }, t('online.room')),
+    h('div', { class: 'room-code', tip: t('tip.roomCode') }, o.code),
+    h('p', { class: 'muted small' }, t('online.share')),
+    h('ul', { class: 'lobby-seats' }, (lobby?.seats ?? []).map((x) => h('li', { class: `${x.taken ? 'taken' : 'open'}${`p${x.seat}` === o.playerId ? ' me' : ''}` },
+      h('i', { class: 'dot', style: { background: hex(PLAYER_COLORS[x.seat]) } }),
+      h('span', {}, x.isAI ? t('online.botSeat') : x.name ?? t('online.waiting')),
+      `p${x.seat}` === o.playerId ? h('small', { class: 'tag' }, t('online.you')) : null,
+      !x.isAI && x.taken && !x.connected ? h('small', { class: 'muted' }, t('online.away')) : null))),
+    o.status !== 'open' ? h('p', { class: 'warn small' }, t('online.connecting')) : null,
+    h('div', { class: 'row end' },
+      h('button', { class: 'btn ghost', onclick: ctx.leaveRoom }, t('online.leave')),
+      o.host
+        ? h('button', { class: 'btn primary', disabled: !ready, tip: ready ? null : t('tip.waitSeats'), onclick: ctx.startRoom }, t('online.start'))
+        : h('span', { class: 'muted small' }, t('online.waitHost')))));
 }
 
 function settingsRows(ctx) {
@@ -131,7 +165,6 @@ export function draftModal(ctx) {
 export function crossroadsModal(ctx) {
   const pend = ctx.state.pendingCrossroads;
   const card = CROSSROADS_BY_ID[pend.cardId];
-  const reader = getPlayer(ctx.state, pend.readerId);
   const active = getPlayer(ctx.state, pend.activePlayerId);
   const mine = ctx.viewer === pend.activePlayerId;
   return h('div', { class: 'backdrop crossroads' },
@@ -139,15 +172,31 @@ export function crossroadsModal(ctx) {
       h('div', { class: 'flip-card' },
         h('div', { class: 'face back' }, h('span', { class: 'sigil' }, icon('exposure')), h('b', {}, t('cross.title'))),
         h('div', { class: 'face front dialog panel', role: 'dialog', 'aria-modal': 'true' },
-          h('small', { class: 'kicker' }, t('cross.title')),
+          h('small', { class: 'kicker', tip: t('cross.because', { why: describeTrigger(card.trigger) }) }, t('cross.title')),
           h('h2', {}, c('crossroads', card.id, 'title')),
-          h('p', { class: 'muted small' }, t('cross.reads', { reader: reader.name, active: active.name })),
-          h('p', { class: 'trigger' }, `⚑ ${t('cross.because', { why: describeTrigger(card.trigger) })}`),
+          // The player it happened to reads it aloud and decides. What each choice does is revealed after.
+          h('p', { class: 'muted small read-aloud' }, icon('person'), ` ${t('cross.readAloud', { name: active.name })}`),
           h('p', { class: 'story' }, c('crossroads', card.id, 'text')),
-          h('div', { class: 'choices' }, card.choices.map((ch, i) => h('button', {
+          h('div', { class: 'choices' }, card.choices.map((_, i) => h('button', {
             class: 'choice', disabled: !mine,
             onclick: () => ctx.dispatch(act.resolveCrossroads(pend.activePlayerId, i)),
-          }, h('b', {}, crossChoice(card.id, i)), h('small', {}, effectArt(ctx, ch.effects), describeEffects(ch.effects)))))))));
+          }, h('b', {}, crossChoice(card.id, i)))))))));
+}
+
+/** Shown to everyone after a crossroads choice: what was chosen and what it did. */
+export function crossResultModal(ctx, q) {
+  const card = CROSSROADS_BY_ID[q.cardId];
+  const who = getPlayer(ctx.state, q.playerId);
+  const effects = card.choices[q.choice].effects;
+  return dialog('cross-result',
+    h('small', { class: 'kicker' }, t('cross.title')),
+    h('h2', {}, c('crossroads', card.id, 'title')),
+    h('p', { class: 'muted small' }, t('cross.chose', { name: who.name })),
+    h('div', { class: 'choices' }, card.choices.map((ch, i) => h('div', { class: `choice${i === q.choice ? ' chosen' : ' other'}` },
+      h('b', {}, crossChoice(card.id, i)),
+      h('small', {}, effectArt(ctx, ch.effects), describeEffects(ch.effects))))),
+    h('p', { class: 'outcome' }, icon('check'), ` ${describeEffects(effects)}`),
+    h('div', { class: 'row end' }, h('button', { class: 'btn primary', onclick: ctx.dismissQueue }, t('colony.continue'))));
 }
 
 /** Small item pictures for crossroads effects that hand out or take away cards. */

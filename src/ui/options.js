@@ -6,8 +6,14 @@ import { getPlayer, survivorDef, itemOf, scenarioDef } from '../core/selectors.j
 import { LOCATION_IDS } from '../core/constants.js';
 
 const check = (state, action) => {
-  const r = tryReduce(state, action);
-  return { action, ok: r.ok, error: r.ok ? null : r.error };
+  try {
+    const r = tryReduce(state, action);
+    return { action, ok: r.ok, error: r.ok ? null : r.error };
+  } catch {
+    // Online, the UI only holds a player's view (hidden cards, placeholder decks). A simulated move that
+    // trips over hidden data is not known to be illegal: offer it and let the server decide.
+    return { action, ok: true, error: null };
+  }
 };
 
 /** Lowest unused die with value >= min (keeps high dice for harder actions). Respects a preferred index. */

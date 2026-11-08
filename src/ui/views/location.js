@@ -111,7 +111,6 @@ export function renderLocationPanel(el, ctx) {
 
   mount(el,
     h('button', { class: 'close', 'aria-label': t('settings.close'), onclick: () => ctx.selectLocation(null) }, icon('close')),
-    h('h2', {}, c('locations', id, 'name')),
-    h('p', { class: 'blurb' }, c('locations', id, 'blurb')),
+    h('h2', { tip: c('locations', id, 'blurb') }, c('locations', id, 'name')),
     stats, people, actions);
 }
