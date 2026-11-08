@@ -158,7 +158,9 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   requestAnimationFrame(loop);
 
   return {
-    renderer, scene, camera, controls, quality: q,
+    renderer, scene, camera, controls, quality: q, hemi, moon,
+    /** Step 20: 0 (light flurries) .. 1 (blizzard). */
+    setWeather(k) { snowfall?.setIntensity(k); },
     onFrame(cb) { frameCallbacks.push(cb); },
     stop() { running = false; },
     /** Tests: advance one frame by hand while the loop is stopped. */
@@ -202,12 +204,20 @@ function createSnow(count = 2600) {
     const points = new THREE.Points(geo, mat);
     points.frustumCulled = false;
     group.add(points);
-    return { ...L, pos, speed, geo };
+    return { ...L, pos, speed, geo, mat };
   });
+  let storm = 0.35;
   return {
     group,
+    setIntensity(k) {
+      storm = Math.max(0, Math.min(1, k));
+      // Fewer flakes when calm (drawRange: no extra cost), all of them in a blizzard.
+      for (const L of layers) { L.geo.setDrawRange(0, Math.round(L.n * (0.35 + storm * 0.65))); L.mat.opacity = L.opacity * (0.7 + storm * 0.3); }
+    },
     update(dt, t) {
-      const gust = Math.sin(t * 0.27) * Math.sin(t * 0.11) * 3.5 + 0.6;
+      const wind = 0.6 + storm * 1.6;
+      const gust = (Math.sin(t * 0.27) * Math.sin(t * 0.11) * 3.5 + 0.6) * wind;
+      dt *= 0.8 + storm * 0.7;
       for (const L of layers) {
         const { pos, speed } = L;
         for (let i = 0; i < L.n; i++) {

@@ -1591,3 +1591,20 @@ html[lang='th'] .obj-front b, html[lang='th'] .obj-back b { font-family: var(--f
 @media (prefers-reduced-motion: reduce) { .obj-inner { transition: none; } }
 /* phones: the top bar grid has no slot for ?, the rules live in the ⋯ menu */
 @media (max-width: 760px) { #topbar .rules-btn { display: none; } }
+
+/* ---------------------------------------------------------------- step 20: living winter (ending) */
+.backdrop.over { background: radial-gradient(ellipse at 50% 42%, rgba(5,10,20,0.05) 30%, rgba(5,10,20,0.7)); transition: background 0.6s; }
+.backdrop.over.won { background: radial-gradient(ellipse at 50% 42%, rgba(255,150,60,0.08) 25%, rgba(60,24,6,0.45) 70%, rgba(8,6,4,0.8)); }
+.backdrop.over.lost { background: radial-gradient(ellipse at 50% 42%, rgba(220,235,255,0.04) 20%, rgba(200,220,245,0.32) 72%, rgba(235,244,255,0.7)); }
+.over-epitaph { margin: -2px 0 8px; font-style: italic; color: var(--muted, #9fb0c8); }
+.dialog.over.won .over-epitaph { color: #ffc98a; }
+.over-actions { display: flex; gap: 8px; align-items: stretch; }
+.over-actions .over-look { flex: 0 0 auto; display: inline-flex; gap: 6px; align-items: center; }
+.over-actions .wide { flex: 1; }
+.dialog.over { transition: opacity 0.35s, transform 0.35s; }
+.backdrop.over.peek { background: transparent; pointer-events: none; }
+.backdrop.over.peek .dialog { opacity: 0; transform: translateY(24px) scale(0.98); pointer-events: none; }
+.over-back { display: none; position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%); pointer-events: auto; }
+.backdrop.over.peek .over-back { display: inline-flex; }
+@media (max-width: 520px) { .over-actions { flex-direction: column; } }
+body:has(.backdrop.over.peek) :is(#player, #hint, #move-pick, #tutorial, #dice-stage) { visibility: hidden; }

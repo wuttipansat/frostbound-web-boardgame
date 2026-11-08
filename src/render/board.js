@@ -271,6 +271,7 @@ export function createBoard() {
 
   // Warm light sources: campfire + a lamp at each location door.
   const lights = [];
+  let fireLevel = 1;
   // A gentle light set high up, so survivors around the fire stay readable instead of blowing out.
   const fireBase = 85;
   const fire = new THREE.PointLight(0xff8a3c, fireBase, 32, 1.2);
@@ -331,13 +332,17 @@ export function createBoard() {
     fx,
     pickTargets,
     locationGroups,
+    /** Step 20: colony bonfire strength (morale), ~0.1 .. 1.4. */
+    setFire(k) { fireLevel = k; },
     setHovered(id) { hovered = id; },
     setSelected(id) { selected = id; },
     /** Location hints: { locationId: 'ok' | 'full' | 'lure' | 'blocked' } (e.g. where a survivor can move). */
     setHints(next) { hints = next ?? {}; },
     update(t) {
       // Flame: flicker in height and sway.
-      flameMesh.scale.set(1 + Math.sin(t * 17) * 0.06, 1 + Math.sin(t * 11.3) * 0.18 + Math.sin(t * 23) * 0.08, 1 + Math.cos(t * 15) * 0.06);
+      const fl = Math.min(1.3, fireLevel);
+      flameMesh.visible = fl > 0.15; // a dead colony: the fire is out
+      flameMesh.scale.set(fl * (1 + Math.sin(t * 17) * 0.06), fl * (1 + Math.sin(t * 11.3) * 0.18 + Math.sin(t * 23) * 0.08), fl * (1 + Math.cos(t * 15) * 0.06));
       flameMesh.rotation.y = Math.sin(t * 2.1) * 0.4;
       // Windows: a slow breathing glow, with the odd quick flicker.
       for (const g of glowMats) {
@@ -346,7 +351,7 @@ export function createBoard() {
       }
       for (const [i, l] of lights.entries()) {
         const f = Math.sin(t * 13 + i * 3) * 0.5 + Math.sin(t * 7.3 + i) * 0.5;
-        l.light.intensity = l.base * (1 + f * l.flicker);
+        l.light.intensity = l.base * (1 + f * l.flicker) * (i === 0 ? fireLevel : 1);
       }
       for (const [id, ring] of Object.entries(rings)) {
         const hint = HINT[hints[id]];

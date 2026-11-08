@@ -528,9 +528,13 @@ export function colonyModal(ctx, item) {
 export function gameOverModal(ctx) {
   const s = ctx.state;
   const r = s.result;
-  return dialog(`over${r.reason === 'objectiveComplete' ? ' won' : ' lost'}`,
+  const won = r.reason === 'objectiveComplete';
+  // Step 20: the scene behind tells the ending (bonfire blazing / colony buried). "Look" hides the card a moment.
+  const peek = (on) => (ev) => { ev.stopPropagation(); ev.currentTarget.closest('.backdrop')?.classList.toggle('peek', on); };
+  const el = dialog(`over${won ? ' won' : ' lost'}`,
     h('small', { class: 'kicker' }, t('over.title')),
     h('h2', {}, t(`over.reason.${r.reason}`)),
+    h('p', { class: 'over-epitaph' }, t(`over.epitaph.${won ? 'won' : 'lost'}`)),
     h('h4', {}, t('over.winners')),
     r.winners.length ? h('p', { class: 'winners' }, r.winners.map((id) => getPlayer(s, id).name).join(' · ')) : h('p', { class: 'muted' }, t('over.noWinners')),
     h('ul', { class: 'outcomes' }, r.outcomes.map((o) => {
@@ -546,7 +550,11 @@ export function gameOverModal(ctx) {
         h('span', {}, c('objectives', obj.id, 'name')),
         h('small', { class: o.objectiveMet ? 'good' : 'bad' }, o.objectiveMet ? t('over.met') : t('over.notMet')));
     })),
-    h('button', { class: 'btn primary wide', onclick: ctx.quitToSetup }, t('over.again')));
+    h('div', { class: 'over-actions' },
+      h('button', { class: 'btn ghost over-look', onclick: peek(true) }, icon('search'), t('over.look')),
+      h('button', { class: 'btn primary wide', onclick: ctx.quitToSetup }, t('over.again'))));
+  el.append(h('button', { class: 'btn over-back', onclick: peek(false) }, t('over.back')));
+  return el;
 }
 
 export function toastLayer(el, toasts) {

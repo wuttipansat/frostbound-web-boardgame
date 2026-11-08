@@ -9,6 +9,8 @@ import { createAmbientParticles } from './render/particles.js';
 import { loadQuality } from './render/quality.js';
 import { createApp } from './ui/app.js';
 import { createCameraRig } from './render/camera.js';
+import { createAtmosphere, atmosphereFor } from './render/atmosphere.js';
+import { createFootprints } from './render/footprints.js';
 import { PLAYER_COLORS } from './render/pieces.js';
 import { createArtStudio } from './render/art.js';
 import { icon } from './ui/icons.js';
@@ -33,6 +35,31 @@ const pieces = createPieces(board, tweens);
 stage.scene.add(pieces.root);
 const diceTray = createDiceTray($('dice'));
 const rig = createCameraRig(stage, { board, pieces });
+// Step 20: living winter — weather/day-night/bonfire follow the game; footprints follow walkers.
+const atmosphere = createAtmosphere(stage, board);
+// Top of whatever solid is under a print (terrain drifts, road slabs); only a few rays per walk.
+const ray = new THREE.Raycaster();
+const solid = (o) => o.visible && o.isMesh && !o.material?.transparent;
+const groundAt = (x, z) => {
+  ray.set(new THREE.Vector3(x, 6, z), new THREE.Vector3(0, -1, 0));
+  const hit = ray.intersectObject(board.root, true).find((h) => solid(h.object) && h.point.y < 2);
+  return hit?.point.y ?? 0;
+};
+const footprints = createFootprints(quality.particleScale < 1 ? 40 : 60, groundAt);
+stage.scene.add(footprints.mesh);
+let lastRound = 0;
+let overShown = false;
+function updateWinter(state) {
+  const a = atmosphereFor(state);
+  atmosphere.set(a);
+  document.body.dataset.mood = a.mood;
+  if (!state || state.round < lastRound) footprints.clear();
+  lastRound = state?.round ?? 0;
+  footprints.setRound(lastRound);
+  const over = state?.phase === 'gameOver';
+  if (over && !overShown) rig.focus({ kind: 'over', at: 'colony' });
+  overShown = over;
+}
 const particles = createAmbientParticles({ ...board.fx, scale: quality.particleScale });
 // Portraits and item pictures, rendered lazily from the voxel models and cached.
 const art = createArtStudio({ quality });
@@ -100,6 +127,7 @@ function sceneCallout(ev, state) {
 
 /** Effects + callout for one scene of the presentation queue (see ui/director.js). */
 function playScene(ev, state) {
+  if (ev.kind === 'move' && board.layout[ev.from] && board.layout[ev.to]) footprints.walk(board.layout[ev.from].center, board.layout[ev.to].center, ev.duration ?? 1.2);
   if (ev.kind === 'exposure') { exposureFx(ev.survivorId, ev.face); return; }
   if (ev.kind === 'turn') return;
   if (ev.kind === 'attack' && ev.survivorId && ev.n) pieces.burstAt(ev.survivorId, [0x8e1b1b, 0xb3202a, 0x6f8a4e], 16, 1.2);
@@ -170,16 +198,20 @@ const app = createApp({
     hint: $('hint'),
     playerRefs: { head: $('pp-head'), survivors: $('pp-survivors'), chips: $('pp-chips'), hand: $('pp-hand'), actions: $('pp-actions') },
     onRender: (state) => {
+      updateWinter(state);
       refreshLabels(state);
       for (const [id, el] of Object.entries(labels)) el.classList.toggle('active', app?.ui.selLoc === id);
     },
   },
 });
 refreshLabels(null);
+updateWinter(null);
 
 stage.onFrame((t, dt) => {
   tweens.update(dt);
   rig.update(dt);
+  atmosphere.update(dt);
+  footprints.update(dt);
   board.update(t);
   pieces.update(t, dt);
   particles.update(dt, stage.renderer.getPixelRatio() * stage.camera.zoom);
@@ -322,4 +354,4 @@ if (params.get('play')) {
 window.addEventListener('pointerdown', () => sound.unlock());
 document.addEventListener('click', (ev) => { if (ev.target.closest?.('button')) sound.play('ui'); });
 
-window.__frostbound = { OBJECTIVES: SECRET_OBJECTIVES, rig, stage, board, pieces, diceTray, tweens, app, art, tryReduce, itemType: (defId) => ITEMS[defId]?.type };
+window.__frostbound = { OBJECTIVES: SECRET_OBJECTIVES, rig, stage, atmosphere, footprints, groundAt, ray, board, pieces, diceTray, tweens, app, art, tryReduce, itemType: (defId) => ITEMS[defId]?.type };
