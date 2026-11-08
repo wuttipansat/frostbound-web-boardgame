@@ -6,6 +6,7 @@ import { createPieces } from './render/pieces.js';
 import { createDiceTray } from './render/dice.js';
 import { Tweens } from './render/tween.js';
 import { createAmbientParticles } from './render/particles.js';
+import { loadQuality } from './render/quality.js';
 import { createApp } from './ui/app.js';
 import { sound } from './audio/sound.js';
 import { c, t as tr } from './i18n/index.js';
@@ -16,14 +17,17 @@ import { tryReduce } from './core/reducer.js';
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
 
-const stage = createStage($('scene'), { snow: params.get('snow') !== '0' });
-const board = createBoard();
+// Graphics tier (Low / Medium / High) decides model resolution, lighting and post-processing.
+const quality = loadQuality();
+document.documentElement.dataset.quality = quality.id;
+const stage = createStage($('scene'), { snow: params.get('snow') !== '0', quality });
+const board = createBoard({ quality });
 stage.scene.add(board.root);
 const tweens = new Tweens();
-const pieces = createPieces(board, tweens);
+const pieces = createPieces(board, tweens, { hd: quality.hd });
 stage.scene.add(pieces.root);
-const diceTray = createDiceTray($('dice'));
-const particles = createAmbientParticles(board.fx);
+const diceTray = createDiceTray($('dice'), { hd: quality.hd });
+const particles = createAmbientParticles({ ...board.fx, scale: quality.particleScale });
 stage.scene.add(particles.group);
 
 // ---------------------------------------------------------------- location labels
@@ -78,6 +82,7 @@ function exposureFx(survivorId, face) {
 const app = createApp({
   board, pieces, diceTray,
   aiFast: params.get('ai') === 'fast', // debug/testing: AI doesn't wait for animations
+  quality: quality.id,
   fx: { exposure: exposureFx },
   dom: {
     topbar: $('topbar'), log: $('log'), loc: $('locpanel'), player: $('player'), modal: $('modal'), toasts: $('toasts'), tutorial: $('tutorial'),
@@ -146,6 +151,42 @@ canvas.addEventListener('pointerup', (ev) => {
 
 // ---------------------------------------------------------------- dev / screenshot helpers
 // ?play=HHA  quick-starts a game (H = human seat, A = AI seat); ?scenario=, ?seed=, ?lang=th
+
+// ---------------------------------------------------------------- dev: character line-up (?lineup)
+
+if (params.has('lineup')) {
+  import('./render/characters.js').then(({ survivorModel, survivorModelHD, zombieModel, zombieModelHD }) => import('./content/survivors.js').then(({ SURVIVORS }) => {
+    board.root.visible = false;
+    pieces.root.visible = false;
+    const g = new THREE.Group();
+    const ground = new THREE.Mesh(new THREE.BoxGeometry(36, 1, 22), new THREE.MeshLambertMaterial({ color: 0xe9f0f8 }));
+    ground.position.y = -0.5;
+    ground.receiveShadow = true;
+    g.add(ground);
+    const size = quality.hd ? 0.075 : 0.15;
+    const add = (model, x, z) => { const o = model.build({ size, jitter: quality.hd ? 0 : 0.05 }); o.position.set(x, 0, z); g.add(o); };
+    SURVIVORS.forEach((s, i) => add(quality.hd ? survivorModelHD(s) : survivorModel(s), (i % 10 - 4.5) * 3, Math.floor(i / 10) * 5.5 - 6));
+    [0, 1, 2, 3, 4].forEach((v, i) => add(quality.hd ? zombieModelHD(v) : zombieModel(v % 3), (i - 2) * 3.4, 5.5));
+    const front = new THREE.DirectionalLight(0xffe6c8, 1.8);
+    front.position.set(10, 25, 60);
+    g.add(front);
+    stage.scene.add(g);
+    stage.camera.position.set(0, 45, 100);
+    stage.controls.target.set(0, 1, 0);
+    stage.camera.zoom = Number(params.get('zoom') ?? 3.1);
+    stage.camera.updateProjectionMatrix();
+    stage.controls.update();
+    for (const id of ['player', 'topbar', 'labels', 'modal', 'tutorial']) document.getElementById(id)?.classList.add('hidden');
+  }));
+}
+
+// After a graphics change the page reloads; pick the autosaved game straight back up.
+try {
+  if (sessionStorage.getItem('frostbound.resume')) {
+    sessionStorage.removeItem('frostbound.resume');
+    app.continueGame();
+  }
+} catch { /* storage unavailable */ }
 
 if (params.get('play')) {
   app.quickStart({

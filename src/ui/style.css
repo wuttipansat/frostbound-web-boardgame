@@ -14,7 +14,8 @@
   --top-h: 64px;
   --player-h: 196px;
   --font: Inter, 'Noto Sans Thai', system-ui, sans-serif;
-  --pixel: Silkscreen, monospace;
+  /* Silkscreen has no Thai glyphs; Kanit (a sturdy Thai display face) takes over for Thai text. */
+  --pixel: Silkscreen, Kanit, monospace;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--font); }
@@ -411,3 +412,24 @@ body.pp-collapsed #player { height: auto; }
   #locpanel { max-height: 34vh; }
   body.pp-collapsed #locpanel { max-height: 46vh; }
 }
+
+/* ---------------------------------------------------------------- step 7: UI art pass */
+.panel, .dialog {
+  /* frosted glass with a soft top highlight and rime in the corners */
+  background-image:
+    radial-gradient(120% 60% at 0% 0%, rgba(205, 225, 255, 0.10), transparent 60%),
+    radial-gradient(80% 50% at 100% 100%, rgba(205, 225, 255, 0.06), transparent 60%),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 40%);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 0 0 1px rgba(160, 200, 255, 0.04);
+}
+#topbar { box-shadow: inset 0 -1px 0 rgba(160, 200, 255, 0.10), 0 6px 22px rgba(0, 0, 0, 0.25); }
+.stat-block { background: linear-gradient(to bottom, rgba(255,255,255,0.08), rgba(255,255,255,0.04)); }
+.btn.primary { background: linear-gradient(to bottom, #ffc46b, #ffa63a); box-shadow: 0 2px 10px rgba(255, 166, 58, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+.btn.primary:hover:not(:disabled) { background: linear-gradient(to bottom, #ffd08a, #ffb24f); }
+.item-card, .sv-card, .draft-card, .scenario, .choice { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+.item-card .ico, .cfront .ico { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4)); }
+.logo { background: linear-gradient(to bottom, #ffffff, #b9d4f3); -webkit-background-clip: text; background-clip: text; color: transparent; }
+/* Thai text in "pixel" spots: Kanit, a bit tighter and without wide pixel letter-spacing. */
+html[lang='th'] .brand-mini, html[lang='th'] .stat b, html[lang='th'] .score, html[lang='th'] .verdict-banner b,
+html[lang='th'] .verdict, html[lang='th'] .kicker { letter-spacing: 0.5px; font-weight: 800; }
+html[lang='th'] .verdict-banner b { font-family: Kanit, var(--font); font-size: 22px; }

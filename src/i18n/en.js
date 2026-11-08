@@ -345,4 +345,9 @@ export default {
   'tut.endTurn.text': 'Free actions are unlimited; unused dice are lost. When you are done, end your turn.',
   'tut.colony.title': 'The colony phase',
   'tut.colony.text': 'After everyone has played: the colony eats, waste piles up, the face-down crisis cards are revealed one by one, and zombies arrive where people are. Survive the rounds and finish the goal!',
+  'settings.graphics': 'Graphics',
+  'settings.graphicsNote': 'Changing graphics reloads the page — your game is saved and resumes.',
+  'quality.low': 'Low',
+  'quality.medium': 'Medium',
+  'quality.high': 'High',
 };

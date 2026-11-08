@@ -4,7 +4,9 @@
 //   barricades-> InstancedMesh pool, pop in / break apart
 import * as THREE from 'three';
 import { MATERIALS } from './voxel.js';
-import { survivorModel, zombieModel, barricadeModel } from './characters.js';
+import {
+  survivorModel, zombieModel, barricadeModel, survivorModelHD, zombieModelHD, barricadeModelHD,
+} from './characters.js';
 import { ease } from './tween.js';
 import { SURVIVORS_BY_ID } from '../content/survivors.js';
 import { LOCATIONS } from '../content/locations.js';
@@ -53,8 +55,8 @@ export function barricadeSlotIndex(locationId, j) {
 // ---------------------------------------------------------------- instanced pool
 
 class Pool {
-  constructor(model, size, capacity) {
-    const { lit, glow } = model.buildGeometries({ size });
+  constructor(model, size, capacity, jitter = 0.05) {
+    const { lit, glow } = model.buildGeometries({ size, jitter });
     this.group = new THREE.Group();
     this.meshes = [];
     for (const [geo, mat] of [[lit, MATERIALS.lit], [glow, MATERIALS.glow]]) {
@@ -137,13 +139,17 @@ class Puffs {
 
 // ---------------------------------------------------------------- manager
 
-export function createPieces(board, tweens) {
+export function createPieces(board, tweens, { hd = false } = {}) {
   const root = new THREE.Group();
   root.name = 'pieces';
   const { layout } = board;
+  // HD characters are authored at 2× resolution → half-size voxels, same world size.
+  const charSize = hd ? CHAR_VOXEL / 2 : CHAR_VOXEL;
 
-  const zombiePools = [0, 1, 2].map((v) => new Pool(zombieModel(v), CHAR_VOXEL, 64));
-  const barricadePool = new Pool(barricadeModel(), 0.22, 64);
+  const zombiePools = hd
+    ? [0, 1, 2, 3, 4].map((v) => new Pool(zombieModelHD(v), charSize, 64, 0))
+    : [0, 1, 2].map((v) => new Pool(zombieModel(v), charSize, 64));
+  const barricadePool = new Pool(hd ? barricadeModelHD() : barricadeModel(), hd ? 0.11 : 0.22, 64, hd ? 0 : 0.05);
   const puffs = new Puffs();
   for (const p of [...zombiePools, barricadePool]) root.add(p.group);
   root.add(puffs.mesh);
@@ -207,7 +213,10 @@ export function createPieces(board, tweens) {
   // ---------------- survivors
 
   function survivorGeometry(id) {
-    if (!geoCache.has(id)) geoCache.set(id, survivorModel(SURVIVORS_BY_ID[id]).buildGeometries({ size: CHAR_VOXEL }));
+    if (!geoCache.has(id)) {
+      const def = SURVIVORS_BY_ID[id];
+      geoCache.set(id, (hd ? survivorModelHD(def) : survivorModel(def)).buildGeometries({ size: charSize, jitter: hd ? 0 : 0.05 }));
+    }
     return geoCache.get(id);
   }
 
@@ -224,7 +233,7 @@ export function createPieces(board, tweens) {
     group.add(disc, body);
     group.userData.survivorId = id;
     root.add(group);
-    return { id, group, body, disc, loc: null, slot: null, moving: false, dying: false, phase: Math.random() * 10 };
+    return { id, group, body, disc, loc: null, slot: null, moving: false, dying: false, phase: Math.random() * 10, breath: Math.random() * 3 };
   }
 
   function hop(vis, pts, targetFacing) {
@@ -298,12 +307,12 @@ export function createPieces(board, tweens) {
 
   function spawnZombie(locId, i, animate) {
     const pos = zombieSlotPos(locId, i);
-    const variant = (i + locId.length) % 3;
+    const variant = (i + locId.length) % zombiePools.length;
     const item = zombiePools[variant].add({
       x: pos.x, y: animate ? -2.2 : 0, z: pos.z,
       rotY: faceToward(pos, layout[locId].center) + (Math.random() - 0.5) * 0.5,
       baseY: animate ? -2.2 : 0, tiltX: 0, tiltZ: 0, lean: 0, scale: 1,
-      phase: Math.random() * 10, variant, rising: animate,
+      phase: Math.random() * 10, variant, rising: animate, twitch: 0,
     });
     if (animate) {
       pending++;
@@ -405,14 +414,26 @@ export function createPieces(board, tweens) {
         // Shuffling idle: bob, side-to-side tilt, a little sway of the head.
         const ph = t * 2.4 + z.phase;
         z.y = z.baseY + (z.dying ? 0 : Math.abs(Math.sin(ph)) * 0.07);
-        z.tiltZ = z.dying ? 0 : Math.sin(ph * 0.5) * 0.14;
+        // Now and then a zombie's head snaps sideways.
+        if (!z.dying && z.twitch <= 0 && Math.random() < dt * 0.15) z.twitch = 0.35;
+        z.twitch = Math.max(0, z.twitch - dt);
+        const snap = z.twitch > 0 ? Math.sin((0.35 - z.twitch) * 18) * 0.35 : 0;
+        z.tiltZ = z.dying ? 0 : Math.sin(ph * 0.5) * 0.14 + snap;
         z.tiltX = 0.12 + z.lean + Math.sin(ph) * 0.03;
       }
       pool.write();
     }
     barricadePool.write();
     for (const vis of survivors.values()) {
-      if (!vis.moving && !vis.dying) vis.body.scale.y = 1 + Math.sin(t * 2 + vis.phase) * 0.025; // breathing
+      if (vis.moving || vis.dying) continue;
+      vis.body.scale.y = 1 + Math.sin(t * 2 + vis.phase) * 0.025; // breathing
+      vis.body.rotation.z = Math.sin(t * 0.9 + vis.phase) * 0.035; // weight shift
+      // A little cloud of breath in the cold every few seconds.
+      if ((vis.breath -= dt) <= 0) {
+        vis.breath = 2.5 + Math.random() * 2;
+        const dir = new THREE.Vector3(Math.sin(vis.group.rotation.y), 0, Math.cos(vis.group.rotation.y));
+        puffs.burst(vis.group.position.clone().addScaledVector(dir, 0.55).setY(1.65), 3, 0xeef4fb, 0.12);
+      }
     }
     puffs.update(dt);
     if (ring.visible) {

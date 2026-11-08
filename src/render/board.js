@@ -3,7 +3,10 @@
 import * as THREE from 'three';
 import { VoxelModel, hash3, MATERIALS } from './voxel.js';
 import { P } from './palette.js';
-import { LOCATION_BUILDERS, colony, pineTree, rock } from './buildings.js';
+import {
+  LOCATION_BUILDERS, LOCATION_BUILDERS_HD, colony, colonyHD, pineTree, rock, treeModelHD, rockModelHD,
+} from './buildings.js';
+import { buildTerrainHD } from './terrain.js';
 import { LOCATIONS } from '../content/locations.js';
 import { OUTSIDE_LOCATIONS } from '../core/constants.js';
 
@@ -66,9 +69,7 @@ function distToSegment(px, pz, a, b) {
   return Math.hypot(px - (a.x + abx * t), pz - (a.z + abz * t));
 }
 
-function buildTerrain(layout) {
-  const m = new VoxelModel();
-  const R = BOARD.radius;
+function computeRoads(layout) {
   const roads = [];
   for (const id of OUTSIDE_LOCATIONS) {
     const L = layout[id];
@@ -76,6 +77,28 @@ function buildTerrain(layout) {
     roads.push([dir.clone().multiplyScalar(BOARD.ringRoad), L.center.clone().addScaledVector(dir, -5)]);
   }
   for (const g of layout.colony.gates) roads.push([g.clone(), g.clone().normalize().multiplyScalar(BOARD.ringRoad)]);
+  return roads;
+}
+
+function distances(layout, roads) {
+  const tmp = new THREE.Vector3();
+  return {
+    distRoad: (x, z) => {
+      let d = Math.abs(Math.hypot(x, z) - BOARD.ringRoad);
+      for (const [a, b] of roads) d = Math.min(d, distToSegment(x, z, a, b));
+      return d;
+    },
+    distPlot: (x, z) => {
+      let d = Math.hypot(x, z) - (BOARD.colonyRadius + 2);
+      for (const id of OUTSIDE_LOCATIONS) d = Math.min(d, layout[id].center.distanceTo(tmp.set(x, 0, z)) - 9);
+      return d;
+    },
+  };
+}
+
+function buildTerrain(layout, roads) {
+  const m = new VoxelModel();
+  const R = BOARD.radius;
 
   for (let x = -R; x <= R; x++) {
     for (let z = -R; z <= R; z++) {
@@ -109,11 +132,11 @@ function buildTerrain(layout) {
       }
     }
   }
-  const { lit } = m.buildGeometries({ size: 1, origin: 'none', jitter: 0.025 });
+  const { lit } = m.buildGeometries({ size: 1, origin: 'none', jitter: 0.025, greedy: false });
   const mesh = new THREE.Mesh(lit, MATERIALS.lit);
   mesh.receiveShadow = true;
   mesh.name = 'terrain';
-  return { mesh, roads };
+  return mesh;
 }
 
 /** Is a spot clear of roads, plots and the colony (for trees and rocks)? */
@@ -127,8 +150,8 @@ function isFreeForDecoration(x, z, layout, roads) {
 
 // ---------------------------------------------------------------- decorations
 
-function instanced(model, scale, transforms, { castShadow = true } = {}) {
-  const { lit, glow } = model.buildGeometries({ size: scale });
+function instanced(model, scale, transforms, { castShadow = true, cacheKey = null, jitter = 0.05 } = {}) {
+  const { lit, glow } = model.buildGeometries({ size: scale, cacheKey, jitter });
   const group = new THREE.Group();
   for (const [geo, mat] of [[lit, MATERIALS.lit], [glow, MATERIALS.glow]]) {
     if (!geo) continue;
@@ -162,18 +185,65 @@ function slotMarker(color, rim) {
   return m;
 }
 
+/** HD slot markers: a bevelled 6×6 plate with a carved emblem (snowflake for survivors, claw marks for zombies). */
+function slotMarkerHD(kind) {
+  const m = new VoxelModel();
+  const survivor = kind === 'survivor';
+  const rim = survivor ? 0x7f97b8 : P.dangerDark;
+  const fill = survivor ? 0xd8e6f5 : P.danger;
+  m.box(0, 0, 0, 6, 1, 6, (x, _y, z) => {
+    const corner = (x === 0 || x === 5) && (z === 0 || z === 5);
+    if (corner) return null;
+    return x === 0 || x === 5 || z === 0 || z === 5 ? rim : fill;
+  });
+  const emblem = survivor
+    ? [[2, 1], [3, 1], [1, 2], [4, 2], [1, 3], [4, 3], [2, 4], [3, 4], [2, 2], [3, 3]]
+    : [[1, 1], [2, 2], [3, 3], [2, 1], [3, 2], [4, 3], [3, 1], [4, 2]];
+  for (const [x, z] of emblem) m.set(x, 0, z, survivor ? 0x9fc4e6 : 0x3a1010);
+  return m;
+}
+
+/** A soft glowing ring texture for hover/selection halos. */
+function haloTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(64, 64, 34, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.55, 'rgba(255,255,255,0.95)');
+  grad.addColorStop(0.7, 'rgba(255,255,255,0.35)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+}
+
 // ---------------------------------------------------------------- public API
 
-export function createBoard() {
+export function createBoard({ quality = { hd: false } } = {}) {
+  const hd = !!quality.hd;
   const root = new THREE.Group();
   root.name = 'board';
   const layout = computeLayout();
+  const roads = computeRoads(layout);
+  // HD models are authored at 2× resolution, so each voxel is half the size.
+  const bScale = hd ? BOARD.buildingScale / 2 : BOARD.buildingScale;
 
-  const { mesh: terrain, roads } = buildTerrain(layout);
+  let terrain;
+  if (hd) {
+    terrain = new THREE.Mesh(buildTerrainHD({ radius: BOARD.radius, ...distances(layout, roads) }), MATERIALS.lit);
+    terrain.receiveShadow = true;
+    terrain.name = 'terrain';
+  } else {
+    terrain = buildTerrain(layout, roads);
+  }
   root.add(terrain);
 
   // Colony
-  const colonyGroup = colony(BOARD.colonyRadius * 2).build({ size: BOARD.buildingScale });
+  // HD models carry their texture in material patterns, so skip the extra per-voxel jitter: it would stop
+  // neighbouring faces from merging and multiply the triangle count.
+  const jitter = hd ? 0 : 0.05;
+  const colonyGroup = (hd ? colonyHD(BOARD.colonyRadius * 2) : colony(BOARD.colonyRadius * 2)).build({ size: bScale, jitter });
   colonyGroup.position.y = 0;
   colonyGroup.name = 'colony';
   root.add(colonyGroup);
@@ -182,7 +252,7 @@ export function createBoard() {
   const locationGroups = {};
   for (const id of OUTSIDE_LOCATIONS) {
     const L = layout[id];
-    const g = LOCATION_BUILDERS[id]().build({ size: BOARD.buildingScale });
+    const g = (hd ? LOCATION_BUILDERS_HD : LOCATION_BUILDERS)[id]().build({ size: bScale, jitter });
     g.position.copy(L.center);
     g.rotation.y = L.facing;
     g.name = id;
@@ -199,29 +269,46 @@ export function createBoard() {
     for (const p of L.survivorSlots) { tmp.position.set(p.x, 0.01, p.z); tmp.rotation.y = L.facing; tmp.updateMatrix(); survivorTransforms.push(tmp.matrix.clone()); }
     for (const p of L.zombieSlots) { tmp.position.set(p.x, 0.01, p.z); tmp.rotation.y = L.facing; tmp.updateMatrix(); zombieTransforms.push(tmp.matrix.clone()); }
   }
-  root.add(instanced(slotMarker(0xd8e6f5, 0x7f97b8), 0.45, survivorTransforms, { castShadow: false }));
-  root.add(instanced(slotMarker(P.danger, P.dangerDark), 0.45, zombieTransforms, { castShadow: false }));
+  if (hd) {
+    root.add(instanced(slotMarkerHD('survivor'), 0.225, survivorTransforms, { castShadow: false, jitter: 0 }));
+    root.add(instanced(slotMarkerHD('zombie'), 0.225, zombieTransforms, { castShadow: false, jitter: 0 }));
+  } else {
+    root.add(instanced(slotMarker(0xd8e6f5, 0x7f97b8), 0.45, survivorTransforms, { castShadow: false }));
+    root.add(instanced(slotMarker(P.danger, P.dangerDark), 0.45, zombieTransforms, { castShadow: false }));
+  }
 
   // Forest + rocks (instanced)
   const trees = scatter(layout, roads, 90, 3);
-  const bySize = [[], [], []];
+  // Low: 3 sizes of the classic pine. HD: 3 silhouettes, one instanced mesh each, size varied by scale
+  // (fewer draw calls than one mesh per shape × size).
+  const groups = hd ? 3 : 3;
+  const bucket = Array.from({ length: groups }, () => []);
   for (const t of trees) {
     tmp.position.set(t.x, 0, t.z);
     tmp.rotation.y = Math.floor(t.r * 4) * (Math.PI / 2);
-    tmp.scale.setScalar(0.85 + t.s * 0.35);
+    tmp.scale.setScalar(hd ? 0.75 + t.s * 0.6 : 0.85 + t.s * 0.35);
     tmp.updateMatrix();
-    bySize[Math.floor(t.s * 3)].push(tmp.matrix.clone());
+    const g = hd ? Math.floor(hash3(Math.round(t.x * 10), 5, Math.round(t.z * 10)) * 3) : Math.floor(t.s * 3);
+    bucket[g].push(tmp.matrix.clone());
   }
-  bySize.forEach((list, size) => { if (list.length) root.add(instanced(pineTree(size), 0.5, list)); });
-  const rocks = scatter(layout, roads, 30, 9, 3).map((t) => {
-    tmp.position.set(t.x, 0, t.z); tmp.rotation.y = t.r * Math.PI * 2; tmp.scale.setScalar(0.8 + t.s); tmp.updateMatrix();
-    return tmp.matrix.clone();
+  bucket.forEach((list, i) => {
+    if (!list.length) return;
+    root.add(hd
+      ? instanced(treeModelHD(i, 1), 0.25, list, { cacheKey: `tree-${i}`, jitter: 0 })
+      : instanced(pineTree(i), 0.5, list));
   });
-  root.add(instanced(rock(), 0.5, rocks));
+  const rockSpots = scatter(layout, roads, 30, 9, 3);
+  const rockBuckets = Array.from({ length: hd ? 3 : 1 }, () => []);
+  rockSpots.forEach((t, i) => {
+    tmp.position.set(t.x, 0, t.z); tmp.rotation.y = t.r * Math.PI * 2; tmp.scale.setScalar(0.8 + t.s); tmp.updateMatrix();
+    rockBuckets[i % rockBuckets.length].push(tmp.matrix.clone());
+  });
+  rockBuckets.forEach((list, shape) => root.add(hd ? instanced(rockModelHD(shape), 0.25, list, { cacheKey: `rock-${shape}`, jitter: 0 }) : instanced(rock(), 0.5, list)));
 
   // Pick targets (invisible cylinders) and hover rings.
   const pickTargets = [];
   const rings = {};
+  const halo = haloTexture();
   for (const L of Object.values(layout)) {
     const hit = new THREE.Mesh(
       new THREE.CylinderGeometry(L.hitRadius, L.hitRadius, 10, 16),
@@ -232,9 +319,10 @@ export function createBoard() {
     root.add(hit);
     pickTargets.push(hit);
 
+    // Soft additive halo (instead of a hard flat ring) for hover / selection.
     const ring = new THREE.Mesh(
-      new THREE.RingGeometry(L.hitRadius + 0.6, L.hitRadius + 1.4, 48),
-      new THREE.MeshBasicMaterial({ color: 0xffc46b, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }),
+      new THREE.PlaneGeometry((L.hitRadius + 2.2) * 2, (L.hitRadius + 2.2) * 2),
+      new THREE.MeshBasicMaterial({ map: halo, color: 0xffc46b, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, fog: false }),
     );
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(L.center.x, 0.06, L.center.z);
@@ -244,10 +332,12 @@ export function createBoard() {
 
   // Warm light sources: campfire + a lamp at each location door.
   const lights = [];
-  const fire = new THREE.PointLight(0xff8a3c, 220, 32, 1.5);
-  fire.position.set(0, 3, 0);
+  // HD: a gentler light set higher up, so survivors around the fire stay readable instead of blowing out.
+  const fireBase = hd ? 85 : 220;
+  const fire = new THREE.PointLight(0xff8a3c, fireBase, 32, hd ? 1.2 : 1.5);
+  fire.position.set(0, hd ? 4.5 : 3, 0);
   root.add(fire);
-  lights.push({ light: fire, base: 220, flicker: 0.25 });
+  lights.push({ light: fire, base: fireBase, flicker: 0.25 });
   for (const id of OUTSIDE_LOCATIONS) {
     const L = layout[id];
     const lamp = new THREE.PointLight(0xffa552, 45, 16, 1.5);
@@ -270,6 +360,27 @@ export function createBoard() {
     }),
   };
 
+  // A separate, animated flame on top of the static campfire voxels.
+  const flame = new VoxelModel();
+  flame.box(-1, 0, -1, 3, 1, 3, (x, _y, z) => (x === 0 && z === 0 ? P.fireCore : P.fire), true);
+  flame.box(0, 1, 0, 1, 2, 1, P.fireCore, true);
+  flame.set(0, 3, 0, P.fire, true);
+  flame.set(1, 1, 0, P.fire, true); flame.set(0, 1, -1, P.fire, true); flame.set(-1, 1, 0, P.ember, true);
+  const flameMesh = flame.build({ size: BOARD.buildingScale * 0.55, cacheKey: 'flame' });
+  flameMesh.position.copy(fx.fire).setY(fx.fire.y + 0.25);
+  root.add(flameMesh);
+
+  // Each building gets its own glow material so windows can breathe independently.
+  const glowMats = [];
+  for (const g of Object.values(locationGroups)) {
+    g.traverse((o) => {
+      if (o.isMesh && o.material === MATERIALS.glow) {
+        o.material = MATERIALS.glow.clone();
+        glowMats.push({ mat: o.material, base: MATERIALS.glow.color.r, phase: Math.random() * 10 });
+      }
+    });
+  }
+
   let hovered = null;
   let selected = null;
 
@@ -282,15 +393,23 @@ export function createBoard() {
     setHovered(id) { hovered = id; },
     setSelected(id) { selected = id; },
     update(t) {
+      // Flame: flicker in height and sway.
+      flameMesh.scale.set(1 + Math.sin(t * 17) * 0.06, 1 + Math.sin(t * 11.3) * 0.18 + Math.sin(t * 23) * 0.08, 1 + Math.cos(t * 15) * 0.06);
+      flameMesh.rotation.y = Math.sin(t * 2.1) * 0.4;
+      // Windows: a slow breathing glow, with the odd quick flicker.
+      for (const g of glowMats) {
+        const flick = Math.sin(t * 0.7 + g.phase) > 0.985 ? 0.55 : 1;
+        g.mat.color.setScalar(g.base * (0.92 + Math.sin(t * 1.3 + g.phase) * 0.08) * flick);
+      }
       for (const [i, l] of lights.entries()) {
         const f = Math.sin(t * 13 + i * 3) * 0.5 + Math.sin(t * 7.3 + i) * 0.5;
         l.light.intensity = l.base * (1 + f * l.flicker);
       }
       for (const [id, ring] of Object.entries(rings)) {
-        const target = id === selected ? 0.85 : id === hovered ? 0.5 : 0;
+        const target = id === selected ? 0.9 : id === hovered ? 0.5 : 0;
         ring.material.opacity += (target - ring.material.opacity) * 0.2;
         ring.material.color.setHex(id === selected ? 0xffc46b : 0xbfdcff);
-        const s = 1 + (id === selected ? Math.sin(t * 3) * 0.02 : 0);
+        const s = 1 + (id === selected ? Math.sin(t * 3) * 0.03 : 0);
         ring.scale.setScalar(s);
       }
     },

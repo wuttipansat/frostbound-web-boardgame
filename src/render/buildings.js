@@ -298,3 +298,86 @@ export const LOCATION_BUILDERS = {
   library,
   gas: gasStation,
 };
+
+// ---------------------------------------------------------------- HD (2×) versions
+
+import { detailBuilding, applyPatterns, lumpySnow, shadeHex } from './detail.js';
+
+const SEED = { police: 1, grocery: 2, school: 3, hospital: 4, library: 5, gas: 6, colony: 7 };
+
+/** HD location models: built at 2× resolution with frames, icicles, patterns and bevels. Render at half the voxel size. */
+export const LOCATION_BUILDERS_HD = Object.fromEntries(Object.entries(LOCATION_BUILDERS).map(([id, build]) => [
+  id, () => detailBuilding(build().upscale(2), { seed: SEED[id] }),
+]));
+
+export function colonyHD(radius = 18) {
+  return detailBuilding(colony(radius).upscale(2), { seed: SEED.colony, bevel: 0.3 });
+}
+
+/**
+ * Pines in three silhouettes: 0 = classic layered pine, 1 = tall narrow spruce, 2 = round snow-laden fir.
+ * size 0..2 adds height.
+ */
+export function treeModel(shape = 0, size = 1) {
+  if (shape === 0) return pineTree(size);
+  const m = new VoxelModel();
+  if (shape === 1) {
+    m.box(0, 0, 0, 1, 3, 1, P.woodDark);
+    const layers = 5 + size;
+    for (let i = 0; i < layers; i++) {
+      const r = Math.max(1, Math.round((layers - i) * 0.6));
+      const y = 3 + i * 2;
+      m.box(-r + 1, y, -r + 1, 2 * r - 1, 1, 2 * r - 1, (x, _y, z) => (Math.abs(x) + Math.abs(z) > r ? null : (hash3(x, y, z) > 0.5 ? P.pine : P.pineDark)));
+      if (hash3(i, 1, size) > 0.3) m.box(-r + 1, y + 1, 0, 2 * r - 1, 1, 1, P.snow);
+    }
+    m.set(0, 3 + layers * 2, 0, P.snow);
+    return m;
+  }
+  // round fir: a lumpy dome of needles under a thick snow blanket
+  m.box(0, 0, 0, 1, 2, 1, P.woodDark);
+  const R = 2 + size;
+  for (let y = 0; y <= R * 2; y++) {
+    const rr = Math.round(Math.sqrt(Math.max(0, R * R - (y - R) * (y - R))));
+    for (let x = -rr; x <= rr; x++) for (let z = -rr; z <= rr; z++) {
+      if (x * x + z * z > rr * rr + 0.5) continue;
+      m.set(x, y + 2, z, hash3(x, y, z) > 0.45 ? P.pine : P.pineDark);
+    }
+  }
+  // A thick blanket: snow on the top and on most upper-hemisphere ledges.
+  m.snowCap(P.snow, 0.95, 2);
+  for (const v of [...m.voxels.values()]) {
+    if ((v.color === P.pine || v.color === P.pineDark) && v.y > R && !m.get(v.x, v.y + 1, v.z) && hash3(v.x, v.y, v.z) < 0.5) v.color = P.snowShade;
+  }
+  return m;
+}
+
+export function treeModelHD(shape = 0, size = 1) {
+  // Trees are instanced ~90 times (and drawn again into the shadow map), so keep them merge-friendly:
+  // needles keep their per-block colour (2×2×2 blocks merge into big quads), only snow gets detail.
+  const m = treeModel(shape, size).upscale(2);
+  lumpySnow(m, { p: 0.3 });
+  // Snow clumps sitting on branch tips.
+  for (const v of [...m.voxels.values()]) {
+    if (v.color !== P.pine && v.color !== P.pineDark) continue;
+    if (!m.get(v.x, v.y + 1, v.z) && hash3(v.x, v.y, v.z + 9) < 0.06) m.set(v.x, v.y + 1, v.z, P.snow);
+  }
+  return m.bevel(0.25, { seed: shape * 7 + size, topOnly: true });
+}
+
+export function rockModel(shape = 0) {
+  if (shape === 0) return rock();
+  const m = new VoxelModel();
+  if (shape === 1) { // tall split boulder
+    m.box(0, 0, 0, 2, 3, 2, P.rock); m.box(2, 0, 0, 1, 2, 2, P.rockLight); m.box(0, 3, 0, 1, 1, 1, P.rockLight);
+  } else { // flat slab pile
+    m.box(0, 0, 0, 4, 1, 3, P.rockLight); m.box(1, 1, 0, 2, 1, 2, P.rock); m.box(3, 1, 2, 1, 1, 1, P.rock);
+  }
+  return m.snowCap(P.snow, 0.7, 1);
+}
+
+export function rockModelHD(shape = 0) {
+  const m = rockModel(shape).upscale(2);
+  lumpySnow(m, { p: 0.5 });
+  m.recolor((v) => (v.color === P.rock || v.color === P.rockLight ? shadeHex(v.color, 0.85 + hash3(v.x, v.y, v.z) * 0.3) : undefined));
+  return m.bevel(0.7, { seed: shape });
+}

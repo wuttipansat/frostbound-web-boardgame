@@ -302,3 +302,108 @@ export function barricadeModel() {
   m.set(0, 5, 1, P.snow); m.set(6, 5, 1, P.snow);
   return m;
 }
+
+// ---------------------------------------------------------------- HD (2×) characters & pieces
+
+import { applyPatterns, shadeHex as shadeHD, mixHex } from './detail.js';
+
+export const HD = 2;
+
+/** Survivor at 2× resolution with a real face (catchlight eyes, brows, mouth, blush), buttons, folds and soles. */
+export function survivorModelHD(def) {
+  const st = SURVIVOR_STYLES[def.id];
+  const has = (e) => (st.extras ?? []).includes(e);
+  const skin = SKIN[st.skin] ?? SKIN.medium;
+  const coat = st.coat ?? Number.parseInt(def.accent.slice(1), 16);
+  const lo = has('short') ? -1 : 0;
+  const top = 9 + lo;
+  const hy = top + 1;
+  const m = survivorModel(def).upscale(HD);
+  const isSkin = (x, y, z) => m.get(x, y, z)?.color === skin;
+  const paint = (x, y, z, c, when = () => true) => { const v = m.get(x, y, z); if (v && when(v)) v.color = c; };
+
+  // Face (front of head is z = 13 in HD).
+  const eyeY = (hy + 2) * 2;
+  for (const ex of [4, 10]) {
+    for (let dx = 0; dx < 2; dx++) for (let dy = 0; dy < 2; dy++) paint(ex + dx, eyeY + dy, 13, EYE);
+    paint(ex, eyeY + 1, 13, 0xffffff); // catchlight
+    for (let dx = 0; dx < 2; dx++) if (isSkin(ex + dx, eyeY + 2, 13)) paint(ex + dx, eyeY + 2, 13, shadeHD(st.hair, 0.8));
+  }
+  const mouthY = hy * 2;
+  for (let x = 6; x <= 9; x++) for (let y = mouthY; y <= mouthY + 1; y++) paint(x, y, 13, skin);
+  paint(7, mouthY + 1, 13, 0x6a3328, (v) => v.color === skin);
+  paint(8, mouthY + 1, 13, 0x6a3328, (v) => v.color === skin);
+  for (const cx of [3, 12]) paint(cx, (hy + 1) * 2, 13, mixHex(skin, 0xe06a6a, 0.35), (v) => v.color === skin);
+
+  // Coat: buttons down the front, soft folds, and darker boot soles.
+  for (let y = 9; y <= top * 2; y += 3) paint(7, y, 11, shadeHD(coat, 0.55), (v) => v.color === coat);
+  for (let y = 8; y <= top * 2 + 1; y++) for (const fx of [4, 11]) paint(fx, y, 11, shadeHD(coat, 0.9), (v) => v.color === coat);
+  for (const v of m.voxels.values()) if (v.y === 0) v.color = 0x1c1714;
+  applyPatterns(m);
+  // Rounded shoulders and head top; never touch the face.
+  return m.bevel(0.35, { topOnly: true, keep: (v) => v.z >= 12 || v.glow });
+}
+
+/** Five zombie variants (3 = one-armed in a hood, 4 = bloated). */
+export function zombieModelV(variant) {
+  const m = zombieModel(variant % 3);
+  if (variant === 3) {
+    m.clearBox(7, 8, 4, 1, 2, 7); // lost an arm
+    m.box(0, 13, 3, 8, 2, 7, 0x3b3a44); // ragged hood
+    m.clearBox(2, 13, 9, 4, 1, 1);
+  } else if (variant === 4) {
+    m.box(0, 5, 3, 8, 4, 5, (x, y, z) => (hash3(x, y, z) > 0.7 ? 0x6b8a4e : 0x5a3f4a)); // bloated belly
+  }
+  return m;
+}
+
+export function zombieModelHD(variant = 0) {
+  const m = zombieModelV(variant).upscale(HD);
+  const skinSet = new Set([0x6f8a4e, 0x7a9a5a, 0x5f7a44, 0x6b8a4e]);
+  // Ribs on exposed chest skin, torn rag edges, pupils and teeth.
+  for (const v of [...m.voxels.values()]) {
+    if (skinSet.has(v.color) && v.y >= 8 && v.y <= 19 && !m.get(v.x, v.y, v.z + 1)) {
+      if (v.y % 3 === 1) v.color = mixHex(v.color, 0xd8d2b8, 0.45);
+      else if (v.y % 3 === 0) v.color = shadeHD(v.color, 0.75);
+    }
+  }
+  const rags = [...m.voxels.values()].filter((v) => !skinSet.has(v.color) && !v.glow && v.y >= 8 && v.y <= 19);
+  for (const v of rags) {
+    const nearSkin = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1]].some(([dx, dy, dz]) => skinSet.has(m.get(v.x + dx, v.y + dy, v.z + dz)?.color));
+    if (nearSkin && hash3(v.x, v.y, v.z + variant) < 0.3) m.remove(v.x, v.y, v.z);
+  }
+  for (const ex of [4, 10]) {
+    const e = m.get(ex + 1, 23, 21);
+    if (e?.glow) e.color = 0xffd2a0; // hot pupil
+  }
+  for (let x = 6; x <= 9; x += 2) { const tth = m.get(x, 19, 21); if (tth) { tth.color = 0xe8e0c8; tth.glow = false; } }
+  applyPatterns(m);
+  return m.bevel(0.3, { topOnly: true, keep: (v) => v.glow || v.z >= 20 });
+}
+
+/** Die at 2×: same faces as dieModel(), but bevelled with recessed pips. */
+export function dieModelHD() {
+  const m = dieModel().upscale(HD);
+  const N = DIE_VOXELS * HD - 1;
+  const onSurface = (v) => v.x === 0 || v.x === N || v.y === 0 || v.y === N || v.z === 0 || v.z === N;
+  // Carve the pips one voxel deep so they read as recesses.
+  for (const v of [...m.voxels.values()]) {
+    if (v.color !== 0xf4f1ea && onSurface(v)) m.remove(v.x, v.y, v.z);
+  }
+  return m.bevel(0.5, { keep: (v) => v.color !== 0xf4f1ea });
+}
+
+export function exposureDieModelHD() {
+  return exposureDieModel().upscale(HD).bevel(0.5, { keep: (v) => v.color !== 0x2b3442 });
+}
+
+export function barricadeModelHD() {
+  const m = barricadeModel().upscale(HD);
+  // Nail heads where planks cross the posts.
+  for (const v of [...m.voxels.values()]) {
+    if (materialColorIsPlank(v.color) && (v.x === 1 || v.x === 13) && !m.get(v.x, v.y, v.z + 1) && v.y % 2 === 0) v.color = 0x3a3f48;
+  }
+  applyPatterns(m);
+  return m.bevel(0.4);
+}
+const materialColorIsPlank = (c) => c === P.woodLight || c === P.wood;

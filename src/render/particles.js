@@ -75,13 +75,14 @@ class Emitter {
 
 const rand = (a, b) => a + Math.random() * (b - a);
 
-export function createAmbientParticles({ fire, chimneys = [], torches = [] }) {
+export function createAmbientParticles({ fire, chimneys = [], torches = [], scale = 1 }) {
+  const n = (k) => Math.max(1, Math.round(k * scale));
   const group = new THREE.Group();
   group.name = 'particles';
 
   const EMBER = [new THREE.Color(0xffd04a), new THREE.Color(0xff8a2a), new THREE.Color(0xff5a1a)];
   const embers = new Emitter({
-    count: 70, blending: THREE.AdditiveBlending, soft: 0.25,
+    count: n(70), blending: THREE.AdditiveBlending, soft: 0.25,
     spawn: (q) => {
       q.max = rand(0.9, 2.2);
       q.life = q.max;
@@ -101,7 +102,7 @@ export function createAmbientParticles({ fire, chimneys = [], torches = [] }) {
 
   const smokeColor = new THREE.Color(0x8a96a8);
   const smoke = chimneys.length ? new Emitter({
-    count: 26 * chimneys.length, soft: 1,
+    count: n(26) * chimneys.length, soft: 1,
     spawn: (q) => {
       const c = chimneys[Math.floor(Math.random() * chimneys.length)];
       q.max = rand(3, 5);
@@ -119,7 +120,7 @@ export function createAmbientParticles({ fire, chimneys = [], torches = [] }) {
   });
 
   const sparks = torches.length ? new Emitter({
-    count: 6 * torches.length, blending: THREE.AdditiveBlending, soft: 0.3,
+    count: n(6) * torches.length, blending: THREE.AdditiveBlending, soft: 0.3,
     spawn: (q) => {
       const c = torches[Math.floor(Math.random() * torches.length)];
       q.max = rand(0.4, 0.9);

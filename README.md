@@ -3,7 +3,13 @@
 An original, semi-cooperative survival board game set in a frozen zombie apocalypse, built for the browser with a 3D voxel look (Three.js).
 2–5 players play hot-seat, with optional bots for empty seats.
 
-> **Status: all 6 build steps are done.** The game is fully playable in the browser: hot-seat for 2–5 players, with AI for any seat, in English or Thai. It has animated crossroads, crisis, exposure and exile-vote reveals, procedural sound, ambient particles and a guided first-round tutorial.
+> **Status: all 7 build steps are done.** The game is fully playable in the browser: hot-seat for 2–5 players, with AI for any seat, in English or Thai. It has animated crossroads, crisis, exposure and exile-vote reveals, procedural sound, ambient particles and a guided first-round tutorial. Step 7 adds an HD graphics overhaul with Low / Medium / High quality tiers.
+
+![FROSTBOUND before and after the step 7 graphics overhaul](docs/screenshots/step7/compare-board.jpg)
+
+| Colony | Police Station | Characters |
+|---|---|---|
+| ![colony](docs/screenshots/step7/compare-colony.jpg) | ![police](docs/screenshots/step7/compare-police.jpg) | ![characters](docs/screenshots/step7/compare-characters.jpg) |
 
 ![Playing FROSTBOUND](docs/screenshots/play.jpg)
 
@@ -99,6 +105,9 @@ src/
     dice.js             dice tray on its own small canvas; dice tumble and settle on the rolled face; used dice dim;
                         the exposure die (wound / frostbite / bite symbols) is thrown here too
     tween.js            frame-driven tween engine + easings
+    detail.js           HD detail passes: materials/patterns, dithering, frames + sills, icicles, lumpy snow
+    terrain.js          HD heightmap terrain mesher (top faces with AO + merged side walls)
+    quality.js          Low / Medium / High tiers and how the active one is chosen
     particles.js        campfire embers, chimney smoke, gate-torch sparks (per-particle size/colour/alpha shader)
   i18n/                 en.js + th.js UI strings, content.th.js (Thai content), format.js (log lines, effect text)
   ui/
@@ -199,6 +208,50 @@ A survivor dies at 3 wounds. Every death costs 1 morale. A player who loses ever
 - If the colony falls, only a betrayer whose condition is met wins.
 
 **Exile vote.** Any player can call a vote during a turn. It needs a strict majority of the *other* players. An exiled loyal player swaps their objective for a random exile objective; a betrayer keeps theirs. An exiled player's survivors leave the colony and can never return. Exiled players can't contribute to crises, deposit, or add food.
+
+## Graphics (step 7)
+
+**Quality tiers.** Choose **Graphics: Low / Medium / High** in Setup or Settings. Changing it reloads the page and the autosaved game resumes; `?quality=high` overrides it for one visit. The default is Medium, or Low on phones and very low-core machines.
+
+| | Low | Medium (default) | High |
+|---|---|---|---|
+| Models | original 1× voxels | **2× HD** voxels with detail passes | 2× HD |
+| Lighting | moon + warm point lights | + soft shadows (2048), cold rim light | + soft shadows (4096) |
+| Post-processing | none | bloom on glowing voxels, colour grade, vignette | + tilt-shift miniature blur |
+| Atmosphere | snowfall | + night sky (stars, moon, aurora), ground mist, two-layer snow with gusts | + denser snow and particles |
+| Draw calls\* | 56–74 | 81–99 | 81–99 |
+| Triangles\* | 166–181k | 534–575k | 534–575k |
+| Load to playable\*\* | 2.9 s | 4.0 s | 4.3 s |
+
+\* Per frame, counting every pass (shadow map + scene + post), measured mid-game on the four comparison views.
+\*\* Measured in a headless browser with a *software* GPU (SwiftShader), so these overstate real load times. Frame times there were 0.3–0.7 s for every tier, so they say nothing about real fps; relative cost was Medium/High ≈ 1.3–1.6× Low. Check fps on your own machine and drop a tier if needed.
+
+**What "more bits" means in practice:**
+- **Higher resolution:** every building, the colony, trees, rocks, survivors, zombies, barricades and dice are rebuilt at 2× voxel resolution (half-size voxels, same world size, same slot layout). The terrain uses a dedicated heightmap mesher at 0.5 world units per cell.
+- **Detail passes** (`src/render/detail.js`):
+  - window frames and protruding sills, icicles under eaves
+  - lumpy half-thickness snow caps, bevelled edges
+  - material patterns: brick courses with mortar and running bond, stone blocks, siding lines, wood grain with knots, banded metal, glass streaks, snow sparkle
+  - ordered (Bayer) dithering between colour steps
+- **Characters:** faces with catchlight eyes, brows, mouth and blush; coat buttons and folds; boot soles. Zombies get exposed ribs, torn rags, glowing pupils and teeth, plus 2 new variants (one-armed hooded, bloated). Dice get recessed pips.
+- **Environment:** 3 tree silhouettes (layered pine, narrow spruce, snow-laden fir) and 3 rock shapes. The terrain has drifts, tyre ruts, footprints, frozen puddles, debris and rock strata on the rim.
+- **Mesher** (`src/render/voxel.js`):
+  - greedy meshing (same-colour coplanar faces merge into big quads)
+  - per-vertex ambient occlusion, with the quad diagonal flipped to avoid artefacts; only uniform-AO faces merge
+  - a geometry cache
+  - HD models skip per-voxel brightness jitter, since their texture comes from material patterns and jitter would block merging
+- **Motion:**
+  - animated campfire flame
+  - windows that breathe and occasionally flicker
+  - survivors' breath puffs and weight shifts
+  - occasional zombie head twitches
+  - soft additive halos for hover and selection
+- **UI:**
+  - frosted panels with rime highlights
+  - Kanit as the Thai fallback for the pixel font
+  - a gradient logo
+
+Dev helper: `?lineup` shows all 20 survivors and 5 zombie variants at the current quality tier.
 
 ## Content (all original)
 - 20 survivors, each with a unique ability: `src/content/survivors.js`

@@ -34,7 +34,7 @@ const storage = {
 
 const defaultSeats = () => Array.from({ length: 5 }, (_, i) => ({ name: t('setup.defaultName', { n: i + 1 }), isAI: i >= 2 }));
 
-export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = false }) {
+export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = false, quality = 'medium' }) {
   const settings = storage.get(SETTINGS_KEY) ?? {};
   setLang(settings.lang ?? (navigator.language?.startsWith('th') ? 'th' : 'en'));
   sound.enabled = settings.sound ?? true;
@@ -56,6 +56,7 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
     tutorial: settings.tutorial ?? !settings.tutorialDone,
     tutStep: DONE,
     ppCollapsed: false,
+    quality,
   };
   let tutPlayer = null; // the human the first-round tutorial follows
 
@@ -94,7 +95,7 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
       state, ui, actor, viewer,
       canAct: !!viewer && viewer === actor && state?.phase === PHASES.TURN && !needsPass(),
       hasSave: !!storage.get(SAVE_KEY)?.state,
-      set, dispatch, dismissQueue, tutorialEvent, setTutorial, sfx: (name, delay) => sound.play(name, delay), selectSurvivor, selectLocation, takeSeat, startGame, continueGame, quitToSetup, setLanguage, setSound,
+      set, dispatch, dismissQueue, tutorialEvent, setTutorial, setQuality, sfx: (name, delay) => sound.play(name, delay), selectSurvivor, selectLocation, takeSeat, startGame, continueGame, quitToSetup, setLanguage, setSound,
     };
   }
 
@@ -107,7 +108,7 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
 
   function saveSettings(extra = {}) {
     const prev = storage.get(SETTINGS_KEY) ?? {};
-    storage.set(SETTINGS_KEY, { ...prev, lang: getLang(), sound: ui.sound, tutorial: ui.tutorial, ...extra });
+    storage.set(SETTINGS_KEY, { ...prev, lang: getLang(), sound: ui.sound, tutorial: ui.tutorial, quality: ui.quality, ...extra });
   }
 
   function tutorialEvent(event) {
@@ -282,6 +283,14 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
     render();
   }
 
+  /** Graphics tier applies at load: save it, remember to resume, and reload. */
+  function setQuality(id) {
+    if (id === ui.quality) return;
+    saveSettings({ quality: id });
+    try { if (state) sessionStorage.setItem('frostbound.resume', '1'); } catch { /* ignore */ }
+    location.reload();
+  }
+
   function setTutorial(on) {
     ui.tutorial = on;
     saveSettings();
@@ -406,5 +415,5 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
   }
 
   render();
-  return { loadState, set, tutorialEvent, tick, render, onBoardPick, quickStart, dispatch, get state() { return state; }, get ui() { return ui; }, takeSeat, selectSurvivor, selectLocation };
+  return { loadState, set, tutorialEvent, continueGame, tick, render, onBoardPick, quickStart, dispatch, get state() { return state; }, get ui() { return ui; }, takeSeat, selectSurvivor, selectLocation };
 }

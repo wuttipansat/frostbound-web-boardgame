@@ -2,10 +2,12 @@
 // Renders only while something moves, so it costs nothing when idle.
 import * as THREE from 'three';
 import { MATERIALS } from './voxel.js';
-import { dieModel, DIE_FACES, DIE_VOXELS, exposureDieModel, EXPOSURE_DIE_FACES } from './characters.js';
+import {
+  dieModel, DIE_FACES, DIE_VOXELS, exposureDieModel, EXPOSURE_DIE_FACES, dieModelHD, exposureDieModelHD, HD,
+} from './characters.js';
 import { Tweens, ease } from './tween.js';
 
-const DIE_SIZE = 1 / DIE_VOXELS; // the whole die is 1 world unit
+const DIE_SIZE = 1 / DIE_VOXELS; // the whole die is 1 world unit (HD dice use half-size voxels)
 const UP = new THREE.Vector3(0, 1, 0);
 
 /** Quaternion that turns the face showing `value` to point straight up. */
@@ -34,7 +36,8 @@ export function diceLayout(count, spacing = 1.35) {
   return Array.from({ length: count }, (_, i) => (i - (count - 1) / 2) * spacing);
 }
 
-export function createDiceTray(canvas) {
+export function createDiceTray(canvas, { hd = false } = {}) {
+  const dieSize = hd ? DIE_SIZE / HD : DIE_SIZE;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
@@ -55,9 +58,9 @@ export function createDiceTray(canvas) {
   floor.receiveShadow = true;
   scene.add(floor);
 
-  const { lit } = dieModel().buildGeometries({ size: DIE_SIZE });
+  const { lit } = (hd ? dieModelHD() : dieModel()).buildGeometries({ size: dieSize, jitter: 0.02 });
   lit.translate(0, -0.5, 0); // centre the cube on its origin so it spins around the middle
-  const expoGeo = exposureDieModel().buildGeometries({ size: DIE_SIZE });
+  const expoGeo = (hd ? exposureDieModelHD() : exposureDieModel()).buildGeometries({ size: dieSize, jitter: 0.02 });
   expoGeo.lit.translate(0, -0.5, 0);
   expoGeo.glow?.translate(0, -0.5, 0);
   const expo = new THREE.Group();
