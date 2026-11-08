@@ -383,6 +383,8 @@ export function createBoard({ quality = { hd: false } } = {}) {
 
   let hovered = null;
   let selected = null;
+  let hints = {};
+  const HINT = { ok: [0x7fd18a, 0.4], lure: [0xffb347, 0.5], full: [0x8a96a8, 0.22] };
 
   return {
     root,
@@ -392,6 +394,8 @@ export function createBoard({ quality = { hd: false } } = {}) {
     locationGroups,
     setHovered(id) { hovered = id; },
     setSelected(id) { selected = id; },
+    /** Location hints: { locationId: 'ok' | 'full' | 'lure' | 'blocked' } (e.g. where a survivor can move). */
+    setHints(next) { hints = next ?? {}; },
     update(t) {
       // Flame: flicker in height and sway.
       flameMesh.scale.set(1 + Math.sin(t * 17) * 0.06, 1 + Math.sin(t * 11.3) * 0.18 + Math.sin(t * 23) * 0.08, 1 + Math.cos(t * 15) * 0.06);
@@ -406,9 +410,10 @@ export function createBoard({ quality = { hd: false } } = {}) {
         l.light.intensity = l.base * (1 + f * l.flicker);
       }
       for (const [id, ring] of Object.entries(rings)) {
-        const target = id === selected ? 0.9 : id === hovered ? 0.5 : 0;
+        const hint = HINT[hints[id]];
+        const target = id === selected ? 0.9 : id === hovered ? 0.55 : hint ? hint[1] * (0.8 + Math.sin(t * 3) * 0.2) : 0;
         ring.material.opacity += (target - ring.material.opacity) * 0.2;
-        ring.material.color.setHex(id === selected ? 0xffc46b : 0xbfdcff);
+        ring.material.color.setHex(id === selected ? 0xffc46b : id === hovered && !hint ? 0xbfdcff : hint ? hint[0] : 0xbfdcff);
         const s = 1 + (id === selected ? Math.sin(t * 3) * 0.03 : 0);
         ring.scale.setScalar(s);
       }

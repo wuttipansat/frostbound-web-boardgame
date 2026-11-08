@@ -220,6 +220,8 @@ export function createDiceTray(canvas, { hd = false } = {}) {
   }
 
   window.addEventListener('resize', resize);
+  // The tray may be created while its panel is hidden (0×0); re-size whenever its box changes.
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => resize()).observe(canvas);
   resize();
   return {
     sync,

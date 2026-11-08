@@ -119,6 +119,15 @@ export function createStage(canvas, { snow = true, quality = { id: 'low', ...QUA
       grade.uniforms.uResolution.value.set(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
     }
     const aspect = w / h;
+    // Sky: crop to the screen aspect ("cover") instead of stretching it (the moon stays round on phones).
+    if (scene.background?.isTexture) {
+      const img = scene.background.image;
+      const ta = img.width / img.height;
+      const tex = scene.background;
+      // keep the moon (drawn at 80% across) in frame on narrow screens
+      if (aspect < ta) { tex.repeat.set(aspect / ta, 1); tex.offset.set((1 - aspect / ta) * 0.8, 0); }
+      else { tex.repeat.set(1, ta / aspect); tex.offset.set(0, 1 - ta / aspect); }
+    }
     // On narrow (portrait) screens, keep the whole board width visible.
     const viewH = aspect < 1.1 ? (VIEW_HEIGHT * 1.25) / Math.max(aspect, 0.42) : VIEW_HEIGHT;
     camera.left = (-viewH * aspect) / 2;

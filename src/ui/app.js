@@ -17,8 +17,10 @@ import { renderPlayerPanel } from './views/player.js';
 import { renderLocationPanel } from './views/location.js';
 import {
   setupScreen, settingsModal, passScreen, draftModal, crossroadsModal, requestModal,
-  incomingRequestModal, voteModal, gameOverModal, toastLayer, colonyModal, voteResultModal, callVoteModal,
+  incomingRequestModal, voteModal, gameOverModal, toastLayer, colonyModal, voteResultModal, callVoteModal, confirmEndModal,
 } from './views/modals.js';
+import { currentActor as actorOf, whoMustHold } from './seat.js';
+import { moveTargets, lureTargets, actingSurvivors } from './options.js';
 import { crossChoice, c } from '../i18n/index.js';
 
 const SAVE_KEY = 'frostbound.save.v1';
@@ -34,7 +36,7 @@ const storage = {
 
 const defaultSeats = () => Array.from({ length: 5 }, (_, i) => ({ name: t('setup.defaultName', { n: i + 1 }), isAI: i >= 2 }));
 
-export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = false, quality = 'medium' }) {
+export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast = false, quality = 'medium' }) {
   const settings = storage.get(SETTINGS_KEY) ?? {};
   setLang(settings.lang ?? (navigator.language?.startsWith('th') ? 'th' : 'en'));
   sound.enabled = settings.sound ?? true;
@@ -58,6 +60,8 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
     tutStep: DONE,
     ppCollapsed: false,
     quality,
+    picking: null, // { type: 'lure', survivorId, dieIndex } while choosing a destination on the board
+    skipEndConfirm: false,
   };
   let tutPlayer = null; // the human the first-round tutorial follows
 
@@ -65,15 +69,7 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
 
   const humans = () => (state ? state.players.filter((p) => !p.isAI) : []);
 
-  function currentActor() {
-    if (!state || state.phase === PHASES.GAME_OVER) return null;
-    const pending = pendingActors(state);
-    if (state.phase === PHASES.DRAFT) {
-      // AI drafts first; then humans in seat order.
-      return pending.find((id) => getPlayer(state, id).isAI) ?? pending[0] ?? null;
-    }
-    return pending[0] ?? null;
-  }
+  const currentActor = () => actorOf(state);
 
   function viewerId() {
     const hs = humans();
@@ -82,18 +78,14 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
     return seat;
   }
 
-  function needsPass() {
-    const actor = currentActor();
-    if (!actor || humans().length < 2) return null;
-    if (getPlayer(state, actor).isAI) return null;
-    return actor !== seat ? actor : null;
-  }
+  /** Human who must take the device now (active player, a voter, or someone asked for an item). */
+  const needsPass = () => whoMustHold(state, { seat });
 
   function ctx() {
     const actor = currentActor();
     const viewer = viewerId();
     return {
-      state, ui, actor, viewer,
+      state, ui, actor, viewer, art,
       canAct: !!viewer && viewer === actor && state?.phase === PHASES.TURN && !needsPass(),
       hasSave: !!storage.get(SAVE_KEY)?.state,
       set, dispatch, dismissQueue, tutorialEvent, setTutorial, setQuality, sfx: (name, delay) => sound.play(name, delay), selectSurvivor, selectLocation, takeSeat, startGame, continueGame, quitToSetup, setLanguage, setSound,
@@ -148,11 +140,11 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
     if (e.k === 'crisisResolved' && state.reports.colony) ui.queue.push({ type: 'colony', report: structuredClone(state.reports.colony), morale: null });
     if (e.k === 'voteResult' && state.reports.vote) ui.queue.push({ type: 'vote', report: structuredClone(state.reports.vote) });
     if (e.k === 'crossroadsChoice' && getPlayer(state, e.playerId).isAI) {
-      toast(t('cross.aiChose', { player: getPlayer(state, e.playerId).name, title: c('crossroads', e.cardId, 'title'), choice: crossChoice(e.cardId, e.choice) }));
+      toast(t('cross.aiChose', { player: getPlayer(state, e.playerId).name, card: c('crossroads', e.cardId, 'title'), choice: crossChoice(e.cardId, e.choice) }));
     }
     if (TOAST_KEYS.has(e.k) && e.k !== 'crisisResolved') {
       const text = formatLog(e, state);
-      if (text) toast(text, e.k === 'crisisResolved' && e.success ? 'good' : 'bad');
+      if (text) toast(text, 'bad', { survivorId: e.survivorId ?? (e.k === 'infectionSpreads' ? e.to : null) });
     }
   }
 
@@ -178,8 +170,9 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
     }
     if (state.activePlayerId !== lastActive) {
       lastActive = state.activePlayerId;
-      Object.assign(ui, { selSurvivor: null, selDie: null, selCard: null, useFuel: false, lureTo: null });
+      Object.assign(ui, { selSurvivor: null, selDie: null, selCard: null, useFuel: false, lureTo: null, picking: null });
     }
+    if (ui.picking && (!state.survivors[ui.picking.survivorId]?.alive || state.phase !== PHASES.TURN)) ui.picking = null;
     // Drop stale selections.
     const v = viewerId();
     const me = v ? getPlayer(state, v) : null;
@@ -192,8 +185,8 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
     render();
   }
 
-  function toast(text, kind = '') {
-    toasts.push({ text, kind, ttl: 3.6 });
+  function toast(text, kind = '', { survivorId = null } = {}) {
+    toasts.push({ text, kind, ttl: 3.6, face: survivorId && art ? art.portrait(survivorId, 's', { cls: kind === 'bad' ? 'toast-face' : 'toast-face' }) : null });
     if (toasts.length > 4) toasts.shift();
     toastLayer(dom.toasts, toasts);
   }
@@ -208,8 +201,10 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
 
   function selectSurvivor(id) {
     ui.selSurvivor = id;
+    ui.picking = null;
     if (id) tutorialEvent('selectSurvivor');
     if (id) ui.selLoc = state.survivors[id].location;
+    if (id && window.innerWidth <= 760) ui.ppCollapsed = true; // phones: give the location sheet the room
     board.setSelected(ui.selLoc);
     pieces.setHighlight?.(id);
     render();
@@ -218,6 +213,8 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
   function selectLocation(id) {
     ui.selLoc = id;
     if (id) tutorialEvent('selectLocation');
+    // Phones: fold the player panel so the location sheet (and its actions) get the screen.
+    if (id && window.innerWidth <= 760) ui.ppCollapsed = true;
     board.setSelected(id);
     render();
   }
@@ -357,8 +354,24 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
     if (shown && state.phase !== PHASES.DRAFT) diceTray.sync(shown.dice, `${shown.id}:${state.round}`);
     // Animated reveal modals keep their DOM while they stay on screen, so the animation isn't restarted.
     const [key, build] = modalFor(x);
-    if (!key || key !== modalKey) mount(dom.modal, build ? build() : null);
+    if (!key || key !== modalKey) {
+      const prevFocus = document.activeElement;
+      mount(dom.modal, build ? build() : null);
+      // Move keyboard focus into a newly shown dialog (pass screen, confirmations…).
+      const target = dom.modal.querySelector('[data-autofocus]') ?? dom.modal.querySelector('.dialog .btn.primary:not([disabled])');
+      if (build && target && (!dom.modal.contains(prevFocus) || key !== modalKey)) target.focus({ preventScroll: true });
+    }
     modalKey = key;
+    // Board hints: survivors that can still act glow; where the selected survivor can go (or lure to) lights up.
+    const me = x.canAct ? x.viewer : null;
+    let hints = {};
+    if (me && ui.picking?.type === 'lure') {
+      for (const tg of lureTargets(state, me, ui.picking.survivorId, ui.picking.dieIndex)) hints[tg.to] = tg.ok ? 'lure' : 'blocked';
+    } else if (me && ui.selSurvivor && state.survivors[ui.selSurvivor]?.owner === me && !state.survivors[ui.selSurvivor].moved) {
+      hints = moveTargets(state, me, ui.selSurvivor);
+    }
+    board.setHints?.(hints);
+    pieces.setActing?.(me ? actingSurvivors(state, me) : []);
     const tutVisible = ui.tutStep < DONE && tutorialVisible(ui.tutStep, {
       canAct: x.canAct && x.viewer === tutPlayer && !build,
       colonyShowing: ui.queue[0]?.type === 'colony',
@@ -385,6 +398,7 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
     if (state.phase === PHASES.VOTE && x.viewer && pendingActors(state).includes(x.viewer)) return [null, () => voteModal(x)];
     if (ui.modal === 'request' && x.canAct) return [null, () => requestModal(x)];
     if (ui.modal === 'callVote' && x.canAct) return [null, () => callVoteModal(x)];
+    if (ui.modal === 'confirmEnd' && x.canAct) return [null, () => confirmEndModal(x)];
     return [null, null];
   }
 
@@ -393,6 +407,13 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
   /** Board clicks: a survivor of the viewer selects it; anything else selects the location. */
   function onBoardPick({ locationId, survivorId }) {
     if (!state) return;
+    // Lure: the clicked location is the destination.
+    if (ui.picking?.type === 'lure' && locationId) {
+      const me = viewerId();
+      const tg = lureTargets(state, me, ui.picking.survivorId, ui.picking.dieIndex).find((x) => x.to === locationId);
+      if (tg?.ok && dispatch(tg.action)) { ui.picking = null; render(); }
+      return;
+    }
     const sv = survivorId && state.survivors[survivorId];
     if (sv && sv.owner === viewerId()) selectSurvivor(survivorId);
     else selectLocation(locationId ?? sv?.location ?? null);
@@ -416,6 +437,20 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
     lastActive = null;
     afterChange({ animate: false });
   }
+
+  // Esc closes the top-most thing: popover, picking mode, card sheet, dialog, then the location panel.
+  window.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Escape' || !state) return;
+    if (ui.crisisOpen) set({ crisisOpen: false });
+    else if (ui.picking) set({ picking: null });
+    else if (ui.selCard) set({ selCard: null });
+    else if (ui.modal) set({ modal: null });
+    else if (ui.selLoc) selectLocation(null);
+  });
+  // Clicking anywhere outside the crisis popover closes it.
+  document.addEventListener('click', (ev) => {
+    if (ui.crisisOpen && !ev.target.closest?.('.crisis-pop, .stat-block.crisis')) set({ crisisOpen: false });
+  });
 
   render();
   return { loadState, set, tutorialEvent, continueGame, tick, render, onBoardPick, quickStart, dispatch, get state() { return state; }, get ui() { return ui; }, takeSeat, selectSurvivor, selectLocation };

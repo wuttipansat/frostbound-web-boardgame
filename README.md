@@ -3,7 +3,13 @@
 An original, semi-cooperative survival board game set in a frozen zombie apocalypse, built for the browser with a 3D voxel look (Three.js).
 2–5 players play hot-seat, with optional bots for empty seats.
 
-> **Status: all 7 build steps are done.** The game is fully playable in the browser: hot-seat for 2–5 players, with AI for any seat, in English or Thai. It has animated crossroads, crisis, exposure and exile-vote reveals, procedural sound, ambient particles and a guided first-round tutorial. Step 7 adds an HD graphics overhaul with Low / Medium / High quality tiers.
+> **Status: all 8 build steps are done.** The game is fully playable in the browser: hot-seat for 2–5 players, with AI for any seat, in English or Thai. It has animated crossroads, crisis, exposure and exile-vote reveals, procedural sound, ambient particles and a guided first-round tutorial. Step 7 adds an HD graphics overhaul with Low / Medium / High quality tiers. Step 8 adds generated portraits and item art, a more visual UI, and a UI bug-fix pass.
+
+| Step 8: before / after (turn, hand) | |
+|---|---|
+| ![turn](docs/screenshots/step8/compare-turn.jpg) | ![hand](docs/screenshots/step8/compare-hand.jpg) |
+
+![Phone, after step 8](docs/screenshots/step8/phone-after.jpg)
 
 ![FROSTBOUND before and after the step 7 graphics overhaul](docs/screenshots/step7/compare-board.jpg)
 
@@ -108,11 +114,17 @@ src/
     detail.js           HD detail passes: materials/patterns, dithering, frames + sills, icicles, lumpy snow
     terrain.js          HD heightmap terrain mesher (top faces with AO + merged side walls)
     quality.js          Low / Medium / High tiers and how the active one is chosen
+    art.js              portrait + item art studio (CPU voxel painter, lazy cache)
+    items3d.js          voxel models for all 36 item cards
     particles.js        campfire embers, chimney smoke, gate-torch sparks (per-particle size/colour/alpha shader)
   i18n/                 en.js + th.js UI strings, content.th.js (Thai content), format.js (log lines, effect text)
   ui/
     app.js              controller: dispatch -> reducer, AI seats, hot-seat pass screens, autosave, settings, toasts
-    options.js          pure: which actions are legal right now (asks the engine via tryReduce) + die picking
+    options.js          pure: which actions are legal right now (asks the engine via tryReduce), die picking,
+                        card targets, lure/move targets, acting survivors, end-turn confirmation
+    seat.js             pure: who must hold the device (incl. answering an item request)
+    icons.js            SVG icons, drawn die faces, hearts
+    tooltip.js          shared tooltip for hover / focus / touch
     views/hud.js        top bar (morale, round, food, waste, crisis, goal, turn) + log panel
     views/player.js     survivors, dice chips, hand + card actions, hold-to-peek objective, request, end turn
     views/location.js   location details, who is here, move / die actions for the selected survivor
@@ -252,6 +264,39 @@ A survivor dies at 3 wounds. Every death costs 1 morale. A player who loses ever
   - a gradient logo
 
 Dev helper: `?lineup` shows all 20 survivors and 5 zombie variants at the current quality tier.
+
+## Portraits, item art and UI (step 8)
+
+**Generated art** (`src/render/art.js`, `src/render/items3d.js`):
+- Every survivor (20) and zombie variant (5) gets a head-and-shoulders portrait, and every item (36) gets a picture.
+- They are *painted from the voxel models on the CPU*: the meshed faces, with their baked AO, are projected in a 3/4 view and drawn back to front onto a 2D canvas, with a cold rim light, an accent-tinted backdrop and halos on glowing voxels. No image files, and no extra WebGL context.
+- Two sizes (64 and 160 px, at device pixel ratio).
+- Rendered lazily, one per idle slot, and cached per id + size + tier.
+- **Measured: all 122 images take 275 ms on Low and 920 ms on Medium**, at most 34 ms for any single image (headless Chrome, CPU-only).
+- Each item type has its own colour language: food yellow, medicine red/white, fuel orange, tools steel-blue, weapons dark steel, junk brown.
+
+**Visual UI:**
+- **Icons:** SVG icons replace every emoji and die glyph; dice are drawn pip faces.
+- **Survivor cards:** a portrait, hearts for health, die-face "needs 3+" badges, a *moved* ribbon, and wound / frostbite / exile states drawn on the portrait.
+- **Hand cards:** item art plus a one-line effect. Tapping a card opens a large card sheet; medicine, tools and weapons ask you to **pick the target survivor**, and junk asks you to **pick the die**.
+- **Location actions:** illustrated buttons that show the die they will use (hovering lights up that die), a *rolls exposure* marker, and the reason when disabled.
+- **Lure:** pick the destination **by clicking the board**.
+- **Board highlights:** survivors who can still act glow; locations the selected survivor can move to light up (full ones grey).
+- **Tooltips:** shared ones that work on hover, keyboard focus and touch.
+
+**Fixes from the UI audit** (full list in [docs/ui-audit.md](docs/ui-audit.md)):
+- explicit targets for card play;
+- phones: all actions visible, and a compact two-row top bar;
+- End turn asks for confirmation when dice are unused;
+- an item request to another human hands them the device right away;
+- Enter works on the pass screen, Esc closes popovers and dialogs, and dialogs take focus;
+- labels no longer slide under the top bar or over panels;
+- toasts no longer cover popovers;
+- the sky no longer stretches on phones.
+
+End-to-end scripts (they need Playwright and `npx vite preview --port 4173`):
+- `npm run e2e`: the hot-seat smoke test with hidden-information assertions, at desktop and phone size.
+- `npm run e2e:audit`: the UI audit checks.
 
 ## Content (all original)
 - 20 survivors, each with a unique ability: `src/content/survivors.js`

@@ -90,3 +90,72 @@ export function voteTargets(state, playerId) {
     .filter((p) => tryReduce(state, act.callVote(playerId, p.id)).ok)
     .map((p) => p.id);
 }
+
+// ---------------------------------------------------------------- step 8: explicit targets & board hints
+
+const TARGETED = ['medicine', 'tools', 'weapon'];
+
+/** Does playing this card need the player to choose something (a survivor, or a die for junk)? */
+export function cardNeeds(state, uid) {
+  const type = itemOf(state, uid).type;
+  if (TARGETED.includes(type)) return 'survivor';
+  if (type === 'junk') return 'die';
+  return null;
+}
+
+/** Every survivor the card could be played on, with legality and the action to dispatch. */
+export function cardTargets(state, playerId, uid) {
+  if (cardNeeds(state, uid) !== 'survivor') return [];
+  return getPlayer(state, playerId).survivors
+    .filter((id) => state.survivors[id]?.alive)
+    .map((survivorId) => ({ survivorId, ...check(state, act.playCard(playerId, uid, { targetSurvivorId: survivorId })) }));
+}
+
+/** Dice a junk card can reroll. */
+export function cardDice(state, playerId, uid) {
+  if (cardNeeds(state, uid) !== 'die') return [];
+  return getPlayer(state, playerId).dice.map((d, dieIndex) => ({ dieIndex, value: d.v, ...check(state, act.playCard(playerId, uid, { dieIndex })) }));
+}
+
+/** Where a survivor could lure zombies to (with the die that would be used). */
+export function lureTargets(state, playerId, survivorId, dieIndex = null) {
+  const sv = state.survivors[survivorId];
+  if (!sv?.alive) return [];
+  const die = pickDie(state, playerId, 1, dieIndex);
+  return LOCATION_IDS.filter((l) => l !== sv.location).map((to) => ({
+    to, die, ...(die == null ? { ok: false, error: 'noSuchDie', action: null } : check(state, act.lure(playerId, survivorId, die, to))),
+  }));
+}
+
+/** Board hint for a selected survivor: each location -> 'ok' | 'full' | 'blocked' (no entry for its own location). */
+export function moveTargets(state, playerId, survivorId) {
+  const sv = state.survivors[survivorId];
+  if (!sv?.alive || sv.owner !== playerId) return {};
+  const out = {};
+  for (const to of LOCATION_IDS) {
+    if (to === sv.location) continue;
+    const r = moveOption(state, playerId, survivorId, to);
+    out[to] = r.ok ? 'ok' : r.error === 'locationFull' ? 'full' : 'blocked';
+  }
+  return out;
+}
+
+/** Survivors of the player who can still do something this turn (move, a die action, or their ability). */
+export function actingSurvivors(state, playerId) {
+  if (state.phase !== 'turn' || state.activePlayerId !== playerId) return [];
+  return getPlayer(state, playerId).survivors.filter((id) => {
+    const sv = state.survivors[id];
+    if (!sv?.alive) return false;
+    if (!sv.moved && Object.values(moveTargets(state, playerId, id)).includes('ok')) return true;
+    return survivorOptions(state, playerId, id).some((o) => o.ok);
+  });
+}
+
+export function unusedDice(state, playerId) {
+  return getPlayer(state, playerId).dice.filter((d) => !d.used).length;
+}
+
+/** Ask before ending a turn while dice are still unused (unless the player opted out this game). */
+export function shouldConfirmEndTurn(state, playerId, { skip = false } = {}) {
+  return !skip && unusedDice(state, playerId) > 0;
+}

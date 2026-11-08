@@ -8,6 +8,9 @@ import { Tweens } from './render/tween.js';
 import { createAmbientParticles } from './render/particles.js';
 import { loadQuality } from './render/quality.js';
 import { createApp } from './ui/app.js';
+import { createArtStudio } from './render/art.js';
+import { icon } from './ui/icons.js';
+import { installTooltips } from './ui/tooltip.js';
 import { sound } from './audio/sound.js';
 import { c, t as tr } from './i18n/index.js';
 import { LOCATION_IDS } from './core/constants.js';
@@ -28,6 +31,9 @@ const pieces = createPieces(board, tweens, { hd: quality.hd });
 stage.scene.add(pieces.root);
 const diceTray = createDiceTray($('dice'), { hd: quality.hd });
 const particles = createAmbientParticles({ ...board.fx, scale: quality.particleScale });
+// Portraits and item pictures, rendered lazily from the voxel models and cached.
+const art = createArtStudio({ quality });
+installTooltips();
 stage.scene.add(particles.group);
 
 // ---------------------------------------------------------------- location labels
@@ -47,7 +53,7 @@ function refreshLabels(state) {
     if (z) {
       const span = document.createElement('span');
       span.className = 'z';
-      span.textContent = `☠${z}`;
+      span.append(icon('skull'), String(z));
       labels[id].append(span);
     }
   }
@@ -57,7 +63,7 @@ function refreshLabels(state) {
 
 // ---------------------------------------------------------------- exposure popups
 
-const FX_ICON = { blank: '✓', wound: '🩸', frostbite: '❄', bite: '☠' };
+const FX_ICON = { blank: 'check', wound: 'heal', frostbite: 'snowflake', bite: 'skull' };
 const FX_BURST = {
   blank: [0xf2f6fc],
   wound: [0xb3202a, 0xe0605a],
@@ -73,14 +79,14 @@ function exposureFx(survivorId, face) {
     pieces.burstAt(survivorId, FX_BURST[face], face === 'bite' ? 30 : 18, face === 'bite' ? 1.5 : 1.1);
     const el = document.createElement('div');
     el.className = `fx-pop f-${face}`;
-    el.textContent = `${FX_ICON[face]} ${c('survivors', survivorId, 'name')} · ${tr(`fx.${face}`)}`;
+    el.append(art.portrait(survivorId, 's', { cls: 'fx-face', alt: '' }), icon(FX_ICON[face]), ` ${c('survivors', survivorId, 'name')} · ${tr(`fx.${face}`)}`);
     $('fx-layer').appendChild(el);
     popups.push({ el, obj, fallback, ttl: 2.6 });
   });
 }
 
 const app = createApp({
-  board, pieces, diceTray,
+  board, pieces, diceTray, art,
   aiFast: params.get('ai') === 'fast', // debug/testing: AI doesn't wait for animations
   quality: quality.id,
   fx: { exposure: exposureFx },
@@ -115,12 +121,23 @@ stage.onFrame((_t, dt) => {
     p.el.style.top = `${((1 - v.y) / 2) * ch}px`;
   }
 });
+const PANELS = ['topbar', 'player', 'locpanel', 'log'].map((id) => document.getElementById(id));
 stage.onFrame(() => {
   const { clientWidth: w, clientHeight: h } = stage.renderer.domElement;
+  const rects = PANELS.filter((el) => el && !el.classList.contains('hidden') && el.offsetWidth).map((el) => el.getBoundingClientRect());
+  const barBottom = document.getElementById('topbar').getBoundingClientRect().bottom;
   for (const id of LOCATION_IDS) {
     v.copy(board.layout[id].label).project(stage.camera);
-    labels[id].style.left = `${((v.x + 1) / 2) * w}px`;
-    labels[id].style.top = `${((1 - v.y) / 2) * h}px`;
+    const x = ((v.x + 1) / 2) * w;
+    // Labels hang above their anchor (translate -100%): keep the whole pill below the top bar.
+    const y = Math.max(((1 - v.y) / 2) * h, barBottom + 30);
+    labels[id].style.left = `${x}px`;
+    labels[id].style.top = `${y}px`;
+    // Label box (it hangs above its anchor, centred): fade it if it touches any panel.
+    const lw = labels[id].offsetWidth; const lh = labels[id].offsetHeight;
+    const box = { left: x - lw / 2, right: x + lw / 2, top: y - lh, bottom: y };
+    const covered = rects.some((r) => box.left < r.right && box.right > r.left && box.top < r.bottom && box.bottom > r.top);
+    labels[id].classList.toggle('covered', covered);
   }
 });
 
@@ -198,4 +215,4 @@ if (params.get('play')) {
 window.addEventListener('pointerdown', () => sound.unlock());
 document.addEventListener('click', (ev) => { if (ev.target.closest?.('button')) sound.play('ui'); });
 
-window.__frostbound = { stage, board, pieces, diceTray, tweens, app, tryReduce, itemType: (defId) => ITEMS[defId]?.type };
+window.__frostbound = { stage, board, pieces, diceTray, tweens, app, art, tryReduce, itemType: (defId) => ITEMS[defId]?.type };

@@ -6,6 +6,7 @@ export function h(tag, props = {}, ...children) {
     if (k === 'class') el.className = v;
     else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
     else if (k === 'dataset') Object.assign(el.dataset, v);
+    else if (k === 'tip') el.dataset.tip = v; // shared tooltip (hover, focus and tap) instead of title=
     else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
     else if (k === 'html') el.innerHTML = v;
     else if (v === true) el.setAttribute(k, '');
@@ -29,6 +30,8 @@ export function mount(container, ...children) {
   return container;
 }
 
-export const ITEM_ICON = { food: '🥫', medicine: '💊', fuel: '⛽', tools: '🔧', weapon: '🪓', junk: '⚙️' };
-export const DIE_GLYPH = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+/** A representative item per type, used for type badges (crisis needs, request types, goals). */
+export const TYPE_REP = {
+  food: 'canned-beans', medicine: 'first-aid-pouch', fuel: 'jerry-can', tools: 'socket-set', weapon: 'riot-baton', junk: 'motor-junk',
+};
 export const hex = (n) => `#${n.toString(16).padStart(6, '0')}`;

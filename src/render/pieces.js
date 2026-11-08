@@ -173,6 +173,10 @@ export function createPieces(board, tweens, { hd = false } = {}) {
   ring.position.y = 0.1;
   ring.visible = false;
   let highlighted = null;
+  // Soft cyan glow under survivors who can still act this turn.
+  const actGeo = new THREE.CircleGeometry(0.95, 24);
+  const actMat = new THREE.MeshBasicMaterial({ color: 0x8fd8ff, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
+  let acting = new Set();
 
   // ---------------- positions
 
@@ -233,7 +237,12 @@ export function createPieces(board, tweens, { hd = false } = {}) {
     group.add(disc, body);
     group.userData.survivorId = id;
     root.add(group);
-    return { id, group, body, disc, loc: null, slot: null, moving: false, dying: false, phase: Math.random() * 10, breath: Math.random() * 3 };
+    const actGlow = new THREE.Mesh(actGeo, actMat);
+    actGlow.rotation.x = -Math.PI / 2;
+    actGlow.position.y = 0.09;
+    actGlow.visible = false;
+    group.add(actGlow);
+    return { id, group, body, disc, actGlow, loc: null, slot: null, moving: false, dying: false, phase: Math.random() * 10, breath: Math.random() * 3 };
   }
 
   function hop(vis, pts, targetFacing) {
@@ -436,6 +445,7 @@ export function createPieces(board, tweens, { hd = false } = {}) {
       }
     }
     puffs.update(dt);
+    actMat.opacity = 0.25 + Math.sin(t * 3.2) * 0.12;
     if (ring.visible) {
       ring.scale.setScalar(1 + Math.sin(t * 4) * 0.06);
       ring.material.opacity = 0.65 + Math.sin(t * 4) * 0.25;
@@ -467,6 +477,11 @@ export function createPieces(board, tweens, { hd = false } = {}) {
     get busy() { return pending > 0; },
     setHighlight,
     pick,
+    /** Survivors that can still act get a soft glow underneath. */
+    setActing(ids) {
+      acting = new Set(ids);
+      for (const vis of survivors.values()) vis.actGlow.visible = acting.has(vis.id);
+    },
     /** Coloured burst at a survivor (exposure results etc.). */
     burstAt(survivorId, colors, n = 18, power = 1.1) {
       const vis = survivors.get(survivorId);

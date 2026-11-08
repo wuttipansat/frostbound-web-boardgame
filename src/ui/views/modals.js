@@ -1,5 +1,6 @@
 // Full-screen screens and dialogs: setup, settings, pass-the-device, draft, crossroads, requests, vote, game over.
-import { h, mount, ITEM_ICON, hex } from '../dom.js';
+import { h, mount, hex, TYPE_REP } from '../dom.js';
+import { icon, dieFace } from '../icons.js';
 import { t, c, LANGUAGES, getLang, crossChoice, signed } from '../../i18n/index.js';
 import { describeEffects, describeTrigger } from '../../i18n/format.js';
 import { SCENARIOS } from '../../content/scenarios.js';
@@ -43,6 +44,8 @@ export function setupScreen(ctx) {
     h('div', { class: 'scenarios' }, SCENARIOS.map((sc) => h('button', {
       class: `scenario${cfg.scenarioId === sc.id ? ' on' : ''}`, onclick: () => update({ scenarioId: sc.id }),
     },
+    sc.goal.type === 'kills' ? ctx.art.zombie(0, 'l', { cls: 'goal-art', alt: '' })
+      : ctx.art.item(sc.goal.type === 'deposit' ? 'jerry-can' : 'rice-sack', 'l', { cls: 'goal-art', alt: '' }),
     h('b', {}, c('scenarios', sc.id, 'name')),
     h('small', { class: `diff ${sc.difficulty}` }, `${t(`difficulty.${sc.difficulty}`)} · ${t('setup.rounds', { n: sc.rounds })} · ${t('setup.morale', { n: sc.morale })}`),
     h('span', {}, c('scenarios', sc.id, 'goalText'))))),
@@ -65,7 +68,7 @@ function settingsRows(ctx) {
       h('div', { class: 'seg small' }, LANGUAGES.map((l) => h('button', { class: getLang() === l.id ? 'on' : '', onclick: () => ctx.setLanguage(l.id) }, l.label)))),
     h('div', { class: 'row' },
       h('span', { class: 'lbl' }, t('settings.graphics')),
-      h('div', { class: 'seg small' }, ['low', 'medium', 'high'].map((q) => h('button', { class: ctx.ui.quality === q ? 'on' : '', title: t('settings.graphicsNote'), onclick: () => ctx.setQuality(q) }, t(`quality.${q}`))))),
+      h('div', { class: 'seg small' }, ['low', 'medium', 'high'].map((q) => h('button', { class: ctx.ui.quality === q ? 'on' : '', tip: t('settings.graphicsNote'), onclick: () => ctx.setQuality(q) }, t(`quality.${q}`))))),
     h('div', { class: 'row' },
       h('span', { class: 'lbl' }, t('settings.sound')),
       h('div', { class: 'seg small' },
@@ -88,7 +91,11 @@ export function settingsModal(ctx) {
 export function passScreen(ctx, playerId) {
   const p = getPlayer(ctx.state, playerId);
   const idx = ctx.state.players.indexOf(p);
-  return h('div', { class: 'backdrop pass', onclick: () => ctx.takeSeat(playerId), role: 'button', tabindex: '0' },
+  return h('div', {
+    class: 'backdrop pass', role: 'button', tabindex: '0', 'data-autofocus': '',
+    onclick: () => ctx.takeSeat(playerId),
+    onkeydown: (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); ctx.takeSeat(playerId); } },
+  },
     h('div', { class: 'pass-card' },
       h('div', { class: 'big-dot', style: { background: hex(PLAYER_COLORS[idx]) } }),
       h('h1', {}, t('pass.title', { name: p.name })),
@@ -109,9 +116,13 @@ export function draftModal(ctx) {
         class: `draft-card${on ? ' on' : ''}`, style: { '--accent': d.accent },
         onclick: () => ctx.set({ draftPicks: on ? picks.filter((x) => x !== id) : [...picks, id].slice(-RULES.SURVIVORS_PER_PLAYER) }),
       },
+      ctx.art.portrait(id, 'l', { cls: 'draft-face', alt: '' }),
       h('b', {}, d.name),
       h('small', {}, c('survivors', id, 'occupation')),
-      h('div', { class: 'sv-stats' }, h('span', {}, `⚔ ${d.attack}+`), h('span', {}, `🔍 ${d.search}+`), h('span', {}, `★ ${d.influence}`)),
+      h('div', { class: 'sv-stats' },
+        h('span', { class: 'need' }, icon('attack'), dieFace(d.attack, 'mini'), '+'),
+        h('span', { class: 'need' }, icon('search'), dieFace(d.search, 'mini'), '+'),
+        h('span', { class: 'need' }, icon('star'), d.influence)),
       h('p', {}, c('survivors', id, 'abilityText')));
     })),
     h('button', {
@@ -129,7 +140,7 @@ export function crossroadsModal(ctx) {
   return h('div', { class: 'backdrop crossroads' },
     h('div', { class: 'flip-stage' },
       h('div', { class: 'flip-card' },
-        h('div', { class: 'face back' }, h('span', { class: 'sigil' }, '✳'), h('b', {}, t('cross.title'))),
+        h('div', { class: 'face back' }, h('span', { class: 'sigil' }, icon('exposure')), h('b', {}, t('cross.title'))),
         h('div', { class: 'face front dialog panel', role: 'dialog', 'aria-modal': 'true' },
           h('small', { class: 'kicker' }, t('cross.title')),
           h('h2', {}, c('crossroads', card.id, 'title')),
@@ -139,7 +150,14 @@ export function crossroadsModal(ctx) {
           h('div', { class: 'choices' }, card.choices.map((ch, i) => h('button', {
             class: 'choice', disabled: !mine,
             onclick: () => ctx.dispatch(act.resolveCrossroads(pend.activePlayerId, i)),
-          }, h('b', {}, crossChoice(card.id, i)), h('small', {}, describeEffects(ch.effects)))))))));
+          }, h('b', {}, crossChoice(card.id, i)), h('small', {}, effectArt(ctx, ch.effects), describeEffects(ch.effects)))))))));
+}
+
+/** Small item pictures for crossroads effects that hand out or take away cards. */
+function effectArt(ctx, effects) {
+  return effects.filter((e) => e.type === 'discard' || e.type === 'drawItem').map((e) => (e.type === 'discard' && e.item
+    ? ctx.art.item(TYPE_REP[e.item], 's', { cls: 'fx-art minus', alt: '' })
+    : h('span', { class: 'fx-art plus' }, icon('search'))));
 }
 
 export function requestModal(ctx) {
@@ -154,7 +172,7 @@ export function requestModal(ctx) {
     h('h4', {}, t('request.type')),
     h('div', { class: 'seg wrap' },
       h('button', { class: r.itemType == null ? 'on' : '', onclick: () => set({ itemType: null }) }, t('item.any')),
-      ITEM_TYPES.map((ty) => h('button', { class: r.itemType === ty ? 'on' : '', onclick: () => set({ itemType: ty }) }, `${ITEM_ICON[ty]} ${t(`item.${ty}`)}`))),
+      ITEM_TYPES.map((ty) => h('button', { class: `type-pick${r.itemType === ty ? ' on' : ''}`, onclick: () => set({ itemType: ty }) }, ctx.art.item(TYPE_REP[ty], 's', { cls: 'badge-art', alt: '' }), t(`item.${ty}`)))),
     h('div', { class: 'row end' },
       h('button', { class: 'btn ghost', onclick: () => ctx.set({ modal: null }) }, t('act.cancel')),
       h('button', {
@@ -173,7 +191,7 @@ export function incomingRequestModal(ctx, req) {
     h('div', { class: 'hand-cards' }, eligible.map((uid) => {
       const it = itemOf(s, uid);
       return h('button', { class: `item-card t-${it.type}`, onclick: () => ctx.dispatch(act.respondRequest(me.id, req.id, uid)) },
-        h('span', { class: 'ico' }, ITEM_ICON[it.type]), h('span', { class: 'iname' }, c('items', it.id, 'name')), h('span', { class: 'itype' }, t('act.give')));
+        ctx.art.item(it.id, 's', { alt: '' }), h('span', { class: 'iname' }, c('items', it.id, 'name')), h('span', { class: 'ishort' }, t('act.give')));
     })),
     h('div', { class: 'row end' }, h('button', { class: 'btn ghost', onclick: () => ctx.dispatch(act.respondRequest(me.id, req.id, null)) }, t('act.decline'))));
 }
@@ -183,13 +201,14 @@ export function callVoteModal(ctx) {
   const targets = voteTargets(s, ctx.viewer);
   const chosen = ctx.ui.voteTarget ?? targets[0];
   return dialog('call-vote',
-    h('h2', {}, `⚖ ${t('vote.callTitle')}`),
+    h('h2', {}, icon('vote'), ` ${t('vote.callTitle')}`),
     h('p', { class: 'muted small' }, t('vote.callHelp')),
     h('h4', {}, t('vote.target')),
     h('div', { class: 'seg wrap' }, targets.map((id) => {
       const p = getPlayer(s, id);
       return h('button', { class: chosen === id ? 'on' : '', onclick: () => ctx.set({ voteTarget: id }) },
-        h('i', { class: 'dot', style: { background: hex(PLAYER_COLORS[s.players.indexOf(p)]), marginRight: '6px' } }), p.name);
+        h('i', { class: 'dot', style: { background: hex(PLAYER_COLORS[s.players.indexOf(p)]), marginRight: '6px' } }), p.name,
+        h('span', { class: 'mini-faces' }, p.survivors.map((sid) => ctx.art.portrait(sid, 's', { alt: '' }))));
     })),
     h('div', { class: 'row end' },
       h('button', { class: 'btn ghost', onclick: () => ctx.set({ modal: null }) }, t('act.cancel')),
@@ -207,13 +226,14 @@ export function voteModal(ctx) {
   const voters = s.players.filter((p) => p.id !== v.targetId);
   return dialog('vote',
     h('small', { class: 'kicker' }, t('vote.callTitle')),
-    h('h2', {}, `⚖ ${t('vote.title', { name: target.name })}`),
+    h('h2', {}, icon('vote'), ` ${t('vote.title', { name: target.name })}`),
+    h('div', { class: 'mini-faces big' }, target.survivors.map((sid) => ctx.art.portrait(sid, 'l', { alt: '' }))),
     h('p', { class: 'muted small' }, t('vote.calledBy', { name: caller.name })),
     h('p', { class: 'small' }, t('vote.secret')),
     h('div', { class: 'ballots' }, voters.map((p) => h('span', { class: `ballot${p.id in v.votes ? ' cast' : ''}` }, p.name))),
     h('div', { class: 'row end' },
-      h('button', { class: 'btn ghost big', onclick: () => ctx.dispatch(act.castVote(ctx.viewer, false)) }, `✋ ${t('vote.no')}`),
-      h('button', { class: 'btn primary big', onclick: () => ctx.dispatch(act.castVote(ctx.viewer, true)) }, `🚪 ${t('vote.yes')}`)));
+      h('button', { class: 'btn ghost big', onclick: () => ctx.dispatch(act.castVote(ctx.viewer, false)) }, icon('hand'), ` ${t('vote.no')}`),
+      h('button', { class: 'btn primary big', onclick: () => ctx.dispatch(act.castVote(ctx.viewer, true)) }, icon('door'), ` ${t('vote.yes')}`)));
 }
 
 export function voteResultModal(ctx, report) {
@@ -221,8 +241,8 @@ export function voteResultModal(ctx, report) {
   return dialog('vote-result',
     h('small', { class: 'kicker' }, t('vote.result', { name: target.name })),
     h('div', { class: 'tally' },
-      Array.from({ length: report.yes }, (_, i) => h('span', { class: 'ballot-card yes', style: { animationDelay: `${0.25 + i * 0.3}s` } }, '🚪')),
-      Array.from({ length: report.no }, (_, i) => h('span', { class: 'ballot-card no', style: { animationDelay: `${0.25 + (report.yes + i) * 0.3}s` } }, '✋'))),
+      Array.from({ length: report.yes }, (_, i) => h('span', { class: 'ballot-card yes', style: { animationDelay: `${0.25 + i * 0.3}s` } }, icon('door'))),
+      Array.from({ length: report.no }, (_, i) => h('span', { class: 'ballot-card no', style: { animationDelay: `${0.25 + (report.yes + i) * 0.3}s` } }, icon('hand')))),
     h('p', { class: 'muted reveal', style: { animationDelay: `${0.4 + (report.yes + report.no) * 0.3}s` } }, t('vote.tally', { yes: report.yes, no: report.no })),
     h('h2', { class: `verdict reveal ${report.passed ? 'bad' : 'good'}`, style: { animationDelay: `${0.7 + (report.yes + report.no) * 0.3}s` } },
       report.passed ? t('vote.passed', { name: target.name }) : t('vote.failed', { name: target.name })),
@@ -239,9 +259,9 @@ export function colonyModal(ctx, item) {
   const next = (step = 0.45) => { const d = delay; delay += step; return { animationDelay: `${d}s` }; };
   const rows = [];
   rows.push(h('p', { class: `step reveal ${r.fed ? '' : 'bad'}`, style: next() },
-    `${ITEM_ICON.food} ${r.fed ? t('colony.fed', { n: r.foodNeeded }) : t('colony.starve', { n: r.starvation })}`));
+    icon('food'), ` ${r.fed ? t('colony.fed', { n: r.foodNeeded }) : t('colony.starve', { n: r.starvation })}`));
   rows.push(h('p', { class: `step reveal ${r.wasteLoss ? 'bad' : 'muted'}`, style: next() },
-    `🗑 ${r.wasteLoss ? t('colony.waste', { n: r.wasteLoss }) : t('colony.noWaste')}`));
+    icon('waste'), ` ${r.wasteLoss ? t('colony.waste', { n: r.wasteLoss }) : t('colony.noWaste')}`));
   rows.push(h('h3', { class: 'reveal', style: next(0.3) }, t('colony.crisis', { name: c('crises', def.id, 'name') })));
   rows.push(h('p', { class: 'muted small reveal', style: next(0.3) }, t('colony.needs', { n: crisis.required, item: t(`item.${def.item}`) })));
   if (crisis.cards.length) {
@@ -254,7 +274,7 @@ export function colonyModal(ctx, item) {
         h('div', { class: 'cflip-inner', style },
           h('div', { class: 'cface cback' }, '?'),
           h('div', { class: `cface cfront t-${cd.type} ${cd.delta > 0 ? 'plus' : 'minus'}` },
-            h('span', { class: 'ico' }, ITEM_ICON[cd.type]),
+            ctx.art.item(cd.card, 's', { alt: '' }),
             h('span', { class: 'iname' }, c('items', cd.card, 'name')),
             h('b', { class: 'delta' }, signed(cd.delta)),
             h('small', { class: 'run' }, `Σ ${running}`))));
@@ -269,15 +289,15 @@ export function colonyModal(ctx, item) {
     h('b', {}, crisis.success ? t('colony.averted') : t('colony.failed')),
     !crisis.success ? h('small', {}, describeEffects(def.fail)) : crisis.score >= crisis.required + 2 ? h('small', {}, t('colony.bonus')) : null));
   const spawns = Object.entries(r.spawns ?? {});
-  rows.push(h('h3', { class: 'reveal', style: next(0.3) }, `🧟 ${t('colony.spawns')}`));
+  rows.push(h('h3', { class: 'reveal', style: next(0.3) }, icon('skull'), ` ${t('colony.spawns')}`));
   rows.push(spawns.length
-    ? h('div', { class: 'chips reveal', style: next() }, spawns.map(([loc, n]) => h('span', { class: 'chip danger' }, `${c('locations', loc, 'name')} +${n}`)))
+    ? h('div', { class: 'chips reveal', style: next() }, spawns.map(([loc, n], i) => h('span', { class: 'chip danger' }, ctx.art.zombie(i % 5, 's', { alt: '' }), `${c('locations', loc, 'name')} +${n}`)))
     : h('p', { class: 'muted reveal', style: next() }, t('colony.noSpawns')));
-  if (item.morale != null) rows.push(h('p', { class: 'step reveal', style: next() }, `❤ ${t('colony.morale', { n: item.morale })}`));
+  if (item.morale != null) rows.push(h('p', { class: 'step reveal', style: next() }, icon('morale'), ` ${t('colony.morale', { n: item.morale })}`));
   rows.push(h('button', { class: 'btn primary wide reveal', style: next(), onclick: ctx.dismissQueue }, t('colony.continue')));
   return dialog('colony',
     h('small', { class: 'kicker' }, t('colony.title', { n: r.round })),
-    h('h2', {}, c('crises', def.id, 'name')),
+    h('h2', { class: 'with-art' }, ctx.art.item(TYPE_REP[def.item], 's', { alt: '' }), c('crises', def.id, 'name')),
     h('p', { class: 'muted small' }, c('crises', def.id, 'text')),
     rows);
 }
@@ -295,6 +315,9 @@ export function gameOverModal(ctx) {
       const obj = objectiveDef(o.objectiveId);
       return h('li', { class: o.won ? 'won' : '' },
         h('i', { class: 'dot', style: { background: hex(PLAYER_COLORS[s.players.indexOf(p)]) } }),
+        h('span', { class: 'mini-faces' },
+          p.survivors.map((sid) => ctx.art.portrait(sid, 's', { alt: '' })),
+          p.fallen.map((sid) => ctx.art.portrait(sid, 's', { cls: 'dead', alt: '' }))),
         h('b', {}, p.name),
         h('span', { class: `tag k-${obj.kind}` }, t(`kind.${obj.kind}`)),
         h('span', {}, c('objectives', obj.id, 'name')),
@@ -304,5 +327,18 @@ export function gameOverModal(ctx) {
 }
 
 export function toastLayer(el, toasts) {
-  mount(el, toasts.map((x) => h('div', { class: `toast ${x.kind ?? ''}` }, x.text)));
+  mount(el, toasts.map((x) => h('div', { class: `toast ${x.kind ?? ''}` }, x.face, h('span', {}, x.text))));
+}
+
+export function confirmEndModal(ctx) {
+  const me = getPlayer(ctx.state, ctx.viewer);
+  const n = me.dice.filter((d) => !d.used).length;
+  return dialog('confirm-end',
+    h('h2', {}, t('confirm.end.title')),
+    h('div', { class: 'dice-row' }, me.dice.map((d) => dieFace(d.v, d.used ? 'spent' : ''))),
+    h('p', {}, t('confirm.end.text', { n })),
+    h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: ctx.ui.skipEndConfirm, onchange: (ev) => { ctx.ui.skipEndConfirm = ev.target.checked; } }), ` ${t('confirm.end.skip')}`),
+    h('div', { class: 'row end' },
+      h('button', { class: 'btn ghost', onclick: () => ctx.set({ modal: null }) }, t('confirm.end.no')),
+      h('button', { class: 'btn primary', 'data-autofocus': '', onclick: () => { ctx.set({ modal: null }); ctx.dispatch(act.endTurn(me.id)); } }, t('confirm.end.yes'))));
 }
