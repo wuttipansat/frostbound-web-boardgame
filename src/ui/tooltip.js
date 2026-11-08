@@ -44,3 +44,13 @@ export function installTooltips() {
   window.addEventListener('scroll', hide, true);
   window.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') hide(); });
 }
+
+let flashTimer = 0;
+/** Show an element's tip for a moment: used when a disabled-looking button is clicked or tapped,
+ * so the reason is readable on touch screens too (it replaces the action). */
+export function flashTip(el) {
+  if (!tipEl || !el) return;
+  show(el.closest?.('[data-tip]') ?? el);
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(hide, 2200);
+}

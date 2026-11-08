@@ -1,11 +1,12 @@
 // Right-hand location panel: details, who is here (portraits), zombies (art), and illustrated actions
 // for the selected survivor. Lure picks its destination on the board.
 import { h, mount, hex } from '../dom.js';
-import { icon, dieFace } from '../icons.js';
+import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
 import { LOCATIONS } from '../../content/locations.js';
 import { survivorsAt, survivorDef, getPlayer, aliveSurvivorsOf } from '../../core/selectors.js';
 import { PLAYER_COLORS } from '../../render/pieces.js';
+import { flashTip } from '../tooltip.js';
 import { survivorOptions, moveOption, hasFuel, lureTargets } from '../options.js';
 
 const ACTION_ICON = { attack: 'attack', search: 'search', barricade: 'barricade', clean: 'clean', lure: 'lure', ability: 'heal' };
@@ -27,14 +28,12 @@ export function renderLocationPanel(el, ctx) {
   const here = survivorsAt(s, id);
   const ownerIdx = (pid) => s.players.findIndex((p) => p.id === pid);
 
-  const stats = h('div', { class: 'stats' },
-    // Icon + number; the label is in the tooltip.
-    h('div', { class: 'stat warm', tip: t('loc.survivors'), tabindex: '0' }, icon('person'), h('b', {}, `${here.length}/${def.survivorSlots ?? '∞'}`)),
-    h('div', { class: 'stat danger', tip: `${t('loc.zombies')} — ${t('tip.zombies', { n: loc.zombies })}`, tabindex: '0' },
-      loc.zombies ? art.zombie((id.length + loc.zombies) % 5, 's', { cls: 'stat-art', alt: '' }) : icon('skull'),
-      h('b', {}, `${loc.zombies}/${def.zombieSlots}`)),
-    h('div', { class: 'stat', tip: t('loc.barricades'), tabindex: '0' }, icon('barricade'), h('b', {}, loc.barricades)),
-    loc.deck ? h('div', { class: 'stat', tip: t('loc.cards'), tabindex: '0' }, icon('search'), h('b', {}, loc.deck.length)) : null);
+  // One inline row: icon + number; the labels are tooltips.
+  const stats = h('div', { class: 'stats inline' },
+    h('span', { class: 'stat warm', tip: t('loc.survivors'), tabindex: '0' }, icon('person'), h('b', {}, `${here.length}/${def.survivorSlots ?? '∞'}`)),
+    h('span', { class: 'stat danger', tip: `${t('loc.zombies')} — ${t('tip.zombies', { n: loc.zombies })}`, tabindex: '0' }, icon('skull'), h('b', {}, `${loc.zombies}/${def.zombieSlots}`)),
+    h('span', { class: 'stat', tip: t('loc.barricades'), tabindex: '0' }, icon('barricade'), h('b', {}, loc.barricades)),
+    loc.deck ? h('span', { class: 'stat', tip: t('loc.cards'), tabindex: '0' }, icon('search'), h('b', {}, loc.deck.length)) : null);
 
   const people = h('div', { class: 'here' },
     here.length ? h('div', { class: 'chips' }, here.map((sv) => h('button', {
@@ -68,17 +67,16 @@ export function renderLocationPanel(el, ctx) {
         const fuelAvailable = hasFuel(s, me);
         const opt = moveOption(s, me, sel.id, id, ui.useFuel && fuelAvailable);
         const safe = survivorDef(sel.id).ability.type === 'noMoveExposure' || (ui.useFuel && fuelAvailable);
+        const moveTip = [t('loc.moveHere', { name: survivorDef(sel.id).name }), opt.ok ? (safe ? t('tip.safe') : t('loc.moveRisk')) : t(`err.${opt.error}`)].join(' — ');
         actions.push(h('div', { class: 'move-box' },
           h('button', {
-            class: 'btn primary wide act-big', disabled: !opt.ok,
-            onclick: () => ctx.dispatch(opt.action),
-          }, icon('move'), h('span', {}, t('loc.moveHere', { name: survivorDef(sel.id).name })),
-          h('span', { class: `risk ${safe ? 'safe' : ''}`, tip: safe ? t('tip.safe') : t('tip.exposure') }, icon(safe ? 'check' : 'exposure'))),
-          !opt.ok ? h('p', { class: 'bad small' }, t(`err.${opt.error}`)) : null,
-          fuelAvailable ? h('label', { class: 'check' }, h('input', {
+            class: `btn primary wide act-move${opt.ok ? '' : ' off'}`, 'aria-disabled': opt.ok ? null : 'true', tip: moveTip, 'aria-label': moveTip,
+            onclick: (ev) => (opt.ok ? ctx.dispatch(opt.action) : flashTip(ev.currentTarget)),
+          }, art.portrait(sel.id, 's', { alt: '', cls: 'mv-face' }), icon('move'), h('span', {}, t('loc.moveShort')),
+          h('span', { class: `risk ${safe ? 'safe' : ''}`, 'aria-hidden': 'true' }, icon(safe ? 'check' : 'exposure'))),
+          fuelAvailable ? h('label', { class: 'check', tip: t('loc.moveFuel') }, h('input', {
             type: 'checkbox', checked: ui.useFuel, onchange: (ev) => ctx.set({ useFuel: ev.target.checked }),
-          }), ` ${t('loc.moveFuel')}`) : null,
-          !safe ? h('p', { class: 'warn small' }, icon('exposure'), ` ${t('loc.moveRisk')}`) : null));
+          }), ` ${t('loc.fuelShort')}`) : null));
       }
       const mine = aliveSurvivorsOf(s, me).filter((sv) => sv.location === id);
       const focus = sel && sel.location === id ? [sel] : mine;
@@ -87,24 +85,30 @@ export function renderLocationPanel(el, ctx) {
         const risky = (o) => o.id === 'attack' && survivorDef(sv.id).ability.type !== 'noAttackExposure';
         actions.push(h('div', { class: 'act-box' },
           h('h4', { tip: t('loc.actionsFor', { name: survivorDef(sv.id).name }) }, art.portrait(sv.id, 's', { cls: 'h4-face', alt: survivorDef(sv.id).name })),
-          h('div', { class: 'act-grid' }, opts.map((o) => {
+          h('div', { class: 'act-grid icons' }, opts.map((o) => {
             const isLure = o.id === 'lure';
             const die = o.die != null ? getPlayer(s, me).dice[o.die] : null;
+            // Icon only; the name, the die it uses and why it can't be done now are in the tooltip.
+            const tip = [t(`act.${o.id}`),
+              !o.ok ? t(`err.${o.error}`) : o.min > 1 ? t('act.needDie', { n: o.min }) : null,
+              o.ok && die ? t('tip.die', { v: die.v }) : null,
+              risky(o) && o.ok ? t('tip.exposure') : null,
+              isLure && o.ok ? t('act.pickOnBoard') : null].filter(Boolean).join(' · ');
             return h('button', {
-              class: 'btn act', disabled: !o.ok,
-              onclick: () => (isLure ? ctx.set({ picking: { type: 'lure', survivorId: sv.id, dieIndex: o.die } }) : ctx.dispatch(o.action)),
+              class: `btn act icon-act${o.ok ? '' : ' off'}`, 'aria-disabled': o.ok ? null : 'true', tip, 'aria-label': tip,
+              dataset: { act: o.id },
+              onclick: (ev) => {
+                if (!o.ok) return flashTip(ev.currentTarget);
+                return isLure ? ctx.set({ picking: { type: 'lure', survivorId: sv.id, dieIndex: o.die } }) : ctx.dispatch(o.action);
+              },
               onpointerenter: () => o.die != null && hintDie(o.die, true),
               onpointerleave: () => o.die != null && hintDie(o.die, false),
               onfocus: () => o.die != null && hintDie(o.die, true),
               onblur: () => o.die != null && hintDie(o.die, false),
             },
             icon(ACTION_ICON[o.id] ?? 'ability', 'act-ico'),
-            h('span', { class: 'act-name' }, t(`act.${o.id}`)),
-            h('span', { class: 'act-meta' },
-              o.ok && die ? dieFace(die.v, 'mini') : null,
-              !o.ok ? h('small', { class: 'why' }, t(`err.${o.error}`)) : o.min > 1 ? h('small', {}, t('act.needDie', { n: o.min })) : null,
-              risky(o) && o.ok ? h('span', { class: 'risk', tip: t('tip.exposure') }, icon('exposure')) : null,
-              isLure && o.ok ? h('small', {}, t('act.pickOnBoard')) : null));
+            o.min > 1 ? h('span', { class: 'need-badge', 'aria-hidden': 'true' }, `${o.min}+`) : null,
+            risky(o) && o.ok ? h('span', { class: 'risk-dot', 'aria-hidden': 'true' }) : null);
           }))));
       }
       if (!sel && !mine.length) actions.push(h('p', { class: 'muted small' }, t('panel.selectHint')));

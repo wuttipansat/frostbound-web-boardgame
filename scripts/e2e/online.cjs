@@ -73,7 +73,7 @@ const URL = `http://localhost:${PORT}/?snow=0`;
       if (await sel('.choice small')) errors.push('crossroads effects shown before choosing');
       await page.locator('button.choice:not([disabled])').first().click(F); counts.choice++; return true;
     }
-    if (await sel('#pp-actions .btn.primary:not([disabled])')) { await page.locator('#pp-actions .btn.primary:not([disabled])').click(F); counts.end++; return true; }
+    if (await sel('#pp-actions .btn.end-turn:not(.off)')) { await page.locator('#pp-actions .btn.end-turn:not(.off)').click(F); counts.end++; return true; }
     return false;
   };
 

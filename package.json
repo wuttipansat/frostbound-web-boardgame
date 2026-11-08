@@ -13,7 +13,8 @@
     "e2e": "node scripts/e2e/smoke.cjs desktop && node scripts/e2e/smoke.cjs phone",
     "e2e:audit": "node scripts/e2e/ui-audit.cjs",
     "start": "node server/index.mjs",
-    "e2e:online": "node scripts/e2e/online.cjs"
+    "e2e:online": "node scripts/e2e/online.cjs",
+    "e2e:layout": "node scripts/e2e/hud-layout.cjs"
   },
   "license": "UNLICENSED",
   "dependencies": {

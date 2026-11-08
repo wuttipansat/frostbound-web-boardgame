@@ -61,10 +61,19 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
     if (await page.locator('.dialog.confirm-end').count()) { await click('.dialog.confirm-end .btn.primary'); counts.confirm++; continue; }
     if (await page.locator('.backdrop.incoming').count()) { await click('.backdrop.incoming .btn.ghost'); counts.incoming++; continue; }
     if (await page.locator('button.choice:not([disabled])').count()) { await click('button.choice:not([disabled])'); counts.choice++; continue; }
-    // On a phone the panel may be folded: open it to reach End turn.
-    if (VP.hasTouch && await page.locator('body.pp-collapsed').count()) { await click('#pp-head .collapse'); continue; }
-    const end = page.locator('#pp-actions .btn.primary:not([disabled])');
-    if (await end.count()) { await click('#pp-actions .btn.primary:not([disabled])'); counts.endTurn++; await page.waitForTimeout(250); continue; }
+    // The hand (step 14): open the pile into a fan once, open a card's sheet, close it again.
+    if (!counts.fan && await page.locator('#pp-hand .pile-btn').count()) {
+      await click('#pp-hand .pile-btn'); await page.waitForTimeout(600);
+      if (!(await page.locator('#pp-hand .hand-fan.fanned').count())) errors.push('the pile did not open into a fan');
+      counts.fan = 1; continue;
+    }
+    if (!counts.sheet && await page.locator('#pp-hand .hand-fan.fanned .item-card').count() && await page.locator('#pp-actions .btn.end-turn').count()) {
+      await click('#pp-hand .hand-fan.fanned .item-card'); await page.waitForTimeout(300);
+      if (!(await page.locator('.card-detail').count())) errors.push('clicking a fanned card opened no sheet');
+      await click('.card-detail .close'); counts.sheet = 1; continue;
+    }
+    const end = page.locator('#pp-actions .btn.end-turn:not(.off)');
+    if (await end.count()) { await click('#pp-actions .btn.end-turn:not(.off)'); counts.endTurn++; await page.waitForTimeout(250); continue; }
     await page.waitForTimeout(350);
   }
   const fin = await page.evaluate(() => ({ round: window.__frostbound.app.state.round, phase: window.__frostbound.app.state.phase }));

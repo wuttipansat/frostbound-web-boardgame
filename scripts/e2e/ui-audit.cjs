@@ -47,7 +47,7 @@ async function audit(browser, device, vp) {
   // Labels under the top bar / covered by panels.
   f.labelsHidden = await page.evaluate(() => {
     const bar = document.getElementById('topbar').getBoundingClientRect();
-    const panels = ['player', 'locpanel', 'log'].map((id) => document.getElementById(id)).filter((e) => e && !e.classList.contains('hidden')).map((e) => e.getBoundingClientRect());
+    const panels = ['pp-left', 'pp-hand', 'pp-actions', 'locpanel', 'log'].map((id) => document.getElementById(id)).filter((e) => e && !e.classList.contains('hidden')).map((e) => e.getBoundingClientRect());
     return [...document.querySelectorAll('.loc-label')].filter((l) => {
       const r = l.getBoundingClientRect();
       const underBar = r.top < bar.bottom;
@@ -60,8 +60,10 @@ async function audit(browser, device, vp) {
   // Location action buttons reachable in the viewport?
   f.actionsVisible = await page.evaluate(() => {
     const btns = [...document.querySelectorAll('#locpanel .btn.act')];
-    const pp = document.getElementById('player').getBoundingClientRect();
-    return { total: btns.length, visible: btns.filter((b) => { const r = b.getBoundingClientRect(); return r.bottom <= Math.min(innerHeight, pp.top) && r.top >= 0; }).length };
+    // Floating HUD pieces (step 14): a button is reachable when it is on screen and none of them cover it.
+    const hud = [...document.querySelectorAll('#pp-left, #pp-actions > *, #pp-hand .item-card, #pp-hand .hand-ctl button, .sv-token')].map((e) => e.getBoundingClientRect());
+    const hit = (r, p) => r.left < p.right && r.right > p.left && r.top < p.bottom && r.bottom > p.top;
+    return { total: btns.length, visible: btns.filter((b) => { const r = b.getBoundingClientRect(); return r.bottom <= innerHeight && r.top >= 0 && !hud.some((p) => hit(r, p)); }).length };
   });
   f.lureIsSelectOnly = !!(await page.$('#locpanel select'));
 
@@ -72,7 +74,7 @@ async function audit(browser, device, vp) {
   });
 
   // Overflow without a hint.
-  f.overflow = await page.evaluate(() => Object.fromEntries(['#pp-survivors', '.hand-cards', '#topbar'].map((sel) => {
+  f.overflow = await page.evaluate(() => Object.fromEntries(['#pp-survivors', '#topbar'].map((sel) => {
     const e = document.querySelector(sel);
     return [sel, e ? { overflows: e.scrollWidth > e.clientWidth + 2, hint: getComputedStyle(e).maskImage !== 'none' || e.classList.contains('scroll-hint') } : null];
   })));
@@ -96,9 +98,9 @@ async function audit(browser, device, vp) {
     const a = window.__frostbound.app;
     const med = a.state.players[0].hand.find((u) => window.__frostbound.itemType(a.state.cards[u]) === 'medicine');
     a.set({ selCard: med });
-    const play = [...document.querySelectorAll('.card-bar .btn, .cd-actions .btn')].find((b) => /Play|ใช้การ์ด/.test(b.textContent));
+    const play = [...document.querySelectorAll('.card-bar .btn, .cd-actions .btn')].find((b) => /Play|Use|ใช้/.test(b.textContent));
     const picker = document.querySelector('[data-target-picker]');
-    return { playEnabledWithoutTarget: !!play && !play.disabled, hasPicker: !!picker };
+    return { playEnabledWithoutTarget: !!play && !play.disabled && play.getAttribute('aria-disabled') !== 'true', hasPicker: !!picker };
   });
   await page.evaluate(() => window.__frostbound.app.set({ selCard: null }));
 

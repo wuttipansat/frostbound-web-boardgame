@@ -1,8 +1,9 @@
-// Bottom player panel: who's playing, their survivors (portraits), dice (drawn faces), hand (item art),
-// the card-detail sheet with an explicit target picker, objective (press & hold), request, vote, end turn.
+// Floating player HUD (step 14): name tag, survivor tokens, dice chips, a floating hand (pile ↔ fan),
+// the card sheet with round targets, and the round "more" button next to End turn.
 import { h, mount, hex } from '../dom.js';
 import { icon, dieFace, heart } from '../icons.js';
-import { t, c } from '../../i18n/index.js';
+import { t, c, getLang } from '../../i18n/index.js';
+import { flashTip } from '../tooltip.js';
 import { getPlayer, aliveSurvivorsOf, survivorDef, itemOf, woundLimit, objectiveDef } from '../../core/selectors.js';
 import { PLAYER_COLORS } from '../../render/pieces.js';
 import {
@@ -12,27 +13,19 @@ import * as act from '../../core/actions.js';
 import { itemPlay, itemShort } from '../itemText.js';
 import { isPermanent } from '../../content/items.js';
 
-/** A horizontally scrolling row with edge fades and arrow buttons when it overflows. */
-export function scrollRow(cls, children) {
-  const inner = h('div', { class: `scroll-inner ${cls}` }, children);
-  const left = h('button', { class: 'scroll-arrow left', 'aria-label': t('act.scrollLeft'), onclick: () => inner.scrollBy({ left: -inner.clientWidth * 0.8, behavior: 'smooth' }) }, icon('left'));
-  const right = h('button', { class: 'scroll-arrow right', 'aria-label': t('act.scrollRight'), onclick: () => inner.scrollBy({ left: inner.clientWidth * 0.8, behavior: 'smooth' }) }, icon('right'));
-  const wrap = h('div', { class: 'scroll-row' }, left, inner, right);
-  const update = () => {
-    const more = inner.scrollWidth > inner.clientWidth + 2;
-    wrap.classList.toggle('more-left', more && inner.scrollLeft > 2);
-    wrap.classList.toggle('more-right', more && inner.scrollLeft + inner.clientWidth < inner.scrollWidth - 2);
-  };
-  inner.addEventListener('scroll', update, { passive: true });
-  // Mouse wheels scroll the row sideways.
-  inner.addEventListener('wheel', (ev) => {
-    if (Math.abs(ev.deltaY) > Math.abs(ev.deltaX) && inner.scrollWidth > inner.clientWidth) { inner.scrollLeft += ev.deltaY; ev.preventDefault(); }
-  }, { passive: false });
-  requestAnimationFrame(update);
-  return wrap;
+/** A small round target: a portrait without a name (the name and the reason are in the tooltip).
+ * Targets that can't be chosen stay visible, greyed, with a small mark; clicking one shows why. */
+function roundTarget(art, survivorId, ok, tipText, onPick) {
+  return h('button', {
+    class: `pick round${ok ? '' : ' off'}`, 'aria-disabled': ok ? null : 'true', tip: tipText,
+    'aria-label': tipText,
+    onclick: (ev) => (ok ? onPick() : flashTip(ev.currentTarget)),
+  }, art.portrait(survivorId, 's', { alt: '' }), ok ? null : h('span', { class: 'off-mark', 'aria-hidden': 'true' }, icon('close')));
 }
 
-/** The big card sheet: art, full text, explicit target/die choice, and the card's actions. */
+const CARD_ACTION_ICON = { play: 'check', contribute: 'crisis', deposit: 'goal' };
+
+/** The card sheet: small art, name, tier, one rule line; explicit target / die choice; the card's actions. */
 function cardDetail(ctx, shown, uid) {
   const { state: s, art } = ctx;
   const item = itemOf(s, uid);
@@ -45,17 +38,16 @@ function cardDetail(ctx, shown, uid) {
   if (need === 'survivor') {
     picker = h('div', { class: 'picker', 'data-target-picker': '' },
       h('h4', {}, t('act.pickTarget')),
-      h('div', { class: 'picker-row' }, cardTargets(s, shown.id, uid).map((tg) => h('button', {
-        class: 'pick', disabled: !tg.ok,
-        onclick: () => go(tg.action),
-      }, art.portrait(tg.survivorId, 's', { alt: '' }), h('b', {}, survivorDef(tg.survivorId).name), h('small', { class: tg.ok ? 'good' : 'muted' }, tg.ok ? t(...itemShort(item)) : t(`err.${tg.error}`))))));
+      h('div', { class: 'picker-row round-row' }, cardTargets(s, shown.id, uid).map((tg) => roundTarget(art, tg.survivorId, tg.ok,
+        `${survivorDef(tg.survivorId).name} — ${tg.ok ? t(...itemShort(item)) : t(`err.${tg.error}`)}`, () => go(tg.action)))));
   } else if (need === 'location') {
     picker = h('div', { class: 'picker', 'data-target-picker': '' },
       h('h4', {}, t('act.pickPlace')),
       h('div', { class: 'picker-row' }, cardLocations(s, shown.id, uid).map((tg) => h('button', {
-        class: 'pick', disabled: !tg.ok,
-        onclick: () => go(tg.action),
-      }, h('b', {}, c('locations', tg.to, 'name')), h('small', { class: tg.ok ? 'good' : 'muted' }, tg.ok ? t('itemShort.zombiesHere', { n: tg.zombies }) : t(`err.${tg.error}`))))));
+        class: `pick place${tg.ok ? '' : ' off'}`, 'aria-disabled': tg.ok ? null : 'true',
+        tip: tg.ok ? t('itemShort.zombiesHere', { n: tg.zombies }) : t(`err.${tg.error}`),
+        onclick: (ev) => (tg.ok ? go(tg.action) : flashTip(ev.currentTarget)),
+      }, c('locations', tg.to, 'name')))));
   } else if (need === 'die' && item.value > 1) {
     // Stronger junk: tick up to two dice, then reroll.
     const picked = (ctx.ui.junkDice ?? []).filter((i) => shown.dice[i] && !shown.dice[i].used);
@@ -78,48 +70,64 @@ function cardDetail(ctx, shown, uid) {
         onclick: () => go(d.action),
       }, dieFace(d.value)))));
   }
+  const flavour = [c('items', item.id, 'text'), isPermanent(item) ? t(`itemPlay.permanent.${item.type}`) : null].filter(Boolean).join(' — ');
   return h('div', { class: `card-detail panel t-${item.type} tier-${item.tier}`, role: 'dialog', 'aria-label': t('panel.cardDetail') },
     h('button', { class: 'close', 'aria-label': t('act.close'), onclick: close }, icon('close')),
-    h('div', { class: 'cd-head' },
+    h('div', { class: 'cd-head', tip: flavour },
       art.item(item.id, 'l', { alt: '' }),
-      h('div', {},
-        h('span', { class: 'type-badge' }, t(`item.${item.type}`), ' · ', t(`tier.${item.tier}`)),
+      h('div', { class: 'cd-title' },
         h('h3', {}, c('items', item.id, 'name')),
-        h('p', {}, t(...itemPlay(item))),
-        isPermanent(item) ? h('p', { class: 'muted small' }, icon('lock'), ' ', t(`itemPlay.permanent.${item.type}`)) : null)),
+        h('span', { class: 'type-badge' }, t(`item.${item.type}`),
+          h('span', { class: 'ic-tier', 'aria-label': t(`tier.${item.tier}`) }, Array.from({ length: item.tier }, () => h('i'))),
+          isPermanent(item) ? icon('lock') : null))),
+    h('p', { class: 'cd-rule' }, t(...itemPlay(item))),
     picker,
     h('div', { class: 'cd-actions' }, opts.map((o) => h('button', {
-      class: `btn${o.id === 'play' ? ' primary' : ''}`, disabled: !o.ok,
-      onclick: () => go(o.action, o.id),
-    }, t(`act.${o.id}`), !o.ok ? h('small', { class: 'why' }, t(`err.${o.error}`)) : null))));
+      class: `btn small-act${o.id === 'play' ? ' primary' : ''}${o.ok ? '' : ' off'}`, 'aria-disabled': o.ok ? null : 'true',
+      tip: o.ok ? t(`act.${o.id}`) : `${t(`act.${o.id}`)} — ${t(`err.${o.error}`)}`,
+      onclick: (ev) => (o.ok ? go(o.action, o.id) : flashTip(ev.currentTarget)),
+    }, icon(CARD_ACTION_ICON[o.id] ?? 'check'), h('span', {}, t(`act.${o.id}Short`))))));
 }
 
-/** refs: { head, survivors, chips, hand, actions } containers inside the panel. */
+/** Put the sheet next to the card it belongs to (phones use a low bottom sheet instead). */
+function placeSheet(container, uid) {
+  const sheet = container.querySelector('.card-detail');
+  if (!sheet) return;
+  if (window.innerWidth <= 760) { sheet.style.left = ''; sheet.style.bottom = ''; return; }
+  const card = container.querySelector(`.item-card[data-uid="${uid}"]`);
+  if (!card) return;
+  const r = card.getBoundingClientRect();
+  const w = sheet.offsetWidth || 300;
+  sheet.style.left = `${Math.min(window.innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2))}px`;
+  sheet.style.bottom = `${Math.max(12, window.innerHeight - r.top + 14)}px`;
+}
+
+/** refs: { head, survivors, chips, hand, actions } floating HUD pieces. */
 export function renderPlayerPanel(refs, ctx) {
-  const { state: s, ui, viewer, actor, art } = ctx;
+  const { state: s, ui, viewer, actor } = ctx;
   const shown = viewer ? getPlayer(s, viewer) : (s.activePlayerId ? getPlayer(s, s.activePlayerId) : null);
-  if (!shown) { for (const el of Object.values(refs)) mount(el); return; }
+  if (!shown) {
+    for (const el of Object.values(refs)) mount(el);
+    document.body.classList.remove('hand-full');
+    return;
+  }
   const idx = s.players.indexOf(shown);
   const isActor = ctx.canAct;
   const actorP = actor ? getPlayer(s, actor) : null;
 
-  // ---- head: name, a small "your turn" light, collapse
+  // ---- name tag: colour dot, name, a small "your turn" light
   const status = isActor || (viewer && viewer === actor) ? t('panel.yourTurn')
     : !viewer ? t('panel.spectating', { name: shown.name })
       : actorP?.isAI ? t('waitingAi', { name: actorP.name })
         : t('panel.waiting', { name: actorP?.name ?? '' });
   mount(refs.head,
     h('span', { class: 'dot', style: { background: hex(PLAYER_COLORS[idx]) } }),
-    h('b', { class: 'pname' }, shown.name),
+    h('b', { class: 'pname', tip: shown.name }, shown.name),
     h('span', { class: `turn-light${isActor ? ' go' : ''}`, tip: status, 'aria-label': status, role: 'status' }),
     shown.isAI ? h('span', { class: 'tag' }, t('panel.aiTag')) : null,
-    shown.exiled ? h('span', { class: 'tag bad' }, t('panel.exiled')) : null,
-    h('button', {
-      class: 'icon-btn collapse', 'aria-label': ui.ppCollapsed ? 'expand' : 'collapse', 'aria-expanded': ui.ppCollapsed ? 'false' : 'true',
-      onclick: () => ctx.set({ ppCollapsed: !ui.ppCollapsed }),
-    }, icon(ui.ppCollapsed ? 'up' : 'down')));
+    shown.exiled ? h('span', { class: 'tag bad' }, t('panel.exiled')) : null);
 
-  // ---- survivors: round tokens floating above the panel
+  // ---- survivors: round tokens
   const acting = new Set(isActor ? actingSurvivors(s, shown.id) : []);
   mount(refs.survivors, aliveSurvivorsOf(s, shown.id).map((sv) => survivorToken(ctx, sv, { canAct: acting.has(sv.id), color: hex(PLAYER_COLORS[idx]) })));
 
@@ -134,22 +142,19 @@ export function renderPlayerPanel(refs, ctx) {
       tip: isActor ? t('tip.dieChip') : null,
       onclick: () => ctx.set({ selDie: ui.selDie === i ? null : i }),
     }, dieFace(d.v))),
-    isActor ? h('span', { class: 'dice-badge', tip: t('tip.diceLeft'), 'aria-label': t('panel.diceLeft', { n: left }) }, String(left)) : null);
+    isActor && shown.dice.length ? h('span', { class: 'dice-badge', tip: t('tip.diceLeft'), 'aria-label': t('panel.diceLeft', { n: left }) }, String(left)) : null);
 
-  // ---- hand (only ever the viewer's own): compact faces or full cards
+  // ---- hand (only ever the viewer's own): a floating pile or a fan
   const hand = viewer ? shown.hand : [];
-  const compact = ui.handCompact;
-  const cards = hand.map((uid) => itemCard(ctx, shown, uid, { isActor, compact }));
-  mount(refs.hand,
-    hand.length ? h('button', {
-      class: `icon-btn hand-toggle${compact ? '' : ' on'}`, tip: t(compact ? 'panel.handExpand' : 'panel.handCompact'),
-      'aria-label': t(compact ? 'panel.handExpand' : 'panel.handCompact'), 'aria-pressed': compact ? 'false' : 'true',
-      onclick: () => ctx.setHandCompact(!compact),
-    }, icon('hand'), h('span', { class: 'count' }, String(hand.length))) : null,
-    cards.length ? scrollRow(`hand-cards${compact ? ' compact' : ''}`, cards) : h('span', { class: 'muted small' }, viewer ? t('panel.handEmpty') : ''),
-    isActor && ui.selCard && hand.includes(ui.selCard) ? cardDetail(ctx, shown, ui.selCard) : null);
+  // Phones: an open location sheet takes the room, so the hand folds into its pile.
+  const phoneLoc = window.innerWidth <= 760 && !!ui.selLoc;
+  // A card picked by other means (keyboard, tutorial, a test) opens the fan while its sheet is up.
+  const picked = !!(ui.selCard && hand.includes(ui.selCard));
+  const compact = (ui.handCompact || phoneLoc) && !picked;
+  document.body.classList.toggle('hand-full', !compact && hand.length > 0);
+  renderHand(refs.hand, ctx, shown, hand, { isActor, compact, phoneLoc });
 
-  // ---- actions: End turn, everything else behind "more"
+  // ---- actions: End turn, everything else behind the round "more" button
   const objective = viewer ? objectiveDef(getPlayer(s, viewer).objectiveId) : null;
   const end = isActor ? endTurnOption(s, shown.id) : null;
   const endTurn = () => {
@@ -173,21 +178,100 @@ export function renderPlayerPanel(refs, ctx) {
   ].filter(Boolean);
   mount(refs.actions,
     menu.length ? h('button', {
-      class: `icon-btn more${ui.moreOpen ? ' on' : ''}`, tip: t('panel.more'), 'aria-label': t('panel.more'),
+      class: `icon-btn round more${ui.moreOpen ? ' on' : ''}`, tip: t('panel.more'), 'aria-label': t('panel.more'),
       'aria-haspopup': 'menu', 'aria-expanded': ui.moreOpen ? 'true' : 'false',
       onclick: (ev) => { ev.stopPropagation(); ctx.set({ moreOpen: !ui.moreOpen }); },
     }, icon('more')) : null,
-    isActor ? h('button', { class: 'btn primary', disabled: !end.ok, onclick: endTurn }, t('panel.endTurn')) : null,
+    isActor ? h('button', {
+      class: `btn primary end-turn${end.ok ? '' : ' off'}`, 'aria-disabled': end.ok ? null : 'true',
+      tip: end.ok ? null : t(`err.${end.error}`),
+      onclick: (ev) => (end.ok ? endTurn() : flashTip(ev.currentTarget)),
+    }, t('panel.endTurn')) : null,
     ui.moreOpen && menu.length ? h('div', { class: 'more-menu panel', role: 'menu', onclick: (ev) => ev.stopPropagation() }, menu) : null,
     ui.peek && objective ? h('div', { class: `objective-peek panel k-${objective.kind}` },
       h('small', {}, t(`kind.${objective.kind}`)),
       h('h3', {}, c('objectives', objective.id, 'name')),
       h('p', {}, c('objectives', objective.id, 'text'))) : null);
-  // eslint-disable-next-line no-unused-expressions
-  art;
 }
 
-// ---------------------------------------------------------------- step 11: vertical item cards
+// ---------------------------------------------------------------- step 14: floating hand
+
+// Cards are kept by uid between renders, so switching pile ↔ fan (and drawing or playing) animates
+// the same elements instead of rebuilding the row.
+let handCtx = null;
+let lastMode = null;
+let settleTimer = 0;
+
+function slots(container) {
+  let fan = container.querySelector(':scope > .hand-fan');
+  if (!fan) {
+    mount(container,
+      fan = h('div', { class: 'hand-fan' }),
+      h('div', { class: 'hand-ctl' }),
+      h('div', { class: 'hand-sheet' }));
+  }
+  return { fan, ctl: container.querySelector(':scope > .hand-ctl'), sheet: container.querySelector(':scope > .hand-sheet') };
+}
+
+function renderHand(container, ctx, shown, hand, { isActor, compact, phoneLoc }) {
+  handCtx = ctx;
+  const { ui } = ctx;
+  const { fan, ctl, sheet } = slots(container);
+  const n = hand.length;
+  const mode = compact ? 'pile' : 'fan';
+  container.classList.toggle('empty', !n);
+  fan.classList.toggle('pile', compact);
+  fan.classList.toggle('fanned', !compact);
+  fan.style.setProperty('--n', String(Math.max(1, n)));
+  if (mode !== lastMode) {
+    // Stagger only while the layout changes; afterwards hover reacts at once.
+    fan.classList.remove('settled');
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => fan.classList.add('settled'), 380 + n * 30);
+    lastMode = mode;
+  }
+
+  const keep = new Map();
+  for (const el of [...fan.children]) {
+    if (hand.includes(el.dataset.uid)) keep.set(el.dataset.uid, el); else el.remove();
+  }
+  hand.forEach((uid, i) => {
+    let el = keep.get(uid);
+    const fresh = !el;
+    el = updateCard(el, ctx, shown, uid, { isActor, compact });
+    const off = i - (n - 1) / 2;
+    const depth = Math.min(n - 1 - i, 4);
+    el.style.setProperty('--i', String(i));
+    el.style.setProperty('--off', String(off));
+    // The middle of the fan rises; the outer cards stay on the baseline.
+    const edge = (n - 1) / 2;
+    const k = edge ? Math.min(2.4, 16 / (edge * edge)) : 0; // the rise is capped for big hands
+    el.style.setProperty('--arc', `${((off * off - edge * edge) * k).toFixed(1)}px`);
+    el.style.setProperty('--depth', String(depth));
+    el.style.setProperty('--pr', `${depth === 0 ? 0 : (depth % 2 ? -1 : 1) * (3 + depth * 2.2)}deg`);
+    if (fan.children[i] !== el) fan.insertBefore(el, fan.children[i] ?? null);
+    if (fresh) {
+      el.classList.add('dealt');
+      el.addEventListener('animationend', () => el.classList.remove('dealt'), { once: true });
+    }
+  });
+
+  const count = h('span', { class: 'count' }, String(n));
+  mount(ctl,
+    !n ? null : compact
+      ? h('button', {
+        class: 'pile-btn', 'aria-label': `${t('panel.handExpand')} (${n})`, tip: t('panel.handExpand'), 'aria-expanded': 'false',
+        onclick: () => { if (phoneLoc) ctx.selectLocation(null); ctx.setHandCompact(false); },
+      }, count)
+      : h('button', {
+        class: 'icon-btn round hand-toggle', 'aria-label': t('panel.handCompact'), tip: t('panel.handCompact'), 'aria-expanded': 'true',
+        onclick: () => { ctx.set({ selCard: null }); ctx.setHandCompact(true); },
+      }, icon('hand'), count));
+
+  const sel = isActor && !compact && hand.includes(ui.selCard) ? ui.selCard : null;
+  mount(sheet, sel ? cardDetail(ctx, shown, sel) : null);
+  if (sel) requestAnimationFrame(() => placeSheet(container, sel));
+}
 
 /** Footer note: how the card behaves after use. */
 function cardFooter(item, used) {
@@ -197,29 +281,45 @@ function cardFooter(item, used) {
   return t('card.consumable');
 }
 
-/** A vertical playing card: header (name, type, tier), sprite plate, effect line, flavour, footer. */
-export function itemCard(ctx, shown, uid, { isActor = false, compact = false } = {}) {
+/** Create or refresh one card of the hand (the element is kept; its face is rebuilt only when it changes). */
+function updateCard(el, ctx, shown, uid, { isActor, compact }) {
   const { state: s, ui, art } = ctx;
   const item = itemOf(s, uid);
-  const selected = ui.selCard === uid;
+  const selected = ui.selCard === uid && !compact;
   const used = (shown.usedCards ?? []).includes(uid);
   const usable = isActor ? cardUsable(s, shown.id, uid) : { ok: true };
-  return h('button', {
-    class: `item-card t-${item.type} tier-${item.tier}${compact ? ' mini' : ''}${selected ? ' selected' : ''}${used ? ' spent' : ''}${usable.ok ? '' : ' unusable'}`,
-    'aria-label': c('items', item.id, 'name'),
-    dataset: { uid },
-    'aria-pressed': selected ? 'true' : 'false',
-    // The card face stays short; the full rule and the flavour text are in the tooltip.
-    tip: `${compact ? `${c('items', item.id, 'name')} · ${t(`tier.${item.tier}`)} — ` : ''}${usable.ok ? `${t(...itemPlay(item))} — ${c('items', item.id, 'text')}` : t(`err.${usable.reason}`)}${compact ? ` · ${cardFooter(item, used)}` : ''}`,
-    onclick: () => ctx.set({ selCard: selected ? null : uid, ppCollapsed: false }),
-  },
-  h('span', { class: 'ic-head' },
-    h('span', { class: 'ic-type' }, t(`item.${item.type}`)),
-    h('span', { class: 'ic-tier', 'aria-label': t(`tier.${item.tier}`) }, Array.from({ length: item.tier }, () => h('i')))),
-  h('span', { class: 'iname' }, c('items', item.id, 'name')),
-  h('span', { class: 'ic-art' }, art.item(item.id, 's', { alt: '' })),
-  h('span', { class: 'ishort' }, t(...itemShort(item))),
-  h('span', { class: 'ic-foot' }, isPermanent(item) ? icon('lock') : null, cardFooter(item, used)));
+  if (!el) {
+    el = h('button', {
+      dataset: { uid },
+      onclick: () => {
+        const cx = handCtx;
+        if (!cx || el.parentElement?.classList.contains('pile')) return;
+        cx.set({ selCard: cx.ui.selCard === uid ? null : uid });
+      },
+    });
+  }
+  el.className = `item-card t-${item.type} tier-${item.tier}${selected ? ' selected' : ''}${used ? ' spent' : ''}${usable.ok ? '' : ' unusable'}`;
+  el.setAttribute('aria-label', c('items', item.id, 'name'));
+  el.setAttribute('aria-pressed', selected ? 'true' : 'false');
+  el.tabIndex = compact ? -1 : 0;
+  if (compact) el.setAttribute('aria-hidden', 'true'); else el.removeAttribute('aria-hidden');
+  // The face stays short; the full rule, flavour and why it can't be used now are in the tooltip.
+  const tip = compact ? '' : usable.ok ? `${t(...itemPlay(item))} — ${c('items', item.id, 'text')}` : t(`err.${usable.reason}`);
+  if (tip) el.dataset.tip = tip; else delete el.dataset.tip;
+  const sig = `${item.id}|${used}|${getLang()}`;
+  if (el.dataset.sig !== sig) {
+    el.dataset.sig = sig;
+    el.replaceChildren(...[
+      h('span', { class: 'ic-head' },
+        h('span', { class: 'ic-type' }, t(`item.${item.type}`)),
+        h('span', { class: 'ic-tier', 'aria-label': t(`tier.${item.tier}`) }, Array.from({ length: item.tier }, () => h('i')))),
+      h('span', { class: 'iname' }, c('items', item.id, 'name')),
+      h('span', { class: 'ic-art' }, art.item(item.id, 's', { alt: '' })),
+      h('span', { class: 'ishort' }, t(...itemShort(item))),
+      h('span', { class: 'ic-foot' }, isPermanent(item) ? icon('lock') : null, cardFooter(item, used)),
+      used ? h('span', { class: 'spent-mark', 'aria-hidden': 'true' }, icon('check')) : null].filter(Boolean));
+  }
+  return el;
 }
 
 /** A ghost of the card flies to where it was used: the board, the crisis gauge, or the goal gauge. */

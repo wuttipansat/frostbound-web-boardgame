@@ -61,7 +61,6 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     sound: sound.enabled,
     tutorial: settings.tutorial ?? !settings.tutorialDone,
     tutStep: DONE,
-    ppCollapsed: false,
     picking: null, // { type: 'lure', survivorId, dieIndex } while choosing a destination on the board
     skipEndConfirm: false,
     moreOpen: false, // the "more actions" menu next to End turn
@@ -216,7 +215,6 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     ui.picking = null;
     if (id) tutorialEvent('selectSurvivor');
     if (id) ui.selLoc = state.survivors[id].location;
-    if (id && window.innerWidth <= 760) ui.ppCollapsed = true; // phones: give the location sheet the room
     board.setSelected(ui.selLoc);
     pieces.setHighlight?.(id);
     render();
@@ -225,8 +223,6 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
   function selectLocation(id) {
     ui.selLoc = id;
     if (id) tutorialEvent('selectLocation');
-    // Phones: fold the player panel so the location sheet (and its actions) get the screen.
-    if (id && window.innerWidth <= 760) ui.ppCollapsed = true;
     board.setSelected(id);
     render();
   }
@@ -431,10 +427,8 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
       return;
     }
     dom.player.classList.remove('hidden');
-    document.body.classList.toggle('hand-full', !ui.handCompact);
     // While the device is being handed over, nothing private may be visible underneath.
     document.body.classList.toggle('passing', !!needsPass());
-    document.body.classList.toggle('pp-collapsed', !!ui.ppCollapsed);
     renderTopbar(dom.topbar, x);
     if (dom.phase) renderPhase(dom.phase, x);
     renderLog(dom.log, x);

@@ -1033,3 +1033,190 @@ body:not(.in-game) #log.feed, body.passing #log.feed { display: none; }
   .feed-recent .feed-item { animation: none; }
   #dice-stage, #dice-stage.on { transition: none; }
 }
+
+/* ================================================================ step 14: floating HUD */
+/* No bottom bar any more: the name tag, dice, hand, End turn and ⋯ float on their own over the board.
+   --player-h is now only the height kept free at the bottom centre (dice stage, toasts, phone sheets). */
+:root {
+  --hud-pad: 14px; --hud-row: 46px;
+  --cw: 108px; --ch: 158px;           /* a full hand card */
+  --sc-fan: 1; --sc-pile: 0.7;        /* hand card scale when fanned / piled */
+  --player-h: 136px;
+  --tok-bottom: calc(var(--hud-pad) + var(--hud-row) + 22px + env(safe-area-inset-bottom, 0px));
+}
+body.hand-full { --player-h: 200px; }
+
+#player { display: contents; }
+#player.hidden { display: none !important; }
+#pp-left, #pp-hand, #pp-actions { position: fixed; z-index: 4; bottom: calc(var(--hud-pad) + env(safe-area-inset-bottom, 0px)); pointer-events: none; }
+body.passing #pp-left, body.passing #pp-hand, body.passing #pp-actions { visibility: hidden; }
+#pp-left > *, #pp-actions > *, #pp-hand .item-card, #pp-hand button { pointer-events: auto; }
+
+/* bottom left: a name tag and the dice, as two separate chips */
+#pp-left { left: calc(var(--hud-pad) + env(safe-area-inset-left, 0px)); display: flex; gap: 8px; align-items: center; height: var(--hud-row); }
+.hud-chip { display: flex; align-items: center; gap: 8px; height: var(--hud-row); padding: 0 12px; border-radius: 23px;
+  background: rgba(27, 29, 30, 0.88); border: 1px solid var(--line); box-shadow: 0 6px 16px rgba(0,0,0,0.45); }
+.hud-chip:empty { display: none; }
+#pp-head { font-size: 14px; max-width: 220px; }
+#pp-head .pname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#pp-head .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+#pp-chips { gap: 6px; padding: 0 8px; flex-wrap: nowrap; }
+#pp-chips .die-chip { width: 34px; height: 34px; }
+
+/* bottom right: the round ⋯ and End turn */
+#pp-actions { right: calc(var(--hud-pad) + env(safe-area-inset-right, 0px)); display: flex; flex-direction: row; align-items: center; gap: 10px; min-width: 0; height: var(--hud-row); }
+.icon-btn.round { border-radius: 50%; display: grid; place-items: center; padding: 0; }
+.icon-btn.more { width: 46px; height: 46px; box-shadow: 0 6px 16px rgba(0,0,0,0.45); }
+#pp-actions .btn.end-turn { height: var(--hud-row); padding: 0 22px; font-size: 14px; border-radius: 23px; box-shadow: 0 6px 16px rgba(0,0,0,0.45); }
+.more-menu { right: 0; bottom: calc(100% + 10px); }
+
+/* things that look disabled but still answer a click with their reason (touch has no hover) */
+.btn.off, .pick.off { opacity: 0.42; cursor: not-allowed; }
+.btn.primary.off:hover { background: var(--warm); }
+
+/* survivor tokens sit above the name tag */
+.sv-tokens { bottom: var(--tok-bottom); left: calc(var(--hud-pad) + 2px + env(safe-area-inset-left, 0px)); }
+
+/* ---- the hand: a pile (cards peeking out) or a fan, the same elements animate between them */
+#pp-hand { left: 360px; right: 250px; bottom: calc(var(--hud-pad) + 10px + env(safe-area-inset-bottom, 0px)); height: calc(var(--ch) * var(--sc-fan) + 24px); --anchor: 50%; }
+#pp-hand.empty { display: none; }
+.hand-fan { position: absolute; inset: 0; }
+.hand-fan .item-card {
+  position: absolute; bottom: 0; margin: 0; width: var(--cw); height: var(--ch); flex: none;
+  transform-origin: 50% 100%; z-index: var(--i);
+  transition: left 0.42s cubic-bezier(.2,.8,.2,1), transform 0.42s cubic-bezier(.2,.8,.2,1), filter 0.14s, box-shadow 0.14s;
+  transition-delay: calc(var(--i) * 32ms);
+}
+.hand-fan.settled .item-card { transition-delay: 0s; }
+/* fan: spread across the space between the name tag and End turn; tighter when the hand is big */
+.hand-fan.fanned .item-card {
+  --step: min(calc(var(--cw) * var(--sc-fan) + 8px), calc((100% - var(--cw) * var(--sc-fan)) / max(1, var(--n) - 1)));
+  left: calc(50% - var(--cw) / 2 + var(--off) * var(--step));
+  transform: translateY(calc(var(--arc) + var(--lift, 0px))) rotate(calc(var(--off) * var(--tilt, 2.6deg))) scale(var(--sc-fan));
+}
+.hand-fan.fanned .item-card:hover, .hand-fan.fanned .item-card:focus-visible { --lift: -18px; z-index: 40; transform: translateY(calc(var(--arc) + var(--lift))) rotate(0deg) scale(calc(var(--sc-fan) * 1.04)); }
+.hand-fan.fanned .item-card.selected { --lift: -24px; z-index: 41; transform: translateY(var(--lift)) rotate(0deg) scale(var(--sc-fan)); outline: 2px solid var(--accent); outline-offset: 1px; }
+/* pile: stacked on one spot; the cards under the top one peek out at small angles */
+.hand-fan.pile .item-card {
+  left: calc(var(--anchor) - var(--cw) / 2 + var(--off) * 1.5px);
+  transform: translate(calc(var(--depth) * 3px), calc(var(--depth) * -5px)) rotate(var(--pr)) scale(var(--sc-pile));
+  pointer-events: none;
+}
+.hand-fan.pile .item-card:not(:nth-last-child(-n+5)) { opacity: 0; }
+.item-card .spent-mark { position: absolute; right: 4px; top: 18px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: #1b1d1e; color: #d07a6d; box-shadow: 0 0 0 1px #000; }
+.item-card .spent-mark .icon { width: 11px; height: 11px; }
+.item-card.dealt { animation: deal 0.42s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i) * 40ms); }
+@keyframes deal { from { opacity: 0; translate: 0 60px; } to { opacity: 1; translate: 0 0; } }
+
+/* the pile is one button (with the card count); the fan has a small round button to stack it again */
+.pile-btn { position: absolute; bottom: 0; left: calc(var(--anchor) - var(--cw) * var(--sc-pile) / 2 - 10px);
+  width: calc(var(--cw) * var(--sc-pile) + 20px); height: calc(var(--ch) * var(--sc-pile) + 22px);
+  background: transparent; border: 0; padding: 0; cursor: pointer; z-index: 30; border-radius: var(--radius-card); }
+.pile-btn:hover ~ *, .pile-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hand-ctl .count { position: absolute; right: -6px; top: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; font-size: 11px; font-weight: 700;
+  background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; box-shadow: 0 0 0 2px #1b1d1e; }
+.hand-ctl .hand-toggle { position: absolute; left: -54px; bottom: 6px; width: 40px; height: 40px; z-index: 30; box-shadow: 0 6px 16px rgba(0,0,0,0.45); }
+.hand-ctl .hand-toggle .count { right: -8px; top: -8px; }
+#pp-hand:has(.pile-btn:hover) .hand-fan.pile .item-card { translate: 0 -4px; }
+
+/* ---- the card sheet: small, next to its card */
+.card-detail { width: 300px; padding: 10px 12px 12px; transform: none; left: auto; bottom: auto; }
+.card-detail .cd-head { gap: 10px; align-items: center; padding-right: 24px; }
+.card-detail .cd-head > img.art-l { width: 56px; height: 56px; flex: none; }
+.cd-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.card-detail .cd-head h3 { margin: 0; font-size: 16px; line-height: 1.15; }
+.card-detail .type-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; text-transform: uppercase; }
+.card-detail .type-badge .icon { width: 11px; height: 11px; color: var(--muted); }
+.cd-rule { margin: 8px 0 0; font-size: 12.5px; line-height: 1.4; color: #d8d2c4; }
+.card-detail .picker h4 { margin: 10px 0 6px; }
+.round-row { gap: 10px; }
+.pick.round { position: relative; min-width: 0; width: 44px; height: 44px; padding: 0; border-radius: 50%; overflow: visible; background: #1b1d1e; border: 0; box-shadow: 0 0 0 2px var(--line); }
+.pick.round:hover:not(.off) { box-shadow: 0 0 0 2px var(--accent); }
+.pick.round img { width: 100%; height: 100%; border-radius: 50%; image-rendering: pixelated; }
+.pick.round.off { opacity: 1; }
+.pick.round.off img { filter: grayscale(1) brightness(0.55); }
+.pick.round .off-mark { position: absolute; right: -3px; bottom: -3px; width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; background: #1b1d1e; color: var(--muted); box-shadow: 0 0 0 1px #000; }
+.pick.round .off-mark .icon { width: 9px; height: 9px; }
+.pick.place { min-width: 0; padding: 5px 9px; font-size: 12px; }
+.card-detail .cd-actions { margin-top: 10px; gap: 6px; }
+.card-detail .cd-actions .btn.small-act { flex-direction: row; align-items: center; gap: 6px; padding: 6px 11px; font-size: 12px; }
+.card-detail .cd-actions .btn.small-act .icon { width: 14px; height: 14px; }
+
+/* ---- location panel: ~40% narrower, inline stats, icon-only actions */
+#locpanel { width: 196px; padding: 10px 10px 12px; max-height: calc(100vh - var(--top-h) - var(--hud-row) - var(--hud-pad) - 52px); }
+#locpanel h2 { font-size: 16px; margin: 0 22px 6px 0; line-height: 1.2; }
+#locpanel .close { top: 6px; right: 6px; }
+#locpanel .stats.inline { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+#locpanel .stats.inline .stat { flex-direction: row; display: inline-flex; align-items: center; gap: 4px; padding: 0; background: none; border: 0; box-shadow: none; text-align: left; }
+#locpanel .stats.inline .stat .icon { width: 14px; height: 14px; color: var(--muted); }
+#locpanel .stats.inline .stat b { display: inline; font-size: 13px; }
+#locpanel .here { margin-top: 8px; }
+#locpanel .chips { gap: 6px; }
+.chip.person.face-only img.art-s { width: 26px; height: 26px; }
+#locpanel h4 { margin: 10px 0 5px; }
+.act-box h4 img.h4-face { width: 24px; height: 24px; }
+.act-grid.icons { display: grid; grid-template-columns: repeat(auto-fill, 40px); gap: 5px; }
+.btn.act.icon-act { position: relative; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; }
+.btn.act.icon-act .act-ico { width: 22px; height: 22px; grid-row: auto; }
+.btn.act.icon-act.off { opacity: 0.38; }
+.btn.act.icon-act.off .act-ico { color: var(--muted); }
+.need-badge { position: absolute; right: -4px; top: -5px; padding: 0 3px; min-width: 18px; height: 14px; border-radius: 7px; font-size: 9.5px; font-weight: 700; line-height: 14px; text-align: center;
+  background: #1b1d1e; color: var(--text); box-shadow: 0 0 0 1px var(--line); font-family: var(--font); }
+.risk-dot { position: absolute; left: 3px; bottom: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--ice); }
+.move-box { margin-top: 10px; gap: 6px; }
+.btn.act-move { display: flex; align-items: center; gap: 6px; padding: 5px 10px 5px 5px; font-size: 13px; }
+.btn.act-move img.mv-face { width: 26px; height: 26px; border-radius: 50%; }
+.btn.act-move .risk { margin-left: auto; }
+.pick-box p.small { display: none; }
+
+/* short screens (laptops, tablets) */
+@media (max-height: 800px) and (min-width: 761px) {
+  :root { --sc-fan: 0.88; --sc-pile: 0.62; --player-h: 124px; }
+  body.hand-full { --player-h: 180px; }
+}
+/* phones held sideways */
+@media (max-height: 500px) and (min-width: 761px) {
+  :root { --hud-pad: 8px; --hud-row: 40px; --sc-fan: 0.6; --sc-pile: 0.45; --player-h: 90px; }
+  body.hand-full { --player-h: 120px; }
+  .sv-token { width: 44px; height: 44px; }
+  .tok-card { bottom: auto; top: auto; }
+  #pp-left { gap: 6px; }
+  #pp-head { max-width: 150px; }
+  #pp-chips .die-chip { width: 30px; height: 30px; }
+  .icon-btn.more { width: 40px; height: 40px; }
+  #pp-actions .btn.end-turn { padding: 0 16px; font-size: 13px; }
+  #pp-hand { left: 380px; right: 236px; }
+}
+/* phones: name + dice and the buttons share the bottom row; tokens and the pile sit above it,
+   and an opened fan takes a row of its own (the tokens move up) */
+@media (max-width: 760px) {
+  :root { --hud-pad: 10px; --hud-row: 44px; --sc-fan: 0.66; --sc-pile: 0.5; --cw: 104px; --ch: 152px;
+    --player-h: calc(var(--hud-pad) + var(--hud-row) + 108px); }
+  body.hand-full { --player-h: calc(var(--hud-pad) + var(--hud-row) + 154px + 70px); }
+  body.hand-full .sv-tokens { bottom: calc(var(--tok-bottom) + 154px); }
+  #pp-left { gap: 6px; }
+  .hud-chip { padding: 0 9px; gap: 6px; }
+  #pp-head { max-width: 108px; font-size: 13px; }
+  #pp-head .tag { display: none; }
+  #pp-chips { gap: 4px; padding: 0 6px; }
+  #pp-chips .die-chip { width: 28px; height: 28px; padding: 2px; }
+  #pp-chips .dice-badge { display: none; }
+  #pp-actions { gap: 8px; }
+  .icon-btn.more { width: 44px; height: 44px; }
+  #pp-actions .btn.end-turn { padding: 0 14px; font-size: 13px; }
+  .hand-fan { --tilt: 1.4deg; }
+  #pp-hand { left: 10px; right: 10px; bottom: calc(var(--hud-pad) + var(--hud-row) + 14px + env(safe-area-inset-bottom, 0px));
+    height: calc(var(--ch) * var(--sc-fan) + 20px); --anchor: calc(100% - var(--cw) * var(--sc-pile) / 2 - 22px); }
+  .hand-ctl .hand-toggle { left: auto; right: -2px; bottom: auto; top: -46px; }
+  .card-detail { left: 8px !important; right: 8px; bottom: 8px !important; width: auto; max-height: 52vh; overflow: auto; z-index: 12; }
+  #locpanel { width: auto; left: 8px; right: 8px; top: auto; bottom: calc(var(--player-h) + 16px); max-height: 40vh; }
+  .act-grid.icons { grid-template-columns: repeat(auto-fill, 44px); }
+  .btn.act.icon-act { width: 44px; height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hand-fan .item-card { transition: none; }
+  .item-card.dealt { animation: none; }
+}
+/* an open card sheet sits above every other floating piece */
+#pp-hand:has(.card-detail) { z-index: 8; }
+.hand-sheet .card-detail { z-index: 50; }

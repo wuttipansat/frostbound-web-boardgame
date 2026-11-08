@@ -140,7 +140,7 @@ stage.onFrame((_t, dt) => {
     p.el.style.top = `${((1 - v.y) / 2) * ch}px`;
   }
 });
-const PANELS = ['topbar', 'player', 'locpanel', 'log', 'pp-survivors'].map((id) => document.getElementById(id));
+const PANELS = ['topbar', 'pp-left', 'pp-hand', 'pp-actions', 'locpanel', 'log', 'pp-survivors'].map((id) => document.getElementById(id));
 stage.onFrame(() => {
   const { clientWidth: w, clientHeight: h } = stage.renderer.domElement;
   const rects = PANELS.filter((el) => el && !el.classList.contains('hidden') && el.offsetWidth).map((el) => el.getBoundingClientRect());
