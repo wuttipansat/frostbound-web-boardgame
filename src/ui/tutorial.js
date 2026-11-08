@@ -5,16 +5,12 @@
 //   on:     events that complete the step (besides pressing Next when `next` is true)
 
 export const TUTORIAL = [
+  // Step 18: learn by doing. Each step waits for the real action (cards also allow Next: you may have none to play).
   { id: 'welcome', target: null, when: 'turn', next: true, on: [] },
-  { id: 'topbar', target: '#topbar', when: 'turn', next: true, on: [] },
-  { id: 'crisis', target: '#topbar .stat-block.crisis', when: 'turn', next: true, on: [] },
-  { id: 'survivors', target: '#pp-survivors', when: 'turn', next: false, on: ['selectSurvivor'] },
-  { id: 'board', target: null, when: 'turn', next: false, on: ['selectLocation'], placement: 'top' },
-  { id: 'move', target: '#move-pick', when: 'turn', next: true, on: ['move'] },
-  { id: 'actions', target: '#locpanel', when: 'turn', next: true, on: ['dieAction'] },
-  { id: 'hand', target: '#pp-hand', when: 'turn', next: true, on: [] },
-  { id: 'objective', target: '#pp-actions .more', when: 'turn', next: true, on: [] },
-  { id: 'endTurn', target: '#pp-actions .btn.primary', when: 'turn', next: false, on: ['endTurn'] },
+  { id: 'move', target: '#move-pick', when: 'turn', next: false, on: ['move'], placement: 'top' },
+  { id: 'actions', target: '#locpanel', when: 'turn', next: false, on: ['dieAction'] },
+  { id: 'card', target: '#pp-hand', when: 'turn', next: true, on: ['card', 'contribute'] },
+  { id: 'endTurn', target: '#pp-actions .btn.end-turn', when: 'turn', next: false, on: ['endTurn'] },
   { id: 'colony', target: '.dialog.colony', when: 'colony', next: true, on: ['colonyDone'] },
 ];
 
@@ -40,6 +36,8 @@ export function eventForAction(action) {
     case 'MOVE': return 'move';
     case 'ATTACK': case 'SEARCH': case 'BARRICADE': case 'CLEAN': case 'LURE': return 'dieAction';
     case 'END_TURN': return 'endTurn';
+    case 'PLAY_CARD': case 'DEPOSIT': return 'card';
+    case 'CONTRIBUTE': return 'contribute';
     default: return null;
   }
 }

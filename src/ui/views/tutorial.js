@@ -17,6 +17,7 @@ export function renderTutorial(el, ctx, index, visible) {
       h('p', {}, t(`tut.${step.id}.text`)),
       h('div', { class: 'row' },
         h('button', { class: 'btn ghost small-btn', onclick: () => ctx.tutorialEvent('skip') }, t('tut.skip')),
+        step.id === 'colony' ? h('button', { class: 'btn ghost small-btn', onclick: () => { ctx.tutorialEvent('next'); ctx.set({ modal: 'rules' }); } }, t('tut.rules')) : null,
         step.next ? h('button', { class: 'btn primary', onclick: () => ctx.tutorialEvent('next') }, step.id === 'colony' ? t('tut.done') : t('tut.next')) : null)));
 }
 

@@ -11,6 +11,7 @@ import { ITEM_TYPES, RULES } from '../../core/constants.js';
 import { getPlayer, survivorDef, itemOf, objectiveDef, woundLimit } from '../../core/selectors.js';
 import { PLAYER_COLORS } from '../../render/pieces.js';
 import * as act from '../../core/actions.js';
+import { checklistView } from './help.js';
 
 function dialog(cls, ...children) {
   return h('div', { class: `backdrop ${cls}` }, h('div', { class: `dialog panel ${cls}`, role: 'dialog', 'aria-modal': 'true' }, children));
@@ -132,6 +133,11 @@ function settingsRows(ctx) {
       h('div', { class: 'seg small' },
         h('button', { class: ctx.ui.sound ? 'on' : '', onclick: () => ctx.setSound(true) }, t('settings.on')),
         h('button', { class: ctx.ui.sound ? '' : 'on', onclick: () => ctx.setSound(false) }, t('settings.off')))),
+    h('div', { class: 'row' },
+      h('span', { class: 'lbl' }, t('settings.hints')),
+      h('div', { class: 'seg small' },
+        h('button', { class: ctx.ui.hints !== false ? 'on' : '', 'data-hints': 'on', onclick: () => ctx.setHints(true) }, t('settings.on')),
+        h('button', { class: ctx.ui.hints !== false ? '' : 'on', 'data-hints': 'off', onclick: () => ctx.setHints(false) }, t('settings.off')))),
     // Step 15: the camera follows what others do; how fast their moves play out.
     h('div', { class: 'row' },
       h('span', { class: 'lbl' }, t('settings.camera')),
@@ -500,6 +506,8 @@ export function confirmEndModal(ctx) {
     h('h2', {}, t('confirm.end.title')),
     h('div', { class: 'dice-row' }, me.dice.map((d) => dieFace(d.v, d.used ? 'spent' : ''))),
     h('p', {}, t('confirm.end.text', { n })),
+    // Step 18: what is still unsafe this round, before you hand over.
+    (() => { const bad = checklistView(ctx.state, { onlyBad: true }); return bad ? h('div', { class: 'warn-box' }, h('small', {}, t('check.warn')), bad) : null; })(),
     h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: ctx.ui.skipEndConfirm, onchange: (ev) => { ctx.ui.skipEndConfirm = ev.target.checked; } }), ` ${t('confirm.end.skip')}`),
     h('div', { class: 'row end' },
       h('button', { class: 'btn ghost', onclick: () => ctx.set({ modal: null }) }, t('confirm.end.no')),

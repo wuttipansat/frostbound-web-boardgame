@@ -49,6 +49,7 @@ function boxes() {
     actions: union(q('#pp-actions > .icon-btn, #pp-actions > .btn')),
     hand: union([...vis('#pp-hand .item-card'), ...q('#pp-hand .hand-ctl button')]),
     tokens: union(q('.sv-token')),
+    hint: union(q('#hint:not(.hidden)')),
     location: loc.classList.contains('hidden') ? null : union([loc]),
   };
 }

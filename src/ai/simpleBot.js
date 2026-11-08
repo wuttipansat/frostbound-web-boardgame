@@ -31,7 +31,8 @@ function pickOne(list, opts) {
 export function botAction(s, playerId, opts = {}) {
   opts = { random: Math.random, chaos: 0, ...opts };
   const p = getPlayer(s, playerId);
-  const isBetrayer = objectiveDef(p.objectiveId)?.kind === 'betrayer';
+  // `cooperative`: suggest moves for a human (step 18 hints) without ever playing as a betrayer.
+  const isBetrayer = !opts.cooperative && objectiveDef(p.objectiveId)?.kind === 'betrayer';
 
   // Answer pending requests addressed to us first (any phase).
   const req = s.requests.find((r) => r.to === playerId);

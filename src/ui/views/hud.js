@@ -9,6 +9,7 @@ import {
 import { RULES } from '../../core/constants.js';
 import { PLAYER_COLORS } from '../../render/pieces.js';
 import { counter } from '../ticker.js';
+import { checklistView } from './help.js';
 import { PHASES } from '../../core/constants.js';
 
 export function renderTopbar(el, ctx) {
@@ -60,6 +61,7 @@ export function renderTopbar(el, ctx) {
     h('div', { class: 'brand-mini' }, 'FROSTBOUND'),
     morale, food, waste, helpless, round, goal, crisisChip, turn,
     h('div', { class: 'spacer' }),
+    h('button', { class: 'icon-btn rules-btn', tip: t('hud.rules'), 'aria-label': t('hud.rules'), onclick: () => ctx.set({ modal: 'rules' }) }, '?'),
     h('button', { class: `icon-btn${ui.logOpen ? ' on' : ''}`, tip: t('hud.log'), 'aria-label': t('hud.log'), onclick: () => ctx.set({ logOpen: !ui.logOpen }) }, icon('log')),
     h('button', { class: 'icon-btn', tip: t('hud.settings'), 'aria-label': t('hud.settings'), onclick: () => ctx.set({ modal: 'settings' }) }, icon('settings')));
 
@@ -70,7 +72,9 @@ export function renderTopbar(el, ctx) {
         h('div', {}, h('h3', {}, c('crises', crisis.id, 'name')), h('p', {}, c('crises', crisis.id, 'text')))),
       h('p', { class: 'need' }, t('hud.crisisNeed', { n: crisisRequirement(s), item: t(`item.${crisis.item}`) })),
       h('p', { class: 'fail' }, icon('crisis'), ` ${describeEffects(crisis.fail)}`),
-      h('p', { class: 'muted' }, icon('person'), ` ${t('hud.helpless', { n: s.helpless })}`)));
+      h('p', { class: 'muted' }, icon('person'), ` ${t('hud.helpless', { n: s.helpless })}`),
+      h('h4', {}, t('check.title')),
+      checklistView(s)));
   }
 }
 

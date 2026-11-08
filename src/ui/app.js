@@ -19,6 +19,7 @@ import { RuleError } from '../core/errors.js';
 import { renderPlayerPanel } from './views/player.js';
 import { renderLocationPanel } from './views/location.js';
 import { renderMovePicker } from './views/movepick.js';
+import { renderHint, rulesModal } from './views/help.js';
 import { createDirector, eventsFromLog } from './director.js';
 import {
   setupScreen, settingsModal, passScreen, draftModal, crossroadsModal, requestModal,
@@ -68,6 +69,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     skipEndConfirm: false,
     moreOpen: false, // the "more actions" menu next to End turn
     // Hand shown as compact faces (remembered per device); phones and short screens start compact.
+    hints: settings.hints ?? true, // step 18: next-move hint bar
     cameraFollow: settings.cameraFollow ?? 'others', // step 15: who the camera follows
     playSpeed: settings.playSpeed ?? 'normal',
     movePick: null, // location whose "who goes there" picker is open
@@ -112,6 +114,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
       online: online ? { code: online.code, lobby: online.lobby, playerId: online.playerId, status: online.status, host: online.playerId === 'p0' } : null,
       set, dispatch, dismissQueue, tutorialEvent, setTutorial, sfx: (name, delay) => sound.play(name, delay), selectSurvivor, selectLocation, takeSeat, startGame, continueGame, quitToSetup, setLanguage, setSound,
       createRoom, joinRoom, startRoom, leaveRoom, setPresentation,
+      setHints: (on) => { ui.hints = on; saveSettings({ hints: on }); render(); },
       watching: director.watching,
       setHandCompact: (on) => { ui.handCompact = on; saveSettings({ handCompact: on }); render(); },
     };
@@ -472,6 +475,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     renderLog(dom.log, x);
     renderLocationPanel(dom.loc, x);
     if (dom.movePick) renderMovePicker(dom.movePick, x);
+    if (dom.hint) renderHint(dom.hint, { ...x, ui: { ...ui, hints: ui.hints && ui.tutStep >= DONE } });
     renderPlayerPanel(dom.playerRefs, x);
     // The tray throws the active player's dice when their turn starts (dice are public); the panel
     // then shows them as 2D chips. Everyone watches the roll, online too.
@@ -510,6 +514,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
   /** Which modal to show: [stableKey | null, builder]. A stable key means "don't re-mount while unchanged". */
   function modalFor(x) {
     if (ui.modal === 'settings') return [null, () => settingsModal(x)];
+    if (ui.modal === 'rules') return [`rules:${getLangKey()}`, () => rulesModal(x)];
     const q = ui.queue[0];
     if (q?.type === 'colony') return [`colony:${q.report.round}:${getLangKey()}`, () => colonyModal(x, q)];
     if (q?.type === 'cross') return [`cross:${state.log.length}:${q.cardId}:${getLangKey()}`, () => crossResultModal(x, q)];

@@ -166,6 +166,7 @@ const app = createApp({
   dom: {
     topbar: $('topbar'), phase: $('phase'), log: $('log'), diceStage: $('dice-stage'), loc: $('locpanel'), player: $('player'), modal: $('modal'), toasts: $('toasts'), tutorial: $('tutorial'),
     movePick: $('move-pick'),
+    hint: $('hint'),
     playerRefs: { head: $('pp-head'), survivors: $('pp-survivors'), chips: $('pp-chips'), hand: $('pp-hand'), actions: $('pp-actions') },
     onRender: (state) => {
       refreshLabels(state);

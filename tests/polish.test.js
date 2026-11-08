@@ -5,21 +5,17 @@ import { sound, soundForLog, SOUND_NAMES } from '../src/audio/sound.js';
 import { EN_STRINGS, TH_STRINGS } from '../src/i18n/index.js';
 import { simulate } from '../src/ai/simulate.js';
 
-test('tutorial: Next only works on steps that offer it; real actions advance the rest', () => {
-  let i = 0;
-  i = advanceTutorial(i, 'next'); // welcome -> topbar
-  i = advanceTutorial(i, 'next'); // topbar -> crisis
-  i = advanceTutorial(i, 'next'); // crisis -> survivors
-  assert.equal(TUTORIAL[i].id, 'survivors');
-  assert.equal(advanceTutorial(i, 'next'), i, 'must actually select a survivor');
-  i = advanceTutorial(i, 'selectSurvivor');
-  assert.equal(TUTORIAL[i].id, 'board');
-  i = advanceTutorial(i, 'selectLocation');
+test('tutorial: learn by doing — each step waits for the real action', () => {
+  let i = advanceTutorial(0, 'next'); // welcome -> move
+  assert.equal(TUTORIAL[i].id, 'move');
+  assert.equal(advanceTutorial(i, 'next'), i, 'must actually move');
   i = advanceTutorial(i, 'move');
   assert.equal(TUTORIAL[i].id, 'actions');
+  assert.equal(advanceTutorial(i, 'next'), i, 'must actually spend a die');
   i = advanceTutorial(i, 'dieAction');
-  i = advanceTutorial(i, 'next');
-  i = advanceTutorial(i, 'next');
+  assert.equal(TUTORIAL[i].id, 'card');
+  assert.equal(TUTORIAL[advanceTutorial(i, 'contribute')].id, 'endTurn');
+  i = advanceTutorial(i, 'card');
   assert.equal(TUTORIAL[i].id, 'endTurn');
   i = advanceTutorial(i, 'endTurn');
   assert.equal(TUTORIAL[i].id, 'colony');
@@ -27,7 +23,7 @@ test('tutorial: Next only works on steps that offer it; real actions advance the
 });
 
 test('tutorial: ending the turn early jumps to the colony step; skip ends it; colony dismissal finishes it', () => {
-  assert.equal(TUTORIAL[advanceTutorial(3, 'endTurn')].id, 'colony');
+  assert.equal(TUTORIAL[advanceTutorial(1, 'endTurn')].id, 'colony');
   assert.equal(advanceTutorial(2, 'skip'), DONE);
   assert.equal(advanceTutorial(5, 'colonyDone'), DONE);
   assert.equal(advanceTutorial(DONE, 'next'), DONE);
@@ -42,7 +38,8 @@ test('tutorial visibility and action mapping', () => {
   assert.equal(eventForAction({ type: 'SEARCH' }), 'dieAction');
   assert.equal(eventForAction({ type: 'MOVE' }), 'move');
   assert.equal(eventForAction({ type: 'END_TURN' }), 'endTurn');
-  assert.equal(eventForAction({ type: 'CONTRIBUTE' }), null);
+  assert.equal(eventForAction({ type: 'CONTRIBUTE' }), 'contribute');
+  assert.equal(eventForAction({ type: 'PLAY_CARD' }), 'card');
 });
 
 test('every tutorial step has a title and text in English and Thai', () => {
