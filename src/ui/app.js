@@ -42,6 +42,7 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
   let state = null;
   let seat = null; // the human currently holding the device (hot seat)
   let aiTimer = 0;
+  let busyWait = 0;
   let queueTimer = 0;
   let modalKey = null;
   let aiRandom = mulberry(Date.now() >>> 0);
@@ -317,7 +318,9 @@ export function createApp({ dom, pieces, diceTray, board, fx = {}, aiFast = fals
     if (!actor || !getPlayer(state, actor).isAI) { aiTimer = 0; return; }
     if (!aiFast) {
       // Let the table see each AI action land before the next one.
-      if (pieces.busy || diceTray.busy || diceTray.exposureBusy) { aiTimer = 0; return; }
+      // Wait for animations, but never forever: after 5 s the AI plays on regardless.
+      if ((pieces.busy || diceTray.busy || diceTray.exposureBusy) && (busyWait += dt) < 5) { aiTimer = 0; return; }
+      busyWait = 0;
       aiTimer += dt;
       if (aiTimer < AI_DELAY) return;
     }

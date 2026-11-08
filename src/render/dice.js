@@ -99,7 +99,9 @@ export function createDiceTray(canvas, { hd = false } = {}) {
     last = now;
     tweens.update(dt);
     render();
-    rafId = tweens.busy ? requestAnimationFrame(loop) : null;
+    // Keep looping while an exposure roll is in flight: its next stage (the fade) is queued from a
+    // promise callback, after this frame has already looked at tweens.busy.
+    rafId = tweens.busy || expoRunning ? requestAnimationFrame(loop) : null;
   }
   function kick() {
     if (rafId == null) { last = performance.now(); rafId = requestAnimationFrame(loop); }
