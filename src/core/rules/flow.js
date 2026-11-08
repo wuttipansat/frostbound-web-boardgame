@@ -61,6 +61,8 @@ export function beginTurn(s) {
   const p = getPlayer(s, s.activePlayerId);
   for (const sv of aliveSurvivorsOf(s, p.id)) sv.moved = false;
   p.abilityUsed = {};
+  p.usedCards = [];
+  p.pick = null;
   s.pendingCrossroads = null;
 
   const reader = nextPlayer(s, p.id);
@@ -155,7 +157,7 @@ export function resolveCrisis(s) {
   const cards = revealed.map(({ uid, playerId }) => {
     const item = itemOf(s, uid);
     let delta = -1;
-    if (item.type === crisis.item) delta = 1;
+    if (item.type === crisis.item || item.wild) delta = 1;
     else if (item.type === 'junk' && playerHasAbility(s, playerId, 'tinkerer')) delta = 1;
     score += delta;
     return { card: s.cards[uid], type: item.type, delta };

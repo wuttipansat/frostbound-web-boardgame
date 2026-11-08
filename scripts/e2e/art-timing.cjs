@@ -12,7 +12,7 @@ const { chromium } = require('playwright');
     const tier = f.stage.quality.id;
     const ids = { survivor: Object.keys(window.__frostbound.app.state ? {} : {}), };
     const t0 = performance.now();
-    const items = ['canned-beans','frozen-venison','rice-sack','beef-jerky','cafeteria-tray','first-aid-pouch','antibiotics','cough-syrup','saline-bags','herbal-guide','jerry-can','lamp-oil','space-heater-fuel','oxygen-tank','candle-box','flare','road-flare-kit','zip-ties','duct-tape','repair-manual','socket-set','surgical-saw','old-almanac','service-pistol','riot-baton','pump-shotgun','box-cutter','hockey-stick','tire-iron','letter-opener','lost-and-found','shopping-cart','board-games','bedpan','paperback-pile','motor-junk'];
+    const items = ['canned-beans','beef-jerky','rice-sack','first-aid-pouch','antibiotics','jerry-can','duct-tape','zip-ties','socket-set','riot-baton','glock-19','remington-870','mosin-nagant','bedpan','motor-junk','stranger-with-child','lone-wanderer','blueprint-police','blueprint-grocery','blueprint-school','blueprint-hospital','blueprint-library','blueprint-gas','winter-cookbook','field-manual'];
     const survivors = ['maren-holt','osei-vance','pim-arunrat','ilse-brandt','teodor-rusu','nia-calloway','wren-okafor','lio-fontaine','hattie-moss','rafael-quist','agnes-pell','corwin-daly','juno-barrera','kanya-srisuk','bo-lindqvist','ezra-kade','greta-vos','silas-thorn','dot-ferreira','ambrose-lark'];
     const specs = [
       ...survivors.flatMap((id) => ['s', 'l'].map((size) => ({ kind: 'survivor', id, size, tier }))),

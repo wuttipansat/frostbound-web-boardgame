@@ -17,6 +17,7 @@ export const A = Object.freeze({
   RESPOND_REQUEST: 'RESPOND_REQUEST',
   CALL_VOTE: 'CALL_VOTE',
   CAST_VOTE: 'CAST_VOTE',
+  RETURN_CARD: 'RETURN_CARD',
 });
 
 export const draftPick = (playerId, survivorIds) => ({ type: A.DRAFT_PICK, playerId, survivorIds });
@@ -27,6 +28,8 @@ export const barricade = (playerId, survivorId, dieIndex) => ({ type: A.BARRICAD
 export const clean = (playerId, survivorId, dieIndex) => ({ type: A.CLEAN, playerId, survivorId, dieIndex });
 export const lure = (playerId, survivorId, dieIndex, toLocation) => ({ type: A.LURE, playerId, survivorId, dieIndex, toLocation });
 export const move = (playerId, survivorId, toLocation, fuelCardUid) => ({ type: A.MOVE, playerId, survivorId, toLocation, fuelCardUid });
+/** Blueprint search: put one of the drawn cards back under the deck. */
+export const returnCard = (playerId, cardUid) => ({ type: A.RETURN_CARD, playerId, cardUid });
 export const playCard = (playerId, cardUid, opts = {}) => ({ type: A.PLAY_CARD, playerId, cardUid, ...opts });
 export const contribute = (playerId, cardUid) => ({ type: A.CONTRIBUTE, playerId, cardUid });
 export const deposit = (playerId, cardUid) => ({ type: A.DEPOSIT, playerId, cardUid });

@@ -56,7 +56,7 @@ test('crisis: matching +1, others -1 (sabotage); tinkerer junk counts; failure a
   assert.equal(ok.result.success, true);
   assert.equal(ok.morale, 8, 'beat by 1: no bonus');
   let fuel2;
-  [s, fuel2] = giveCard(s, 'p0', 'lamp-oil');
+  [s, fuel2] = giveCard(s, 'p0', 'jerry-can');
   const great = patch(s, (x) => {
     x.crisis.contributions = [{ uid: fuel, playerId: 'p1' }, { uid: junk, playerId: 'p0' }, { uid: fuel2, playerId: 'p0' }];
     resolveCrisis(x);

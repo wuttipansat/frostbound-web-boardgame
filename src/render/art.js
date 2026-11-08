@@ -1,7 +1,6 @@
 // Generated artwork: character portraits (survivors + zombies) and item pictures, painted from the
 // voxel models on the CPU (2D canvas, no extra WebGL context), lazily when the browser is idle, cached.
 import { survivorModel, survivorModelHD, zombieModelV, zombieModelHD } from './characters.js';
-import { itemModel, itemModelHD } from './items3d.js';
 import { SURVIVORS_BY_ID } from '../content/survivors.js';
 
 export const ART_SIZES = { s: 64, l: 160 };
@@ -15,6 +14,8 @@ export const artKey = ({ kind, id, size, tier }) => `${kind}:${id}:${size}:${tie
  */
 /** URL of a survivor's pixel-art portrait sprite (relative, so it works under any base path). */
 export const portraitUrl = (id) => `./portraits/${id}.png`;
+/** URL of an item's pixel-art sprite. */
+export const itemUrl = (id) => `./items/${id}.png`;
 
 export class ArtCache {
   constructor(render, { schedule = null, now = () => Date.now() } = {}) {
@@ -127,7 +128,7 @@ export function createArtStudio({ quality }) {
   function modelFor(kind, id) {
     if (kind === 'survivor') return hd ? survivorModelHD(SURVIVORS_BY_ID[id]) : survivorModel(SURVIVORS_BY_ID[id]);
     if (kind === 'zombie') return hd ? zombieModelHD(Number(id)) : zombieModelV(Number(id));
-    return hd ? itemModelHD(id) : itemModel(id);
+    throw new Error(`no model for ${kind}`);
   }
 
   /** Projected quads per model (shared by both sizes). */
@@ -258,7 +259,15 @@ export function createArtStudio({ quality }) {
       return el;
     },
     zombie: (variant, size = 's', opts) => img({ kind: 'zombie', id: String(variant), size }, opts),
-    item: (defId, size = 's', opts) => img({ kind: 'item', id: defId, size }, opts),
+    /** Items are hand-made 64×64 pixel sprites (public/items/<id>.png). */
+    item: (defId, size = 's', { cls = '', alt = '' } = {}) => {
+      const el = document.createElement('img');
+      el.className = `art art-item art-${size} sprite ${cls}`;
+      el.alt = alt;
+      el.decoding = 'async';
+      el.src = itemUrl(defId);
+      return el;
+    },
     /** Warm the cache in the background (e.g. small portraits for the current players). */
     prefetch(specs) { for (const s of specs) cache.get({ tier, size: 's', ...s }); },
     get stats() { return { ...cache.stats, queued: cache.queue.length }; },

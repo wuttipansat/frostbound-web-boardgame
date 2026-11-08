@@ -17,7 +17,7 @@ import { renderPlayerPanel } from './views/player.js';
 import { renderLocationPanel } from './views/location.js';
 import {
   setupScreen, settingsModal, passScreen, draftModal, crossroadsModal, requestModal,
-  incomingRequestModal, voteModal, gameOverModal, toastLayer, colonyModal, voteResultModal, callVoteModal, confirmEndModal,
+  incomingRequestModal, voteModal, gameOverModal, toastLayer, colonyModal, voteResultModal, callVoteModal, confirmEndModal, pickModal,
 } from './views/modals.js';
 import { currentActor as actorOf, whoMustHold } from './seat.js';
 import { moveTargets, lureTargets, actingSurvivors } from './options.js';
@@ -396,6 +396,8 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
       return [`cross:${state.pendingCrossroads.cardId}:${state.round}:${state.activePlayerId}:${getLangKey()}`, () => crossroadsModal(x)];
     }
     if (state.phase === PHASES.VOTE && x.viewer && pendingActors(state).includes(x.viewer)) return [null, () => voteModal(x)];
+    const picker = x.canAct && getPlayer(state, x.viewer)?.pick;
+    if (picker) return [null, () => pickModal(x, picker)];
     if (ui.modal === 'request' && x.canAct) return [null, () => requestModal(x)];
     if (ui.modal === 'callVote' && x.canAct) return [null, () => callVoteModal(x)];
     if (ui.modal === 'confirmEnd' && x.canAct) return [null, () => confirmEndModal(x)];

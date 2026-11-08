@@ -98,6 +98,13 @@ function turnAction(s, p, isBetrayer, opts) {
   const crisis = crisisDef(s);
   const cardsOf = (type) => p.hand.filter((u) => itemOf(s, u).type === type);
 
+  // Blueprint search: put back the weakest card (lowest tier, then lowest value).
+  if (p.pick) {
+    const rank = (u) => itemOf(s, u).tier * 10 + itemOf(s, u).value;
+    const worst = [...p.pick.uids].sort((a, b) => rank(a) - rank(b))[0];
+    return act.returnCard(pid, worst);
+  }
+
   // Chaos-only social actions.
   if (opts.chaos && opts.random() < 0.02 && p.lastVoteRound !== s.round) {
     const targets = s.players.filter((o) => o.id !== pid && !o.exiled);
@@ -145,12 +152,21 @@ function turnAction(s, p, isBetrayer, opts) {
     if (target) candidates.push(act.useAbility(pid, healer.id, target.id));
   }
 
-  // Weapons kill without exposure.
-  const weapon = cardsOf('weapon')[0];
-  if (weapon && crisis?.item !== 'weapon') {
-    const sv = survivors.find((x) => s.locations[x.location].zombies > 0);
-    if (sv) candidates.push(act.playCard(pid, weapon, { targetSurvivorId: sv.id }));
+  // Weapons kill without exposure (permanent: each once per turn; long guns reach any location).
+  for (const weapon of cardsOf('weapon').filter((u) => !(p.usedCards ?? []).includes(u))) {
+    if (itemOf(s, weapon).range === 'any') {
+      const where = Object.keys(s.locations).filter((l) => s.locations[l].zombies > 0)
+        .sort((a, b) => s.locations[b].zombies - s.locations[a].zombies)[0];
+      if (where && survivors.length) candidates.push(act.playCard(pid, weapon, { targetLocation: where }));
+    } else {
+      const sv = survivors.find((x) => s.locations[x.location].zombies > 0);
+      if (sv) candidates.push(act.playCard(pid, weapon, { targetSurvivorId: sv.id }));
+    }
   }
+
+  // Recruit survivors found out there.
+  const recruit = cardsOf('survivor')[0];
+  if (recruit && s.survivorDeck.length && !isBetrayer) candidates.push(act.playCard(pid, recruit));
 
   // Die actions, highest dice first.
   const dice = p.dice.map((d, i) => ({ ...d, i })).filter((d) => !d.used).sort((a, b) => b.v - a.v);

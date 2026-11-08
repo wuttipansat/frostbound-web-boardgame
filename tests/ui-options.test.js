@@ -46,7 +46,7 @@ test('move and card options', () => {
   const fuelOpts = cardOptions(s, pid, fuel);
   assert.deepEqual(fuelOpts.map((o) => o.id), ['contribute', 'deposit'], 'fuel is used when moving, not played');
   assert.ok(fuelOpts.find((o) => o.id === 'deposit').ok);
-  let gun; [s, gun] = giveCard(s, pid, 'tire-iron');
+  let gun; [s, gun] = giveCard(s, pid, 'glock-19');
   assert.equal(cardOptions(s, pid, gun, { survivorId: 'corwin-daly' })[0].error, 'noZombiesHere');
 });
 

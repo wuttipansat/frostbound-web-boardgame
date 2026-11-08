@@ -38,6 +38,7 @@ const HANDLERS = {
   [A.RESPOND_REQUEST]: social.respondRequest,
   [A.CALL_VOTE]: social.callVote,
   [A.CAST_VOTE]: social.castVote,
+  [A.RETURN_CARD]: turn.returnCard,
 };
 
 export function reduce(state, action) {

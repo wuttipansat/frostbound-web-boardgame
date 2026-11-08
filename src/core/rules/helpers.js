@@ -84,6 +84,11 @@ export function killSurvivor(s, survivorId, cause) {
 
 /** A player who loses everyone recruits a fresh survivor from the deck. */
 export function recruitReplacement(s, playerId) {
+  recruitSurvivor(s, playerId);
+}
+
+/** Add the top survivor of the deck to a player's group (colony, or a safe spot for exiles). */
+export function recruitSurvivor(s, playerId) {
   if (!s.survivorDeck.length) return;
   const p = getPlayer(s, playerId);
   const id = s.survivorDeck.pop();

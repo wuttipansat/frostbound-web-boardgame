@@ -74,7 +74,7 @@ test('item requests: target may give a (matching) card or decline', () => {
   const [p0, p1] = ['p0', 'p1'];
   let food, gun;
   [s, food] = giveCard(s, p1, 'canned-beans');
-  [s, gun] = giveCard(s, p1, 'tire-iron');
+  [s, gun] = giveCard(s, p1, 'glock-19');
   s = reduce(s, a.requestItem(p0, p1, 'food'));
   const req = s.requests[0];
   assert.equal(tryReduce(s, a.respondRequest(p0, req.id, null)).error, 'notYourRequest');

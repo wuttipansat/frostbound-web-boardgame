@@ -181,6 +181,18 @@ export function requestModal(ctx) {
       }, t('request.send'))));
 }
 
+/** Blueprint search: the player saw one card too many and puts one back. */
+export function pickModal(ctx, pick) {
+  return dialog('pick',
+    h('h2', {}, t('pick.title')),
+    h('p', { class: 'muted' }, t('pick.text', { place: c('locations', pick.locationId, 'name') })),
+    h('div', { class: 'hand-cards' }, pick.uids.map((uid) => {
+      const it = itemOf(ctx.state, uid);
+      return h('button', { class: `item-card t-${it.type} tier-${it.tier}`, onclick: () => ctx.dispatch(act.returnCard(ctx.viewer, uid)) },
+        ctx.art.item(it.id, 's', { alt: '' }), h('span', { class: 'iname' }, c('items', it.id, 'name')), h('span', { class: 'ishort' }, t('pick.putBack')));
+    })));
+}
+
 export function incomingRequestModal(ctx, req) {
   const s = ctx.state;
   const me = getPlayer(s, ctx.viewer);
@@ -190,7 +202,7 @@ export function incomingRequestModal(ctx, req) {
     h('h2', {}, t('request.incoming', { from: from.name, item: req.itemType ? t(`item.${req.itemType}`) : t('item.any') })),
     h('div', { class: 'hand-cards' }, eligible.map((uid) => {
       const it = itemOf(s, uid);
-      return h('button', { class: `item-card t-${it.type}`, onclick: () => ctx.dispatch(act.respondRequest(me.id, req.id, uid)) },
+      return h('button', { class: `item-card t-${it.type} tier-${it.tier}`, onclick: () => ctx.dispatch(act.respondRequest(me.id, req.id, uid)) },
         ctx.art.item(it.id, 's', { alt: '' }), h('span', { class: 'iname' }, c('items', it.id, 'name')), h('span', { class: 'ishort' }, t('act.give')));
     })),
     h('div', { class: 'row end' }, h('button', { class: 'btn ghost', onclick: () => ctx.dispatch(act.respondRequest(me.id, req.id, null)) }, t('act.decline'))));

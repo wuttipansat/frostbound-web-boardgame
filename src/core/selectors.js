@@ -45,6 +45,20 @@ export function hasAbility(s, survivorId, type) {
 }
 
 /** Does this player control a living survivor with the given ability type? */
+/** How many copies of a passive book (by passive key) the colony's players hold. Exiles don't share. */
+export function booksHeld(s, passive, playerId = null) {
+  let n = 0;
+  for (const p of s.players) {
+    if (playerId ? p.id !== playerId : p.exiled) continue;
+    for (const uid of p.hand) if (ITEMS[s.cards[uid]]?.passive === passive) n += 1;
+  }
+  return n;
+}
+
+/** Does the player hold the blueprint for this location? */
+export const holdsBlueprint = (s, playerId, locationId) =>
+  s.players.find((p) => p.id === playerId)?.hand.some((uid) => ITEMS[s.cards[uid]]?.blueprint === locationId) ?? false;
+
 export function playerHasAbility(s, playerId, type) {
   return aliveSurvivorsOf(s, playerId).some((sv) => survivorDef(sv.id).ability.type === type);
 }
@@ -74,6 +88,7 @@ export function foodNeeded(s) {
   let need = Math.ceil(colonyPopulation(s) / 2);
   const cookHome = survivorsAt(s, 'colony').some((sv) => survivorDef(sv.id).ability.type === 'foodSaver');
   if (cookHome) need -= 1;
+  need -= booksHeld(s, 'foodSaver');
   return Math.max(0, need);
 }
 

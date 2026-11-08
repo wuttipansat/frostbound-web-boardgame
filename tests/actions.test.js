@@ -120,7 +120,7 @@ test('playing cards: food, medicine, tools, weapon, junk', () => {
   let { s, pid } = setup({ 'corwin-daly': 'police' }, [1, 6]);
   s = patch(s, (x) => { x.survivors['corwin-daly'].wounds = 1; x.locations.police.zombies = 1; });
   let food, med, tool, gun, junk;
-  [s, food] = giveCard(s, pid, 'frozen-venison');
+  [s, food] = giveCard(s, pid, 'rice-sack');
   [s, med] = giveCard(s, pid, 'antibiotics');
   [s, tool] = giveCard(s, pid, 'duct-tape');
   [s, gun] = giveCard(s, pid, 'riot-baton');
@@ -161,14 +161,14 @@ test('contribute is face-down and removes the card from hand', () => {
 test('deposit (beacon scenario) needs a survivor in the colony and the right item', () => {
   let { s, pid } = setup({ 'corwin-daly': 'police' });
   let fuel, food;
-  [s, fuel] = giveCard(s, pid, 'lamp-oil');
+  [s, fuel] = giveCard(s, pid, 'jerry-can');
   [s, food] = giveCard(s, pid, 'rice-sack');
   assert.equal(tryReduce(s, a.deposit(pid, fuel)).error, 'mustBeInColony');
   s = setSurvivors(s, pid, { 'corwin-daly': 'colony' });
   assert.equal(tryReduce(s, a.deposit(pid, food)).error, 'wrongItemType');
   assert.equal(reduce(s, a.deposit(pid, fuel)).scenario.deposited, 1);
   const stores = setup({ 'corwin-daly': 'colony' }, [6], { scenarioId: 'stores' });
-  let [st, f2] = giveCard(stores.s, stores.pid, 'lamp-oil');
+  let [st, f2] = giveCard(stores.s, stores.pid, 'jerry-can');
   assert.equal(tryReduce(st, a.deposit(stores.pid, f2)).error, 'scenarioHasNoDeposit');
 });
 

@@ -18,8 +18,8 @@ export const LOCATIONS = {
     survivorSlots: 3,
     zombieSlots: 3,
     deck: {
-      'service-pistol': 3, 'riot-baton': 3, 'pump-shotgun': 2, 'first-aid-pouch': 2,
-      'zip-ties': 2, 'canned-beans': 1, 'flare': 1, 'lost-and-found': 2,
+      'glock-19': 2, 'riot-baton': 2, 'remington-870': 1, 'mosin-nagant': 1, 'first-aid-pouch': 2,
+      'zip-ties': 2, 'canned-beans': 3, 'jerry-can': 1, bedpan: 1, 'blueprint-police': 1,
     },
   },
   grocery: {
@@ -29,8 +29,8 @@ export const LOCATIONS = {
     survivorSlots: 4,
     zombieSlots: 3,
     deck: {
-      'canned-beans': 4, 'frozen-venison': 2, 'rice-sack': 3, 'cough-syrup': 1,
-      'lamp-oil': 1, 'box-cutter': 2, 'shopping-cart': 3,
+      'canned-beans': 4, 'beef-jerky': 3, 'rice-sack': 2, 'first-aid-pouch': 1, 'jerry-can': 1,
+      'duct-tape': 1, bedpan: 2, 'blueprint-grocery': 1, 'winter-cookbook': 1,
     },
   },
   school: {
@@ -40,8 +40,8 @@ export const LOCATIONS = {
     survivorSlots: 4,
     zombieSlots: 3,
     deck: {
-      'cafeteria-tray': 3, 'canned-beans': 2, 'first-aid-pouch': 2, 'duct-tape': 2,
-      'hockey-stick': 2, 'board-games': 2, 'space-heater-fuel': 1, 'rice-sack': 1,
+      'canned-beans': 2, 'beef-jerky': 1, 'jerry-can': 1, 'first-aid-pouch': 2, 'duct-tape': 2,
+      'riot-baton': 1, bedpan: 2, 'stranger-with-child': 2, 'lone-wanderer': 1, 'blueprint-school': 1,
     },
   },
   hospital: {
@@ -51,8 +51,8 @@ export const LOCATIONS = {
     survivorSlots: 3,
     zombieSlots: 3,
     deck: {
-      'antibiotics': 3, 'first-aid-pouch': 3, 'cough-syrup': 2, 'surgical-saw': 1,
-      'oxygen-tank': 1, 'saline-bags': 2, 'bedpan': 2, 'canned-beans': 1,
+      'first-aid-pouch': 4, antibiotics: 2, 'canned-beans': 1, 'rice-sack': 1, 'jerry-can': 1,
+      'zip-ties': 1, 'duct-tape': 1, bedpan: 2, 'stranger-with-child': 1, 'blueprint-hospital': 1,
     },
   },
   library: {
@@ -62,8 +62,8 @@ export const LOCATIONS = {
     survivorSlots: 3,
     zombieSlots: 3,
     deck: {
-      'old-almanac': 3, 'repair-manual': 3, 'herbal-guide': 2, 'paperback-pile': 3,
-      'candle-box': 2, 'letter-opener': 1, 'canned-beans': 1,
+      'duct-tape': 2, 'zip-ties': 2, 'socket-set': 1, 'field-manual': 1, 'blueprint-library': 1, 'jerry-can': 2,
+      'canned-beans': 1, 'rice-sack': 1, 'first-aid-pouch': 1, bedpan: 2, 'stranger-with-child': 1,
     },
   },
   gas: {
@@ -73,8 +73,8 @@ export const LOCATIONS = {
     survivorSlots: 3,
     zombieSlots: 3,
     deck: {
-      'jerry-can': 4, 'lamp-oil': 2, 'tire-iron': 2, 'socket-set': 2,
-      'beef-jerky': 2, 'road-flare-kit': 1, 'motor-junk': 2,
+      'jerry-can': 6, 'beef-jerky': 1, 'socket-set': 1, 'riot-baton': 1, 'motor-junk': 2,
+      'duct-tape': 1, 'zip-ties': 1, 'blueprint-gas': 1, 'canned-beans': 1,
     },
   },
 };

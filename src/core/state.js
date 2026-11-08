@@ -111,6 +111,8 @@ export function createGame(config) {
       exiled: false,
       kills: 0,
       abilityUsed: {},
+      usedCards: [],   // permanent cards (weapons) already used this turn
+      pick: null,      // blueprint search: { locationId, uids } until one card is put back
       lastVoteRound: 0,
     });
   });

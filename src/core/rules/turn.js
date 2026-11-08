@@ -3,20 +3,23 @@ import { PHASES, LOCATION_IDS, RULES } from '../constants.js';
 import { rollD6 } from '../rng.js';
 import { assert } from '../errors.js';
 import {
-  getPlayer, survivorDef, freeSurvivorSlots, freeZombieSlots, itemOf, scenarioDef,
+  getPlayer, survivorDef, freeSurvivorSlots, freeZombieSlots, itemOf, scenarioDef, booksHeld, holdsBlueprint,
 } from '../selectors.js';
 import {
   log, rollExposure, drawItems, wasteCard, removeFromHand, addZombies, removeZombies,
-  addBarricades, creditKills, healSurvivor, changeFood,
+  addBarricades, creditKills, healSurvivor, changeFood, changeHelpless, recruitSurvivor,
 } from './helpers.js';
 import { endTurn } from './flow.js';
+import { isPermanent } from '../../content/items.js';
 
 // ---------------------------------------------------------------- guards
 
-function requireTurn(s, playerId) {
+function requireTurn(s, playerId, { picking = false } = {}) {
   assert(s.phase === PHASES.TURN, 'wrongPhase', s.phase);
   assert(playerId === s.activePlayerId, 'notYourTurn');
-  return getPlayer(s, playerId);
+  const p = getPlayer(s, playerId);
+  assert(picking || !p.pick, 'pickPending');
+  return p;
 }
 
 function requireSurvivor(s, playerId, survivorId) {
@@ -66,9 +69,22 @@ export function search(s, { playerId, survivorId, dieIndex }) {
   die.used = true;
   const a = ability(survivorId);
   const n = a.type === 'doubleSearch' && a.location === sv.location ? 2 : 1;
-  const drawn = drawItems(s, playerId, sv.location, n);
+  // A blueprint for this place: draw one extra, then put one back (returnCard).
+  const blueprint = holdsBlueprint(s, playerId, sv.location);
+  const drawn = drawItems(s, playerId, sv.location, blueprint ? n + 1 : n);
   log(s, 'search', { playerId, survivorId, locationId: sv.location, count: drawn.length, die: die.v });
+  if (blueprint && drawn.length > n) p.pick = { locationId: sv.location, uids: drawn };
   return drawn;
+}
+
+/** Resolve a blueprint search: the chosen card goes back to the bottom of that location's deck. */
+export function returnCard(s, { playerId, cardUid }) {
+  const p = requireTurn(s, playerId, { picking: true });
+  assert(p.pick, 'notPicking');
+  assert(p.pick.uids.includes(cardUid), 'cardNotInHand', cardUid);
+  removeFromHand(s, playerId, cardUid);
+  s.locations[p.pick.locationId].deck.unshift(cardUid);
+  p.pick = null;
 }
 
 export function barricade(s, { playerId, survivorId, dieIndex }) {
@@ -77,7 +93,8 @@ export function barricade(s, { playerId, survivorId, dieIndex }) {
   assert(freeZombieSlots(s, sv.location) > 0, 'noBarricadeSpace');
   const die = requireDie(p, dieIndex);
   die.used = true;
-  addBarricades(s, sv.location, ability(survivorId).type === 'barricadeTwo' ? 2 : 1);
+  const n = (ability(survivorId).type === 'barricadeTwo' ? 2 : 1) + Math.min(1, booksHeld(s, 'barricadePlus', playerId));
+  addBarricades(s, sv.location, n);
 }
 
 export function clean(s, { playerId, survivorId, dieIndex }) {
@@ -130,49 +147,71 @@ export function move(s, { playerId, survivorId, toLocation, fuelCardUid }) {
 }
 
 /**
- * Play an item card for its effect.
- * food -> colony supply; medicine -> heal targetSurvivorId; tools -> barricade at targetSurvivorId;
- * weapon -> kill a zombie at targetSurvivorId (no exposure); junk -> reroll dieIndex.
- * (Fuel is played via move({ fuelCardUid }).)
+ * Play an item card for its effect (strength = item.value).
+ * food -> colony supply; medicine -> heal targetSurvivorId; tools -> barricades at targetSurvivorId;
+ * weapon -> kill zombies at targetSurvivorId, or anywhere (targetLocation) for long guns, no exposure;
+ * junk -> reroll dieIndex (and dieIndex2); survivor -> recruit to your group.
+ * Weapons are permanent: they stay in hand and work once per turn. Books are passive; fuel is used when moving.
  */
-export function playCard(s, { playerId, cardUid, targetSurvivorId, dieIndex }) {
+export function playCard(s, { playerId, cardUid, targetSurvivorId, targetLocation, dieIndex, dieIndex2 }) {
   const p = requireTurn(s, playerId);
   const item = requireCard(s, p, cardUid);
+  const spend = () => { if (!isPermanent(item)) wasteCard(s, playerId, cardUid); };
   switch (item.type) {
     case 'food':
       assert(!p.exiled, 'exiledFromColony');
-      wasteCard(s, playerId, cardUid);
+      spend();
       changeFood(s, item.value, 'played');
       break;
     case 'medicine': {
       const sv = requireSurvivor(s, playerId, targetSurvivorId);
       assert(sv.wounds > 0 || sv.frostbite, 'notWounded');
-      wasteCard(s, playerId, cardUid);
-      healSurvivor(s, sv.id);
+      spend();
+      for (let i = 0; i < item.value; i++) healSurvivor(s, sv.id);
       break;
     }
     case 'tools': {
       const sv = requireSurvivor(s, playerId, targetSurvivorId);
       assert(freeZombieSlots(s, sv.location) > 0, 'noBarricadeSpace');
-      wasteCard(s, playerId, cardUid);
-      addBarricades(s, sv.location, 1);
+      spend();
+      addBarricades(s, sv.location, item.value);
       break;
     }
     case 'weapon': {
-      const sv = requireSurvivor(s, playerId, targetSurvivorId);
-      assert(s.locations[sv.location].zombies > 0, 'noZombiesHere');
-      wasteCard(s, playerId, cardUid);
-      creditKills(s, playerId, removeZombies(s, sv.location, 1));
+      assert(!(p.usedCards ?? []).includes(cardUid), 'cardUsedThisTurn');
+      let where;
+      if (item.range === 'any') {
+        assert(LOCATION_IDS.includes(targetLocation), 'noSuchLocation', targetLocation);
+        assert(p.survivors.some((id) => s.survivors[id]?.alive), 'noSuchSurvivor');
+        where = targetLocation;
+      } else {
+        where = requireSurvivor(s, playerId, targetSurvivorId).location;
+      }
+      assert(s.locations[where].zombies > 0, 'noZombiesHere');
+      spend();
+      p.usedCards = [...(p.usedCards ?? []), cardUid];
+      creditKills(s, playerId, removeZombies(s, where, item.value));
       break;
     }
     case 'junk': {
-      const die = requireDie(p, dieIndex);
-      wasteCard(s, playerId, cardUid);
-      die.v = rollD6(s);
+      const dice = [requireDie(p, dieIndex)];
+      if (item.value > 1 && dieIndex2 != null && dieIndex2 !== dieIndex) dice.push(requireDie(p, dieIndex2));
+      spend();
+      for (const die of dice) die.v = rollD6(s);
+      break;
+    }
+    case 'survivor': {
+      assert(s.survivorDeck.length > 0, 'noSurvivorsLeft');
+      removeFromHand(s, playerId, cardUid); // they join you; the card is not waste
+      recruitSurvivor(s, playerId);
+      if (item.helpless) changeHelpless(s, item.helpless, 'recruited');
       break;
     }
     case 'fuel':
       assert(false, 'fuelIsPlayedWhenMoving');
+      break;
+    case 'book':
+      assert(false, 'passiveItem');
       break;
     default:
       assert(false, 'unplayable');

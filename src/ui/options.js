@@ -68,7 +68,7 @@ export function hasFuel(state, playerId) {
 export function cardOptions(state, playerId, uid, { survivorId = null, dieIndex = null } = {}) {
   const item = itemOf(state, uid);
   const out = [];
-  if (item.type !== 'fuel') {
+  if (item.type !== 'fuel' && item.type !== 'book') {
     const opts = {};
     if (['medicine', 'tools', 'weapon'].includes(item.type)) opts.targetSurvivorId = survivorId;
     if (item.type === 'junk') opts.dieIndex = pickDie(state, playerId, 1, dieIndex) ?? 0;
@@ -97,7 +97,9 @@ const TARGETED = ['medicine', 'tools', 'weapon'];
 
 /** Does playing this card need the player to choose something (a survivor, or a die for junk)? */
 export function cardNeeds(state, uid) {
-  const type = itemOf(state, uid).type;
+  const item = itemOf(state, uid);
+  const type = item.type;
+  if (type === 'weapon' && item.range === 'any') return 'location';
   if (TARGETED.includes(type)) return 'survivor';
   if (type === 'junk') return 'die';
   return null;
@@ -109,6 +111,17 @@ export function cardTargets(state, playerId, uid) {
   return getPlayer(state, playerId).survivors
     .filter((id) => state.survivors[id]?.alive)
     .map((survivorId) => ({ survivorId, ...check(state, act.playCard(playerId, uid, { targetSurvivorId: survivorId })) }));
+}
+
+/** Locations a long gun can shoot into (any location, legal where there are zombies). */
+export function cardLocations(state, playerId, uid) {
+  if (cardNeeds(state, uid) !== 'location') return [];
+  return LOCATION_IDS.map((to) => ({ to, zombies: state.locations[to].zombies, ...check(state, act.playCard(playerId, uid, { targetLocation: to })) }));
+}
+
+/** The reroll action for a junk card and the chosen dice (one, or two for stronger junk). */
+export function junkAction(playerId, uid, picked) {
+  return act.playCard(playerId, uid, { dieIndex: picked[0], ...(picked.length > 1 ? { dieIndex2: picked[1] } : {}) });
 }
 
 /** Dice a junk card can reroll. */

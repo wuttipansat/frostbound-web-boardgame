@@ -12,6 +12,7 @@ export function viewFor(state, playerId) {
       p.hand = [];
       p.objectiveId = null;
       p.draftOptions = [];
+      p.pick = null;
     }
   }
   if (v.crisis) {

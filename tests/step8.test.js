@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import {
   cardNeeds, cardTargets, cardDice, lureTargets, moveTargets, actingSurvivors, unusedDice, shouldConfirmEndTurn,
 } from '../src/ui/options.js';
 import { whoMustHold, currentActor } from '../src/ui/seat.js';
 import { ArtCache, artKey } from '../src/render/art.js';
-import { itemModel, itemModelHD, ITEM_MODEL_IDS, TYPE_COLORS } from '../src/render/items3d.js';
 import { ITEMS } from '../src/content/items.js';
+import { SURVIVORS_BY_ID } from '../src/content/survivors.js';
 import { reduce } from '../src/core/reducer.js';
 import * as A from '../src/core/actions.js';
 import { startedGame, setSurvivors, setDice, giveCard, patch } from './_helpers.js';
@@ -104,21 +104,9 @@ test('art cache renders each key once, queues lazily and keeps timing stats', ()
   assert.equal(cache.stats.totalMs, 6);
 });
 
-test('every item has a voxel model; types share a colour language', () => {
-  assert.deepEqual([...ITEM_MODEL_IDS].sort(), Object.keys(ITEMS).sort());
-  const shapes = new Set();
-  for (const [id, def] of Object.entries(ITEMS)) {
-    const lo = itemModel(id);
-    const hd = itemModelHD(id);
-    const { min, max } = hd.bounds();
-    assert.ok(Math.max(...max.map((v, i) => v - min[i])) <= 18, `${id} is small`);
-    assert.ok(hd.voxels.size > lo.voxels.size * 3, `${id} HD has more detail`);
-    const palette = Object.values(TYPE_COLORS[def.type]);
-    assert.ok([...lo.voxels.values()].some((v) => palette.includes(v.color)) || def.type === 'weapon' || id === 'hockey-stick',
-      `${id} uses its type colours`);
-    shapes.add([...lo.voxels.keys()].sort().join('|'));
-  }
-  assert.equal(shapes.size, Object.keys(ITEMS).length, 'every item looks different');
+test('every item and survivor has a 64x64 pixel sprite', () => {
+  for (const id of Object.keys(ITEMS)) assert.ok(existsSync(`public/items/${id}.png`), `item sprite ${id}`);
+  for (const id of Object.keys(SURVIVORS_BY_ID)) assert.ok(existsSync(`public/portraits/${id}.png`), `portrait ${id}`);
 });
 
 function walk(dir) {
