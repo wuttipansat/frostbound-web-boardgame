@@ -25,6 +25,8 @@ export function renderLocationPanel(el, ctx) {
   if (!id) return;
   const def = LOCATIONS[id];
   const loc = s.locations[id];
+  // Step 17: a location at its zombie limit gets blood on its panel.
+  el.classList.toggle('overrun', loc.zombies >= def.zombieSlots);
   const here = survivorsAt(s, id);
   const ownerIdx = (pid) => s.players.findIndex((p) => p.id === pid);
 

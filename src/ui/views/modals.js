@@ -468,7 +468,7 @@ export function colonyModal(ctx, item) {
 export function gameOverModal(ctx) {
   const s = ctx.state;
   const r = s.result;
-  return dialog('over',
+  return dialog(`over${r.reason === 'objectiveComplete' ? ' won' : ' lost'}`,
     h('small', { class: 'kicker' }, t('over.title')),
     h('h2', {}, t(`over.reason.${r.reason}`)),
     h('h4', {}, t('over.winners')),

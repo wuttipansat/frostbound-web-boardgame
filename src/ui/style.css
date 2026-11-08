@@ -1412,3 +1412,99 @@ html[lang='th'] .sv-pick b { font-family: var(--font); font-weight: 700; }
 }
 .backdrop.draft-screen, .backdrop.teams-reveal { display: flex; align-items: center; justify-content: center; }
 body.drafting .sv-tokens, body.drafting #player, body.drafting #move-pick { display: none !important; }
+
+/* ================================================================ step 17: frost and blood on the UI */
+/* Procedural textures (inline SVG): no image files. Frost is thick at the edges and fades toward the middle,
+   so text in a panel stays on a near-plain ground. Layers sit under the content (isolation + z-index -1). */
+:root {
+  --frost-tex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='f' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' seed='7' stitchTiles='stitch'/%3E %3CfeColorMatrix values='0 0 0 0 0.86 0 0 0 0 0.93 0 0 0 0 1 0 0 0 2.1 -0.85'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23f)'/%3E%3C/svg%3E");
+  --rime-tl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='110' height='110' fill='none' stroke='%23e6f3ff' stroke-opacity='.62' stroke-width='1' stroke-linecap='round'%3E%3Cpath d='M0 0L86 28M14.3 4.6l13.8 -10.4M14.3 4.6l5.1 16.6M28.5 9.3l11.7 -8.8M28.5 9.3l4.3 14.0M42.8 13.9l9.6 -7.2M42.8 13.9l3.5 11.5M57.1 18.5l7.5 -5.6M57.1 18.5l2.7 8.9M71.3 23.2l5.3 -4.0M71.3 23.2l1.9 6.4M0 0L52 47M8.7 7.8l16.9 -3.9M8.7 7.8l-2.1 17.2M17.3 15.6l14.3 -3.3M17.3 15.6l-1.8 14.6M26.0 23.4l11.7 -2.7M26.0 23.4l-1.5 11.9M34.7 31.2l9.1 -2.1M34.7 31.2l-1.1 9.3M43.4 39.0l6.5 -1.5M43.4 39.0l-0.8 6.6M0 0L31 76M5.1 12.7l16.9 3.9M5.1 12.7l-9.4 14.5M10.2 25.3l14.3 3.3M10.2 25.3l-8.0 12.3M15.4 38.0l11.7 2.7M15.4 38.0l-6.5 10.1M20.5 50.7l9.1 2.1M20.5 50.7l-5.1 7.8M25.6 63.4l6.5 1.5M25.6 63.4l-3.6 5.6'/%3E%3C/svg%3E");
+  --rime-br: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='110' height='110' fill='none' stroke='%23e6f3ff' stroke-opacity='.55' stroke-width='1' stroke-linecap='round'%3E%3Cpath transform='rotate(180 55 55)' d='M0 0L86 28M14.3 4.6l13.8 -10.4M14.3 4.6l5.1 16.6M28.5 9.3l11.7 -8.8M28.5 9.3l4.3 14.0M42.8 13.9l9.6 -7.2M42.8 13.9l3.5 11.5M57.1 18.5l7.5 -5.6M57.1 18.5l2.7 8.9M71.3 23.2l5.3 -4.0M71.3 23.2l1.9 6.4M0 0L52 47M8.7 7.8l16.9 -3.9M8.7 7.8l-2.1 17.2M17.3 15.6l14.3 -3.3M17.3 15.6l-1.8 14.6M26.0 23.4l11.7 -2.7M26.0 23.4l-1.5 11.9M34.7 31.2l9.1 -2.1M34.7 31.2l-1.1 9.3M43.4 39.0l6.5 -1.5M43.4 39.0l-0.8 6.6M0 0L31 76M5.1 12.7l16.9 3.9M5.1 12.7l-9.4 14.5M10.2 25.3l14.3 3.3M10.2 25.3l-8.0 12.3M15.4 38.0l11.7 2.7M15.4 38.0l-6.5 10.1M20.5 50.7l9.1 2.1M20.5 50.7l-5.1 7.8M25.6 63.4l6.5 1.5M25.6 63.4l-3.6 5.6'/%3E%3C/svg%3E");
+  --icicles: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='18'%3E%3Cpath d='M0 0H120V2L117.0 9L114 2L111.5 13L109 2L105.0 6L101 2L98.5 4L96 2L93.5 13L91 2L86.5 9L82 2L76.5 4L71 2L68.0 16L65 2L60.5 9L56 2L52.5 6L49 2L43.5 4L38 2L34.5 6L31 2L28.5 9L26 2L20.5 9L15 2L12.0 6L9 2L5.5 9L2 2L1.0 9L0 2Z' fill='%23e2f1ff' fill-opacity='.5'/%3E%3C/svg%3E");
+  --blood-tex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='130' height='100'%3E%3Cfilter id='r'%3E%3CfeTurbulence baseFrequency='.07' numOctaves='2' seed='3'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='10'/%3E%3C/filter%3E %3Cg fill='%23721510' filter='url(%23r)'%3E%3Cpath fill-opacity='.5' d='M44 34c8-10 26-8 30 2 6 2 12 8 8 14-2 6-12 6-16 10-6 6-18 6-22-2-8 0-12-8-8-14 2-4 4-8 8-10z'/%3E %3Cpath fill-opacity='.3' d='M66 56c10 6 30 14 54 30l-3 4C94 76 76 68 62 60z'/%3E%3Ccircle cx='94' cy='24' r='4.5' fill-opacity='.45'/%3E%3Ccircle cx='106' cy='15' r='2.2' fill-opacity='.4'/%3E %3Ccircle cx='22' cy='64' r='3.4' fill-opacity='.45'/%3E%3Ccircle cx='12' cy='76' r='1.8' fill-opacity='.38'/%3E%3Ccircle cx='34' cy='18' r='2' fill-opacity='.35'/%3E%3C/g%3E%3C/svg%3E");
+  --blood-drip: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='70'%3E%3Cg fill='%23721510' fill-opacity='.42'%3E%3Cpath d='M6 0h40c-2 6-6 8-9 9-1 14-2 30-5 30s-3-14-4-24c-3 2-5 10-8 10s-2-9-4-14C10 9 7 6 6 0z'/%3E%3Ccircle cx='31' cy='50' r='3'/%3E%3C/g%3E%3C/svg%3E");
+  --frost-line: #5b6a74;
+  --frost-glint: rgba(220, 238, 255, 0.32);
+}
+#topbar, #phase, #locpanel, .card-detail, .more-menu, .dialog, .hud-chip, #pp-actions .btn.end-turn, .icon-btn.more, .feed-history, #tip, .toast,
+#move-pick, .scene-callout, .item-card, .sv-pick, .scenario-card, .mode-card, .team, #loc-name, .draft-status li, .objective-peek { isolation: isolate; }
+.dialog, .hud-chip, #pp-actions .btn.end-turn, .icon-btn.more, .feed-history, .toast, .item-card, .sv-pick, .scenario-card, .mode-card, .team, .draft-status li { position: relative; }
+
+/* the frost layer */
+#topbar::before, #phase::before, #locpanel::before, .card-detail::before, .more-menu::before, .dialog::before, .hud-chip::before,
+#pp-actions .btn.end-turn::before, .icon-btn.more::before, .feed-history::before, #tip::before, .toast::before, #move-pick::before,
+.scene-callout::before, .item-card::before, .sv-pick::before, .scenario-card::before, .mode-card::before, .team::before, .objective-peek::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
+  background: var(--rime-tl) left top / 110px 110px no-repeat, var(--rime-br) right bottom / 110px 110px no-repeat, var(--frost-tex) 0 0 / 180px 180px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 70% at 50% 50%, transparent 45%, #000 95%);
+  mask-image: radial-gradient(ellipse 75% 70% at 50% 50%, transparent 45%, #000 95%);
+  opacity: 1;
+}
+/* rime build-up along the top edge (ice collects where it is coldest) */
+#topbar, #locpanel, .card-detail, .more-menu, .dialog, .feed-history, .objective-peek, #phase {
+  background-image: linear-gradient(to bottom, rgba(214, 234, 252, 0.10), transparent 26px), var(--grain);
+}
+/* big dialogs: icicles along the top edge */
+.dialog::before {
+  background: var(--icicles) left top / 120px 18px repeat-x, var(--rime-tl) left top / 130px 130px no-repeat, var(--rime-br) right bottom / 130px 130px no-repeat, var(--frost-tex) 0 0 / 180px 180px;
+  -webkit-mask-image: linear-gradient(#000 0 18px, transparent 18px), radial-gradient(ellipse 78% 72% at 50% 50%, transparent 55%, #000 100%);
+  mask-image: linear-gradient(#000 0 18px, transparent 18px), radial-gradient(ellipse 78% 72% at 50% 50%, transparent 55%, #000 100%);
+}
+/* small pieces and cards: only a thin rim of frost (the art stays clear) */
+.hud-chip::before, #pp-actions .btn.end-turn::before, .icon-btn.more::before, .toast::before, .scene-callout::before, #tip::before, #move-pick::before,
+.item-card::before, .sv-pick::before {
+  background: var(--frost-tex) 0 0 / 140px 140px;
+  -webkit-mask-image: radial-gradient(ellipse 60% 60% at 50% 50%, transparent 70%, #000 100%);
+  mask-image: radial-gradient(ellipse 60% 60% at 50% 50%, transparent 70%, #000 100%);
+  opacity: 0.7;
+}
+.item-card::before, .sv-pick::before { opacity: 0.5; }
+#pp-actions .btn.end-turn::before { opacity: 0.45; }
+/* cold borders: blue-grey edge with a white highlight on top */
+#topbar, #phase, #locpanel, .card-detail, .more-menu, .dialog, .hud-chip, .feed-history, #tip, .toast, #move-pick, .scene-callout, .objective-peek {
+  border-color: var(--frost-line);
+  box-shadow: inset 0 1px 0 var(--frost-glint), inset 0 0 22px rgba(180, 215, 250, 0.13), 0 8px 22px rgba(0, 0, 0, 0.5);
+}
+#topbar { border-bottom-color: var(--frost-line); }
+.icon-btn.more { border-color: var(--frost-line); }
+
+/* blood: only where things are dangerous */
+#topbar .stat-block.crisis, .dialog.over.lost, .dialog.colony:has(.verdict-banner.bad), #locpanel.overrun, .toast.bad, .setup-v2, .dialog.over { isolation: isolate; }
+#topbar .stat-block.crisis::after, .dialog.over.lost::after, .dialog.colony:has(.verdict-banner.bad)::after, #locpanel.overrun::after, .toast.bad::after,
+.setup-v2::after, .dialog.over.won::after {
+  content: ''; position: absolute; z-index: -1; pointer-events: none;
+  left: var(--blood-x, auto); right: var(--blood-r, auto); top: var(--blood-y, auto); bottom: var(--blood-b, auto);
+  width: var(--blood-w, 130px); height: var(--blood-h, 100px); background: var(--blood-tex) center / contain no-repeat;
+}
+#topbar .stat-block.crisis { position: relative; }
+#topbar .stat-block.crisis::after { --blood-r: -10px; --blood-y: -14px; --blood-w: 90px; --blood-h: 70px; opacity: 0.85; }
+.dialog.over.lost::after { --blood-r: 10px; --blood-y: 6px; --blood-w: 200px; --blood-h: 150px; }
+.dialog.over.won::after { --blood-x: 8px; --blood-b: 8px; --blood-w: 70px; --blood-h: 54px; opacity: 0.6; }
+.dialog.colony:has(.verdict-banner.bad)::after { --blood-x: -6px; --blood-b: 30px; --blood-w: 180px; --blood-h: 140px; }
+#locpanel.overrun::after { --blood-r: 0; --blood-y: 0; --blood-w: 120px; --blood-h: 92px; background: var(--blood-drip) right top / 46px 54px no-repeat, var(--blood-tex) center / contain no-repeat; }
+.toast.bad { position: relative; }
+.toast.bad::after { --blood-x: -8px; --blood-y: -10px; --blood-w: 60px; --blood-h: 46px; }
+.setup-v2::after { --blood-r: 18px; --blood-y: 54px; --blood-w: 96px; --blood-h: 74px; opacity: 0.75; }
+.dialog.over.lost { border-top-color: #6e1d18; }
+
+/* a cold glint on the main button (hover only, never looping) */
+.btn.primary { position: relative; overflow: hidden; }
+.btn.primary:not(:disabled):not(.off)::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; transform: translateX(-120%);
+  background: linear-gradient(105deg, transparent 35%, rgba(235, 246, 255, 0.35) 50%, transparent 65%);
+}
+.btn.primary:not(:disabled):not(.off):hover::after { transform: translateX(120%); transition: transform 0.6s ease-out; }
+@media (prefers-reduced-motion: reduce) { .btn.primary:hover::after { transition: none; } }
+
+/* phones: lighter frost (no crystals), smaller blood */
+@media (max-width: 760px) {
+  #topbar::before, #phase::before, #locpanel::before, .card-detail::before, .more-menu::before, .feed-history::before, .scenario-card::before, .mode-card::before, .team::before, .objective-peek::before {
+    background: var(--frost-tex) 0 0 / 160px 160px;
+  }
+  .dialog::before { background: var(--icicles) left top / 120px 18px repeat-x, var(--frost-tex) 0 0 / 160px 160px; }
+  #topbar .stat-block.crisis::after { --blood-w: 60px; --blood-h: 46px; }
+  .dialog.over.lost::after, .dialog.colony:has(.verdict-banner.bad)::after { --blood-w: 120px; --blood-h: 92px; }
+  #locpanel.overrun::after { --blood-w: 80px; --blood-h: 62px; }
+  .setup-v2::after { --blood-w: 64px; --blood-h: 50px; }
+}
+#topbar { background: linear-gradient(to bottom, rgba(214, 234, 252, 0.10), transparent 26px), linear-gradient(to bottom, #1d1f20, #191b1c); }
