@@ -89,7 +89,7 @@ const app = createApp({
   aiFast: params.get('ai') === 'fast', // debug/testing: AI doesn't wait for animations
   fx: { exposure: exposureFx },
   dom: {
-    topbar: $('topbar'), log: $('log'), loc: $('locpanel'), player: $('player'), modal: $('modal'), toasts: $('toasts'), tutorial: $('tutorial'),
+    topbar: $('topbar'), phase: $('phase'), colony: $('colony'), log: $('log'), loc: $('locpanel'), player: $('player'), modal: $('modal'), toasts: $('toasts'), tutorial: $('tutorial'),
     playerRefs: { head: $('pp-head'), survivors: $('pp-survivors'), chips: $('pp-chips'), hand: $('pp-hand'), actions: $('pp-actions') },
     onRender: (state) => {
       refreshLabels(state);
@@ -119,7 +119,7 @@ stage.onFrame((_t, dt) => {
     p.el.style.top = `${((1 - v.y) / 2) * ch}px`;
   }
 });
-const PANELS = ['topbar', 'player', 'locpanel', 'log'].map((id) => document.getElementById(id));
+const PANELS = ['topbar', 'player', 'locpanel', 'log', 'colony'].map((id) => document.getElementById(id));
 stage.onFrame(() => {
   const { clientWidth: w, clientHeight: h } = stage.renderer.domElement;
   const rects = PANELS.filter((el) => el && !el.classList.contains('hidden') && el.offsetWidth).map((el) => el.getBoundingClientRect());

@@ -12,7 +12,8 @@ import { sound, soundForLog } from '../audio/sound.js';
 import { mount } from './dom.js';
 import { advanceTutorial, eventForAction, tutorialVisible, DONE } from './tutorial.js';
 import { renderTutorial, positionTutorial } from './views/tutorial.js';
-import { renderTopbar, renderLog } from './views/hud.js';
+import { renderTopbar, renderLog, renderPhase, renderColony } from './views/hud.js';
+import { resetTicker } from './ticker.js';
 import { renderPlayerPanel } from './views/player.js';
 import { renderLocationPanel } from './views/location.js';
 import {
@@ -159,6 +160,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
   }
 
   function afterChange({ animate = true } = {}) {
+    if (!animate) resetTicker(); // a new or loaded game: its numbers are not changes
     // AI seats draft instantly (nothing to watch).
     for (let i = 0; i < 10 && state.phase === PHASES.DRAFT; i++) {
       const a = currentActor();
@@ -326,7 +328,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     const x = ctx();
     document.body.classList.toggle('in-game', !!state);
     if (!state) {
-      for (const el of [dom.topbar, dom.log, dom.loc]) mount(el);
+      for (const el of [dom.topbar, dom.log, dom.loc, dom.phase, dom.colony]) if (el) mount(el);
       dom.player.classList.add('hidden');
       dom.loc.classList.add('hidden');
       mount(dom.modal, ui.modal === 'settings' ? settingsModal(x) : setupScreen(x));
@@ -338,6 +340,11 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     document.body.classList.toggle('passing', !!needsPass());
     document.body.classList.toggle('pp-collapsed', !!ui.ppCollapsed);
     renderTopbar(dom.topbar, x);
+    if (dom.phase) renderPhase(dom.phase, x);
+    if (dom.colony) {
+      renderColony(dom.colony, x);
+      document.documentElement.style.setProperty('--colony-h', `${dom.colony.offsetHeight}px`);
+    }
     renderLog(dom.log, x);
     renderLocationPanel(dom.loc, x);
     renderPlayerPanel(dom.playerRefs, x);

@@ -172,3 +172,22 @@ export function unusedDice(state, playerId) {
 export function shouldConfirmEndTurn(state, playerId, { skip = false } = {}) {
   return !skip && unusedDice(state, playerId) > 0;
 }
+
+// ---------------------------------------------------------------- step 11: card availability
+
+/**
+ * Can this card do anything right now (play on some target, add to the crisis, deposit)?
+ * { ok, reason } — reason is the first error key when nothing is legal. Passive books are "ok"
+ * as long as they can still be contributed or deposited; otherwise their reason is passiveItem.
+ */
+export function cardUsable(state, playerId, uid) {
+  const need = cardNeeds(state, uid);
+  const plays = need === 'survivor' ? cardTargets(state, playerId, uid)
+    : need === 'location' ? cardLocations(state, playerId, uid)
+      : need === 'die' ? cardDice(state, playerId, uid)
+        : [];
+  const opts = cardOptions(state, playerId, uid);
+  const all = [...plays, ...opts];
+  if (all.some((o) => o.ok)) return { ok: true, reason: null };
+  return { ok: false, reason: (plays[0] ?? opts[0])?.error ?? 'unplayable' };
+}

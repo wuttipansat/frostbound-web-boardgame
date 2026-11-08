@@ -6,7 +6,7 @@ import { t, c } from '../../i18n/index.js';
 import { getPlayer, aliveSurvivorsOf, survivorDef, itemOf, woundLimit, objectiveDef } from '../../core/selectors.js';
 import { PLAYER_COLORS } from '../../render/pieces.js';
 import {
-  cardOptions, endTurnOption, voteTargets, cardNeeds, cardTargets, cardDice, shouldConfirmEndTurn, cardLocations, junkAction,
+  cardOptions, endTurnOption, voteTargets, cardNeeds, cardTargets, cardDice, shouldConfirmEndTurn, cardLocations, junkAction, cardUsable, actingSurvivors, unusedDice,
 } from '../options.js';
 import * as act from '../../core/actions.js';
 import { itemPlay, itemShort } from '../itemText.js';
@@ -32,14 +32,14 @@ export function scrollRow(cls, children) {
   return wrap;
 }
 
-function survivorCard(ctx, sv, { selectable = true } = {}) {
+function survivorCard(ctx, sv, { selectable = true, canAct = false } = {}) {
   const { ui, art } = ctx;
   const d = survivorDef(sv.id);
   const limit = woundLimit(sv.id);
   const selected = ui.selSurvivor === sv.id;
   const left = limit - sv.wounds;
   return h('button', {
-    class: `sv-card${selected ? ' selected' : ''}${sv.moved ? ' moved' : ''}`,
+    class: `sv-card${selected ? ' selected' : ''}${sv.moved ? ' moved' : ''}${canAct ? ' can-act' : ''}`,
     style: { '--accent': d.accent },
     'aria-pressed': selected ? 'true' : 'false',
     onclick: selectable ? () => ctx.selectSurvivor(selected ? null : sv.id) : null,
@@ -47,6 +47,7 @@ function survivorCard(ctx, sv, { selectable = true } = {}) {
   h('div', { class: 'sv-face' },
     art.portrait(sv.id, 's', { alt: d.name, cls: `${sv.wounds ? 'wounded' : ''}${sv.frostbite ? ' frosty' : ''}` }),
     sv.moved ? h('span', { class: 'moved-ribbon' }, t('panel.moved')) : null,
+    canAct ? h('span', { class: 'ready-mark', tip: t('panel.canAct'), 'aria-label': t('panel.canAct') }) : null,
     ctx.state.players.find((p) => p.id === sv.owner)?.exiled ? h('span', { class: 'exile-badge', tip: t('panel.exiled') }, icon('door')) : null),
   h('div', { class: 'sv-info' },
     h('div', { class: 'sv-top' }, h('b', {}, d.name), h('span', { class: 'loc-chip' }, c('locations', sv.location, 'name'))),
@@ -68,20 +69,22 @@ function cardDetail(ctx, shown, uid) {
   const need = cardNeeds(s, uid);
   const opts = cardOptions(s, shown.id, uid).filter((o) => o.id !== 'play' || !need);
   const close = () => ctx.set({ selCard: null });
+  // Every use goes through the legal action; the card flies to where it went (board, crisis, goal).
+  const go = (action, kind = 'play') => { flyCard(uid, kind); if (ctx.dispatch(action)) close(); };
   let picker = null;
   if (need === 'survivor') {
     picker = h('div', { class: 'picker', 'data-target-picker': '' },
       h('h4', {}, t('act.pickTarget')),
       h('div', { class: 'picker-row' }, cardTargets(s, shown.id, uid).map((tg) => h('button', {
         class: 'pick', disabled: !tg.ok,
-        onclick: () => { if (ctx.dispatch(tg.action)) close(); },
+        onclick: () => go(tg.action),
       }, art.portrait(tg.survivorId, 's', { alt: '' }), h('b', {}, survivorDef(tg.survivorId).name), h('small', { class: tg.ok ? 'good' : 'muted' }, tg.ok ? t(...itemShort(item)) : t(`err.${tg.error}`))))));
   } else if (need === 'location') {
     picker = h('div', { class: 'picker', 'data-target-picker': '' },
       h('h4', {}, t('act.pickPlace')),
       h('div', { class: 'picker-row' }, cardLocations(s, shown.id, uid).map((tg) => h('button', {
         class: 'pick', disabled: !tg.ok,
-        onclick: () => { if (ctx.dispatch(tg.action)) close(); },
+        onclick: () => go(tg.action),
       }, h('b', {}, c('locations', tg.to, 'name')), h('small', { class: tg.ok ? 'good' : 'muted' }, tg.ok ? t('itemShort.zombiesHere', { n: tg.zombies }) : t(`err.${tg.error}`))))));
   } else if (need === 'die' && item.value > 1) {
     // Stronger junk: tick up to two dice, then reroll.
@@ -95,14 +98,14 @@ function cardDetail(ctx, shown, uid) {
       }, dieFace(d.value))),
       h('button', {
         class: 'btn primary', disabled: !picked.length,
-        onclick: () => { if (ctx.dispatch(junkAction(shown.id, uid, picked))) { ctx.set({ junkDice: [] }); close(); } },
+        onclick: () => { flyCard(uid, 'play'); if (ctx.dispatch(junkAction(shown.id, uid, picked))) { ctx.set({ junkDice: [] }); close(); } },
       }, t('act.reroll'))));
   } else if (need === 'die') {
     picker = h('div', { class: 'picker', 'data-target-picker': '' },
       h('h4', {}, t('act.pickDie')),
       h('div', { class: 'picker-row' }, cardDice(s, shown.id, uid).map((d) => h('button', {
         class: 'pick die-pick', disabled: !d.ok, 'aria-label': t('tip.die', { v: d.value }),
-        onclick: () => { if (ctx.dispatch(d.action)) close(); },
+        onclick: () => go(d.action),
       }, dieFace(d.value)))));
   }
   return h('div', { class: `card-detail panel t-${item.type} tier-${item.tier}`, role: 'dialog', 'aria-label': t('panel.cardDetail') },
@@ -117,7 +120,7 @@ function cardDetail(ctx, shown, uid) {
     picker,
     h('div', { class: 'cd-actions' }, opts.map((o) => h('button', {
       class: `btn${o.id === 'play' ? ' primary' : ''}`, disabled: !o.ok,
-      onclick: () => { if (ctx.dispatch(o.action)) close(); },
+      onclick: () => go(o.action, o.id),
     }, t(`act.${o.id}`), !o.ok ? h('small', { class: 'why' }, t(`err.${o.error}`)) : null))));
 }
 
@@ -140,6 +143,7 @@ export function renderPlayerPanel(refs, ctx) {
     h('b', { class: 'pname' }, shown.name),
     shown.isAI ? h('span', { class: 'tag' }, t('panel.aiTag')) : null,
     shown.exiled ? h('span', { class: 'tag bad' }, t('panel.exiled')) : null,
+    isActor ? h('span', { class: 'dice-left', tip: t('tip.diceLeft') }, icon('dice'), t('panel.diceLeft', { n: unusedDice(s, shown.id) })) : null,
     h('span', { class: `status${isActor ? ' go' : ''}` }, status),
     h('button', {
       class: 'icon-btn collapse', 'aria-label': ui.ppCollapsed ? 'expand' : 'collapse', 'aria-expanded': ui.ppCollapsed ? 'false' : 'true',
@@ -147,7 +151,8 @@ export function renderPlayerPanel(refs, ctx) {
     }, icon(ui.ppCollapsed ? 'up' : 'down')));
 
   // ---- survivors
-  mount(refs.survivors, scrollRow('sv-row', aliveSurvivorsOf(s, shown.id).map((sv) => survivorCard(ctx, sv))));
+  const acting = new Set(isActor ? actingSurvivors(s, shown.id) : []);
+  mount(refs.survivors, scrollRow('sv-row', aliveSurvivorsOf(s, shown.id).map((sv) => survivorCard(ctx, sv, { canAct: acting.has(sv.id) }))));
 
   // ---- dice (drawn faces; the tray above shows them in 3D)
   mount(refs.chips, shown.dice.map((d, i) => h('button', {
@@ -161,20 +166,7 @@ export function renderPlayerPanel(refs, ctx) {
 
   // ---- hand (only ever the viewer's own)
   const hand = viewer ? shown.hand : [];
-  const cards = hand.map((uid) => {
-    const item = itemOf(s, uid);
-    const selected = ui.selCard === uid;
-    const spent = (shown.usedCards ?? []).includes(uid);
-    return h('button', {
-      class: `item-card t-${item.type} tier-${item.tier}${selected ? ' selected' : ''}${spent ? ' spent' : ''}`,
-      dataset: { uid },
-      'aria-pressed': selected ? 'true' : 'false',
-      onclick: () => ctx.set({ selCard: selected ? null : uid, ppCollapsed: false }),
-    },
-    art.item(item.id, 's', { alt: '' }),
-    h('span', { class: 'iname' }, c('items', item.id, 'name')),
-    h('span', { class: 'ishort' }, t(...itemShort(item))));
-  });
+  const cards = hand.map((uid) => itemCard(ctx, shown, uid, { isActor }));
   mount(refs.hand,
     cards.length ? scrollRow('hand-cards', cards) : h('span', { class: 'muted small' }, viewer ? t('panel.handEmpty') : ''),
     isActor && ui.selCard && hand.includes(ui.selCard) ? cardDetail(ctx, shown, ui.selCard) : null);
@@ -206,4 +198,60 @@ export function renderPlayerPanel(refs, ctx) {
       h('p', {}, c('objectives', objective.id, 'text'))) : null);
   // eslint-disable-next-line no-unused-expressions
   art;
+}
+
+// ---------------------------------------------------------------- step 11: vertical item cards
+
+/** Footer note: how the card behaves after use. */
+function cardFooter(item, used) {
+  if (item.type === 'weapon') return used ? t('card.used') : t('card.permanent');
+  if (item.type === 'book') return t('card.passive');
+  if (item.wild) return t('card.wild');
+  return t('card.consumable');
+}
+
+/** A vertical playing card: header (name, type, tier), sprite plate, effect line, flavour, footer. */
+export function itemCard(ctx, shown, uid, { isActor = false } = {}) {
+  const { state: s, ui, art } = ctx;
+  const item = itemOf(s, uid);
+  const selected = ui.selCard === uid;
+  const used = (shown.usedCards ?? []).includes(uid);
+  const usable = isActor ? cardUsable(s, shown.id, uid) : { ok: true };
+  return h('button', {
+    class: `item-card t-${item.type} tier-${item.tier}${selected ? ' selected' : ''}${used ? ' spent' : ''}${usable.ok ? '' : ' unusable'}`,
+    dataset: { uid },
+    'aria-pressed': selected ? 'true' : 'false',
+    tip: usable.ok ? null : t(`err.${usable.reason}`),
+    onclick: () => ctx.set({ selCard: selected ? null : uid, ppCollapsed: false }),
+  },
+  h('span', { class: 'ic-head' },
+    h('span', { class: 'ic-type' }, t(`item.${item.type}`)),
+    h('span', { class: 'ic-tier', 'aria-label': t(`tier.${item.tier}`) }, Array.from({ length: item.tier }, () => h('i')))),
+  h('span', { class: 'iname' }, c('items', item.id, 'name')),
+  h('span', { class: 'ic-art' }, art.item(item.id, 's', { alt: '' })),
+  h('span', { class: 'ishort' }, t(...itemShort(item))),
+  h('span', { class: 'ic-text' }, c('items', item.id, 'text')),
+  h('span', { class: 'ic-foot' }, isPermanent(item) ? icon('lock') : null, cardFooter(item, used)));
+}
+
+/** A ghost of the card flies to where it was used: the board, the crisis gauge, or the goal gauge. */
+export function flyCard(uid, kind) {
+  const card = document.querySelector(`.item-card[data-uid="${uid}"]`);
+  if (!card || typeof card.animate !== 'function') return;
+  if (matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const from = card.getBoundingClientRect();
+  const target = kind === 'contribute' ? document.querySelector('.stat-block.crisis')
+    : kind === 'deposit' ? document.querySelector('.stat-block.goal') : null;
+  const to = target?.getBoundingClientRect() ?? { left: innerWidth / 2 - 20, top: innerHeight * 0.42, width: 40, height: 40 };
+  const ghost = card.cloneNode(true);
+  ghost.classList.add('card-ghost');
+  Object.assign(ghost.style, { position: 'fixed', left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px`, margin: 0, zIndex: 50, pointerEvents: 'none' });
+  document.body.append(ghost);
+  const dx = to.left + to.width / 2 - (from.left + from.width / 2);
+  const dy = to.top + to.height / 2 - (from.top + from.height / 2);
+  ghost.animate([
+    { transform: 'translate(0, 0) scale(1) rotate(0deg)', opacity: 1 },
+    { transform: `translate(${dx * 0.55}px, ${dy * 0.55 - 30}px) scale(0.8) rotate(-6deg)`, opacity: 0.95, offset: 0.55 },
+    { transform: `translate(${dx}px, ${dy}px) scale(0.3) rotate(-10deg)`, opacity: 0 },
+  ], { duration: 520, easing: 'cubic-bezier(.3,.7,.3,1)' }).finished.then(() => ghost.remove(), () => ghost.remove());
 }
