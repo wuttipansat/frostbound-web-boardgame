@@ -176,6 +176,8 @@ export function renderPhase(el, ctx) {
     h('span', { class: 'phase-round' }, t('phase.round', { n: s.round, total: s.scenario.rounds })),
     h('ol', { class: 'phase-steps' }, PHASE_STEPS.map((k) => h('li', { class: k === now ? 'now' : '' }, t(`phase.${k}`)))),
     h('span', { class: 'phase-who' },
-      idx >= 0 && s.phase !== PHASES.DRAFT ? h('span', { class: 'dot', style: { background: hex(PLAYER_COLORS[idx]) } }) : null, who));
+      idx >= 0 && s.phase !== PHASES.DRAFT ? h('span', { class: 'dot', style: { background: hex(PLAYER_COLORS[idx]) } }) : null, who),
+    // Step 15: while someone else's move plays out.
+    ctx.watching ? h('span', { class: 'skip-hint' }, t('scene.skip')) : null);
 }
 

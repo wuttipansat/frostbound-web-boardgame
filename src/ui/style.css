@@ -1220,3 +1220,71 @@ body.passing #pp-left, body.passing #pp-hand, body.passing #pp-actions { visibil
 /* an open card sheet sits above every other floating piece */
 #pp-hand:has(.card-detail) { z-index: 8; }
 .hand-sheet .card-detail { z-index: 50; }
+
+/* ================================================================ step 15: watching others, moving by faces */
+/* location signs are gone: a small zombie badge stays; the name shows on hover / tap / selection */
+.loc-label.zbadge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; font-family: var(--head); font-size: 12px; color: #e2a399; letter-spacing: 0; }
+.loc-label.zbadge .icon { width: 12px; height: 12px; }
+.loc-label.zbadge.empty, .loc-label.zbadge.named { display: none; }
+#loc-name { position: absolute; transform: translate(-50%, -100%); padding: 4px 10px; border-radius: 2px; pointer-events: none; white-space: nowrap;
+  background: rgba(23,25,26,0.92); border: 1px solid var(--line); color: var(--text); font-family: var(--head); font-weight: 500; font-size: 12px;
+  letter-spacing: 0.08em; text-transform: uppercase; opacity: 0; transition: opacity 0.15s; display: inline-flex; align-items: center; gap: 8px; }
+html[lang='th'] #loc-name { font-family: var(--font); letter-spacing: 0; text-transform: none; font-weight: 600; }
+#loc-name.on { opacity: 1; }
+#loc-name .z { display: inline-flex; align-items: center; gap: 2px; color: #e2a399; }
+#loc-name .z .icon { width: 12px; height: 12px; }
+
+/* "who goes there": round faces by the location */
+#move-pick { position: fixed; z-index: 5; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 34px;
+  background: rgba(23,25,26,0.82); border: 1px solid var(--line); box-shadow: 0 8px 22px rgba(0,0,0,0.5); animation: tut-fade 0.18s ease-out; }
+body.passing #move-pick, body:not(.in-game) #move-pick { display: none; }
+.mp-token { position: relative; width: 50px; height: 50px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; background: #1b1d1e;
+  box-shadow: 0 0 0 3px var(--ring, #888), 0 4px 10px rgba(0,0,0,0.5); transition: transform 0.12s; }
+.mp-token:hover:not(.off), .mp-token:focus-visible { transform: translateY(-3px) scale(1.06); }
+.mp-token.preferred { width: 58px; height: 58px; box-shadow: 0 0 0 3px var(--ring, #888), 0 0 0 6px var(--accent), 0 6px 14px rgba(0,0,0,0.55); }
+.mp-token img.mp-face { width: 100%; height: 100%; border-radius: 50%; image-rendering: pixelated; }
+.mp-token.off { cursor: not-allowed; }
+.mp-token.off img.mp-face { filter: grayscale(1) brightness(0.5); }
+.mp-hp { position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%); display: flex; gap: 2px; }
+.mp-hp i { width: 8px; height: 4px; border-radius: 1px; background: #3a3f3e; box-shadow: 0 0 0 1px #111; }
+.mp-hp i.on { background: #b5554a; }
+.mp-risk, .mp-off { position: absolute; right: -4px; top: -4px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: #1b1d1e; box-shadow: 0 0 0 1px #000; color: var(--ice); }
+.mp-risk.safe { color: var(--good); }
+.mp-off { color: var(--muted); }
+.mp-risk .icon, .mp-off .icon { width: 11px; height: 11px; }
+.mp-fuel { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border-radius: 15px; border: 1px solid var(--line); background: #2a2e2d; color: var(--muted); font-size: 12px; cursor: pointer; }
+.mp-fuel.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.mp-fuel .icon { width: 13px; height: 13px; }
+
+/* callouts over someone else's move */
+.scene-callout { position: absolute; transform: translate(-50%, -100%); display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 6px; border-radius: 18px; white-space: nowrap;
+  background: rgba(23,25,26,0.9); border: 1px solid var(--line); box-shadow: 0 6px 16px rgba(0,0,0,0.5); color: var(--text); font-size: 13px; pointer-events: none;
+  animation: callout-in 0.25s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes callout-in { from { opacity: 0; translate: 0 8px; } to { opacity: 1; translate: 0 0; } }
+.scene-callout .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.scene-callout img.sc-face { width: 26px; height: 26px; border-radius: 50%; image-rendering: pixelated; }
+.scene-callout img.sc-item { width: 26px; height: 26px; image-rendering: pixelated; }
+.scene-callout > .icon { width: 16px; height: 16px; color: var(--accent); }
+.scene-callout b { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; }
+.scene-callout b .icon { width: 13px; height: 13px; }
+.scene-callout.k-attack b { color: #e2a399; }
+.scene-callout.k-move b { font-family: var(--head); font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; font-size: 12px; }
+html[lang='th'] .scene-callout.k-move b { font-family: var(--font); letter-spacing: 0; text-transform: none; font-weight: 600; }
+.card-back { display: inline-block; width: 14px; height: 20px; margin-left: -6px; border-radius: 2px; border: 1px solid #6a5a3e;
+  background: repeating-linear-gradient(45deg, #3b3125 0 3px, #4a3e2e 3px 6px); box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  animation: card-rise 0.7s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--k) * 90ms + 0.1s); }
+.card-back:first-of-type { margin-left: 0; }
+@keyframes card-rise { from { opacity: 0; translate: 0 26px; rotate: -12deg; } to { opacity: 1; translate: 0 0; rotate: 0deg; } }
+
+/* the phase banner while someone else's move plays */
+body.watching #phase { box-shadow: inset 0 -2px 0 var(--accent), var(--shadow); }
+body.watching #phase .phase-who { color: var(--text); }
+.skip-hint { font-size: 10.5px; color: var(--muted); letter-spacing: 0.04em; padding-left: 8px; border-left: 1px solid var(--line); }
+@media (max-width: 760px) {
+  .skip-hint { display: none; }
+  .mp-token { width: 46px; height: 46px; }
+  .mp-token.preferred { width: 52px; height: 52px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scene-callout, .card-back, #move-pick { animation: none; }
+}

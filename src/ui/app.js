@@ -18,6 +18,8 @@ import { connect, hydrateView, newLogEntries, savedSession } from '../net/client
 import { RuleError } from '../core/errors.js';
 import { renderPlayerPanel } from './views/player.js';
 import { renderLocationPanel } from './views/location.js';
+import { renderMovePicker } from './views/movepick.js';
+import { createDirector, eventsFromLog } from './director.js';
 import {
   setupScreen, settingsModal, passScreen, draftModal, crossroadsModal, requestModal,
   incomingRequestModal, voteModal, gameOverModal, toastLayer, colonyModal, voteResultModal, callVoteModal, confirmEndModal, pickModal, lobbyScreen, crossResultModal,
@@ -39,7 +41,7 @@ const storage = {
 
 const defaultSeats = () => Array.from({ length: 5 }, (_, i) => ({ name: t('setup.defaultName', { n: i + 1 }), isAI: i >= 2 }));
 
-export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast = false }) {
+export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = {}, aiFast = false, sceneScale = 1 }) {
   const settings = storage.get(SETTINGS_KEY) ?? {};
   setLang(settings.lang ?? (navigator.language?.startsWith('th') ? 'th' : 'en'));
   sound.enabled = settings.sound ?? true;
@@ -65,11 +67,22 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     skipEndConfirm: false,
     moreOpen: false, // the "more actions" menu next to End turn
     // Hand shown as compact faces (remembered per device); phones and short screens start compact.
+    cameraFollow: settings.cameraFollow ?? 'others', // step 15: who the camera follows
+    playSpeed: settings.playSpeed ?? 'normal',
+    movePick: null, // location whose "who goes there" picker is open
     handCompact: settings.handCompact ?? (typeof window !== 'undefined' && (window.innerWidth <= 760 || window.innerHeight <= 800)),
   };
   let tutPlayer = null; // the human the first-round tutorial follows
   // Online play: { client, playerId, code, lobby, status } while connected to a room server.
   let online = null;
+  // Step 15: what happened plays out one scene at a time (camera, effect, callout).
+  const director = createDirector({
+    camera: scene.camera ?? null,
+    play: (ev) => scene.play?.(ev, state),
+    settings: () => ({ follow: ui.cameraFollow, speed: ui.playSpeed, scale: sceneScale }),
+    onChange: () => { document.body.classList.toggle('watching', director.watching); if (state) render(); },
+  });
+  const present = (entries) => { if (state && entries.length) director.push(eventsFromLog(entries, state, viewerId())); };
 
   // ---------------------------------------------------------------- derived
 
@@ -97,7 +110,8 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
       hasSave: !!storage.get(SAVE_KEY)?.state,
       online: online ? { code: online.code, lobby: online.lobby, playerId: online.playerId, status: online.status, host: online.playerId === 'p0' } : null,
       set, dispatch, dismissQueue, tutorialEvent, setTutorial, sfx: (name, delay) => sound.play(name, delay), selectSurvivor, selectLocation, takeSeat, startGame, continueGame, quitToSetup, setLanguage, setSound,
-      createRoom, joinRoom, startRoom, leaveRoom,
+      createRoom, joinRoom, startRoom, leaveRoom, setPresentation,
+      watching: director.watching,
       setHandCompact: (on) => { ui.handCompact = on; saveSettings({ handCompact: on }); render(); },
     };
   }
@@ -134,9 +148,11 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
       sound.play('error');
       return false;
     }
-    const before = state.log.length;
+    const prevLog = state.log;
     state = res.state;
-    for (const e of state.log.slice(before)) onLogEntry(e);
+    const added = newLogEntries(prevLog, state.log);
+    for (const e of added) onLogEntry(e);
+    present(added);
     for (const q of ui.queue) if (q.type === 'colony' && q.morale == null) q.morale = state.morale;
     answerAiRequests();
     const tev = action.playerId === tutPlayer ? eventForAction(action) : null;
@@ -147,7 +163,6 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
 
   function onLogEntry(e) {
     sound.play(soundForLog(e));
-    if (e.k === 'exposure') fx.exposure?.(e.survivorId, e.face);
     if (e.k === 'crisisResolved' && state.reports.colony) ui.queue.push({ type: 'colony', report: structuredClone(state.reports.colony), morale: null });
     if (e.k === 'voteResult' && state.reports.vote) ui.queue.push({ type: 'vote', report: structuredClone(state.reports.vote) });
     // Everyone sees what was chosen and what it did (the chooser only saw the options).
@@ -170,7 +185,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
   }
 
   function afterChange({ animate = true } = {}) {
-    if (!animate) resetTicker(); // a new or loaded game: its numbers are not changes
+    if (!animate) { resetTicker(); director.clear(); } // a new or loaded game: its numbers are not changes
     // AI seats draft instantly (nothing to watch).
     for (let i = 0; i < 10 && !online && state.phase === PHASES.DRAFT; i++) {
       const a = currentActor();
@@ -181,7 +196,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     }
     if (state.activePlayerId !== lastActive) {
       lastActive = state.activePlayerId;
-      Object.assign(ui, { selSurvivor: null, selDie: null, selCard: null, useFuel: false, lureTo: null, picking: null });
+      Object.assign(ui, { selSurvivor: null, selDie: null, selCard: null, useFuel: false, lureTo: null, picking: null, movePick: null });
     }
     if (ui.picking && (!state.survivors[ui.picking.survivorId]?.alive || state.phase !== PHASES.TURN)) ui.picking = null;
     // Drop stale selections.
@@ -221,6 +236,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
   }
 
   function selectLocation(id) {
+    if (id !== ui.movePick) ui.movePick = null;
     ui.selLoc = id;
     if (id) tutorialEvent('selectLocation');
     board.setSelected(id);
@@ -270,7 +286,8 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     sound.setAmbient(false);
     if (state?.phase === PHASES.GAME_OVER) storage.del(SAVE_KEY);
     state = null;
-    Object.assign(ui, { modal: null, selLoc: null, selSurvivor: null, queue: [] });
+    director.clear();
+    Object.assign(ui, { modal: null, selLoc: null, selSurvivor: null, queue: [], movePick: null });
     board.setSelected(null);
     render();
   }
@@ -287,6 +304,12 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     sound.setEnabled(on);
     ui.sound = on;
     saveSettings();
+    render();
+  }
+
+  function setPresentation(patch) {
+    Object.assign(ui, patch);
+    saveSettings({ cameraFollow: ui.cameraFollow, playSpeed: ui.playSpeed });
     render();
   }
 
@@ -335,6 +358,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     const added = newLogEntries(state.log, next.log);
     state = next;
     for (const e of added) onLogEntry(e);
+    present(added);
     for (const q of ui.queue) if (q.type === 'colony' && q.morale == null) q.morale = state.morale;
     afterChange();
   }
@@ -375,7 +399,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     online.client.leave();
     online.client.close();
     online = null;
-    if (state) { state = null; sound.setAmbient(false); }
+    if (state) { state = null; director.clear(); sound.setAmbient(false); }
     render();
   }
 
@@ -400,6 +424,8 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     if (!aiFast) {
       // Let the table see each AI action land before the next one.
       // Wait for animations, but never forever: after 5 s the AI plays on regardless.
+      // Someone else's move plays out first (the queue caps each scene, so this can't hang).
+      if (director.busy) { aiTimer = 0; busyWait = 0; return; }
       if ((pieces.busy || diceTray.busy || diceTray.exposureBusy) && (busyWait += dt) < 5) { aiTimer = 0; return; }
       busyWait = 0;
       aiTimer += dt;
@@ -433,6 +459,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     if (dom.phase) renderPhase(dom.phase, x);
     renderLog(dom.log, x);
     renderLocationPanel(dom.loc, x);
+    if (dom.movePick) renderMovePicker(dom.movePick, x);
     renderPlayerPanel(dom.playerRefs, x);
     // The tray throws the active player's dice when their turn starts (dice are public); the panel
     // then shows them as 2D chips. Everyone watches the roll, online too.
@@ -498,6 +525,8 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
   /** Board clicks: a survivor of the viewer selects it; anything else selects the location. */
   function onBoardPick({ locationId, survivorId }) {
     if (!state) return;
+    // Someone else's move is playing: a click on the board skips it.
+    if (director.watching) { director.skip(); return; }
     // Lure: the clicked location is the destination.
     if (ui.picking?.type === 'lure' && locationId) {
       const me = viewerId();
@@ -506,8 +535,11 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
       return;
     }
     const sv = survivorId && state.survivors[survivorId];
-    if (sv && sv.owner === viewerId()) selectSurvivor(survivorId);
-    else selectLocation(locationId ?? sv?.location ?? null);
+    if (sv && sv.owner === viewerId()) { selectSurvivor(survivorId); return; }
+    const loc = locationId ?? sv?.location ?? null;
+    // On your turn, a location opens "who goes there" (your survivors as round faces).
+    ui.movePick = loc && ctx().canAct ? loc : null;
+    selectLocation(loc);
   }
 
   /** Quick start for testing/screenshots, e.g. seats "HHA". */
@@ -531,11 +563,17 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
 
   // Esc closes the top-most thing: popover, picking mode, card sheet, dialog, then the location panel.
   window.addEventListener('keydown', (ev) => {
-    if (ev.key !== 'Escape' || !state) return;
+    if (!state) return;
+    // Space / Esc skip the scene of someone else's move that is on screen.
+    if ((ev.key === ' ' || ev.key === 'Escape') && director.watching && !ev.target.closest?.('input, textarea, button, [role="button"]')) {
+      ev.preventDefault(); director.skip(); return;
+    }
+    if (ev.key !== 'Escape') return;
     if (ui.crisisOpen) set({ crisisOpen: false });
     else if (ui.moreOpen) set({ moreOpen: false });
     else if (ui.logOpen) set({ logOpen: false });
     else if (ui.picking) set({ picking: null });
+    else if (ui.movePick) set({ movePick: null });
     else if (ui.selCard) set({ selCard: null });
     else if (ui.modal) set({ modal: null });
     else if (ui.selLoc) selectLocation(null);
@@ -550,5 +588,9 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
   // A reload during an online game: reconnect to the same seat.
   if (savedSession()?.token) goOnline();
 
-  return { loadState, set, tutorialEvent, continueGame, tick, render, onBoardPick, quickStart, dispatch, get state() { return state; }, get ui() { return ui; }, takeSeat, selectSurvivor, selectLocation };
+  return {
+    get watching() { return director.watching; },
+    sceneHold: (on) => director.setHold(on),
+    director,
+    loadState, set, tutorialEvent, continueGame, tick, render, onBoardPick, quickStart, dispatch, get state() { return state; }, get ui() { return ui; }, takeSeat, selectSurvivor, selectLocation };
 }

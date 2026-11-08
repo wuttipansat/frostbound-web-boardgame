@@ -140,10 +140,7 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   const frameCallbacks = [];
   const clock = new THREE.Clock();
   let running = true;
-  function loop() {
-    if (!running) return;
-    const dt = Math.min(clock.getDelta(), 0.05);
-    const t = clock.elapsedTime;
+  function frame(dt, t) {
     controls.update();
     snowfall?.update(dt, t);
     mist?.update(dt);
@@ -151,6 +148,11 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
     renderer.info.reset();
     if (composer) composer.render(dt);
     else renderer.render(scene, camera);
+  }
+  function loop() {
+    if (!running) return;
+    const dt = Math.min(clock.getDelta(), 0.05);
+    frame(dt, clock.elapsedTime);
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
@@ -159,6 +161,8 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
     renderer, scene, camera, controls, quality: q,
     onFrame(cb) { frameCallbacks.push(cb); },
     stop() { running = false; },
+    /** Tests: advance one frame by hand while the loop is stopped. */
+    step(dt = 0.05) { frame(dt, clock.elapsedTime + dt); },
   };
 }
 

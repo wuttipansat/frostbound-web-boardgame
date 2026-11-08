@@ -105,6 +105,17 @@ function settingsRows(ctx) {
       h('div', { class: 'seg small' },
         h('button', { class: ctx.ui.sound ? 'on' : '', onclick: () => ctx.setSound(true) }, t('settings.on')),
         h('button', { class: ctx.ui.sound ? '' : 'on', onclick: () => ctx.setSound(false) }, t('settings.off')))),
+    // Step 15: the camera follows what others do; how fast their moves play out.
+    h('div', { class: 'row' },
+      h('span', { class: 'lbl' }, t('settings.camera')),
+      h('div', { class: 'seg small' }, ['all', 'others', 'off'].map((v) => h('button', {
+        class: ctx.ui.cameraFollow === v ? 'on' : '', 'data-camera': v, onclick: () => ctx.setPresentation({ cameraFollow: v }),
+      }, t(`settings.camera.${v}`))))),
+    h('div', { class: 'row' },
+      h('span', { class: 'lbl' }, t('settings.speed')),
+      h('div', { class: 'seg small' }, ['normal', 'fast'].map((v) => h('button', {
+        class: ctx.ui.playSpeed === v ? 'on' : '', 'data-speed': v, onclick: () => ctx.setPresentation({ playSpeed: v }),
+      }, t(`settings.speed.${v}`))))),
   ];
 }
 

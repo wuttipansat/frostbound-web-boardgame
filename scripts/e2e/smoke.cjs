@@ -61,6 +61,29 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
     if (await page.locator('.dialog.confirm-end').count()) { await click('.dialog.confirm-end .btn.primary'); counts.confirm++; continue; }
     if (await page.locator('.backdrop.incoming').count()) { await click('.backdrop.incoming .btn.ghost'); counts.incoming++; continue; }
     if (await page.locator('button.choice:not([disabled])').count()) { await click('button.choice:not([disabled])'); counts.choice++; continue; }
+    // Moving (step 15): tap a location, then one of your survivors' round faces by it.
+    if (!counts.move && await page.locator('#pp-actions .btn.end-turn').count()) {
+      const target = await page.evaluate(() => {
+        const a = window.__frostbound.app; const s = a.state; const me = a.state.activePlayerId;
+        const svs = s.players.find((p) => p.id === me).survivors.map((id) => s.survivors[id]).filter((sv) => sv.alive && !sv.moved);
+        const to = ['grocery', 'gas', 'police', 'hospital', 'school', 'library'].find((l) => s.locations[l] && svs.some((sv) => sv.location !== l));
+        if (!to) return null;
+        a.onBoardPick({ locationId: to, survivorId: null });
+        return to;
+      });
+      if (target && await page.locator('#move-pick .mp-token:not(.off)').count()) {
+        const sv = await page.locator('#move-pick .mp-token:not(.off)').first().getAttribute('data-sv');
+        await click('#move-pick .mp-token:not(.off)');
+        await page.waitForTimeout(300);
+        const at = await page.evaluate((id) => window.__frostbound.app.state.survivors[id].location, sv);
+        if (at !== target) errors.push(`the move picker did not move ${sv} to ${target} (at ${at})`);
+        counts.move = 1;
+        await page.evaluate(() => window.__frostbound.app.selectLocation(null));
+        continue;
+      }
+      counts.move = target ? 0 : 1;
+      if (!target) continue;
+    }
     // The hand (step 14): open the pile into a fan once, open a card's sheet, close it again.
     if (!counts.fan && await page.locator('#pp-hand .pile-btn').count()) {
       await click('#pp-hand .pile-btn'); await page.waitForTimeout(600);

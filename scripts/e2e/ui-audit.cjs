@@ -48,13 +48,15 @@ async function audit(browser, device, vp) {
   f.labelsHidden = await page.evaluate(() => {
     const bar = document.getElementById('topbar').getBoundingClientRect();
     const panels = ['pp-left', 'pp-hand', 'pp-actions', 'locpanel', 'log'].map((id) => document.getElementById(id)).filter((e) => e && !e.classList.contains('hidden')).map((e) => e.getBoundingClientRect());
-    return [...document.querySelectorAll('.loc-label')].filter((l) => {
+    // Step 15: zombie badges (hidden when empty) and the hovered / selected location's name.
+    return [...document.querySelectorAll('.loc-label, #loc-name.on')].filter((l) => {
       const r = l.getBoundingClientRect();
+      if (!r.width || !r.height) return false; // not shown
       const underBar = r.top < bar.bottom;
       // A label drawn over a panel without being faded out counts as a problem; faded ("covered") ones don't.
       const overPanel = !l.classList.contains('covered') && panels.some((p) => r.left < p.right && r.right > p.left && r.top < p.bottom && r.bottom > p.top);
       return underBar || overPanel;
-    }).map((l) => l.textContent);
+    }).map((l) => l.textContent || l.dataset.loc);
   });
 
   // Location action buttons reachable in the viewport?

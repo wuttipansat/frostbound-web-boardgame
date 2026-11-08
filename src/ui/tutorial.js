@@ -10,7 +10,7 @@ export const TUTORIAL = [
   { id: 'crisis', target: '#topbar .stat-block.crisis', when: 'turn', next: true, on: [] },
   { id: 'survivors', target: '#pp-survivors', when: 'turn', next: false, on: ['selectSurvivor'] },
   { id: 'board', target: null, when: 'turn', next: false, on: ['selectLocation'], placement: 'top' },
-  { id: 'move', target: '#locpanel', when: 'turn', next: true, on: ['move'] },
+  { id: 'move', target: '#move-pick', when: 'turn', next: true, on: ['move'] },
   { id: 'actions', target: '#locpanel', when: 'turn', next: true, on: ['dieAction'] },
   { id: 'hand', target: '#pp-hand', when: 'turn', next: true, on: [] },
   { id: 'objective', target: '#pp-actions .more', when: 'turn', next: true, on: [] },

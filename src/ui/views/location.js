@@ -7,7 +7,7 @@ import { LOCATIONS } from '../../content/locations.js';
 import { survivorsAt, survivorDef, getPlayer, aliveSurvivorsOf } from '../../core/selectors.js';
 import { PLAYER_COLORS } from '../../render/pieces.js';
 import { flashTip } from '../tooltip.js';
-import { survivorOptions, moveOption, hasFuel, lureTargets } from '../options.js';
+import { survivorOptions, lureTargets } from '../options.js';
 
 const ACTION_ICON = { attack: 'attack', search: 'search', barricade: 'barricade', clean: 'clean', lure: 'lure', ability: 'heal' };
 
@@ -63,21 +63,7 @@ export function renderLocationPanel(el, ctx) {
         }, c('locations', tg.to, 'name')))),
         h('button', { class: 'btn ghost', onclick: () => ctx.set({ picking: null }) }, t('act.cancel'))));
     } else {
-      if (sel && sel.location !== id) {
-        const fuelAvailable = hasFuel(s, me);
-        const opt = moveOption(s, me, sel.id, id, ui.useFuel && fuelAvailable);
-        const safe = survivorDef(sel.id).ability.type === 'noMoveExposure' || (ui.useFuel && fuelAvailable);
-        const moveTip = [t('loc.moveHere', { name: survivorDef(sel.id).name }), opt.ok ? (safe ? t('tip.safe') : t('loc.moveRisk')) : t(`err.${opt.error}`)].join(' — ');
-        actions.push(h('div', { class: 'move-box' },
-          h('button', {
-            class: `btn primary wide act-move${opt.ok ? '' : ' off'}`, 'aria-disabled': opt.ok ? null : 'true', tip: moveTip, 'aria-label': moveTip,
-            onclick: (ev) => (opt.ok ? ctx.dispatch(opt.action) : flashTip(ev.currentTarget)),
-          }, art.portrait(sel.id, 's', { alt: '', cls: 'mv-face' }), icon('move'), h('span', {}, t('loc.moveShort')),
-          h('span', { class: `risk ${safe ? 'safe' : ''}`, 'aria-hidden': 'true' }, icon(safe ? 'check' : 'exposure'))),
-          fuelAvailable ? h('label', { class: 'check', tip: t('loc.moveFuel') }, h('input', {
-            type: 'checkbox', checked: ui.useFuel, onchange: (ev) => ctx.set({ useFuel: ev.target.checked }),
-          }), ` ${t('loc.fuelShort')}`) : null));
-      }
+      // Moving is done from the round faces that float by the location (views/movepick.js).
       const mine = aliveSurvivorsOf(s, me).filter((sv) => sv.location === id);
       const focus = sel && sel.location === id ? [sel] : mine;
       for (const sv of focus) {

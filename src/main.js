@@ -8,6 +8,8 @@ import { Tweens } from './render/tween.js';
 import { createAmbientParticles } from './render/particles.js';
 import { loadQuality } from './render/quality.js';
 import { createApp } from './ui/app.js';
+import { createCameraRig } from './render/camera.js';
+import { PLAYER_COLORS } from './render/pieces.js';
 import { createArtStudio } from './render/art.js';
 import { icon } from './ui/icons.js';
 import { installTooltips } from './ui/tooltip.js';
@@ -29,33 +31,83 @@ const tweens = new Tweens();
 const pieces = createPieces(board, tweens);
 stage.scene.add(pieces.root);
 const diceTray = createDiceTray($('dice'));
+const rig = createCameraRig(stage, { board, pieces });
 const particles = createAmbientParticles({ ...board.fx, scale: quality.particleScale });
 // Portraits and item pictures, rendered lazily from the voxel models and cached.
 const art = createArtStudio({ quality });
 installTooltips();
 stage.scene.add(particles.group);
 
-// ---------------------------------------------------------------- location labels
+// ---------------------------------------------------------------- location badges + hover name
+// Step 15: no permanent name signs. Each location keeps a small zombie badge (only when zombies are there);
+// the name shows over the building that is hovered, tapped or selected.
 
 const labels = {};
 for (const id of LOCATION_IDS) {
   const el = document.createElement('div');
-  el.className = 'loc-label';
+  el.className = 'loc-label zbadge';
   $('labels').appendChild(el);
   labels[id] = el;
 }
+const nameTag = document.createElement('div');
+nameTag.id = 'loc-name';
+nameTag.setAttribute('aria-hidden', 'true');
+$('labels').appendChild(nameTag);
+let hoveredLoc = null;
+
 function refreshLabels(state) {
   for (const id of LOCATION_IDS) {
     const z = state?.locations[id].zombies ?? 0;
-    labels[id].innerHTML = '';
-    labels[id].append(c('locations', id, 'name'));
-    if (z) {
-      const span = document.createElement('span');
-      span.className = 'z';
-      span.append(icon('skull'), String(z));
-      labels[id].append(span);
-    }
+    labels[id].replaceChildren();
+    labels[id].classList.toggle('empty', !z);
+    labels[id].dataset.loc = id;
+    if (z) labels[id].append(icon('skull'), String(z));
+    labels[id].setAttribute('aria-label', `${c('locations', id, 'name')}: ${z}`);
   }
+}
+
+const hex = (n) => `#${n.toString(16).padStart(6, '0')}`;
+const SCENE_ICON = { move: 'move', attack: 'attack', search: 'search', barricade: 'barricade', clean: 'clean', lure: 'lure', play: 'check', contribute: 'crisis', deposit: 'goal' };
+
+/** A short floating callout over where a scene happens: who (colour + face), what (icon), the result. */
+function sceneCallout(ev, state) {
+  const el = document.createElement('div');
+  el.className = `scene-callout k-${ev.kind}`;
+  const pIdx = state.players.findIndex((p) => p.id === ev.playerId);
+  const dot = document.createElement('span');
+  dot.className = 'dot';
+  if (pIdx >= 0) dot.style.background = hex(PLAYER_COLORS[pIdx]);
+  el.append(dot);
+  if (ev.survivorId) el.append(art.portrait(ev.survivorId, 's', { cls: 'sc-face', alt: '' }));
+  el.append(icon(SCENE_ICON[ev.kind] ?? 'check'));
+  const res = document.createElement('b');
+  const cardBacks = (n) => Array.from({ length: Math.min(n, 3) }, (_, i) => { const cb = document.createElement('i'); cb.className = 'card-back'; cb.style.setProperty('--k', i); return cb; });
+  switch (ev.kind) {
+    case 'move': res.append(c('locations', ev.to, 'name')); break;
+    case 'attack': res.append(`−${ev.n}`, icon('skull')); break;
+    case 'search': el.append(...cardBacks(ev.n)); res.append(tr('scene.cards', { n: ev.n })); break;
+    case 'barricade': res.append(`+${ev.n}`); break;
+    case 'clean': res.append(`−${ev.n}`, icon('waste')); break;
+    case 'lure': res.append(`${ev.n}`, icon('skull'), ' → ', c('locations', ev.to, 'name')); break;
+    case 'contribute': el.append(...cardBacks(1)); break;
+    case 'play': case 'deposit': if (ev.card) { el.append(art.item(ev.card, 's', { cls: 'sc-item', alt: '' })); res.append(c('items', ev.card, 'name')); } break;
+    default: break;
+  }
+  if (res.childNodes.length) el.append(res);
+  return el;
+}
+
+/** Effects + callout for one scene of the presentation queue (see ui/director.js). */
+function playScene(ev, state) {
+  if (ev.kind === 'exposure') { exposureFx(ev.survivorId, ev.face); return; }
+  if (ev.kind === 'turn') return;
+  if (ev.kind === 'attack' && ev.survivorId && ev.n) pieces.burstAt(ev.survivorId, [0x8e1b1b, 0xb3202a, 0x6f8a4e], 16, 1.2);
+  if (!ev.watch) return; // your own move: the pieces' animation says enough
+  const el = sceneCallout(ev, state);
+  $('fx-layer').appendChild(el);
+  const obj = ev.kind === 'move' && ev.survivorId ? pieces.survivorObject(ev.survivorId) : null;
+  const lay = board.layout[ev.at] ?? board.layout.colony;
+  popups.push({ el, obj, fallback: lay.label.clone(), y: obj ? 3.4 : 7, ttl: Math.max(0.8, ev.duration ?? 1.2) });
 }
 
 // ---------------------------------------------------------------- app
@@ -108,9 +160,12 @@ function exposureFx(survivorId, face) {
 const app = createApp({
   board, pieces, diceTray, art,
   aiFast: params.get('ai') === 'fast', // debug/testing: AI doesn't wait for animations
+  sceneScale: Math.max(0.1, Math.min(20, Number(params.get('scenes') ?? 1) || 1)), // testing: slower scenes
   fx: { exposure: exposureFx, diceRoll: showDice },
+  scene: { camera: rig, play: playScene },
   dom: {
     topbar: $('topbar'), phase: $('phase'), log: $('log'), diceStage: $('dice-stage'), loc: $('locpanel'), player: $('player'), modal: $('modal'), toasts: $('toasts'), tutorial: $('tutorial'),
+    movePick: $('move-pick'),
     playerRefs: { head: $('pp-head'), survivors: $('pp-survivors'), chips: $('pp-chips'), hand: $('pp-hand'), actions: $('pp-actions') },
     onRender: (state) => {
       refreshLabels(state);
@@ -122,6 +177,7 @@ refreshLabels(null);
 
 stage.onFrame((t, dt) => {
   tweens.update(dt);
+  rig.update(dt);
   board.update(t);
   pieces.update(t, dt);
   particles.update(dt, stage.renderer.getPixelRatio() * stage.camera.zoom);
@@ -135,7 +191,7 @@ stage.onFrame((_t, dt) => {
     const p = popups[i];
     if ((p.ttl -= dt) <= 0) { p.el.remove(); popups.splice(i, 1); continue; }
     const pos = p.obj?.parent ? p.obj.position : p.fallback;
-    v.copy(pos).setY(3.1).project(stage.camera);
+    v.copy(pos).setY(p.y ?? 3.1).project(stage.camera);
     p.el.style.left = `${((v.x + 1) / 2) * cw}px`;
     p.el.style.top = `${((1 - v.y) / 2) * ch}px`;
   }
@@ -158,6 +214,33 @@ stage.onFrame(() => {
     const covered = rects.some((r) => box.left < r.right && box.right > r.left && box.top < r.bottom && box.bottom > r.top);
     labels[id].classList.toggle('covered', covered);
   }
+  // The name of the hovered (or selected) location, over its building, with its zombie count.
+  const named = app?.state ? (hoveredLoc ?? app.ui.selLoc) : null;
+  nameTag.classList.toggle('on', !!named);
+  if (named) {
+    const z = app.state.locations[named]?.zombies ?? 0;
+    const key = `${named}:${z}:${document.documentElement.lang}`;
+    if (nameTag.dataset.key !== key) {
+      nameTag.dataset.key = key;
+      nameTag.replaceChildren(c('locations', named, 'name'));
+      if (z) { const zs = document.createElement('span'); zs.className = 'z'; zs.append(icon('skull'), String(z)); nameTag.append(zs); }
+    }
+    v.copy(board.layout[named].label).project(stage.camera);
+    nameTag.style.left = `${((v.x + 1) / 2) * w}px`;
+    nameTag.style.top = `${Math.max(((1 - v.y) / 2) * h, barBottom + 30)}px`;
+  }
+  for (const id of LOCATION_IDS) labels[id].classList.toggle('named', id === named);
+  // The "who goes there" picker floats by the location's survivor pads.
+  const mp = $('move-pick');
+  const at = app?.ui.movePick;
+  if (mp && at && !mp.classList.contains('hidden')) {
+    const pads = board.layout[at].survivorSlots;
+    v.set(0, 0, 0);
+    for (const p of pads) v.add(p);
+    v.divideScalar(pads.length || 1).setY(1.5).project(stage.camera);
+    mp.style.left = `${Math.min(w - mp.offsetWidth / 2 - 8, Math.max(mp.offsetWidth / 2 + 8, ((v.x + 1) / 2) * w))}px`;
+    mp.style.top = `${Math.min(h - 120, Math.max(barBottom + 40, ((1 - v.y) / 2) * h + 26))}px`;
+  }
 });
 
 // ---------------------------------------------------------------- picking
@@ -177,10 +260,21 @@ let downAt = null;
 canvas.addEventListener('pointermove', (ev) => {
   const p = pick(ev);
   board.setHovered(p.locationId);
+  hoveredLoc = ev.pointerType === 'mouse' ? p.locationId : null;
   canvas.style.cursor = p.survivorId || p.locationId ? 'pointer' : 'grab';
 });
-canvas.addEventListener('pointerdown', (ev) => { downAt = [ev.clientX, ev.clientY]; });
+canvas.addEventListener('pointerleave', () => { hoveredLoc = null; });
+// While someone else's move plays: a click skips it, holding the pointer down plays it faster.
+let holdTimer = 0;
+let held = false;
+canvas.addEventListener('pointerdown', (ev) => {
+  downAt = [ev.clientX, ev.clientY];
+  clearTimeout(holdTimer);
+  if (app.watching) holdTimer = setTimeout(() => { held = true; app.sceneHold(true); }, 320);
+});
 canvas.addEventListener('pointerup', (ev) => {
+  clearTimeout(holdTimer);
+  if (held) { held = false; app.sceneHold(false); return; }
   if (!downAt || Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]) > 6) return;
   app.onBoardPick(pick(ev));
 });
@@ -226,4 +320,4 @@ if (params.get('play')) {
 window.addEventListener('pointerdown', () => sound.unlock());
 document.addEventListener('click', (ev) => { if (ev.target.closest?.('button')) sound.play('ui'); });
 
-window.__frostbound = { stage, board, pieces, diceTray, tweens, app, art, tryReduce, itemType: (defId) => ITEMS[defId]?.type };
+window.__frostbound = { rig, stage, board, pieces, diceTray, tweens, app, art, tryReduce, itemType: (defId) => ITEMS[defId]?.type };
