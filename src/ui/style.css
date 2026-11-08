@@ -1608,3 +1608,23 @@ html[lang='th'] .obj-front b, html[lang='th'] .obj-back b { font-family: var(--f
 .backdrop.over.peek .over-back { display: inline-flex; }
 @media (max-width: 520px) { .over-actions { flex-direction: column; } }
 body:has(.backdrop.over.peek) :is(#player, #hint, #move-pick, #tutorial, #dice-stage) { visibility: hidden; }
+
+/* ---------------------------------------------------------------- step 21: colony journal */
+.feed-tabs { display: inline-flex; gap: 2px; }
+.feed-tab { background: none; border: 0; color: var(--muted, #9fb0c8); font: inherit; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+.feed-tab.on { color: #fff; background: rgba(255,255,255,0.08); }
+.journal { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.jr-day > b { display: block; font-size: 12px; color: #ffc98a; letter-spacing: 0.03em; margin-bottom: 3px; }
+.jr-day ul { margin: 0; padding-left: 14px; display: grid; gap: 2px; }
+.jr-line { font-family: Georgia, 'Noto Serif Thai', serif; font-style: italic; font-size: 13px; color: #dfe6f0; }
+.jr-line.w4, .jr-line.w5 { color: #ffb3a8; }
+.jr-empty { padding: 6px 2px; }
+.jr-summary { font-size: 13px; color: #ffc98a; margin: 0 0 6px; display: flex; gap: 6px; align-items: center; }
+.jr-story { margin: 6px 0 10px; padding: 8px 12px; border-left: 2px solid rgba(255,201,138,0.5); background: rgba(255,255,255,0.03); }
+.jr-story h4 { margin: 0 0 4px; }
+.jr-story ul { margin: 0; padding-left: 16px; display: grid; gap: 3px; }
+.jr-story li { font-family: Georgia, 'Noto Serif Thai', serif; font-style: italic; font-size: 13px; }
+/* Phones hide the live feed, but a pinned log (top-bar button) opens, journal included. */
+body.in-game:not(.passing) #log.feed.pinned { display: block; }
+@media (max-width: 720px) { #log.feed.pinned .feed-history { max-height: 46vh; overflow-y: auto; } }
+body:has(.more-menu) #dice-stage { visibility: hidden; } /* the rolled dice never cover the open ⋯ menu */

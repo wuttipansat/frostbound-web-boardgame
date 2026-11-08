@@ -176,6 +176,8 @@ export function renderPlayerPanel(refs, ctx) {
     isActor ? h('button', { class: 'menu-item', role: 'menuitem', onclick: () => ctx.set({ modal: 'request', moreOpen: false }) }, icon('request'), h('span', {}, t('panel.request'))) : null,
     canVote ? h('button', { class: 'menu-item', role: 'menuitem', onclick: () => ctx.set({ modal: 'callVote', voteTarget: null, moreOpen: false }) }, icon('vote'), h('span', {}, t('vote.call'))) : null,
     // Quick rules are also here (on phones the top bar has no room for the ? button).
+    // Step 21: mute right where you are (also in settings; the choice is saved).
+    h('button', { class: `menu-item sound-item${ctx.ui.sound ? ' on' : ''}`, role: 'menuitemcheckbox', 'aria-checked': ctx.ui.sound ? 'true' : 'false', onclick: () => ctx.setSound(!ctx.ui.sound) }, icon(ctx.ui.sound ? 'sound' : 'mute'), h('span', {}, `${t('settings.sound')}: ${t(ctx.ui.sound ? 'settings.on' : 'settings.off')}`)),
     h('button', { class: 'menu-item rules-item', role: 'menuitem', onclick: () => ctx.set({ modal: 'rules', moreOpen: false }) }, icon('log'), h('span', {}, t('hud.rules'))),
   ].filter(Boolean);
   mount(refs.actions,

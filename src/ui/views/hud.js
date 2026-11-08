@@ -1,4 +1,5 @@
 // Top bar (morale, round, food, waste, crisis, goal, turn) and the log panel — drawn icons, no emoji.
+import { journalEntries, daySummary } from '../journal.js';
 import { h, mount, hex, TYPE_REP } from '../dom.js';
 import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
@@ -154,12 +155,28 @@ export function renderLog(el, ctx) {
     const li = feedLine(s.log[i], s, ctx, { pid: who[i] });
     if (li) history.push(li);
   }
+  const journal = ui.logTab === 'journal';
+  const tab = (id, label) => h('button', { class: `feed-tab${(ui.logTab ?? 'log') === id ? ' on' : ''}`, role: 'tab', 'aria-selected': (ui.logTab ?? 'log') === id ? 'true' : 'false', onclick: () => ctx.set({ logTab: id }) }, label);
   mount(el,
     h('ol', { class: 'feed-recent' }, recent),
     h('div', { class: 'feed-history' },
-      h('div', { class: 'feed-head' }, h('span', {}, t('hud.log')),
+      h('div', { class: 'feed-head' }, h('span', { class: 'feed-tabs', role: 'tablist' }, tab('log', t('jr.tabLog')), tab('journal', t('jr.tab'))),
         h('button', { class: `icon-btn pin${ui.logOpen ? ' on' : ''}`, tip: t('tip.logPin'), 'aria-label': t('tip.logPin'), 'aria-pressed': ui.logOpen ? 'true' : 'false', onclick: () => ctx.set({ logOpen: !ui.logOpen }) }, icon('log'))),
-      h('ol', {}, history)));
+      journal ? journalView(s) : h('ol', {}, history)));
+}
+
+/** Step 21: the diary — newest day first, each with its one-line summary. */
+function journalView(s) {
+  const entries = journalEntries(s);
+  const days = [];
+  for (let r = s.round; r >= 1; r--) {
+    const lines = entries.filter((j) => j.round === r);
+    if (!lines.length && r === s.round) continue;
+    days.push(h('li', { class: 'jr-day' },
+      h('b', {}, daySummary(s, r)),
+      lines.length ? h('ul', {}, lines.map((j) => h('li', { class: `jr-line w${Math.min(5, j.weight)}` }, t(`jr.${j.key}`, j.params)))) : null));
+  }
+  return days.length ? h('ol', { class: 'journal' }, days) : h('p', { class: 'muted small jr-empty' }, t('jr.empty'));
 }
 
 // ---------------------------------------------------------------- step 11: phase banner

@@ -31,6 +31,8 @@ const PATHS = {
   check: S(`<path ${st} d="M5 12l5 5L20 7"/>`),
   more: S(`<circle fill="currentColor" cx="5" cy="12" r="1.8"/><circle fill="currentColor" cx="12" cy="12" r="1.8"/><circle fill="currentColor" cx="19" cy="12" r="1.8"/>`),
   close: S(`<path ${st} d="M6 6l12 12M18 6L6 18"/>`),
+  sound: S(`<path ${st} d="M4 9h4l5-4v14l-5-4H4z"/><path ${st} d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>`),
+  mute: S(`<path ${st} d="M4 9h4l5-4v14l-5-4H4z"/><path ${st} d="M17 9l5 6M22 9l-5 6"/>`),
   left: S(`<path ${st} d="M15 5l-7 7 7 7"/>`),
   right: S(`<path ${st} d="M9 5l7 7-7 7"/>`),
   up: S(`<path ${st} d="M5 15l7-7 7 7"/>`),

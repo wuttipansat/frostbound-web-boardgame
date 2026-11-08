@@ -52,6 +52,7 @@ let overShown = false;
 function updateWinter(state) {
   const a = atmosphereFor(state);
   atmosphere.set(a);
+  sound.setWeather(a.storm, a.fire);
   document.body.dataset.mood = a.mood;
   if (!state || state.round < lastRound) footprints.clear();
   lastRound = state?.round ?? 0;

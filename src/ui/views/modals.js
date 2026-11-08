@@ -12,6 +12,7 @@ import { getPlayer, survivorDef, itemOf, objectiveDef, woundLimit } from '../../
 import { PLAYER_COLORS } from '../../render/pieces.js';
 import * as act from '../../core/actions.js';
 import { checklistView } from './help.js';
+import { daySummary, highlights, journalLine } from '../journal.js';
 
 function dialog(cls, ...children) {
   return h('div', { class: `backdrop ${cls}` }, h('div', { class: `dialog panel ${cls}`, role: 'dialog', 'aria-modal': 'true' }, children));
@@ -481,6 +482,7 @@ export function colonyModal(ctx, item) {
   let delay = 0.2;
   const next = (step = 0.45) => { const d = delay; delay += step; return { animationDelay: `${d}s` }; };
   const rows = [];
+  if (item.round) rows.push(h('p', { class: 'jr-summary reveal', style: next(0.2) }, icon('log'), ` ${daySummary(ctx.state, item.round)}`));
   rows.push(h('p', { class: `step reveal ${r.fed ? '' : 'bad'}`, style: next() },
     icon('food'), ` ${r.fed ? t('colony.fed', { n: r.foodNeeded }) : t('colony.starve', { n: r.starvation })}`));
   rows.push(h('p', { class: `step reveal ${r.wasteLoss ? 'bad' : 'muted'}`, style: next() },
@@ -535,6 +537,7 @@ export function gameOverModal(ctx) {
     h('small', { class: 'kicker' }, t('over.title')),
     h('h2', {}, t(`over.reason.${r.reason}`)),
     h('p', { class: 'over-epitaph' }, t(`over.epitaph.${won ? 'won' : 'lost'}`)),
+    (() => { const hl = highlights(s); return hl.length ? h('div', { class: 'jr-story' }, h('h4', {}, t('jr.story')), h('ul', {}, hl.map((j) => h('li', {}, journalLine(j))))) : null; })(),
     h('h4', {}, t('over.winners')),
     r.winners.length ? h('p', { class: 'winners' }, r.winners.map((id) => getPlayer(s, id).name).join(' · ')) : h('p', { class: 'muted' }, t('over.noWinners')),
     h('ul', { class: 'outcomes' }, r.outcomes.map((o) => {

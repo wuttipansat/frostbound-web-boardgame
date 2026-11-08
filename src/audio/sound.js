@@ -6,6 +6,10 @@ const AC = typeof window !== 'undefined' ? (window.AudioContext || window.webkit
 let ctx = null;
 let master = null;
 let ambient = null;
+// Step 21: the ambience follows the scene (storm 0..1 = wind, fire 0..~1.2 = crackle).
+const weather = { storm: 0.35, fire: 1 };
+export const windGain = (storm) => 0.025 + storm * 0.075;
+export const crackleChance = (fire) => Math.max(0, Math.min(0.9, fire * 0.6));
 
 function ensure() {
   if (!AC) return null;
@@ -150,7 +154,7 @@ function startAmbient() {
   f.frequency.value = 420;
   const g = ctx.createGain();
   g.gain.value = 0.0001;
-  g.gain.exponentialRampToValueAtTime(0.05, ctx.currentTime + 2);
+  g.gain.exponentialRampToValueAtTime(windGain(weather.storm), ctx.currentTime + 2);
   // slow gusts
   const lfo = ctx.createOscillator();
   const lg = ctx.createGain();
@@ -161,9 +165,9 @@ function startAmbient() {
   src.start();
   lfo.start();
   const crackle = setInterval(() => {
-    if (Math.random() < 0.6) noise({ dur: 0.02 + Math.random() * 0.03, freq: 2000 + Math.random() * 3000, q: 3, gain: 0.02 + Math.random() * 0.03 });
+    if (Math.random() < crackleChance(weather.fire)) noise({ dur: 0.02 + Math.random() * 0.03, freq: 2000 + Math.random() * 3000, q: 3, gain: 0.02 + Math.random() * 0.03 });
   }, 140);
-  ambient = { src, lfo, g, crackle };
+  ambient = { src, lfo, g, f, lg, crackle };
 }
 
 function stopAmbient() {
@@ -200,6 +204,16 @@ export const sound = {
     this.enabled = on;
     if (!on) stopAmbient();
     else this.unlock();
+  },
+
+  /** Called as the weather eases (cheap: only touches gains when the ambience runs). */
+  setWeather(storm, fire) {
+    weather.storm = storm; weather.fire = fire;
+    if (!ambient || !ctx) return;
+    const now = ctx.currentTime;
+    ambient.g.gain.setTargetAtTime(windGain(storm), now, 0.8);
+    ambient.f.frequency.setTargetAtTime(320 + storm * 520, now, 0.8);
+    ambient.lg.gain.setTargetAtTime(180 + storm * 380, now, 0.8);
   },
 
   setAmbient(on) {

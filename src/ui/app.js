@@ -61,7 +61,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     setup: { count: 3, seats: defaultSeats(), scenarioId: 'beacon', betrayer: 'maybe' },
     modal: null, selSurvivor: null, selDie: null, selCard: null, selLoc: null, lureTo: null,
     queue: [], // public reveal modals waiting to be shown: { type: 'colony' | 'vote', report }
-    useFuel: false, logOpen: false, // pins the log history open (the feed itself always shows) crisisOpen: false, peek: false, draftPicks: [], req: null,
+    useFuel: false, logOpen: false, logTab: 'log', crisisOpen: false, peek: false, draftPicks: [], req: null, // logOpen pins the log history open (the feed itself always shows)
     sound: sound.enabled,
     tutorial: settings.tutorial ?? !settings.tutorialDone,
     tutStep: DONE,
@@ -203,7 +203,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
       ui.queue.push(item);
       setTimeout(() => { if (ui.queue[0] === item) dismissQueue(); }, 2600);
     }
-    if (e.k === 'crisisResolved' && state.reports.colony) ui.queue.push({ type: 'colony', report: structuredClone(state.reports.colony), morale: null });
+    if (e.k === 'crisisResolved' && state.reports.colony) ui.queue.push({ type: 'colony', report: structuredClone(state.reports.colony), morale: null, round: e.r });
     if (e.k === 'voteResult' && state.reports.vote) ui.queue.push({ type: 'vote', report: structuredClone(state.reports.vote) });
     // Everyone sees what was chosen and what it did (the chooser only saw the options).
     if (e.k === 'crossroadsChoice') ui.queue.push({ type: 'cross', cardId: e.cardId, choice: e.choice, playerId: e.playerId });
