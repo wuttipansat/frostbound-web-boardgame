@@ -467,6 +467,8 @@ img.art.pending { background: linear-gradient(110deg, rgba(255,255,255,0.05) 30%
 img.art.pending[src] { animation: none; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 img.art-survivor, img.art-zombie { border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.35); }
+img.art.sprite { background: #2f5a86; }
+img.art-l.sprite { image-rendering: pixelated; }
 img.art.wounded { box-shadow: 0 0 0 2px #e0605a, 0 2px 8px rgba(0,0,0,0.35); }
 img.art.frosty { box-shadow: 0 0 0 2px #9fd4ff, 0 0 12px rgba(159,212,255,0.6); filter: saturate(0.75) hue-rotate(-10deg); }
 img.art.dead { filter: grayscale(1) brightness(0.7); opacity: 0.75; }

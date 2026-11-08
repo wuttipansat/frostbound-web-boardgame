@@ -13,6 +13,9 @@ export const artKey = ({ kind, id, size, tier }) => `${kind}:${id}:${size}:${tie
  * render(spec) -> result (string URL). schedule(fn) decides when the next job runs (idle callback in the
  * browser, manual pump in tests).
  */
+/** URL of a survivor's pixel-art portrait sprite (relative, so it works under any base path). */
+export const portraitUrl = (id) => `./portraits/${id}.png`;
+
 export class ArtCache {
   constructor(render, { schedule = null, now = () => Date.now() } = {}) {
     this.render = render;
@@ -245,7 +248,15 @@ export function createArtStudio({ quality }) {
   return {
     cache,
     img,
-    portrait: (id, size = 's', opts) => img({ kind: 'survivor', id, size }, opts),
+    /** Survivor portraits are hand-made 64×64 pixel sprites (public/portraits/<id>.png), not renders. */
+    portrait: (id, size = 's', { cls = '', alt = '' } = {}) => {
+      const el = document.createElement('img');
+      el.className = `art art-survivor art-${size} sprite ${cls}`;
+      el.alt = alt;
+      el.decoding = 'async';
+      el.src = portraitUrl(id);
+      return el;
+    },
     zombie: (variant, size = 's', opts) => img({ kind: 'zombie', id: String(variant), size }, opts),
     item: (defId, size = 's', opts) => img({ kind: 'item', id: defId, size }, opts),
     /** Warm the cache in the background (e.g. small portraits for the current players). */
