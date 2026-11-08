@@ -27,7 +27,7 @@ async function audit(browser, device, vp) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const f = {};
-  await page.goto('http://localhost:4173/?snow=0&play=HHA&seed=4&ai=fast&quality=low', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:4173/?snow=0&play=HHA&seed=4&ai=fast', { waitUntil: 'networkidle' });
   await page.waitForTimeout(800);
 
   // Pass screen: keyboard can't continue?

@@ -36,8 +36,8 @@ export function diceLayout(count, spacing = 1.35) {
   return Array.from({ length: count }, (_, i) => (i - (count - 1) / 2) * spacing);
 }
 
-export function createDiceTray(canvas, { hd = false } = {}) {
-  const dieSize = hd ? DIE_SIZE / HD : DIE_SIZE;
+export function createDiceTray(canvas) {
+  const dieSize = DIE_SIZE / HD;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
@@ -58,9 +58,9 @@ export function createDiceTray(canvas, { hd = false } = {}) {
   floor.receiveShadow = true;
   scene.add(floor);
 
-  const { lit } = (hd ? dieModelHD() : dieModel()).buildGeometries({ size: dieSize, jitter: 0.02 });
+  const { lit } = dieModelHD().buildGeometries({ size: dieSize, jitter: 0.02 });
   lit.translate(0, -0.5, 0); // centre the cube on its origin so it spins around the middle
-  const expoGeo = (hd ? exposureDieModelHD() : exposureDieModel()).buildGeometries({ size: dieSize, jitter: 0.02 });
+  const expoGeo = exposureDieModelHD().buildGeometries({ size: dieSize, jitter: 0.02 });
   expoGeo.lit.translate(0, -0.5, 0);
   expoGeo.glow?.translate(0, -0.5, 0);
   const expo = new THREE.Group();

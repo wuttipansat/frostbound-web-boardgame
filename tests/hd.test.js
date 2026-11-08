@@ -10,7 +10,7 @@ import {
 } from '../src/render/characters.js';
 import { frameWindows, addIcicles, patternColor, materialOf, DETAIL_COLORS } from '../src/render/detail.js';
 import { heightmapGeometry, buildTerrainHD } from '../src/render/terrain.js';
-import { QUALITY_TIERS, resolveQuality, defaultQuality } from '../src/render/quality.js';
+import { QUALITY, qualityFor } from '../src/render/quality.js';
 import { BOARD } from '../src/render/board.js';
 import { SURVIVORS } from '../src/content/survivors.js';
 import { OUTSIDE_LOCATIONS } from '../src/core/constants.js';
@@ -113,15 +113,11 @@ test('heightmap mesher: one top quad per cell, walls only where the ground steps
   assert.ok(tris(terrain) < 150000, `HD terrain budget (${tris(terrain)})`);
 });
 
-test('quality tiers: Low keeps 1× models and no post; URL beats saved beats device default', () => {
-  for (const [id, q] of Object.entries(QUALITY_TIERS)) {
-    for (const k of ['hd', 'maxPixelRatio', 'shadowMapSize', 'post', 'snowFlakes', 'particleScale', 'mist', 'sky', 'glowBoost']) assert.ok(k in q, `${id}.${k}`);
-  }
-  assert.equal(QUALITY_TIERS.low.hd, false);
-  assert.equal(QUALITY_TIERS.low.post, false);
-  assert.ok(QUALITY_TIERS.high.shadowMapSize > QUALITY_TIERS.medium.shadowMapSize);
-  assert.equal(resolveQuality({ search: '?quality=high', saved: 'low' }).id, 'high');
-  assert.equal(resolveQuality({ search: '', saved: 'low' }).id, 'low');
-  assert.equal(defaultQuality({ navigator: { userAgent: 'iPhone', hardwareConcurrency: 6 } }), 'low');
-  assert.equal(defaultQuality({ navigator: { userAgent: 'Desktop', hardwareConcurrency: 8 } }), 'medium');
+test('one graphics quality: full effects everywhere; phones only lower pixel ratio and particles', () => {
+  for (const k of ['maxPixelRatio', 'shadowMapSize', 'post', 'snowFlakes', 'particleScale', 'sky', 'glowBoost']) assert.ok(k in QUALITY, k);
+  assert.ok(QUALITY.post.bloom > 0 && QUALITY.post.tiltShift);
+  assert.equal(qualityFor({ navigator: { userAgent: 'Desktop', hardwareConcurrency: 8 } }), QUALITY);
+  const phone = qualityFor({ navigator: { userAgent: 'iPhone', hardwareConcurrency: 6 } });
+  assert.deepEqual(phone.post, QUALITY.post, 'same look on phones');
+  assert.ok(phone.maxPixelRatio < QUALITY.maxPixelRatio && phone.snowFlakes < QUALITY.snowFlakes);
 });

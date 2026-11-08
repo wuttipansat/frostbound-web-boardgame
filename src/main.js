@@ -20,16 +20,15 @@ import { tryReduce } from './core/reducer.js';
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
 
-// Graphics tier (Low / Medium / High) decides model resolution, lighting and post-processing.
+// One graphics quality; only the pixel ratio and particle counts adapt to the device.
 const quality = loadQuality();
-document.documentElement.dataset.quality = quality.id;
 const stage = createStage($('scene'), { snow: params.get('snow') !== '0', quality });
-const board = createBoard({ quality });
+const board = createBoard();
 stage.scene.add(board.root);
 const tweens = new Tweens();
-const pieces = createPieces(board, tweens, { hd: quality.hd });
+const pieces = createPieces(board, tweens);
 stage.scene.add(pieces.root);
-const diceTray = createDiceTray($('dice'), { hd: quality.hd });
+const diceTray = createDiceTray($('dice'));
 const particles = createAmbientParticles({ ...board.fx, scale: quality.particleScale });
 // Portraits and item pictures, rendered lazily from the voxel models and cached.
 const art = createArtStudio({ quality });
@@ -88,7 +87,6 @@ function exposureFx(survivorId, face) {
 const app = createApp({
   board, pieces, diceTray, art,
   aiFast: params.get('ai') === 'fast', // debug/testing: AI doesn't wait for animations
-  quality: quality.id,
   fx: { exposure: exposureFx },
   dom: {
     topbar: $('topbar'), log: $('log'), loc: $('locpanel'), player: $('player'), modal: $('modal'), toasts: $('toasts'), tutorial: $('tutorial'),
@@ -180,10 +178,10 @@ if (params.has('lineup')) {
     ground.position.y = -0.5;
     ground.receiveShadow = true;
     g.add(ground);
-    const size = quality.hd ? 0.075 : 0.15;
-    const add = (model, x, z) => { const o = model.build({ size, jitter: quality.hd ? 0 : 0.05 }); o.position.set(x, 0, z); g.add(o); };
-    SURVIVORS.forEach((s, i) => add(quality.hd ? survivorModelHD(s) : survivorModel(s), (i % 10 - 4.5) * 3, Math.floor(i / 10) * 5.5 - 6));
-    [0, 1, 2, 3, 4].forEach((v, i) => add(quality.hd ? zombieModelHD(v) : zombieModel(v % 3), (i - 2) * 3.4, 5.5));
+    const size = 0.075;
+    const add = (model, x, z) => { const o = model.build({ size, jitter: 0 }); o.position.set(x, 0, z); g.add(o); };
+    SURVIVORS.forEach((s, i) => add(survivorModelHD(s), (i % 10 - 4.5) * 3, Math.floor(i / 10) * 5.5 - 6));
+    [0, 1, 2, 3, 4].forEach((v, i) => add(zombieModelHD(v), (i - 2) * 3.4, 5.5));
     const front = new THREE.DirectionalLight(0xffe6c8, 1.8);
     front.position.set(10, 25, 60);
     g.add(front);
@@ -196,14 +194,6 @@ if (params.has('lineup')) {
     for (const id of ['player', 'topbar', 'labels', 'modal', 'tutorial']) document.getElementById(id)?.classList.add('hidden');
   }));
 }
-
-// After a graphics change the page reloads; pick the autosaved game straight back up.
-try {
-  if (sessionStorage.getItem('frostbound.resume')) {
-    sessionStorage.removeItem('frostbound.resume');
-    app.continueGame();
-  }
-} catch { /* storage unavailable */ }
 
 if (params.get('play')) {
   app.quickStart({

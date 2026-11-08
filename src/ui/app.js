@@ -36,7 +36,7 @@ const storage = {
 
 const defaultSeats = () => Array.from({ length: 5 }, (_, i) => ({ name: t('setup.defaultName', { n: i + 1 }), isAI: i >= 2 }));
 
-export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast = false, quality = 'medium' }) {
+export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast = false }) {
   const settings = storage.get(SETTINGS_KEY) ?? {};
   setLang(settings.lang ?? (navigator.language?.startsWith('th') ? 'th' : 'en'));
   sound.enabled = settings.sound ?? true;
@@ -59,7 +59,6 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     tutorial: settings.tutorial ?? !settings.tutorialDone,
     tutStep: DONE,
     ppCollapsed: false,
-    quality,
     picking: null, // { type: 'lure', survivorId, dieIndex } while choosing a destination on the board
     skipEndConfirm: false,
   };
@@ -88,7 +87,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
       state, ui, actor, viewer, art,
       canAct: !!viewer && viewer === actor && state?.phase === PHASES.TURN && !needsPass(),
       hasSave: !!storage.get(SAVE_KEY)?.state,
-      set, dispatch, dismissQueue, tutorialEvent, setTutorial, setQuality, sfx: (name, delay) => sound.play(name, delay), selectSurvivor, selectLocation, takeSeat, startGame, continueGame, quitToSetup, setLanguage, setSound,
+      set, dispatch, dismissQueue, tutorialEvent, setTutorial, sfx: (name, delay) => sound.play(name, delay), selectSurvivor, selectLocation, takeSeat, startGame, continueGame, quitToSetup, setLanguage, setSound,
     };
   }
 
@@ -101,7 +100,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
 
   function saveSettings(extra = {}) {
     const prev = storage.get(SETTINGS_KEY) ?? {};
-    storage.set(SETTINGS_KEY, { ...prev, lang: getLang(), sound: ui.sound, tutorial: ui.tutorial, quality: ui.quality, ...extra });
+    storage.set(SETTINGS_KEY, { ...prev, lang: getLang(), sound: ui.sound, tutorial: ui.tutorial, ...extra });
   }
 
   function tutorialEvent(event) {
@@ -279,14 +278,6 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, aiFast =
     ui.sound = on;
     saveSettings();
     render();
-  }
-
-  /** Graphics tier applies at load: save it, remember to resume, and reload. */
-  function setQuality(id) {
-    if (id === ui.quality) return;
-    saveSettings({ quality: id });
-    try { if (state) sessionStorage.setItem('frostbound.resume', '1'); } catch { /* ignore */ }
-    location.reload();
   }
 
   function setTutorial(on) {

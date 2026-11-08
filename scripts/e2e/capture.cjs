@@ -7,6 +7,15 @@ const [outDir, prefix] = process.argv.slice(2);
 
 const SCENES = {
   setup: null,
+  draft: `(() => { window.__frostbound.app.tutorialEvent?.('skip'); })()`,
+  crisis: `(() => {
+    const a = window.__frostbound.app; const me = a.state.players[0];
+    a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 2) });
+    a.tutorialEvent?.('skip');
+    const s = structuredClone(a.state);
+    s.phase = 'turn'; s.pendingCrossroads = null; s.activePlayerId = 'p0';
+    a.loadState(s, 'p0'); setTimeout(() => document.querySelector('.stat-block.crisis')?.click(), 300);
+  })()`,
   turn: `(() => {
     const a = window.__frostbound.app; const me = a.state.players[0];
     a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 2) });
@@ -27,7 +36,7 @@ const SCENES = {
     const sv = s.players[0].survivors[0];
     s.survivors[sv].wounds = 1;
     // A varied hand: take one card of several types from the decks.
-    const want = ['medicine', 'weapon', 'food', 'tools', 'junk'];
+    const want = ['medicine', 'weapon', 'food', 'tools', 'junk', 'book', 'survivor'];
     for (const type of want) for (const loc of Object.values(s.locations)) {
       const i = (loc.deck || []).findIndex((u) => window.__frostbound.itemType(s.cards[u]) === type);
       if (i >= 0) { s.players[0].hand.push(loc.deck.splice(i, 1)[0]); break; }
@@ -70,7 +79,7 @@ const SCENES = {
     for (const [name, script] of Object.entries(SCENES)) {
       const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height }, isMobile: !!vp.isMobile, hasTouch: !!vp.hasTouch, deviceScaleFactor: 1 });
       page.on('pageerror', (e) => errors.push(`${device}/${name}: ${e.message}`));
-      const url = script ? '/?snow=0&play=HAA&seed=4&ai=fast&quality=medium' : '/?snow=0&quality=medium';
+      const url = script ? '/?snow=0&play=HAA&seed=4&ai=fast' : '/?snow=0';
       await page.goto('http://localhost:4173' + url, { waitUntil: 'networkidle' });
       await page.waitForTimeout(1200);
       if (script) await page.evaluate(script);

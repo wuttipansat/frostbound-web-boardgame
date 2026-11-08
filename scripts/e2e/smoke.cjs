@@ -10,7 +10,7 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
   const page = await browser.newPage({ viewport: { width: VP.width, height: VP.height }, isMobile: !!VP.isMobile, hasTouch: !!VP.hasTouch });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('http://localhost:4173/?snow=0&play=HH&seed=21&quality=low&ai=fast', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:4173/?snow=0&play=HH&seed=21&ai=fast', { waitUntil: 'networkidle' });
   const counts = { pass: 0, draft: 0, choice: 0, endTurn: 0, confirm: 0, incoming: 0, colony: 0, leakChecks: 0 };
   const click = async (sel) => { const l = page.locator(sel).first(); if (VP.hasTouch) await l.tap(); else await l.click(); };
 

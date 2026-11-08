@@ -8,12 +8,12 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { P } from './palette.js';
 import { MATERIALS } from './voxel.js';
-import { QUALITY_TIERS } from './quality.js';
+import { QUALITY } from './quality.js';
 
 const VIEW_HEIGHT = 62; // world units visible vertically at zoom 1
 const PAN_LIMIT = 24;
 
-export function createStage(canvas, { snow = true, quality = { id: 'low', ...QUALITY_TIERS.low } } = {}) {
+export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   const q = quality;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !q.post, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, q.maxPixelRatio));
@@ -81,18 +81,16 @@ export function createStage(canvas, { snow = true, quality = { id: 'low', ...QUA
   scene.add(moon.target);
 
   // Cold rim light from behind the board: outlines silhouettes against the dark.
-  if (q.hd) {
-    const rim = new THREE.DirectionalLight(0x7f9fe0, 0.55);
-    rim.position.set(-55, 18, -70);
-    scene.add(rim);
-  }
+  const rim = new THREE.DirectionalLight(0x7f9fe0, 0.55);
+  rim.position.set(-55, 18, -70);
+  scene.add(rim);
 
   const snowfall = snow ? createSnow(q.snowFlakes) : null;
   if (snowfall) scene.add(snowfall.group);
-  const mist = q.mist ? createMist() : null;
-  if (mist) scene.add(mist.group);
+  const mist = createMist();
+  scene.add(mist.group);
 
-  // Post-processing (Medium / High): bloom -> grade + vignette (+ tilt-shift) -> tone map.
+  // Post-processing: bloom -> grade + vignette (+ tilt-shift) -> tone map.
   let composer = null;
   let bloom = null;
   let grade = null;

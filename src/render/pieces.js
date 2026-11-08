@@ -54,6 +54,19 @@ export function barricadeSlotIndex(locationId, j) {
 
 // ---------------------------------------------------------------- instanced pool
 
+/**
+ * Survivor figures that no longer belong on the board: their survivor is not in this state at all
+ * (a different game) or belongs to a different owner. Dead survivors are handled by the death animation.
+ */
+export function staleSurvivors(visIds, state, owners = null) {
+  const out = [];
+  for (const id of visIds) {
+    const sv = state.survivors?.[id];
+    if (!sv || (owners && owners.get(id) !== sv.owner)) out.push(id);
+  }
+  return out;
+}
+
 class Pool {
   constructor(model, size, capacity, jitter = 0.05) {
     const { lit, glow } = model.buildGeometries({ size, jitter });
@@ -139,17 +152,15 @@ class Puffs {
 
 // ---------------------------------------------------------------- manager
 
-export function createPieces(board, tweens, { hd = false } = {}) {
+export function createPieces(board, tweens) {
   const root = new THREE.Group();
   root.name = 'pieces';
   const { layout } = board;
   // HD characters are authored at 2× resolution → half-size voxels, same world size.
-  const charSize = hd ? CHAR_VOXEL / 2 : CHAR_VOXEL;
+  const charSize = CHAR_VOXEL / 2;
 
-  const zombiePools = hd
-    ? [0, 1, 2, 3, 4].map((v) => new Pool(zombieModelHD(v), charSize, 64, 0))
-    : [0, 1, 2].map((v) => new Pool(zombieModel(v), charSize, 64));
-  const barricadePool = new Pool(hd ? barricadeModelHD() : barricadeModel(), hd ? 0.11 : 0.22, 64, hd ? 0 : 0.05);
+  const zombiePools = [0, 1, 2, 3, 4].map((v) => new Pool(zombieModelHD(v), charSize, 64, 0));
+  const barricadePool = new Pool(barricadeModelHD(), 0.11, 64, 0);
   const puffs = new Puffs();
   for (const p of [...zombiePools, barricadePool]) root.add(p.group);
   root.add(puffs.mesh);
@@ -219,7 +230,7 @@ export function createPieces(board, tweens, { hd = false } = {}) {
   function survivorGeometry(id) {
     if (!geoCache.has(id)) {
       const def = SURVIVORS_BY_ID[id];
-      geoCache.set(id, (hd ? survivorModelHD(def) : survivorModel(def)).buildGeometries({ size: charSize, jitter: hd ? 0 : 0.05 }));
+      geoCache.set(id, survivorModelHD(def).buildGeometries({ size: charSize, jitter: 0 }));
     }
     return geoCache.get(id);
   }
@@ -373,6 +384,14 @@ export function createPieces(board, tweens, { hd = false } = {}) {
 
   function sync(state, { animate = true } = {}) {
     const ownerIdx = Object.fromEntries(state.players.map((p, i) => [p.id, i]));
+
+    // Figures from another game (new game, load, draft) are dropped at once, without a death animation.
+    for (const id of staleSurvivors(survivors.keys(), state)) {
+      const vis = survivors.get(id);
+      if (highlighted === id) setHighlight(null);
+      root.remove(vis.group);
+      survivors.delete(id);
+    }
 
     // Survivors: assign slots per location, then animate differences.
     const byLoc = new Map(LOCATION_IDS.map((id) => [id, []]));

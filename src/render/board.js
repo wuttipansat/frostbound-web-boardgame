@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { VoxelModel, hash3, MATERIALS } from './voxel.js';
 import { P } from './palette.js';
 import {
-  LOCATION_BUILDERS, LOCATION_BUILDERS_HD, colony, colonyHD, pineTree, rock, treeModelHD, rockModelHD,
+  LOCATION_BUILDERS_HD, colonyHD, treeModelHD, rockModelHD,
 } from './buildings.js';
 import { buildTerrainHD } from './terrain.js';
 import { LOCATIONS } from '../content/locations.js';
@@ -96,48 +96,6 @@ function distances(layout, roads) {
   };
 }
 
-function buildTerrain(layout, roads) {
-  const m = new VoxelModel();
-  const R = BOARD.radius;
-
-  for (let x = -R; x <= R; x++) {
-    for (let z = -R; z <= R; z++) {
-      const r = Math.hypot(x + 0.5, z + 0.5);
-      // Slightly ragged diorama edge
-      const edge = R - 1.5 + hash3(x, 7, z) * 2;
-      if (r > edge) continue;
-      const cx = x + 0.5; const cz = z + 0.5;
-      const ringD = Math.abs(r - BOARD.ringRoad);
-      let roadD = ringD;
-      for (const [a, b] of roads) roadD = Math.min(roadD, distToSegment(cx, cz, a, b));
-      let plotD = r - (BOARD.colonyRadius + 2);
-      for (const id of OUTSIDE_LOCATIONS) plotD = Math.min(plotD, layout[id].center.distanceTo(new THREE.Vector3(cx, 0, cz)) - 9);
-
-      // Gentle drifts away from roads and plots.
-      const n = Math.sin(cx * 0.21) * Math.cos(cz * 0.17) + Math.sin((cx + cz) * 0.09) * 0.8 + hash3(x, 1, z) * 0.35;
-      const flat = Math.min(roadD - 1.5, plotD);
-      let h = flat > 2 ? Math.max(0, Math.floor(n + 0.4)) : 0;
-      if (r > R - 6) h = Math.max(h, Math.floor(hash3(x, 3, z) * 2)); // snowbanks near the rim
-      const isRoad = roadD < 1.9;
-      const top = isRoad ? (roadD > 1.2 ? P.roadEdge : (hash3(x, 2, z) > 0.7 ? P.roadDark : P.road))
-        : (hash3(x, 4, z) > 0.8 ? P.snowShade : (hash3(x, 5, z) > 0.93 ? P.snowBlue : P.snow));
-      // Strata visible at the diorama edge.
-      for (let y = -6; y < h; y++) {
-        let c;
-        if (y === h - 1) c = top;
-        else if (y >= -2) c = P.snowShade;
-        else if (y === -3) c = P.dirt;
-        else c = hash3(x, y, z) > 0.5 ? P.rock : P.rockLight;
-        m.set(x, y, z, c);
-      }
-    }
-  }
-  const { lit } = m.buildGeometries({ size: 1, origin: 'none', jitter: 0.025, greedy: false });
-  const mesh = new THREE.Mesh(lit, MATERIALS.lit);
-  mesh.receiveShadow = true;
-  mesh.name = 'terrain';
-  return mesh;
-}
 
 /** Is a spot clear of roads, plots and the colony (for trees and rocks)? */
 function isFreeForDecoration(x, z, layout, roads) {
@@ -179,11 +137,6 @@ function scatter(layout, roads, count, seed, minGap = 2.4) {
   return pts;
 }
 
-function slotMarker(color, rim) {
-  const m = new VoxelModel();
-  m.box(-1, 0, -1, 3, 1, 3, (x, _y, z) => (x === 0 && z === 0 ? color : rim));
-  return m;
-}
 
 /** HD slot markers: a bevelled 6×6 plate with a carved emblem (snowflake for survivors, claw marks for zombies). */
 function slotMarkerHD(kind) {
@@ -220,30 +173,24 @@ function haloTexture() {
 
 // ---------------------------------------------------------------- public API
 
-export function createBoard({ quality = { hd: false } } = {}) {
-  const hd = !!quality.hd;
+export function createBoard() {
   const root = new THREE.Group();
   root.name = 'board';
   const layout = computeLayout();
   const roads = computeRoads(layout);
   // HD models are authored at 2× resolution, so each voxel is half the size.
-  const bScale = hd ? BOARD.buildingScale / 2 : BOARD.buildingScale;
+  const bScale = BOARD.buildingScale / 2;
 
-  let terrain;
-  if (hd) {
-    terrain = new THREE.Mesh(buildTerrainHD({ radius: BOARD.radius, ...distances(layout, roads) }), MATERIALS.lit);
-    terrain.receiveShadow = true;
-    terrain.name = 'terrain';
-  } else {
-    terrain = buildTerrain(layout, roads);
-  }
+  const terrain = new THREE.Mesh(buildTerrainHD({ radius: BOARD.radius, ...distances(layout, roads) }), MATERIALS.lit);
+  terrain.receiveShadow = true;
+  terrain.name = 'terrain';
   root.add(terrain);
 
   // Colony
   // HD models carry their texture in material patterns, so skip the extra per-voxel jitter: it would stop
   // neighbouring faces from merging and multiply the triangle count.
-  const jitter = hd ? 0 : 0.05;
-  const colonyGroup = (hd ? colonyHD(BOARD.colonyRadius * 2) : colony(BOARD.colonyRadius * 2)).build({ size: bScale, jitter });
+  const jitter = 0;
+  const colonyGroup = colonyHD(BOARD.colonyRadius * 2).build({ size: bScale, jitter });
   colonyGroup.position.y = 0;
   colonyGroup.name = 'colony';
   root.add(colonyGroup);
@@ -252,7 +199,7 @@ export function createBoard({ quality = { hd: false } } = {}) {
   const locationGroups = {};
   for (const id of OUTSIDE_LOCATIONS) {
     const L = layout[id];
-    const g = (hd ? LOCATION_BUILDERS_HD : LOCATION_BUILDERS)[id]().build({ size: bScale, jitter });
+    const g = LOCATION_BUILDERS_HD[id]().build({ size: bScale, jitter });
     g.position.copy(L.center);
     g.rotation.y = L.facing;
     g.name = id;
@@ -269,41 +216,33 @@ export function createBoard({ quality = { hd: false } } = {}) {
     for (const p of L.survivorSlots) { tmp.position.set(p.x, 0.01, p.z); tmp.rotation.y = L.facing; tmp.updateMatrix(); survivorTransforms.push(tmp.matrix.clone()); }
     for (const p of L.zombieSlots) { tmp.position.set(p.x, 0.01, p.z); tmp.rotation.y = L.facing; tmp.updateMatrix(); zombieTransforms.push(tmp.matrix.clone()); }
   }
-  if (hd) {
-    root.add(instanced(slotMarkerHD('survivor'), 0.225, survivorTransforms, { castShadow: false, jitter: 0 }));
-    root.add(instanced(slotMarkerHD('zombie'), 0.225, zombieTransforms, { castShadow: false, jitter: 0 }));
-  } else {
-    root.add(instanced(slotMarker(0xd8e6f5, 0x7f97b8), 0.45, survivorTransforms, { castShadow: false }));
-    root.add(instanced(slotMarker(P.danger, P.dangerDark), 0.45, zombieTransforms, { castShadow: false }));
-  }
+  root.add(instanced(slotMarkerHD('survivor'), 0.225, survivorTransforms, { castShadow: false, jitter: 0 }));
+  root.add(instanced(slotMarkerHD('zombie'), 0.225, zombieTransforms, { castShadow: false, jitter: 0 }));
 
   // Forest + rocks (instanced)
   const trees = scatter(layout, roads, 90, 3);
-  // Low: 3 sizes of the classic pine. HD: 3 silhouettes, one instanced mesh each, size varied by scale
-  // (fewer draw calls than one mesh per shape × size).
-  const groups = hd ? 3 : 3;
+  // 3 silhouettes, one instanced mesh each, size varied by scale (fewer draw calls than one mesh per shape × size).
+  const groups = 3;
   const bucket = Array.from({ length: groups }, () => []);
   for (const t of trees) {
     tmp.position.set(t.x, 0, t.z);
     tmp.rotation.y = Math.floor(t.r * 4) * (Math.PI / 2);
-    tmp.scale.setScalar(hd ? 0.75 + t.s * 0.6 : 0.85 + t.s * 0.35);
+    tmp.scale.setScalar(0.75 + t.s * 0.6);
     tmp.updateMatrix();
-    const g = hd ? Math.floor(hash3(Math.round(t.x * 10), 5, Math.round(t.z * 10)) * 3) : Math.floor(t.s * 3);
+    const g = Math.floor(hash3(Math.round(t.x * 10), 5, Math.round(t.z * 10)) * 3);
     bucket[g].push(tmp.matrix.clone());
   }
   bucket.forEach((list, i) => {
     if (!list.length) return;
-    root.add(hd
-      ? instanced(treeModelHD(i, 1), 0.25, list, { cacheKey: `tree-${i}`, jitter: 0 })
-      : instanced(pineTree(i), 0.5, list));
+    root.add(instanced(treeModelHD(i, 1), 0.25, list, { cacheKey: `tree-${i}`, jitter: 0 }));
   });
   const rockSpots = scatter(layout, roads, 30, 9, 3);
-  const rockBuckets = Array.from({ length: hd ? 3 : 1 }, () => []);
+  const rockBuckets = Array.from({ length: 3 }, () => []);
   rockSpots.forEach((t, i) => {
     tmp.position.set(t.x, 0, t.z); tmp.rotation.y = t.r * Math.PI * 2; tmp.scale.setScalar(0.8 + t.s); tmp.updateMatrix();
     rockBuckets[i % rockBuckets.length].push(tmp.matrix.clone());
   });
-  rockBuckets.forEach((list, shape) => root.add(hd ? instanced(rockModelHD(shape), 0.25, list, { cacheKey: `rock-${shape}`, jitter: 0 }) : instanced(rock(), 0.5, list)));
+  rockBuckets.forEach((list, shape) => root.add(instanced(rockModelHD(shape), 0.25, list, { cacheKey: `rock-${shape}`, jitter: 0 })));
 
   // Pick targets (invisible cylinders) and hover rings.
   const pickTargets = [];
@@ -332,10 +271,10 @@ export function createBoard({ quality = { hd: false } } = {}) {
 
   // Warm light sources: campfire + a lamp at each location door.
   const lights = [];
-  // HD: a gentler light set higher up, so survivors around the fire stay readable instead of blowing out.
-  const fireBase = hd ? 85 : 220;
-  const fire = new THREE.PointLight(0xff8a3c, fireBase, 32, hd ? 1.2 : 1.5);
-  fire.position.set(0, hd ? 4.5 : 3, 0);
+  // A gentle light set high up, so survivors around the fire stay readable instead of blowing out.
+  const fireBase = 85;
+  const fire = new THREE.PointLight(0xff8a3c, fireBase, 32, 1.2);
+  fire.position.set(0, 4.5, 0);
   root.add(fire);
   lights.push({ light: fire, base: fireBase, flicker: 0.25 });
   for (const id of OUTSIDE_LOCATIONS) {

@@ -3,7 +3,7 @@ const { chromium } = require('playwright');
 (async () => {
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
-  await page.goto('http://localhost:4173/?snow=0&quality=' + (process.argv[2] || 'medium'), { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:4173/?snow=0', { waitUntil: 'networkidle' });
   await page.waitForTimeout(1500);
   // Time every portrait + item synchronously (worst case: everything at once), small and large.
   console.log(JSON.stringify(await page.evaluate(() => {

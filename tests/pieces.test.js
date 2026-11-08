@@ -109,3 +109,10 @@ test('die faces: opposite faces sum to 7, pips are correct, and face-up rotation
   }
   assert.deepEqual(diceLayout(3, 1), [-1, 0, 1]);
 });
+
+test('a new game drops survivor figures that are not in the new state', async () => {
+  const { staleSurvivors } = await import('../src/render/pieces.js');
+  const state = { survivors: { 'maren-holt': { owner: 'p0', alive: true }, 'ezra-kade': { owner: 'p1', alive: false } } };
+  assert.deepEqual(staleSurvivors(['maren-holt', 'bo-lindqvist', 'ezra-kade'], state), ['bo-lindqvist']);
+  assert.deepEqual(staleSurvivors(['maren-holt'], { survivors: {} }), ['maren-holt'], 'draft of a new game: board is empty');
+});

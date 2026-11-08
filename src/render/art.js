@@ -117,8 +117,7 @@ const ZOMBIE_TINTS = ['#3f5a32', '#5a2a2a', '#344a3a', '#4a2f3a', '#3a4a2a'];
 const RIM = [0.75, 0.25, -0.6];
 
 export function createArtStudio({ quality }) {
-  const hd = !!quality?.hd;
-  const tier = quality?.id ?? 'low';
+  const tier = quality?.id ?? 'high';
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const out = document.createElement('canvas');
   // CPU-backed canvas: small images paint faster in software than through the GPU raster path.
@@ -126,8 +125,8 @@ export function createArtStudio({ quality }) {
   const projCache = new Map();
 
   function modelFor(kind, id) {
-    if (kind === 'survivor') return hd ? survivorModelHD(SURVIVORS_BY_ID[id]) : survivorModel(SURVIVORS_BY_ID[id]);
-    if (kind === 'zombie') return hd ? zombieModelHD(Number(id)) : zombieModelV(Number(id));
+    if (kind === 'survivor') return survivorModelHD(SURVIVORS_BY_ID[id]);
+    if (kind === 'zombie') return zombieModelHD(Number(id));
     throw new Error(`no model for ${kind}`);
   }
 
