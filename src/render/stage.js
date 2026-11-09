@@ -1,11 +1,6 @@
 // Renderer, orthographic "diorama" camera with limited orbit/zoom/pan, lighting, fog and snowfall.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { P } from './palette.js';
 import { MATERIALS } from './voxel.js';
 import { QUALITY } from './quality.js';
@@ -90,32 +85,26 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   const mist = createMist();
   scene.add(mist.group);
 
-  // Post-processing: bloom -> grade + vignette (+ tilt-shift) -> tone map.
-  let composer = null;
-  let bloom = null;
-  let grade = null;
-  if (q.post) {
-    composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, camera));
-    // Threshold above 1.0: only boosted glow voxels (fire, windows, eyes) bloom, not firelit snow.
-    bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), q.post.bloom, 0.5, 1.05);
-    composer.addPass(bloom);
-    grade = new ShaderPass(GradeShader);
-    grade.uniforms.uTilt.value = q.post.tiltShift ? 1 : 0;
-    composer.addPass(grade);
-    composer.addPass(new OutputPass());
+  // Post-processing lives in its own chunk (step 22); until it arrives (or on the saver tier) we render plain.
+  let post = null;
+  let postWanted = false; // set by setTier (main applies the graphics tier right away)
+  let postLoading = null;
+  let ratio = Math.min(window.devicePixelRatio, q.maxPixelRatio);
+  const size = { w: 1, h: 1 };
+  function ensurePost() {
+    if (post || postLoading || !q.post) return;
+    postLoading = import('./post.js').then(({ createPost }) => {
+      post = createPost(renderer, scene, camera, q.post);
+      post.setSize(size.w, size.h, renderer.getPixelRatio());
+    }).catch((err) => console.error(err));
   }
 
   function resize() {
     const w = canvas.clientWidth || window.innerWidth;
     const h = canvas.clientHeight || window.innerHeight;
+    size.w = w; size.h = h;
     renderer.setSize(w, h, false);
-    if (composer) {
-      composer.setPixelRatio(renderer.getPixelRatio());
-      composer.setSize(w, h);
-      bloom.setSize(Math.round(w / 2), Math.round(h / 2));
-      grade.uniforms.uResolution.value.set(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
-    }
+    post?.setSize(w, h, renderer.getPixelRatio());
     const aspect = w / h;
     // Sky: crop to the screen aspect ("cover") instead of stretching it (the moon stays round on phones).
     if (scene.background?.isTexture) {
@@ -146,19 +135,52 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
     mist?.update(dt);
     for (const cb of frameCallbacks) cb(t, dt);
     renderer.info.reset();
-    if (composer) composer.render(dt);
+    if (post && postWanted) post.render(dt);
     else renderer.render(scene, camera);
   }
+  // Step 22: frame pacing. `every` = draw 1 frame in N (2 = 30 fps saver, 4 = behind an opaque screen);
+  // a hidden tab draws nothing. `onTime(dt)` lets the governor watch real frame times.
+  let every = 1;
+  let idle = 1;
+  let tick = 0;
+  let acc = 0;
+  let onTime = null;
   function loop() {
     if (!running) return;
-    const dt = Math.min(clock.getDelta(), 0.05);
-    frame(dt, clock.elapsedTime);
     requestAnimationFrame(loop);
+    const raw = clock.getDelta();
+    if (document.hidden) { acc = 0; return; }
+    acc += raw;
+    if (++tick % Math.max(every, idle) !== 0) return;
+    const dt = acc;
+    acc = 0;
+    const t0 = performance.now();
+    const n = Math.max(every, idle);
+    frame(Math.min(dt, 0.05 * n), clock.elapsedTime); // throttled frames still keep game time
+    onTime?.(dt, performance.now() - t0, n);
   }
   requestAnimationFrame(loop);
 
   return {
     renderer, scene, camera, controls, quality: q, hemi, moon,
+    /** Step 22: apply a graphics tier (see render/perf.js TIERS). */
+    setTier(tier) {
+      ratio = Math.min(window.devicePixelRatio, q.maxPixelRatio, tier.pixelRatio);
+      renderer.setPixelRatio(ratio);
+      postWanted = !!(tier.post && q.post);
+      if (postWanted) ensurePost();
+      const map = Math.min(q.shadowMapSize, tier.shadow);
+      if (moon.shadow.mapSize.x !== map) { moon.shadow.mapSize.set(map, map); moon.shadow.map?.dispose(); moon.shadow.map = null; }
+      MATERIALS.glow.color.setScalar(postWanted ? q.glowBoost : Math.min(q.glowBoost, 1.5));
+      snowfall?.setScale(tier.snow);
+      every = tier.every ?? 1;
+      resize();
+    },
+    /** Draw less while an opaque full-screen panel covers the scene (1 = normal). */
+    setIdle(n) { idle = Math.max(1, n | 0); },
+    onFrameTime(cb) { onTime = cb; },
+    get drawEvery() { return Math.max(every, idle); },
+    get postActive() { return !!(post && postWanted); },
     /** Step 20: 0 (light flurries) .. 1 (blizzard). */
     setWeather(k) { snowfall?.setIntensity(k); },
     onFrame(cb) { frameCallbacks.push(cb); },
@@ -207,12 +229,14 @@ function createSnow(count = 2600) {
     return { ...L, pos, speed, geo, mat };
   });
   let storm = 0.35;
+  let scale = 1; // step 22: fewer flakes on lower graphics tiers
   return {
     group,
+    setScale(k) { scale = k; this.setIntensity(storm); },
     setIntensity(k) {
       storm = Math.max(0, Math.min(1, k));
       // Fewer flakes when calm (drawRange: no extra cost), all of them in a blizzard.
-      for (const L of layers) { L.geo.setDrawRange(0, Math.round(L.n * (0.35 + storm * 0.65))); L.mat.opacity = L.opacity * (0.7 + storm * 0.3); }
+      for (const L of layers) { L.geo.setDrawRange(0, Math.round(L.n * (0.35 + storm * 0.65) * scale)); L.mat.opacity = L.opacity * (0.7 + storm * 0.3); }
     },
     update(dt, t) {
       const wind = 0.6 + storm * 1.6;
@@ -220,7 +244,8 @@ function createSnow(count = 2600) {
       dt *= 0.8 + storm * 0.7;
       for (const L of layers) {
         const { pos, speed } = L;
-        for (let i = 0; i < L.n; i++) {
+        const n = L.geo.drawRange.count === Infinity ? L.n : Math.min(L.n, L.geo.drawRange.count);
+        for (let i = 0; i < n; i++) {
           const k = i * 3;
           pos[k + 1] -= speed[i] * dt;
           pos[k] += (Math.sin(t * 0.7 + i) * 0.8 + gust) * dt;
@@ -322,50 +347,3 @@ function createMist() {
     update(dt) { for (const l of layers) { l.mat.map.offset.x += l.speed * dt; l.mat.map.offset.y += l.speed * 0.4 * dt; } },
   };
 }
-
-/** Colour grade (cool shadows, warm highlights, a touch of saturation), vignette, optional tilt-shift. */
-const GradeShader = {
-  uniforms: {
-    tDiffuse: { value: null },
-    uTilt: { value: 0 },
-    uResolution: { value: new THREE.Vector2(1, 1) },
-  },
-  vertexShader: /* glsl */`
-    varying vec2 vUv;
-    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
-  `,
-  fragmentShader: /* glsl */`
-    uniform sampler2D tDiffuse;
-    uniform float uTilt;
-    uniform vec2 uResolution;
-    varying vec2 vUv;
-    void main() {
-      vec3 c = texture2D(tDiffuse, vUv).rgb;
-      if (uTilt > 0.5) {
-        // Miniature look: blur grows towards the top and bottom of the frame.
-        float amt = smoothstep(0.22, 0.5, abs(vUv.y - 0.55)) * 2.5;
-        if (amt > 0.01) {
-          vec2 px = amt / uResolution;
-          vec3 acc = c;
-          acc += texture2D(tDiffuse, vUv + vec2( px.x,  0.0)).rgb;
-          acc += texture2D(tDiffuse, vUv + vec2(-px.x,  0.0)).rgb;
-          acc += texture2D(tDiffuse, vUv + vec2( 0.0,  px.y)).rgb;
-          acc += texture2D(tDiffuse, vUv + vec2( 0.0, -px.y)).rgb;
-          acc += texture2D(tDiffuse, vUv + px * 1.4).rgb;
-          acc += texture2D(tDiffuse, vUv - px * 1.4).rgb;
-          acc += texture2D(tDiffuse, vUv + vec2(px.x, -px.y) * 1.4).rgb;
-          acc += texture2D(tDiffuse, vUv + vec2(-px.x, px.y) * 1.4).rgb;
-          c = acc / 9.0;
-        }
-      }
-      float l = dot(c, vec3(0.299, 0.587, 0.114));
-      vec3 cool = c * vec3(0.93, 0.98, 1.09);
-      vec3 warm = c * vec3(1.07, 1.0, 0.9);
-      c = mix(cool, warm, smoothstep(0.25, 0.9, l));
-      c = mix(vec3(l), c, 1.1);
-      float d = distance(vUv, vec2(0.5));
-      c *= mix(1.0, 0.7, smoothstep(0.38, 0.85, d));
-      gl_FragColor = vec4(c, 1.0);
-    }
-  `,
-};

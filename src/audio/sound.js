@@ -200,6 +200,12 @@ export const sound = {
     try { SOUNDS[name](); } catch { /* never let audio break the game */ }
   },
 
+  /** Hidden tab: suspend the audio clock (wind and crackle stop costing anything). */
+  pause(on) {
+    if (!ctx) return;
+    try { if (on) ctx.suspend(); else if (this.enabled) ctx.resume(); } catch { /* ignore */ }
+  },
+
   setEnabled(on) {
     this.enabled = on;
     if (!on) stopAmbient();

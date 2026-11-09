@@ -24,6 +24,11 @@ export default {
 
   'settings.title': 'ตั้งค่า',
   'settings.language': 'ภาษา',
+  'settings.graphics': "กราฟิก",
+  'settings.graphics.auto': "อัตโนมัติ",
+  'settings.graphics.high': "สูง",
+  'settings.graphics.saver': "ประหยัดแบต",
+  'boot.loading': "กำลังจุดไฟ…",
   'settings.camera': 'กล้องตาม',
   'settings.camera.all': 'ทุกคน',
   'settings.camera.others': 'คนอื่น',

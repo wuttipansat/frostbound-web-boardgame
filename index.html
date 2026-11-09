@@ -7,8 +7,33 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/src/ui/style.css" />
+  <!-- Step 22: the loading screen is plain inline HTML/CSS, so it shows before any script arrives. -->
+  <style>
+    #boot { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, #1b2c47, #070d18 70%); color: #dfe8f5; font: 600 14px/1.4 system-ui, sans-serif; transition: opacity .5s; }
+    #boot.done { opacity: 0; pointer-events: none; }
+    #boot .bx { width: min(320px, 80vw); text-align: center; }
+    #boot h1 { font: 600 28px/1 Oswald, system-ui, sans-serif; letter-spacing: .32em; margin: 0 0 18px; text-shadow: 0 0 18px rgba(160,200,255,.35); }
+    #boot .bar { height: 4px; border-radius: 4px; background: rgba(255,255,255,.1); overflow: hidden; }
+    #boot .bar i { display: block; height: 100%; width: 12%; background: linear-gradient(90deg, #8fc0ff, #ffc46b); transition: width .35s; }
+    #boot p { margin: 12px 0 0; opacity: .7; font-weight: 500; }
+    #boot::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle, rgba(255,255,255,.55) 0 1px, transparent 1.5px) 0 0/38px 38px, radial-gradient(circle, rgba(255,255,255,.35) 0 1px, transparent 1.5px) 19px 13px/53px 53px; animation: bootsnow 9s linear infinite; opacity: .5; }
+    @keyframes bootsnow { to { background-position: 0 380px, 19px 543px; } }
+    @media (prefers-reduced-motion: reduce) { #boot::before { animation: none; } }
+  </style>
 </head>
 <body>
+  <div id="boot" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="10">
+    <div class="bx"><h1>FROSTBOUND</h1><div class="bar"><i></i></div><p id="boot-msg">Lighting the fire… / กำลังจุดไฟ…</p></div>
+  </div>
+  <script>
+    // Progress from the module (0..1); 1 = first frame drawn, the screen fades away.
+    window.__boot = function (p) {
+      var b = document.getElementById('boot'); if (!b) return;
+      b.querySelector('i').style.width = Math.round(Math.max(0.12, p) * 100) + '%';
+      b.setAttribute('aria-valuenow', String(Math.round(p * 100)));
+      if (p >= 1) { b.classList.add('done'); setTimeout(function () { b.remove(); }, 600); }
+    };
+  </script>
   <canvas id="scene"></canvas>
   <div id="labels" aria-hidden="true"></div>
   <div id="fx-layer" aria-live="polite"></div>

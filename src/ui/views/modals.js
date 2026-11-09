@@ -134,6 +134,12 @@ function settingsRows(ctx) {
       h('div', { class: 'seg small' },
         h('button', { class: ctx.ui.sound ? 'on' : '', onclick: () => ctx.setSound(true) }, t('settings.on')),
         h('button', { class: ctx.ui.sound ? '' : 'on', onclick: () => ctx.setSound(false) }, t('settings.off')))),
+    // Step 22: graphics — auto adapts to the device, saver = 30 fps and no post effects.
+    h('div', { class: 'row' },
+      h('span', { class: 'lbl' }, t('settings.graphics')),
+      h('div', { class: 'seg small' }, ['auto', 'high', 'saver'].map((v) => h('button', {
+        class: (ctx.ui.graphics ?? 'auto') === v ? 'on' : '', 'data-graphics': v, onclick: () => ctx.setGraphics(v),
+      }, t(`settings.graphics.${v}`))))),
     h('div', { class: 'row' },
       h('span', { class: 'lbl' }, t('settings.hints')),
       h('div', { class: 'seg small' },

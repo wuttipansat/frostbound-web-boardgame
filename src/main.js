@@ -7,6 +7,7 @@ import { createDiceTray } from './render/dice.js';
 import { Tweens } from './render/tween.js';
 import { createAmbientParticles } from './render/particles.js';
 import { loadQuality } from './render/quality.js';
+import { createGovernor, TIERS } from './render/perf.js';
 import { createApp } from './ui/app.js';
 import { createCameraRig } from './render/camera.js';
 import { createAtmosphere, atmosphereFor } from './render/atmosphere.js';
@@ -27,10 +28,25 @@ const $ = (id) => document.getElementById(id);
 
 // One graphics quality; only the pixel ratio and particle counts adapt to the device.
 const quality = loadQuality();
+const boot = (p) => window.__boot?.(p); // loading bar in index.html (step 22)
+boot(0.35);
 const stage = createStage($('scene'), { snow: params.get('snow') !== '0', quality });
+// Step 22: graphics tiers. Phones / small CPUs start one tier down; "auto" adapts to measured fps.
+const savedGraphics = (() => { try { return JSON.parse(localStorage.getItem('frostbound.settings.v1') ?? '{}').graphics; } catch { return null; } })();
+const governor = createGovernor({
+  mode: params.get('gfx') ?? savedGraphics ?? 'auto',
+  start: quality.maxPixelRatio < 2 ? 'medium' : 'high',
+  onTier: (tier) => { stage.setTier(tier); document.body.dataset.gfx = tier.id; },
+});
+stage.setTier(TIERS[governor.tier]);
+document.body.dataset.gfx = governor.tier;
+// Only judge fps while every frame is drawn (not while throttled behind a screen or in saver mode).
+stage.onFrameTime((dt, _ms, every) => { if (every === 1) governor.sample(dt); });
+boot(0.55);
 const board = createBoard();
 stage.scene.add(board.root);
 const tweens = new Tweens();
+boot(0.7);
 const pieces = createPieces(board, tweens);
 stage.scene.add(pieces.root);
 const diceTray = createDiceTray($('dice'));
@@ -189,6 +205,7 @@ function exposureFx(survivorId, face) {
 
 const app = createApp({
   board, pieces, diceTray, art,
+  graphics: governor,
   aiFast: params.get('ai') === 'fast', // debug/testing: AI doesn't wait for animations
   sceneScale: Math.max(0.1, Math.min(20, Number(params.get('scenes') ?? 1) || 1)), // testing: slower scenes
   fx: { exposure: exposureFx, diceRoll: showDice },
@@ -208,6 +225,12 @@ const app = createApp({
 refreshLabels(null);
 updateWinter(null);
 
+// Step 22: behind an opaque full-screen panel (pass the device, draft, objective reveal) draw 1 frame in 4.
+let coverCheck = 0;
+stage.onFrame(() => {
+  if (++coverCheck % 15) return;
+  stage.setIdle(document.querySelector('.backdrop.pass, .draft-screen, .obj-reveal') ? 4 : 1);
+});
 stage.onFrame((t, dt) => {
   tweens.update(dt);
   rig.update(dt);
@@ -356,3 +379,9 @@ window.addEventListener('pointerdown', () => sound.unlock());
 document.addEventListener('click', (ev) => { if (ev.target.closest?.('button')) sound.play('ui'); });
 
 window.__frostbound = { OBJECTIVES: SECRET_OBJECTIVES, rig, stage, atmosphere, footprints, groundAt, ray, board, pieces, diceTray, tweens, app, art, tryReduce, itemType: (defId) => ITEMS[defId]?.type };
+
+// Step 22: the first frame is on screen — drop the loading screen. A hidden tab draws nothing and
+// pauses the ambience.
+boot(0.9);
+requestAnimationFrame(() => requestAnimationFrame(() => boot(1)));
+document.addEventListener('visibilitychange', () => sound.pause(document.hidden));

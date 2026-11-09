@@ -15,7 +15,8 @@
     "start": "node server/index.mjs",
     "e2e:online": "node scripts/e2e/online.cjs",
     "e2e:layout": "node scripts/e2e/hud-layout.cjs",
-    "e2e:watch": "node scripts/e2e/watch.cjs"
+    "e2e:watch": "node scripts/e2e/watch.cjs",
+    "e2e:perf": "node scripts/e2e/perf.cjs"
   },
   "license": "UNLICENSED",
   "dependencies": {

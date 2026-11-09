@@ -43,7 +43,7 @@ const storage = {
 
 const defaultSeats = () => Array.from({ length: 5 }, (_, i) => ({ name: t('setup.defaultName', { n: i + 1 }), isAI: i >= 2 }));
 
-export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = {}, aiFast = false, sceneScale = 1 }) {
+export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = {}, aiFast = false, sceneScale = 1, graphics = null }) {
   const settings = storage.get(SETTINGS_KEY) ?? {};
   setLang(settings.lang ?? (navigator.language?.startsWith('th') ? 'th' : 'en'));
   sound.enabled = settings.sound ?? true;
@@ -74,6 +74,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     hints: settings.hints ?? true, // step 18: next-move hint bar
     cameraFollow: settings.cameraFollow ?? 'others', // step 15: who the camera follows
     playSpeed: settings.playSpeed ?? 'normal',
+    graphics: graphics?.mode ?? settings.graphics ?? 'auto', // step 22: auto | high | saver
     movePick: null, // location whose "who goes there" picker is open
     handCompact: settings.handCompact ?? (typeof window !== 'undefined' && (window.innerWidth <= 760 || window.innerHeight <= 800)),
   };
@@ -143,6 +144,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
       online: online ? { code: online.code, lobby: online.lobby, playerId: online.playerId, status: online.status, host: online.playerId === 'p0' } : null,
       set, dispatch, dismissQueue, tutorialEvent, setTutorial, sfx: (name, delay) => sound.play(name, delay), selectSurvivor, selectLocation, takeSeat, startGame, continueGame, quitToSetup, setLanguage, setSound,
       createRoom, joinRoom, startRoom, leaveRoom, setPresentation,
+      setGraphics: (mode) => { ui.graphics = mode; saveSettings({ graphics: mode }); graphics?.setMode(mode); render(); },
       setHints: (on) => { ui.hints = on; saveSettings({ hints: on }); render(); },
       watching: director.watching,
       setHandCompact: (on) => { ui.handCompact = on; saveSettings({ handCompact: on }); render(); },

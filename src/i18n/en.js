@@ -26,6 +26,11 @@ export default {
   // settings
   'settings.title': 'Settings',
   'settings.language': 'Language',
+  'settings.graphics': "Graphics",
+  'settings.graphics.auto': "Auto",
+  'settings.graphics.high': "High",
+  'settings.graphics.saver': "Battery saver",
+  'boot.loading': "Lighting the fire…",
   'settings.camera': 'Camera follows',
   'settings.camera.all': 'Everyone',
   'settings.camera.others': 'Others',
