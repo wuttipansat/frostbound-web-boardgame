@@ -89,14 +89,14 @@ export const CROSSROADS = [
       { label: 'Go yourself.', effects: [{ type: 'food', delta: 1 }, { type: 'wound' }] },
     ] },
   { id: 'xr-rotting-pile', title: 'The Midden',
-    trigger: { type: 'roundAtLeast', n: 3 },
+    trigger: { type: 'dayAtLeast', n: 3 },
     text: 'The waste pile behind the bunks is starting to smell, even in this cold.',
     choices: [
       { label: 'Burn it.', effects: [{ type: 'morale', delta: 1 }, { type: 'spawn', where: 'colony', n: 1 }] },
       { label: 'Ignore it a while longer.', effects: [{ type: 'morale', delta: -1 }] },
     ] },
   { id: 'xr-old-friend', title: 'An Old Friend',
-    trigger: { type: 'roundAtLeast', n: 2 },
+    trigger: { type: 'dayAtLeast', n: 2 },
     text: 'A familiar face at the fence. They\'re pale. They swear they weren\'t bitten.',
     choices: [
       { label: 'Let them in.', effects: [{ type: 'helpless', delta: 1 }, { type: 'spawn', where: 'colony', n: 1 }] },
@@ -159,7 +159,7 @@ export const CROSSROADS = [
       { label: 'Not today.', effects: [] },
     ] },
   { id: 'xr-final-rounds', title: 'Counting Days',
-    trigger: { type: 'roundAtLeast', n: 4 },
+    trigger: { type: 'dayAtLeast', n: 4 },
     text: 'Someone scratches another line in the doorframe. The lines are running out of room.',
     choices: [
       { label: 'Work through the night.', effects: [{ type: 'energy', delta: 20 }, { type: 'morale', delta: -1 }] },

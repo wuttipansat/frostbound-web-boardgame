@@ -5,13 +5,15 @@ import * as THREE from 'three';
 const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
 
 /** Pure: what the weather should look like for a (viewed) state. */
+const DUSK = { dawn: 0.3, day: 0, dusk: 0.65, night: 1 };
+
 export function atmosphereFor(s) {
   if (!s || !s.scenario) return { storm: 0.35, dusk: 0.5, fire: 1, mood: 'calm' };
-  const rounds = s.scenario.rounds || 1;
-  const progress = clamp((s.round - 1) / Math.max(1, rounds - 1));
+  const rounds = s.scenario.days || 1;
+  const progress = clamp((s.day - 1) / Math.max(1, rounds - 1));
   const morale = clamp(s.morale / (s.maxMorale || 10));
-  // Day -> night within a round: the turn is the day, the colony phase the night.
-  let dusk = s.phase === 'turn' ? 0.35 : s.phase === 'crossroads' ? 0.2 : 0.5;
+  // The light follows the time of day (the colony reveal shows dusk → night).
+  let dusk = DUSK[s.time] ?? 0.2;
   let storm = clamp(0.2 + progress * 0.45 + (1 - morale) * 0.45);
   let fire = 0.35 + morale * 0.75;
   let mood = storm > 0.7 ? 'storm' : 'calm';

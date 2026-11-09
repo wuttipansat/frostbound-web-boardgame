@@ -147,7 +147,7 @@ function energyActions(s, p, survivors, candidates, cardsOf, opts) {
   // 5. Walk: hurt, done, or carrying the goal home → colony; idle in the colony → out to a stocked place.
   const goal = scenarioDef(s).goal;
   const carrying = goal.type === 'deposit' ? cardsOf(goal.item).length : 0;
-  const lateRound = s.round >= s.scenario.rounds - 1;
+  const lateRound = s.day >= s.scenario.days - 1;
   for (const sv of survivors) {
     const loc = s.locations[sv.location];
     const bringHome = carrying >= 2 || (carrying >= 1 && lateRound);

@@ -98,7 +98,7 @@ test('move: costs energy, repeatable, respects slots; fuel drives; the trucker p
   let r = reduce(s, a.move('corwin-daly', 'hospital'));
   assert.equal(r.survivors['corwin-daly'].location, 'hospital');
   assert.equal(r.log.findLast((e) => e.k === 'move').safe, false, 'zombies there');
-  assert.equal(energy(r), 100 - ENERGY.COST.move - (r.round % 2 === 0 ? ENERGY.NIGHT : 0));
+  assert.equal(energy(r), 100 - ENERGY.COST.move - (r.day % 3 === 0 ? ENERGY.STORM : 0));
   const again = reduce(r, a.move('corwin-daly', 'library'));
   assert.equal(again.log.findLast((e) => e.k === 'move').safe, true, 'empty place');
 
@@ -185,6 +185,6 @@ test('healer ability: once per turn, same location only', () => {
 test('ending the turn runs the colony phase and starts the next round', () => {
   let s = startedGame();
   s = reduce(s, a.endTurn());
-  assert.ok(s.round === 2 || s.phase === 'gameOver');
+  assert.ok(s.day === 2 || s.phase === 'gameOver');
   assert.ok(s.reports.colony);
 });

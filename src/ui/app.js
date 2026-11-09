@@ -136,7 +136,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
 
   function onLogEntry(e) {
     sound.play(soundForLog(e));
-    if (e.k === 'crisisResolved' && state.reports.colony) ui.queue.push({ type: 'colony', report: structuredClone(state.reports.colony), morale: null, round: e.r });
+    if (e.k === 'crisisResolved' && state.reports.colony) ui.queue.push({ type: 'colony', report: structuredClone(state.reports.colony), morale: null, day: e.r });
     // What was chosen and what it did (the choice buttons only show the words).
     if (e.k === 'crossroadsChoice') ui.queue.push({ type: 'cross', cardId: e.cardId, choice: e.choice });
     if (TOAST_KEYS.has(e.k) && e.k !== 'crisisResolved') {
@@ -312,12 +312,12 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
     if (ui.modal === 'settings') return [null, () => settingsModal(x)];
     if (ui.modal === 'rules') return [`rules:${getLangKey()}`, () => rulesModal(x)];
     const q = ui.queue[0];
-    if (q?.type === 'colony') return [`colony:${q.report.round}:${getLangKey()}`, () => colonyModal(x, q)];
+    if (q?.type === 'colony') return [`colony:${q.report.day}:${getLangKey()}`, () => colonyModal(x, q)];
     if (q?.type === 'cross') return [`cross:${state.log.length}:${q.cardId}:${getLangKey()}`, () => crossResultModal(x, q)];
     if (state.phase === PHASES.GAME_OVER) return [null, () => gameOverModal(x)];
     if (state.phase === PHASES.DRAFT) return [`draft:${(ui.draftPicks ?? []).join()}:${getLangKey()}`, () => draftModal(x)];
     if (state.phase === PHASES.CROSSROADS) {
-      return [`cross:${state.pendingCrossroads.cardId}:${state.round}:${getLangKey()}`, () => crossroadsModal(x)];
+      return [`cross:${state.pendingCrossroads.cardId}:${state.day}:${getLangKey()}`, () => crossroadsModal(x)];
     }
     const picker = x.canAct && state.team.pick;
     if (picker) return [null, () => pickModal(x, picker)];

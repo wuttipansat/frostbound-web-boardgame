@@ -50,8 +50,9 @@ export function finishDraft(s) {
 
 export function startRound(s) {
   const crisisId = drawFromDeck(s, 'crisisDeck', 'crisisDiscard');
+  s.time = 'dawn';
   s.crisis = { id: crisisId, contributions: [] };
-  log(s, 'roundStart', { round: s.round, crisisId });
+  log(s, 'roundStart', { day: s.day, crisisId });
   beginTurn(s);
 }
 
@@ -77,11 +78,12 @@ export function beginTurn(s) {
   if (triggered) {
     const focusSv = focusSurvivor(s, focusFilterFor(card.trigger)) ?? focusSurvivor(s);
     s.pendingCrossroads = { cardId, focusSurvivorId: focusSv?.id ?? null };
-    s.phase = PHASES.CROSSROADS;
+    s.phase = PHASES.CROSSROADS; // still dawn
     log(s, 'crossroadsTriggered', { cardId });
   } else {
     if (cardId) s.crossroadsDiscard.push(cardId);
     s.phase = PHASES.TURN;
+    s.time = 'day';
   }
 }
 
@@ -96,6 +98,7 @@ export function resolveCrossroads(s, { choice }) {
   s.pendingCrossroads = null;
   s.crossroadsDiscard.push(card.id);
   s.phase = PHASES.TURN;
+  s.time = 'day';
   applyEffects(s, card.choices[choice].effects, { focusSurvivorId: pending.focusSurvivorId, reason: 'crossroads' });
 }
 
@@ -107,8 +110,9 @@ export function endTurn(s) {
 // ---------------------------------------------------------------- colony phase
 
 export function colonyPhase(s) {
-  const report = { round: s.round };
+  const report = { day: s.day };
   s.phase = PHASES.COLONY;
+  s.time = 'dusk';
 
   // 1. Food
   const need = foodNeeded(s);
@@ -133,6 +137,7 @@ export function colonyPhase(s) {
   report.crisis = resolveCrisis(s);
 
   // 4. Zombie spawns
+  s.time = 'night';
   report.spawns = spawnZombies(s);
 
   // 5. Frostbite: the campfire cures it; out in the cold it bites deeper.
@@ -147,8 +152,8 @@ export function colonyPhase(s) {
 
   // 6. Main objective, then round tracker.
   if (checkScenarioGoal(s)) return endGame(s, 'objectiveComplete');
-  s.round += 1;
-  if (s.round > s.scenario.rounds) return endGame(s, 'timeOut');
+  s.day += 1;
+  if (s.day > s.scenario.days) return endGame(s, 'timeOut');
   startRound(s);
 }
 

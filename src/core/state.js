@@ -25,8 +25,9 @@ export function createGame(config = {}) {
     rng: normalizeSeed(config.seed),
     config: { scenarioId: scenario.id },
     phase: PHASES.DRAFT,
-    round: 1,
-    scenario: { id: scenario.id, rounds: scenario.rounds, deposited: 0 },
+    day: 1,
+    time: 'dawn', // dawn | day | dusk | night
+    scenario: { id: scenario.id, days: scenario.days, deposited: 0 },
     morale: scenario.morale,
     maxMorale: 10,
     food: scenario.startFood,

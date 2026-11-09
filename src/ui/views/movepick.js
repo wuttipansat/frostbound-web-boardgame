@@ -34,7 +34,7 @@ export function renderMovePicker(el, ctx) {
   mount(el,
     list.map(({ sv, opt, safe }) => {
       const name = survivorDef(sv.id).name;
-      const tip = `${t('scene.moveTo', { name })} — ${opt.ok ? (safe ? t('tip.safe') : t('loc.moveRisk')) : t(`err.${opt.error}`)}`;
+      const tip = `${t('scene.moveTo', { name })} — ${opt.ok ? t('tip.safe') : t(`err.${opt.error}`)}`;
       const left = woundLimit(sv.id) - sv.wounds;
       return h('button', {
         class: `mp-token${opt.ok ? '' : ' off'}${ui.selSurvivor === sv.id ? ' preferred' : ''}`,

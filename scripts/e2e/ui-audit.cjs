@@ -130,10 +130,10 @@ async function audit(browser, device, vp) {
 
   // End turn with energy left: confirmation?
   f.endTurnUnusedDiceConfirm = await page.evaluate(() => {
-    const before = window.__frostbound.app.state.round;
+    const before = window.__frostbound.app.state.day;
     const btn = [...document.querySelectorAll('#pp-actions .btn.primary')].pop();
     btn?.click();
-    const after = window.__frostbound.app.state.round;
+    const after = window.__frostbound.app.state.day;
     return { endedImmediately: after !== before, confirmShown: !!document.querySelector('.dialog.confirm-end') };
   });
 

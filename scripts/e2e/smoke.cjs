@@ -26,8 +26,8 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
   });
 
   for (let i = 0; i < 260; i++) {
-    const st = await page.evaluate(() => { const s = window.__frostbound.app.state; return { phase: s.phase, round: s.round }; });
-    if (st.phase === 'gameOver' || st.round >= 4) { console.log('stop at', JSON.stringify(st)); break; }
+    const st = await page.evaluate(() => { const s = window.__frostbound.app.state; return { phase: s.phase, round: s.day }; });
+    if (st.phase === 'gameOver' || st.day >= 4) { console.log('stop at', JSON.stringify(st)); break; }
     const l = await leaks(); counts.leakChecks++;
     if (l.length) { errors.push(...l); break; }
     if (await page.locator('.dialog.colony .btn.primary, .dialog.cross-result .btn.primary').count()) {
@@ -81,7 +81,7 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
     if (await end.count()) { await click('#pp-actions .btn.end-turn:not(.off)'); counts.endTurn++; await page.waitForTimeout(250); continue; }
     await page.waitForTimeout(350);
   }
-  const fin = await page.evaluate(() => ({ round: window.__frostbound.app.state.round, phase: window.__frostbound.app.state.phase }));
+  const fin = await page.evaluate(() => ({ round: window.__frostbound.app.state.day, phase: window.__frostbound.app.state.phase }));
   console.log(JSON.stringify({ device, counts, fin, errors }));
   await browser.close();
   process.exit(errors.length ? 1 : 0);

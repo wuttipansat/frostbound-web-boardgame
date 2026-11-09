@@ -5,7 +5,7 @@ import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
 import { formatLog, describeEffects } from '../../i18n/format.js';
 import {
-  foodNeeded, crisisDef, crisisRequirement, scenarioProgress, scenarioTarget,
+  foodNeeded, isStorm, crisisDef, crisisRequirement, scenarioProgress, scenarioTarget,
 } from '../../core/selectors.js';
 import { counter } from '../ticker.js';
 import { checklistView } from './help.js';
@@ -22,13 +22,15 @@ export function renderTopbar(el, ctx) {
     style: cnt?.live ? { animationDelay: `${-Math.round(cnt.age)}ms` } : {},
   }, icon(ico, 'stat-ico'), h('span', { class: 'lbl' }, label), cnt?.num ?? null, cnt?.tag ?? null, body);
 
-  const lastRound = s.round === s.scenario.rounds;
+  const lastRound = s.day === s.scenario.days;
   const cMorale = counter('morale', s.morale);
   const morale = block(`morale${s.morale <= 3 ? ' critical' : ''}`, t('tip.morale'), 'morale', t('hud.morale'), cMorale,
     h('div', { class: 'meter' }, Array.from({ length: s.maxMorale }, (_, i) => h('i', { class: i < s.morale ? (s.morale <= 3 ? 'on low' : 'on') : '' }))));
-  const round = block(`round${lastRound ? ' critical' : ''}`, t('tip.round'), 'round', t('hud.round'),
-    counter('round', s.round, { text: (v) => `${v}/${s.scenario.rounds}` }),
-    h('div', { class: 'track' }, Array.from({ length: s.scenario.rounds }, (_, i) => h('i', { class: i + 1 < s.round ? 'past' : i + 1 === s.round ? 'now' : '' }))));
+  // Calendar: day n / 40, the time of day, and how much of the winter has passed.
+  const round = block(`round calendar${lastRound ? ' critical' : ''}`, t('tip.day'), 'round', t('hud.day'),
+    counter('round', s.day, { text: (v) => `${v}/${s.scenario.days}` }),
+    h('small', { class: `time t-${s.time ?? 'day'}` }, t(`time.${s.time ?? 'day'}`), isStorm(s) ? ` · ${t('hud.storm')}` : ''),
+    h('div', { class: 'mini-bar' }, h('i', { style: { width: `${Math.round((s.day / s.scenario.days) * 100)}%` } })));
   const food = block(`food${s.food < need ? ' critical' : ''}`, t('tip.food'), 'food', t('hud.food'), counter('food', s.food),
     h('small', {}, t('hud.foodNeed', { n: need })),
     s.starvation ? h('small', { class: 'bad' }, t('hud.starvation', { n: s.starvation })) : null);
@@ -133,9 +135,9 @@ export function renderLog(el, ctx) {
 function journalView(s) {
   const entries = journalEntries(s);
   const days = [];
-  for (let r = s.round; r >= 1; r--) {
-    const lines = entries.filter((j) => j.round === r);
-    if (!lines.length && r === s.round) continue;
+  for (let r = s.day; r >= 1; r--) {
+    const lines = entries.filter((j) => j.day === r);
+    if (!lines.length && r === s.day) continue;
     days.push(h('li', { class: 'jr-day' },
       h('b', {}, daySummary(s, r)),
       lines.length ? h('ul', {}, lines.map((j) => h('li', { class: `jr-line w${Math.min(5, j.weight)}` }, t(`jr.${j.key}`, j.params)))) : null));
@@ -145,18 +147,18 @@ function journalView(s) {
 
 // ---------------------------------------------------------------- step 11: phase banner
 
-const PHASE_STEPS = ['draft', 'crossroads', 'turn', 'colony'];
+const PHASE_STEPS = ['dawn', 'day', 'dusk', 'night'];
 
-/** Where the round is: Draft → (Crossroads) → Your turn → Colony phase. */
+/** Where the day is: Dawn → Day → Dusk → Night. */
 export function renderPhase(el, ctx) {
   const s = ctx.state;
-  const now = s.phase === PHASES.GAME_OVER ? null : s.phase;
+  const now = s.phase === PHASES.GAME_OVER || s.phase === PHASES.DRAFT ? null : (ctx.ui.queue[0]?.type === 'colony' ? 'night' : s.time);
   const who = s.phase === PHASES.DRAFT ? t('phase.draftWho')
     : s.phase === PHASES.GAME_OVER ? t('phase.over')
       : s.phase === PHASES.CROSSROADS ? t('phase.crossroadsWho') : ''; // the step list already says "Your turn"
   mount(el,
-    h('span', { class: 'phase-round' }, t('phase.round', { n: s.round, total: s.scenario.rounds })),
-    h('ol', { class: 'phase-steps' }, PHASE_STEPS.map((k) => h('li', { class: k === now ? 'now' : '' }, t(`phase.${k}`)))),
+    h('span', { class: 'phase-round' }, t('phase.day', { n: s.day, total: s.scenario.days })),
+    h('ol', { class: 'phase-steps' }, PHASE_STEPS.map((k) => h('li', { class: k === now ? 'now' : '' }, t(`time.${k}`)))),
     who ? h('span', { class: 'phase-who' }, who) : null,
     // Step 15: while a move plays out.
     ctx.watching ? h('span', { class: 'skip-hint' }, t('scene.skip')) : null);

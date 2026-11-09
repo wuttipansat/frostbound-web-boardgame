@@ -10,6 +10,10 @@ export const PHASES = Object.freeze({
 
 export const ITEM_TYPES = Object.freeze(['food', 'medicine', 'fuel', 'tools', 'weapon', 'armor', 'junk', 'survivor', 'book']);
 
+/** Parts of a day: dawn (crisis, crossroads) → day (your actions) → dusk (food, crisis) → night (zombies). */
+export const TIMES = Object.freeze(['dawn', 'day', 'dusk', 'night']);
+export const GAME_DAYS = 40;
+
 export const LOCATION_IDS = Object.freeze(['colony', 'police', 'grocery', 'school', 'hospital', 'library', 'gas']);
 export const OUTSIDE_LOCATIONS = Object.freeze(LOCATION_IDS.filter((l) => l !== 'colony'));
 
@@ -27,7 +31,7 @@ export const ENERGY = Object.freeze({
   MAX: 100,               // hard ceiling for any pool
   STARVING: 20,           // the colony is starving: regen this much less
   HURT: 20,               // 2+ wounds: the pool's max is this much lower
-  NIGHT: 4,               // even rounds: actions outside the colony cost more
+  STORM: 4,               // storm days (every 3rd day): actions outside the colony cost more
   COST: Object.freeze({ move: 13, barricade: 19, lure: 11 }),
   ATTACK_BASE: 9,         // attack cost = 9 + 2 × the survivor's attack skill (2..6 → 13..21)
   SEARCH_BASE: 15,        // search cost = 15 + 2 × search skill (2..6 → 19..27)

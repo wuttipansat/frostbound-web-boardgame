@@ -107,12 +107,13 @@ export function scenarioProgress(s) {
 }
 
 export function roundsRemaining(s) {
-  return s.scenario.rounds - s.round + 1;
+  return s.scenario.days - s.day + 1;
 }
 
 // ---------------------------------------------------------------- energy, forecast
 
-export const isNight = (s) => s.round % 2 === 0;
+/** Every third day a storm blows: outside actions cost more. */
+export const isStorm = (s) => s.day % 3 === 0;
 
 /**
  * Energy cost of an action for a survivor (move: `to` is the destination). Odd numbers on purpose.
@@ -137,7 +138,7 @@ export function actionCost(s, survivorId, kind, to = null) {
   const cheaper = { move: 'roadRunner', attack: 'sharpshooter', barricade: 'handy' }[kind];
   if (cheaper && def?.ability.type === cheaper) cost -= ENERGY.SKILLED;
   const outside = kind === 'move' ? to && to !== 'colony' : here !== 'colony';
-  if (isNight(s) && outside && def?.ability.type !== 'coldProof') cost += ENERGY.NIGHT;
+  if (isStorm(s) && outside && def?.ability.type !== 'coldProof') cost += ENERGY.STORM;
   return Math.max(1, cost);
 }
 

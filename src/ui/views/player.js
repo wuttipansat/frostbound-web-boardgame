@@ -147,7 +147,7 @@ export function renderPlayerPanel(refs, ctx) {
       class: `btn primary end-turn${end.ok ? '' : ' off'}`, 'aria-disabled': end.ok ? null : 'true',
       tip: end.ok ? null : t(`err.${end.error}`),
       onclick: (ev) => (end.ok ? endTurn() : flashTip(ev.currentTarget)),
-    }, t('panel.endTurn')) : null,
+    }, t('panel.endDay')) : null,
     ui.moreOpen && menu.length ? h('div', { class: 'more-menu panel', role: 'menu', onclick: (ev) => ev.stopPropagation() }, menu) : null);
 }
 

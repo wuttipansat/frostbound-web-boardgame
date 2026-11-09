@@ -10,7 +10,7 @@ import {
 } from '../selectors.js';
 
 export function log(s, key, params = {}) {
-  s.log.push({ r: s.round, k: key, ...params });
+  s.log.push({ r: s.day, k: key, ...params });
   if (s.log.length > RULES.MAX_LOG) s.log.splice(0, s.log.length - RULES.MAX_LOG);
 }
 

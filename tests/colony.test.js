@@ -102,20 +102,20 @@ test('the game ends won or lost: there are no secret objectives', () => {
 
 test('scenario goal is checked in the colony phase; time running out ends the game', () => {
   let s = team({ 'corwin-daly': 'colony' });
-  s = patch(s, (x) => { x.scenario.deposited = 2; x.food = 10; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
+  s = patch(s, (x) => { x.scenario.deposited = 8; x.food = 10; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
   assert.equal(s.phase, 'gameOver');
   assert.equal(s.result.reason, 'objectiveComplete');
 
   let t = team({ 'corwin-daly': 'colony' });
-  t = patch(t, (x) => { x.round = x.scenario.rounds; x.food = 10; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
+  t = patch(t, (x) => { x.day = x.scenario.days; x.food = 10; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
   assert.equal(t.result.reason, 'timeOut');
 });
 
 test('kills scenario goal', () => {
   let k = team({ 'corwin-daly': 'colony' }, { scenarioId: 'purge' });
-  k = patch(k, (x) => { x.totalKills = 5; x.food = 10; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
-  assert.notEqual(k.result?.reason, 'objectiveComplete', 'needs 6');
-  k = patch(k, (x) => { x.totalKills = 6; x.phase = 'turn'; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
+  k = patch(k, (x) => { x.totalKills = 24; x.food = 10; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
+  assert.notEqual(k.result?.reason, 'objectiveComplete', 'needs 25');
+  k = patch(k, (x) => { x.totalKills = 25; x.phase = 'turn'; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
   assert.equal(k.result?.reason, 'objectiveComplete');
 });
 
@@ -130,10 +130,10 @@ test('stockpile goal requires food AND a clear gate', () => {
       colonyPhase(x);
     });
   };
-  assert.equal(base(6, 0).result?.reason, 'objectiveComplete');
-  assert.equal(base(6, 3).result?.reason, 'objectiveComplete', 'exactly 3 zombies is allowed');
-  assert.notEqual(base(6, 4).result?.reason, 'objectiveComplete', 'too many zombies at the gate');
-  assert.notEqual(base(5, 0).result?.reason, 'objectiveComplete');
+  assert.equal(base(12, 0).result?.reason, 'objectiveComplete');
+  assert.equal(base(12, 3).result?.reason, 'objectiveComplete', 'exactly 3 zombies is allowed');
+  assert.notEqual(base(12, 4).result?.reason, 'objectiveComplete', 'too many zombies at the gate');
+  assert.notEqual(base(11, 0).result?.reason, 'objectiveComplete');
 });
 
 test('morale hitting 0 mid-turn ends the game immediately', () => {

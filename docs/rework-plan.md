@@ -17,7 +17,7 @@ Numbers are starting values; Step 18 tunes them.
 |---|------|--------|
 | 1 | Solo only: remove multiplayer, online, hot seat, AI seats, secret objectives, betrayer, requests, votes, `perPlayer` values. State has `s.team`, actions carry no player id. | **done** |
 | 2 | Remove waste and the danger deck. Item art becomes empty frames (name + type colour); `public/items/<item-id>.png` is used when it exists (`docs/item-art.md` lists the files, 128×128, transparent). | **done** |
-| 3 | Rounds → days (`s.day` 1–40), parts of the day, calendar on the HUD, light follows the time of day. | |
+| 3 | Rounds → days (`s.day` 1–40), parts of the day, calendar on the HUD, light follows the time of day. | **done** |
 | 4 | Several survivors: pick 2 of 6 at the start; recruit up to 6. Each survivor has location, HP, AP, ATK, gear, backpack. Remove "helpless". | |
 | 5 | AP per survivor (max 60–95, odd numbers) and sleep. Night: bed 100% AP +15 HP, no bed 70% +5 HP, outside 40% +0 HP (and the zombies there attack). Guard duty (helps defend, 50% AP next day). Nap: +25 AP +5 HP, skips the day. | |
 | 6 | HP 100 and fights. One attack = one zombie dead, costs 15 AP. HP lost = `max(0, zombie ferocity − (AP left + ATK)) ÷ 3` rounded up, minus armor. Walker ferocity 110, brute 150 (day 21+). Leaving a place with zombies: 5 HP per zombie. Guns: kill without losing HP, 10 AP + 1 ammo, a chance a new zombie appears (pistol 40%, shotgun 50% and kills 2, silenced rifle 15%). | |
@@ -60,3 +60,14 @@ Numbers are starting values; Step 18 tunes them.
   Padded parka and riot vest now lower move cost (−2 / −3) until armor protects HP in Step 6.
 - Item pictures: the old sprites were removed. `art.item()` shows an empty dashed frame in the item type's
   colour and checks `public/items/<id>.png` once; when the file exists it replaces the frame.
+
+## Step 3 notes
+
+- `s.round` → `s.day` (1–40), `scenario.rounds` → `scenario.days` (all 40). `s.time` is
+  `dawn` (crisis, crossroads) → `day` (your actions) → `dusk` (food, crisis) → `night` (zombies), then the next dawn.
+- HUD: a calendar block ("Day 12/40", time of day, storm, a progress bar) and a Dawn · Day · Dusk · Night strip.
+  The board's light follows `s.time`; the night report is shown at night. The button says "End the day →".
+- The old "even rounds are night" cost became **storm days** (every 3rd day: outside actions +4; Bo ignores it).
+- Scenario targets for 40 days: beacon 8 fuel, stores 12 food, purge 25 kills (placeholders until Step 13).
+- Balance: with one survivor the bot now loses almost every 40-day game (morale runs out by day 6–10).
+  Expected; Steps 4–14 add the team, sleep, food and base systems that make 40 days survivable.

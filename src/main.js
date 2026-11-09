@@ -66,8 +66,8 @@ function updateWinter(state) {
   atmosphere.set(a);
   sound.setWeather(a.storm, a.fire);
   document.body.dataset.mood = a.mood;
-  if (!state || state.round < lastRound) footprints.clear();
-  lastRound = state?.round ?? 0;
+  if (!state || state.day < lastRound) footprints.clear();
+  lastRound = state?.day ?? 0;
   footprints.setRound(lastRound);
   const over = state?.phase === 'gameOver';
   if (over && !overShown) rig.focus({ kind: 'over', at: 'colony' });
@@ -185,7 +185,8 @@ const app = createApp({
     hint: $('hint'),
     playerRefs: { head: $('pp-head'), survivors: $('pp-survivors'), chips: $('pp-chips'), hand: $('pp-hand'), actions: $('pp-actions') },
     onRender: (state) => {
-      updateWinter(state);
+      // While the night report is on screen, the board shows night.
+      updateWinter(state && app?.ui.queue[0]?.type === 'colony' ? { ...state, time: 'night' } : state);
       refreshLabels(state);
       for (const [id, el] of Object.entries(labels)) el.classList.toggle('active', app?.ui.selLoc === id);
     },

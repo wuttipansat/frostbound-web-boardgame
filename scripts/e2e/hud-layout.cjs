@@ -18,7 +18,7 @@ async function setup(p) {
     a.dispatch({ type: 'DRAFT_PICK', survivorIds: a.state.team.draftOptions.slice(0, 1) });
     a.tutorialEvent?.('skip');
     const s = structuredClone(a.state);
-    s.phase = 'turn'; s.pendingCrossroads = null; s.round = 2;
+    s.phase = 'turn'; s.pendingCrossroads = null; s.day = 2;
     const [sv, sv2] = s.team.survivors;
     s.survivors[sv].location = 'grocery'; s.survivors[sv].wounds = 1; s.locations.grocery.zombies = 2;
     // one survivor each now

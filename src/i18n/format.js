@@ -23,7 +23,7 @@ export function formatLog(e, state) {
     n: e.n ?? e.count ?? e.wounds ?? e.killed ?? e.removed ?? e.need ?? e.tokens ?? e.total ?? '',
     d: e.delta != null ? signed(e.delta) : '',
     value: e.value,
-    round: e.round,
+    round: e.day,
     crisis: c('crises', e.crisisId, 'name'),
     card: e.card ? n.card(e.card) : '',
     item: n.item(e.itemType),
@@ -37,8 +37,6 @@ export function formatLog(e, state) {
   switch (e.k) {
     case 'move': return t(e.safe ? 'log.moveSafe' : 'log.move', p);
     case 'exposure': return t(e.danger ? 'log.dangerDraw' : 'log.exposure', p);
-    case 'dangerShuffle': return t('log.dangerShuffle', { n: e.size });
-    case 'dangerAdded': return t('log.dangerAdded', { kind: t(`danger.${e.kind}`) });
     case 'crisisResolved': return t('log.crisisResolved', { ...p, result: t(e.success ? 'log.crisisOk' : 'log.crisisFail') });
     case 'infectionSpreads': return t('log.infectionSpreads', p);
     case 'lure': return t('log.lure', p);

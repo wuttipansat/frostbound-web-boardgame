@@ -10,7 +10,7 @@ for (const scenarioId of ['beacon', 'stores', 'purge']) {
     const { state, errors: e } = simulate({ scenarioId, seed });
     const r = state.result?.reason ?? 'unfinished';
     reasons[r] = (reasons[r] ?? 0) + 1;
-    rounds += state.round;
+    rounds += state.day;
     errors += e.length;
   }
   console.log(`${scenarioId.padEnd(7)} avg round ${(rounds / N).toFixed(1)}  illegal ${errors}  ${JSON.stringify(reasons)}`);

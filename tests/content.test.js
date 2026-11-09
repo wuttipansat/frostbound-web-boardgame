@@ -71,6 +71,5 @@ test('crises and scenarios reference known types', () => {
     for (const e of c.fail) assert.ok(EFFECT_TYPES.includes(e.type));
   }
   for (const sc of SCENARIOS) assert.ok(sc.goal.target > 0, `${sc.id}: a fixed solo target`);
-  const lengths = SCENARIOS.map((s) => s.rounds);
-  assert.ok(unique(lengths), 'scenarios differ in length');
+  for (const sc of SCENARIOS) assert.equal(sc.days, 40, `${sc.id}: a 40-day winter`);
 });

@@ -30,7 +30,7 @@ function scenarioCard(ctx, sc, { on = false, onclick = null } = {}) {
   h('span', { class: 'sc-goal' }, c('scenarios', sc.id, 'goalText')),
   h('span', { class: 'sc-meta' },
     h('span', { class: `diff ${sc.difficulty}` }, t(`difficulty.${sc.difficulty}`)),
-    h('span', {}, icon('round'), sc.rounds),
+    h('span', {}, icon('round'), sc.days),
     h('span', {}, icon('morale'), sc.morale)));
 }
 
@@ -229,7 +229,7 @@ export function colonyModal(ctx, item) {
   let delay = 0.2;
   const next = (step = 0.45) => { const d = delay; delay += step; return { animationDelay: `${d}s` }; };
   const rows = [];
-  if (item.round) rows.push(h('p', { class: 'jr-summary reveal', style: next(0.2) }, icon('log'), ` ${daySummary(ctx.state, item.round)}`));
+  if (item.day) rows.push(h('p', { class: 'jr-summary reveal', style: next(0.2) }, icon('log'), ` ${daySummary(ctx.state, item.day)}`));
   rows.push(h('p', { class: `step reveal ${r.fed ? '' : 'bad'}`, style: next() },
     icon('food'), ` ${r.fed ? t('colony.fed', { n: r.foodNeeded }) : t('colony.starve', { n: r.starvation })}`));
   rows.push(h('h3', { class: 'reveal', style: next(0.3) }, t('colony.crisis', { name: c('crises', def.id, 'name') })));
@@ -266,7 +266,7 @@ export function colonyModal(ctx, item) {
   if (item.morale != null) rows.push(h('p', { class: 'step reveal', style: next() }, icon('morale'), ` ${t('colony.morale', { n: item.morale })}`));
   rows.push(h('button', { class: 'btn primary wide reveal', style: next(), onclick: ctx.dismissQueue }, t('colony.continue')));
   return dialog('colony',
-    h('small', { class: 'kicker' }, t('colony.title', { n: r.round })),
+    h('small', { class: 'kicker' }, t('colony.title', { n: r.day })),
     h('h2', { class: 'with-art' }, ctx.art.item(TYPE_REP[def.item], 's', { alt: '' }), c('crises', def.id, 'name')),
     h('p', { class: 'muted small' }, c('crises', def.id, 'text')),
     rows);

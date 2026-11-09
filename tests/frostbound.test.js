@@ -66,16 +66,16 @@ test('gear: equip is free, swaps back to hand, changes personal stats, and is wo
 test('actions cost energy: odd numbers, modifiers, and not enough energy is illegal', () => {
   let s = fb({ seed: 5 });
   s = setSurvivors(s, { 'osei-vance': 'grocery', 'greta-vos': 'hospital' });
-  s.round = 1;
+  s.day = 1;
   const search = (id) => ENERGY.SEARCH_BASE + ENERGY.PER_SKILL * SURVIVORS.find((x) => x.id === id).search;
   const attack = (id) => ENERGY.ATTACK_BASE + ENERGY.PER_SKILL * SURVIVORS.find((x) => x.id === id).attack;
   assert.equal(actionCost(s, 'osei-vance', 'search'), search('osei-vance'));
   assert.equal(actionCost(s, 'greta-vos', 'search'), search('greta-vos') + ENERGY.DANGEROUS);
   s.locations.grocery.zombies = 2;
   assert.equal(actionCost(s, 'osei-vance', 'search'), search('osei-vance') + ENERGY.CROWDED);
-  s.round = 2; // night: outside costs more
-  assert.equal(actionCost(s, 'osei-vance', 'attack'), attack('osei-vance') + ENERGY.NIGHT);
-  s.round = 1;
+  s.day = 3; // storm day: outside costs more
+  assert.equal(actionCost(s, 'osei-vance', 'attack'), attack('osei-vance') + ENERGY.STORM);
+  s.day = 1;
   me(s).energy = 100;
   const after = reduce(s, act.search('greta-vos'));
   assert.equal(me(after).energy, 100 - search('greta-vos') - ENERGY.DANGEROUS);
@@ -88,7 +88,7 @@ test('moving: costs energy, repeatable, and walking in among zombies is safe for
   s = setSurvivors(s, { 'osei-vance': 'colony', 'greta-vos': 'colony' });
   me(s).energy = 80;
   s = reduce(s, act.move('osei-vance', 'grocery'));
-  assert.equal(me(s).energy, 80 - ENERGY.COST.move - (s.round % 2 === 0 ? ENERGY.NIGHT : 0));
+  assert.equal(me(s).energy, 80 - ENERGY.COST.move - (s.day % 3 === 0 ? ENERGY.STORM : 0));
   s = reduce(s, act.move('osei-vance', 'school')); // a second move is fine
   s.locations.police.zombies = 2;
   s = reduce(s, act.move('greta-vos', 'police'));
@@ -102,10 +102,10 @@ test('new abilities: cheaper moves, attacks and barricades, cold-proof nights, d
   assert.equal(actionCost(s, 'maren-holt', 'move', 'colony'), ENERGY.COST.move - ENERGY.SKILLED);
   assert.equal(actionCost(s, 'ilse-brandt', 'attack'), ENERGY.ATTACK_BASE + ENERGY.PER_SKILL * SURVIVORS.find((x) => x.id === 'ilse-brandt').attack - ENERGY.SKILLED);
   assert.equal(actionCost(s, 'wren-okafor', 'barricade'), actionCost(s, 'corwin-daly', 'barricade') - ENERGY.SKILLED);
-  s.round = 2; // night
-  assert.equal(actionCost(s, 'bo-lindqvist', 'barricade'), ENERGY.COST.barricade, 'no night cost for Bo');
-  assert.equal(actionCost(s, 'corwin-daly', 'barricade'), ENERGY.COST.barricade + ENERGY.NIGHT);
-  s.round = 1;
+  s.day = 3; // storm
+  assert.equal(actionCost(s, 'bo-lindqvist', 'barricade'), ENERGY.COST.barricade, 'no storm cost for Bo');
+  assert.equal(actionCost(s, 'corwin-daly', 'barricade'), ENERGY.COST.barricade + ENERGY.STORM);
+  s.day = 1;
   let junk; [s, junk] = giveCard(setSurvivors(s, { 'ezra-kade': 'colony' }), 'bedpan');
   s = setEnergy(s, 10);
   assert.equal(reduce(s, act.playCard(junk)).team.energy, 10 + 2 * ENERGY.JUNK);

@@ -5,7 +5,7 @@ import { windGain, crackleChance } from '../src/audio/sound.js';
 import { setLang } from '../src/i18n/index.js';
 
 const state = () => ({
-  round: 3,
+  day: 3,
   log: [
     { r: 1, k: 'search', survivorId: 'maren', locationId: 'hospital', count: 2, card: { defId: 'secret' } },
     { r: 1, k: 'move', survivorId: 'maren', from: 'colony', to: 'hospital' },

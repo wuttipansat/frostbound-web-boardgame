@@ -61,7 +61,7 @@ test('drafting validates picks and starts round 1', () => {
   assert.deepEqual(before, newGame(), 'reduce never mutates its input');
   assert.ok(['turn', 'crossroads'].includes(s.phase));
   assert.equal(tryReduce(s, draftPick(opts.slice(0, RULES.TEAM_START))).error, 'wrongPhase');
-  assert.equal(s.round, 1);
+  assert.equal(s.day, 1);
   assert.ok(s.crisis?.id);
   assert.equal(s.survivorDeck.length, 20 - RULES.TEAM_START, 'unpicked options go back');
 
