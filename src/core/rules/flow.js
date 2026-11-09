@@ -1,5 +1,5 @@
 // Game flow (solo): pick survivors -> rounds (crisis, one turn w/ crossroads, energy) -> colony phase -> end checks.
-import { PHASES, OUTSIDE_LOCATIONS, RULES, DANGER_ESCALATION } from '../constants.js';
+import { PHASES, OUTSIDE_LOCATIONS, RULES } from '../constants.js';
 import { shuffle, pick } from '../rng.js';
 import { assert } from '../errors.js';
 import { CROSSROADS_BY_ID } from '../../content/crossroads.js';
@@ -9,7 +9,7 @@ import {
   focusSurvivor, teamHasAbility, energyMax, energyRegen, spawnForecast,
 } from '../selectors.js';
 import {
-  log, changeMorale, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems, addDangerCard,
+  log, changeMorale, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems,
 } from './helpers.js';
 import { applyEffects } from './effects.js';
 import { evaluate, focusFilterFor } from './conditions.js';
@@ -61,13 +61,12 @@ export function beginTurn(s) {
   p.abilityUsed = {};
   p.usedCards = [];
   p.pick = null;
-  // Regain energy (carry-over stays, capped by the pool); a frost card's penalty applies once.
+  // Regain energy (carry-over stays, capped by the pool).
   // The first turn of the game starts full, so it gets nothing extra.
   const max = energyMax(s);
   if (p.fresh) p.fresh = false;
   else p.energy = Math.min(max, p.energy + energyRegen(s));
   p.energy = Math.min(p.energy, max);
-  p.regenPenalty = 0;
   log(s, 'energy', { value: p.energy, max });
   s.pendingCrossroads = null;
 
@@ -130,11 +129,6 @@ export function colonyPhase(s) {
   }
   report.starvation = s.starvation;
 
-  // 2. Waste
-  const wasteLoss = Math.floor(s.waste / RULES.WASTE_PER_MORALE);
-  report.wasteLoss = wasteLoss;
-  if (wasteLoss) changeMorale(s, -wasteLoss, 'waste');
-
   // 3. Crisis
   report.crisis = resolveCrisis(s);
 
@@ -147,9 +141,6 @@ export function colonyPhase(s) {
     if (sv.location === 'colony') sv.frostbite = false;
     else woundSurvivor(s, sv.id, 'frostbite');
   }
-
-  // 6. Frostbound: the danger deck gets meaner as the winter goes on.
-  if (DANGER_ESCALATION[s.round]) addDangerCard(s, DANGER_ESCALATION[s.round], 'winter');
 
   s.reports.colony = report;
   if (s.morale <= 0) return endGame(s, 'moraleCollapse');
@@ -174,7 +165,6 @@ export function resolveCrisis(s) {
     score += delta;
     return { card: s.cards[uid], type: item.type, delta };
   });
-  s.waste += revealed.length;
   const success = score >= required;
   const result = { crisisId: crisis.id, required, score, success, cards };
   log(s, 'crisisResolved', { crisisId: crisis.id, required, score, success });
@@ -184,7 +174,6 @@ export function resolveCrisis(s) {
     if (bonus) changeMorale(s, bonus, 'crisisAverted');
   } else {
     applyEffects(s, crisis.fail, { reason: 'crisisFailed' });
-    addDangerCard(s, 'scratch', 'crisisFailed');
   }
   s.crisisDiscard.push(s.crisis.id);
   s.crisis = null;

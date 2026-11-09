@@ -5,7 +5,7 @@ import * as a from '../src/core/actions.js';
 import { colonyPhase, resolveCrisis, spawnZombies, endGame } from '../src/core/rules/flow.js';
 import { addZombies } from '../src/core/rules/helpers.js';
 import { foodNeeded, crisisRequirement } from '../src/core/selectors.js';
-import { startedGame, setSurvivors, giveCard, patch, topDanger } from './_helpers.js';
+import { startedGame, setSurvivors, giveCard, patch } from './_helpers.js';
 
 /** A started solo game with the team placed as given. */
 function team(placements, opts = {}) {
@@ -30,13 +30,6 @@ test('colony phase pays food or adds escalating starvation', () => {
   const starving = patch(s, (x) => { x.food = 0; x.starvation = 1; x.crisis = { id: 'empty-pantry', contributions: [] }; colonyPhase(x); });
   assert.equal(starving.starvation, 2);
   assert.ok(starving.log.some((e) => e.k === 'morale' && e.reason === 'starvation' && e.delta === -2));
-});
-
-test('every 10 waste costs 1 morale in the colony phase', () => {
-  let s = team({ 'corwin-daly': 'police', 'greta-vos': 'police' });
-  s = patch(s, (x) => { x.helpless = 0; x.waste = 23; x.morale = 8; colonyPhase(x); });
-  assert.equal(s.reports.colony.wasteLoss, 2);
-  assert.ok(s.log.some((e) => e.k === 'morale' && e.reason === 'waste' && e.delta === -2));
 });
 
 test('crisis: matching +1, others -1; tinkerer junk counts; failure applies effects', () => {
@@ -64,7 +57,7 @@ test('crisis: matching +1, others -1; tinkerer junk counts; failure applies effe
   assert.equal(wrong.result.success, false);
   assert.equal(wrong.morale, 7, 'whiteout: -1 morale');
   assert.equal(wrong.locations.colony.zombies, 2, 'whiteout: 2 zombies at the colony');
-  assert.equal(wrong.waste, s.waste + 2, 'contributed cards go to waste');
+  assert.equal(wrong.waste, undefined, 'no waste pile');
 });
 
 test('inspire adds morale when a crisis is averted', () => {
@@ -145,9 +138,9 @@ test('stockpile goal requires food AND a clear gate', () => {
 
 test('morale hitting 0 mid-turn ends the game immediately', () => {
   let s = team({ 'corwin-daly': 'colony' });
-  s = patch(s, (x) => { x.morale = 1; x.locations.school.zombies = 1; });
-  const r = reduce(topDanger(s, 'bite'), a.move('corwin-daly', 'school'));
-  assert.equal(r.survivors['corwin-daly'].alive, false);
+  // A crossroads choice that costs the last point of morale ("Rations are rations.": morale −1).
+  s = patch(s, (x) => { x.morale = 1; x.phase = 'crossroads'; x.pendingCrossroads = { cardId: 'xr-low-spirits', focusSurvivorId: 'corwin-daly' }; });
+  const r = reduce(s, a.resolveCrossroads(1));
   assert.equal(r.phase, 'gameOver');
   assert.equal(r.result.reason, 'moraleCollapse');
   assert.throws(() => reduce(r, a.endTurn()), /gameOver/);

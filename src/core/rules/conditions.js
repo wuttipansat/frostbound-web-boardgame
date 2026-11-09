@@ -15,7 +15,6 @@ const PREDICATES = {
   moraleAtLeast: (s, c) => s.morale >= c.n,
   foodAtMost: (s, c) => s.food <= c.n,
   foodAtLeast: (s, c) => s.food >= c.n,
-  wasteAtLeast: (s, c) => s.waste >= c.n,
   roundAtLeast: (s, c) => s.round >= c.n,
   helplessAtLeast: (s, c) => s.helpless >= c.n,
   colonyZombiesAtLeast: (s, c) => s.locations.colony.zombies >= c.n,

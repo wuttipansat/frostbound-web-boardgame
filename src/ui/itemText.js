@@ -7,8 +7,6 @@ function effect(item) {
   const signed = (v) => (v > 0 ? `+${v}` : `${v}`);
   if (item.type === 'weapon') return ['weapon', { n: item.value, mod: signed(item.attackMod ?? 0) }];
   if (item.type === 'armor') {
-    if (item.frostProof) return ['armorFrost', {}];
-    if (item.soak) return ['armorSoak', { n: item.soak }];
     if (item.moveMod) return ['armorMove', { mod: signed(item.moveMod) }];
   }
   if (item.type === 'survivor') return [item.helpless ? 'recruitHelpless' : 'recruit', { n: 1 + (item.helpless ?? 0) }];

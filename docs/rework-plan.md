@@ -16,7 +16,7 @@ Numbers are starting values; Step 18 tunes them.
 | # | Step | Status |
 |---|------|--------|
 | 1 | Solo only: remove multiplayer, online, hot seat, AI seats, secret objectives, betrayer, requests, votes, `perPlayer` values. State has `s.team`, actions carry no player id. | **done** |
-| 2 | Remove waste and the danger deck. Item art becomes empty frames (name + type colour); `public/items/<item-id>.png` is used when it exists (`docs/item-art.md` lists the files, 128×128, transparent). | |
+| 2 | Remove waste and the danger deck. Item art becomes empty frames (name + type colour); `public/items/<item-id>.png` is used when it exists (`docs/item-art.md` lists the files, 128×128, transparent). | **done** |
 | 3 | Rounds → days (`s.day` 1–40), parts of the day, calendar on the HUD, light follows the time of day. | |
 | 4 | Several survivors: pick 2 of 6 at the start; recruit up to 6. Each survivor has location, HP, AP, ATK, gear, backpack. Remove "helpless". | |
 | 5 | AP per survivor (max 60–95, odd numbers) and sleep. Night: bed 100% AP +15 HP, no bed 70% +5 HP, outside 40% +0 HP (and the zombies there attack). Guard duty (helps defend, 50% AP next day). Nap: +25 AP +5 HP, skips the day. | |
@@ -47,3 +47,16 @@ Numbers are starting values; Step 18 tunes them.
   strings, `ws` dependency.
 - Balance right now (one survivor, 60 games each): beacon 13% won, stores 8%, purge 7%. That is expected
   with a single survivor; Step 4 gives the team two, and Step 18 tunes everything.
+
+## Step 2 notes
+
+- Waste is gone: no `s.waste`, no clean action, used cards simply leave the game (`discardCard`).
+  Crises and crossroads that used waste now cost morale or food instead.
+- The danger deck is gone: no `s.danger`, `lastExposure`, infection, escalation. Moving into zombies
+  and bare-handed fights carry no risk until HP fights (Step 6). Crossroads "exposure" became "wound".
+- Abilities that only touched waste or danger cards were replaced:
+  Maren `roadRunner` (move −5), Ilse `sharpshooter` (attack −5), Wren `handy` (barricade −5),
+  Bo `coldProof` (no night extra), Ezra `haggler` (junk gives double energy).
+  Padded parka and riot vest now lower move cost (−2 / −3) until armor protects HP in Step 6.
+- Item pictures: the old sprites were removed. `art.item()` shows an empty dashed frame in the item type's
+  colour and checks `public/items/<id>.png` once; when the file exists it replaces the frame.

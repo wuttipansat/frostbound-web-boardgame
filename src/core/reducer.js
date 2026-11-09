@@ -11,7 +11,6 @@ const HANDLERS = {
   [A.ATTACK]: turn.attack,
   [A.SEARCH]: turn.search,
   [A.BARRICADE]: turn.barricade,
-  [A.CLEAN]: turn.clean,
   [A.LURE]: turn.lure,
   [A.MOVE]: turn.move,
   [A.PLAY_CARD]: turn.playCard,

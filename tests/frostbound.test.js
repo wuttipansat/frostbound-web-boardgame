@@ -1,27 +1,23 @@
-// Energy (personal, per survivor), gear, the shared danger deck, threat forecast.
-// There are no dice anywhere.
+// Energy, gear, abilities, threat forecast. No dice, no danger deck, no waste.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame, startedGame, setSurvivors, patch } from './_helpers.js';
 import { reduce, tryReduce } from '../src/core/reducer.js';
 import * as act from '../src/core/actions.js';
-import { ENERGY, DANGER_DECK } from '../src/core/constants.js';
-import { actionCost, spawnForecast, dangerCounts, energyRegen, energyMax, killsPerAttack, gearOf } from '../src/core/selectors.js';
+import { ENERGY } from '../src/core/constants.js';
+import { actionCost, spawnForecast, energyRegen, energyMax, killsPerAttack, gearOf } from '../src/core/selectors.js';
 import { SURVIVORS } from '../src/content/survivors.js';
 import { giveCard, setEnergy } from './_helpers.js';
 import { spawnZombies } from '../src/core/rules/flow.js';
-import { drawDanger } from '../src/core/rules/helpers.js';
 import { simulate } from '../src/ai/simulate.js';
 
 const fb = (o = {}) => startedGame(o);
 const me = (s) => s.team;
-/** Put a specific card on top of the danger deck. */
-const topDanger = (s, kind) => { const c = structuredClone(s); c.danger.deck.push(kind); return c; };
 
-test('the team starts full of energy; a 20-card danger deck; no dice anywhere', () => {
+test('the team starts full of energy; no danger deck, no waste, no dice', () => {
   const s = fb();
-  const total = Object.values(DANGER_DECK).reduce((x, y) => x + y, 0);
-  assert.equal(s.danger.deck.length + s.danger.discard.length, total);
+  assert.equal(s.danger, undefined);
+  assert.equal(s.waste, undefined);
   assert.equal(s.team.survivors.length, 1);
   assert.equal(s.team.energy, energyMax(s));
   assert.equal(s.team.dice, undefined);
@@ -57,7 +53,6 @@ test('gear: equip is free, swaps back to hand, changes personal stats, and is wo
   assert.equal(killsPerAttack(s, 'corwin-daly'), 2);
   const r = reduce(s, act.attack('corwin-daly'));
   assert.equal(r.locations.police.zombies, 1);
-  assert.deepEqual(r.lastExposure, s.lastExposure, 'armed: no danger card');
   s = reduce(s, act.equip(boots));
   assert.equal(actionCost(s, 'corwin-daly', 'move', 'colony'), ENERGY.COST.move - 5);
   const regen = energyRegen(s);
@@ -88,61 +83,32 @@ test('actions cost energy: odd numbers, modifiers, and not enough energy is ille
   assert.equal(tryReduce(broke, act.search('greta-vos')).error, 'notEnoughEnergy');
 });
 
-test('moving: costs energy, repeatable, safe into empty places, a danger card where zombies wait', () => {
+test('moving: costs energy, repeatable, and walking in among zombies is safe for now', () => {
   let s = fb({ seed: 6 });
   s = setSurvivors(s, { 'osei-vance': 'colony', 'greta-vos': 'colony' });
-  s.locations.police.zombies = 0;
   me(s).energy = 80;
   s = reduce(s, act.move('osei-vance', 'grocery'));
   assert.equal(me(s).energy, 80 - ENERGY.COST.move - (s.round % 2 === 0 ? ENERGY.NIGHT : 0));
-  assert.ok(!s.log.some((e) => e.k === 'exposure'), 'empty place: no draw');
   s = reduce(s, act.move('osei-vance', 'school')); // a second move is fine
-  s.locations.police.zombies = 1;
-  s = topDanger(s, 'scratch');
+  s.locations.police.zombies = 2;
   s = reduce(s, act.move('greta-vos', 'police'));
-  const e = s.log.filter((x) => x.k === 'exposure').at(-1);
-  assert.equal(e.danger, 'scratch');
-  assert.equal(s.survivors['greta-vos'].wounds, 1);
+  assert.equal(s.survivors['greta-vos'].wounds, 0);
+  assert.ok(!s.log.some((e) => e.k === 'exposure'));
 });
 
-test('danger cards: frost lowers next regen, startle drains energy, surrounded adds a zombie, bite kills', () => {
+test('new abilities: cheaper moves, attacks and barricades, cold-proof nights, double junk', () => {
   let s = fb({ seed: 7 });
-  s = setSurvivors(s, { 'osei-vance': 'grocery', 'greta-vos': 'school' });
-  const regen = energyRegen(s);
-  let c = topDanger(s, 'frost'); drawDanger(c, 'osei-vance', 'test');
-  assert.ok(c.survivors['osei-vance'].frostbite);
-  assert.equal(energyRegen(c), regen + ENERGY.REGEN_FROST);
-  c = topDanger(s, 'startle'); const e0 = me(c).energy; drawDanger(c, 'osei-vance', 'test');
-  assert.equal(me(c).energy, e0 - 10);
-  c = topDanger(s, 'surrounded'); const z0 = c.locations.grocery.zombies; drawDanger(c, 'osei-vance', 'test');
-  assert.equal(c.locations.grocery.zombies + c.locations.grocery.barricades, z0 + s.locations.grocery.barricades + 1);
-  c = topDanger(s, 'bite'); drawDanger(c, 'greta-vos', 'test');
-  assert.equal(c.survivors['greta-vos'].alive, false);
-});
-
-test('abilities: lucky draws two and keeps the better; frost-proof ignores frost', () => {
-  let s = fb({ seed: 8 });
-  s = setSurvivors(s, { 'ezra-kade': 'grocery', 'bo-lindqvist': 'school' });
-  let c = structuredClone(s); c.danger.deck.push('safe', 'bite'); // bite on top, then safe
-  drawDanger(c, 'ezra-kade', 'test');
-  assert.ok(c.survivors['ezra-kade'].alive);
-  assert.equal(c.lastExposure.danger, 'safe');
-  c = topDanger(s, 'frost'); drawDanger(c, 'bo-lindqvist', 'test');
-  assert.equal(c.survivors['bo-lindqvist'].wounds, 0);
-});
-
-test('the deck reshuffles its discards when empty; escalation adds bites; failed crisis adds a scratch', () => {
-  let s = fb({ seed: 10 });
-  s = setSurvivors(s, { 'osei-vance': 'grocery', 'greta-vos': 'school' });
-  const c = structuredClone(s);
-  c.danger.discard.push(...c.danger.deck.splice(0)); // all in the discard pile
-  drawDanger(c, 'osei-vance', 'test');
-  assert.ok(c.log.some((e) => e.k === 'dangerShuffle'));
-  assert.equal(c.danger.deck.length + c.danger.discard.length, 20);
-  // Play bot games to the end of round 3 and check the deck grew.
-  let grew = false;
-  simulate({ seed: 3, onStep: (st) => { if (st.log.some((e) => e.k === 'dangerAdded' && e.kind === 'bite')) grew = true; } });
-  assert.ok(grew, 'a bite card was added as the winter went on');
+  s = setSurvivors(s, { 'maren-holt': 'colony', 'ilse-brandt': 'police', 'wren-okafor': 'school', 'bo-lindqvist': 'gas', 'corwin-daly': 'school' });
+  assert.equal(actionCost(s, 'maren-holt', 'move', 'colony'), ENERGY.COST.move - ENERGY.SKILLED);
+  assert.equal(actionCost(s, 'ilse-brandt', 'attack'), ENERGY.ATTACK_BASE + ENERGY.PER_SKILL * SURVIVORS.find((x) => x.id === 'ilse-brandt').attack - ENERGY.SKILLED);
+  assert.equal(actionCost(s, 'wren-okafor', 'barricade'), actionCost(s, 'corwin-daly', 'barricade') - ENERGY.SKILLED);
+  s.round = 2; // night
+  assert.equal(actionCost(s, 'bo-lindqvist', 'barricade'), ENERGY.COST.barricade, 'no night cost for Bo');
+  assert.equal(actionCost(s, 'corwin-daly', 'barricade'), ENERGY.COST.barricade + ENERGY.NIGHT);
+  s.round = 1;
+  let junk; [s, junk] = giveCard(setSurvivors(s, { 'ezra-kade': 'colony' }), 'bedpan');
+  s = setEnergy(s, 10);
+  assert.equal(reduce(s, act.playCard(junk)).team.energy, 10 + 2 * ENERGY.JUNK);
 });
 
 test('energy: regen at turn start, carry-over, cap, lower cap when badly hurt', () => {

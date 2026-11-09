@@ -1,4 +1,4 @@
-// Top bar (morale, round, food, waste, crisis, goal, turn) and the log panel — drawn icons, no emoji.
+// Top bar (morale, round, food, helpless, crisis, goal) and the log panel — drawn icons, no emoji.
 import { journalEntries, daySummary } from '../journal.js';
 import { h, mount, TYPE_REP } from '../dom.js';
 import { icon } from '../icons.js';
@@ -7,7 +7,6 @@ import { formatLog, describeEffects } from '../../i18n/format.js';
 import {
   foodNeeded, crisisDef, crisisRequirement, scenarioProgress, scenarioTarget,
 } from '../../core/selectors.js';
-import { RULES } from '../../core/constants.js';
 import { counter } from '../ticker.js';
 import { checklistView } from './help.js';
 import { PHASES } from '../../core/constants.js';
@@ -24,7 +23,6 @@ export function renderTopbar(el, ctx) {
   }, icon(ico, 'stat-ico'), h('span', { class: 'lbl' }, label), cnt?.num ?? null, cnt?.tag ?? null, body);
 
   const lastRound = s.round === s.scenario.rounds;
-  const wasteLeft = RULES.WASTE_PER_MORALE - (s.waste % RULES.WASTE_PER_MORALE);
   const cMorale = counter('morale', s.morale);
   const morale = block(`morale${s.morale <= 3 ? ' critical' : ''}`, t('tip.morale'), 'morale', t('hud.morale'), cMorale,
     h('div', { class: 'meter' }, Array.from({ length: s.maxMorale }, (_, i) => h('i', { class: i < s.morale ? (s.morale <= 3 ? 'on low' : 'on') : '' }))));
@@ -34,8 +32,6 @@ export function renderTopbar(el, ctx) {
   const food = block(`food${s.food < need ? ' critical' : ''}`, t('tip.food'), 'food', t('hud.food'), counter('food', s.food),
     h('small', {}, t('hud.foodNeed', { n: need })),
     s.starvation ? h('small', { class: 'bad' }, t('hud.starvation', { n: s.starvation })) : null);
-  const waste = block(`waste${wasteLeft <= 2 ? ' critical' : ''}`, t('tip.waste'), 'waste', t('hud.waste'), counter('waste', s.waste, { goodWhen: 'down' }),
-    h('div', { class: 'mini-bar' }, h('i', { style: { width: `${((s.waste % RULES.WASTE_PER_MORALE) / RULES.WASTE_PER_MORALE) * 100}%` } })));
   const helpless = block('helpless', t('tip.helpless'), 'person', t('hud.helplessShort'), counter('helpless', s.helpless));
 
   const crisisChip = crisis ? h('button', {
@@ -53,7 +49,7 @@ export function renderTopbar(el, ctx) {
 
   mount(el,
     h('div', { class: 'brand-mini' }, 'FROSTBOUND'),
-    morale, food, waste, helpless, round, goal, crisisChip,
+    morale, food, helpless, round, goal, crisisChip,
     h('div', { class: 'spacer' }),
     h('button', { class: 'icon-btn rules-btn', tip: t('hud.rules'), 'aria-label': t('hud.rules'), onclick: () => ctx.set({ modal: 'rules' }) }, '?'),
     h('button', { class: `icon-btn${ui.logOpen ? ' on' : ''}`, tip: t('hud.log'), 'aria-label': t('hud.log'), onclick: () => ctx.set({ logOpen: !ui.logOpen }) }, icon('log')),
@@ -95,7 +91,7 @@ function feedLine(e, s, ctx, { age = null } = {}) {
   const text = formatLog(e, s);
   if (!text) return null;
   const cls = e.k === 'roundStart' ? 'round' : e.k === 'turnStart' ? 'turn'
-    : ['death', 'overrun', 'infectionSpreads'].includes(e.k) ? 'bad' : e.k === 'exposure' && e.face !== 'blank' ? 'warn' : '';
+    : ['death', 'overrun', 'infectionSpreads'].includes(e.k) ? 'bad' : '';
   return h('li', {
     class: `feed-item ${cls}`,
     style: age != null ? { animationDelay: `${-Math.round(age)}ms` } : {},

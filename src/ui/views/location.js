@@ -8,7 +8,7 @@ import { survivorsAt, survivorDef, aliveSurvivors, spawnForecast } from '../../c
 import { flashTip } from '../tooltip.js';
 import { survivorOptions, lureTargets } from '../options.js';
 
-const ACTION_ICON = { attack: 'attack', search: 'search', barricade: 'barricade', clean: 'clean', lure: 'lure', ability: 'heal' };
+const ACTION_ICON = { attack: 'attack', search: 'search', barricade: 'barricade', lure: 'lure', ability: 'heal' };
 
 export function renderLocationPanel(el, ctx) {
   const { state: s, ui, art } = ctx;
@@ -61,7 +61,6 @@ export function renderLocationPanel(el, ctx) {
       const focus = sel && sel.location === id ? [sel] : mine;
       for (const sv of focus) {
         const opts = survivorOptions(s, sv.id);
-        const risky = (o) => o.id === 'attack' && survivorDef(sv.id).ability.type !== 'noAttackExposure';
         actions.push(h('div', { class: 'act-box' },
           h('h4', { tip: t('loc.actionsFor', { name: survivorDef(sv.id).name }) }, art.portrait(sv.id, 's', { cls: 'h4-face', alt: survivorDef(sv.id).name })),
           h('div', { class: 'act-grid icons' }, opts.map((o) => {
@@ -70,7 +69,6 @@ export function renderLocationPanel(el, ctx) {
             const tip = [t(`act.${o.id}`),
               o.cost != null ? t('act.cost', { n: o.cost, have: s.team.energy }) : null,
               !o.ok ? t(`err.${o.error}`) : null,
-              risky(o) && o.ok ? t('tip.exposure') : null,
               isLure && o.ok ? t('act.pickOnBoard') : null].filter(Boolean).join(' · ');
             return h('button', {
               class: `btn act icon-act${o.ok ? '' : ' off'}`, 'aria-disabled': o.ok ? null : 'true', tip, 'aria-label': tip,
@@ -82,7 +80,7 @@ export function renderLocationPanel(el, ctx) {
             },
             icon(ACTION_ICON[o.id] ?? 'ability', 'act-ico'),
             o.cost ? h('span', { class: 'need-badge cost', 'aria-hidden': 'true' }, String(o.cost)) : null,
-            risky(o) && o.ok ? h('span', { class: 'risk-dot', 'aria-hidden': 'true' }) : null);
+            null);
           }))));
       }
       if (!sel && !mine.length) actions.push(h('p', { class: 'muted small' }, t('panel.selectHint')));

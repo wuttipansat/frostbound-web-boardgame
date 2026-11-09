@@ -5,7 +5,7 @@
 
 /** Seconds each scene holds at normal speed: [watched, own move]. */
 const DURATION = {
-  move: [1.5, 0.15], attack: [1.3, 0.25], search: [1.35, 0.25], barricade: [1.05, 0.2], clean: [0.95, 0.2],
+  move: [1.5, 0.15], attack: [1.3, 0.25], search: [1.35, 0.25], barricade: [1.05, 0.2],
   lure: [1.35, 0.2], play: [1.0, 0.15], contribute: [0.9, 0.15], deposit: [1.0, 0.15], exposure: [2.9, 2.5], turn: [0.55, 0],
 };
 const MAX_SCENE = 4; // seconds: nothing may hold the queue longer, whatever the frame rate
@@ -25,7 +25,6 @@ export function eventsFromLog(entries, state) {
       case 'attack': ev = { kind: 'attack', survivorId: e.survivorId, at: e.locationId, n: e.killed ?? 0 }; break;
       case 'search': ev = { kind: 'search', survivorId: e.survivorId, at: e.locationId, n: e.count ?? 0 }; break;
       case 'barricade': ev = { kind: 'barricade', at: e.locationId, n: e.n ?? 1 }; break;
-      case 'clean': ev = { kind: 'clean', survivorId: e.survivorId, at: 'colony', n: e.removed ?? 0 }; break;
       case 'lure': ev = { kind: 'lure', survivorId: e.survivorId, from: e.from, to: e.to, at: e.to, n: e.n ?? 0 }; break;
       case 'play': ev = { kind: 'play', at: 'colony', card: e.card, type: e.type }; break;
       case 'contribute': ev = { kind: 'contribute', at: 'colony' }; break;

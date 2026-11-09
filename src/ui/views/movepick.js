@@ -12,7 +12,7 @@ export function moveCandidates(state, locationId, useFuel = false) {
   const fuel = useFuel && hasFuel(state);
   return aliveSurvivors(state).filter((sv) => sv.location !== locationId).map((sv) => {
     const opt = moveOption(state, sv.id, locationId, fuel);
-    const safe = survivorDef(sv.id).ability.type === 'noMoveExposure' || fuel;
+    const safe = true; // walking carries no risk until HP fights (rework step 6)
     return { sv, opt, safe };
   });
 }

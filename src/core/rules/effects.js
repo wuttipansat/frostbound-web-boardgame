@@ -5,8 +5,8 @@ import { OUTSIDE_LOCATIONS } from '../constants.js';
 import { pick } from '../rng.js';
 import { itemOf, focusSurvivor, energyMax } from '../selectors.js';
 import {
-  changeMorale, changeFood, changeWaste, changeHelpless, drawItems, wasteCard, addZombies,
-  removeZombies, addBarricades, woundSurvivor, healSurvivor, rollExposure, log, gainEnergy,
+  changeMorale, changeFood, changeHelpless, drawItems, discardCard, addZombies,
+  removeZombies, addBarricades, woundSurvivor, healSurvivor, log, gainEnergy,
 } from './helpers.js';
 
 function focus(s, ctx) {
@@ -23,7 +23,6 @@ function resolveWhere(s, ctx, where) {
 const EFFECTS = {
   morale: (s, ctx, e) => changeMorale(s, e.delta, ctx.reason),
   food: (s, ctx, e) => changeFood(s, e.delta, ctx.reason),
-  waste: (s, ctx, e) => changeWaste(s, e.delta, ctx.reason),
   helpless: (s, ctx, e) => changeHelpless(s, e.delta, ctx.reason),
   starvation: (s, _ctx, e) => { s.starvation += e.delta; },
   spawn: (s, ctx, e) => addZombies(s, resolveWhere(s, ctx, e.where), e.n, ctx.reason),
@@ -46,13 +45,12 @@ const EFFECTS = {
     for (let i = 0; i < e.n; i++) {
       const uid = s.team.hand.find((u) => !e.item || itemOf(s, u).type === e.item);
       if (!uid) break;
-      wasteCard(s, uid);
+      discardCard(s, uid);
       log(s, 'discard', { card: s.cards[uid] });
     }
   },
   wound: (s, ctx) => { const sv = focus(s, ctx); if (sv) woundSurvivor(s, sv.id, 'crossroads'); },
   heal: (s, ctx) => { const sv = focus(s, ctx); if (sv) healSurvivor(s, sv.id); },
-  exposure: (s, ctx) => { const sv = focus(s, ctx); if (sv) rollExposure(s, sv.id, 'crossroads'); },
   // Team energy (crossroads): delta can be negative; capped by the pool.
   energy: (s, _ctx, e) => gainEnergy(s, e.delta ?? ENERGY.CARD, energyMax(s)),
   moveHome: (s, ctx) => {

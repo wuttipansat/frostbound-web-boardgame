@@ -24,7 +24,7 @@ test('items have tiers 1-3 and higher tiers are scarcer in the decks', () => {
   assert.ok(copies[1] > copies[2] && copies[2] > copies[3] && copies[3] >= 1, JSON.stringify(copies));
 });
 
-test('weapons are worn: each attack kills the weapon\'s value, at the weapon\'s cost, with no danger card', () => {
+test('weapons are worn: each attack kills the weapon\'s value, at the weapon\'s cost', () => {
   let { s } = turn({ 'corwin-daly': 'police' });
   s = patch(s, (x) => { x.locations.police.zombies = 3; });
   let glock, shotgun, rifle;
@@ -37,8 +37,6 @@ test('weapons are worn: each attack kills the weapon\'s value, at the weapon\'s 
   assert.equal(actionCost(r, 'corwin-daly', 'attack'), bare + 2);
   const shot = reduce(r, a.attack('corwin-daly'));
   assert.equal(shot.locations.police.zombies, 1, 'shotgun kills 2');
-  assert.deepEqual(shot.lastExposure, r.lastExposure, 'armed: no danger card');
-  assert.equal(shot.waste, s.waste, 'gear is never spent');
   r = reduce(r, a.equip(rifle));
   assert.equal(actionCost(r, 'corwin-daly', 'attack'), bare - 6, 'the rifle is the cheapest shot');
   assert.ok(r.team.hand.includes(shotgun) && r.team.hand.includes(glock));

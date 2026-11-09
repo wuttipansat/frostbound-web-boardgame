@@ -2,6 +2,7 @@
 // voxel models on the CPU (2D canvas, no extra WebGL context), lazily when the browser is idle, cached.
 import { survivorModel, survivorModelHD, zombieModelV, zombieModelHD } from './characters.js';
 import { SURVIVORS_BY_ID } from '../content/survivors.js';
+import { ITEMS } from '../content/items.js';
 
 export const ART_SIZES = { s: 64, l: 160 };
 
@@ -16,6 +17,31 @@ export const artKey = ({ kind, id, size, tier }) => `${kind}:${id}:${size}:${tie
 export const portraitUrl = (id) => `./portraits/${id}.png`;
 /** URL of an item's pixel-art sprite. */
 export const itemUrl = (id) => `./items/${id}.png`;
+
+// Item pictures are optional: until a PNG is dropped into public/items/, a card shows an empty frame.
+const TYPE_COLOR = { food: '#7d8f5a', medicine: '#6f8aa3', fuel: '#b0643a', tools: '#8a9298', weapon: '#9a4a40', armor: '#6a7a8c', junk: '#7a6650', survivor: '#b9ab8e', book: '#a8894a' };
+const frames = new Map();
+/** An empty, dashed frame (SVG data URL) in the colour of the item type. */
+export function blankFrame(type) {
+  if (!frames.has(type)) {
+    const c = TYPE_COLOR[type] ?? '#888888';
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect x='4' y='4' width='56' height='56' rx='6' fill='${c}' fill-opacity='0.12' stroke='${c}' stroke-width='3' stroke-dasharray='6 5'/></svg>`;
+    frames.set(type, `data:image/svg+xml,${encodeURIComponent(svg)}`);
+  }
+  return frames.get(type);
+}
+const itemArt = new Map(); // defId -> 'pending' | 'ok' | 'missing'
+function probeItem(defId) {
+  if (itemArt.has(defId) || typeof Image === 'undefined') return;
+  itemArt.set(defId, 'pending');
+  const probe = new Image();
+  probe.onload = () => {
+    itemArt.set(defId, 'ok');
+    for (const el of document.querySelectorAll(`img.art-item.blank[data-item="${defId}"]`)) { el.src = itemUrl(defId); el.classList.remove('blank'); }
+  };
+  probe.onerror = () => itemArt.set(defId, 'missing');
+  probe.src = itemUrl(defId);
+}
 
 export class ArtCache {
   constructor(render, { schedule = null, now = () => Date.now() } = {}) {
@@ -258,13 +284,15 @@ export function createArtStudio({ quality }) {
       return el;
     },
     zombie: (variant, size = 's', opts) => img({ kind: 'zombie', id: String(variant), size }, opts),
-    /** Items are hand-made 64×64 pixel sprites (public/items/<id>.png). */
+    /** Items: public/items/<id>.png when that file exists, else an empty frame in the item type's colour. */
     item: (defId, size = 's', { cls = '', alt = '' } = {}) => {
       const el = document.createElement('img');
       el.className = `art art-item art-${size} sprite ${cls}`;
       el.alt = alt;
       el.decoding = 'async';
-      el.src = itemUrl(defId);
+      el.dataset.item = defId;
+      if (itemArt.get(defId) === 'ok') el.src = itemUrl(defId);
+      else { el.classList.add('blank'); el.src = blankFrame(ITEMS[defId]?.type); probeItem(defId); }
       return el;
     },
     /** Warm the cache in the background (e.g. small portraits for the current players). */

@@ -107,7 +107,7 @@ function refreshLabels(state) {
   }
 }
 
-const SCENE_ICON = { move: 'move', attack: 'attack', search: 'search', barricade: 'barricade', clean: 'clean', lure: 'lure', play: 'check', contribute: 'crisis', deposit: 'goal' };
+const SCENE_ICON = { move: 'move', attack: 'attack', search: 'search', barricade: 'barricade', lure: 'lure', play: 'check', contribute: 'crisis', deposit: 'goal' };
 
 /** A short floating callout over where a scene happens: who (face), what (icon), the result. */
 function sceneCallout(ev, state) {
@@ -122,7 +122,6 @@ function sceneCallout(ev, state) {
     case 'attack': res.append(`−${ev.n}`, icon('skull')); break;
     case 'search': el.append(...cardBacks(ev.n)); res.append(tr('scene.cards', { n: ev.n })); break;
     case 'barricade': res.append(`+${ev.n}`); break;
-    case 'clean': res.append(`−${ev.n}`, icon('waste')); break;
     case 'lure': res.append(`${ev.n}`, icon('skull'), ' → ', c('locations', ev.to, 'name')); break;
     case 'contribute': el.append(...cardBacks(1)); break;
     case 'play': case 'deposit': if (ev.card) { el.append(art.item(ev.card, 's', { cls: 'sc-item', alt: '' })); res.append(c('items', ev.card, 'name')); } break;

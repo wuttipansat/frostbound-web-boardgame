@@ -15,7 +15,7 @@ export const CROSSROADS = [
     trigger: { type: 'survivorAt', location: 'police' },
     text: 'The locker is padlocked. The key is on a belt. The belt is on someone who is still moving.',
     choices: [
-      { label: 'Wrestle the key free.', effects: [{ type: 'exposure' }, { type: 'drawItem', from: 'police', n: 2 }] },
+      { label: 'Wrestle the key free.', effects: [{ type: 'wound' }, { type: 'drawItem', from: 'police', n: 2 }] },
       { label: 'Not worth it. Walk away.', effects: [] },
     ] },
   { id: 'xr-nurse-notes', title: 'Charted Until the End',
@@ -86,13 +86,13 @@ export const CROSSROADS = [
     text: 'The children are hungry. A volunteer offers to go hunting alone in the dark.',
     choices: [
       { label: 'Let them go.', effects: [{ type: 'food', delta: 2 }, { type: 'helpless', delta: -1 }] },
-      { label: 'Go yourself.', effects: [{ type: 'food', delta: 1 }, { type: 'exposure' }] },
+      { label: 'Go yourself.', effects: [{ type: 'food', delta: 1 }, { type: 'wound' }] },
     ] },
   { id: 'xr-rotting-pile', title: 'The Midden',
-    trigger: { type: 'wasteAtLeast', n: 6 },
+    trigger: { type: 'roundAtLeast', n: 3 },
     text: 'The waste pile behind the bunks is starting to smell, even in this cold.',
     choices: [
-      { label: 'Burn it.', effects: [{ type: 'waste', delta: -4 }, { type: 'spawn', where: 'colony', n: 1 }] },
+      { label: 'Burn it.', effects: [{ type: 'morale', delta: 1 }, { type: 'spawn', where: 'colony', n: 1 }] },
       { label: 'Ignore it a while longer.', effects: [{ type: 'morale', delta: -1 }] },
     ] },
   { id: 'xr-old-friend', title: 'An Old Friend',
@@ -121,7 +121,7 @@ export const CROSSROADS = [
     text: 'Your people argue about who should take the night shift.',
     choices: [
       { label: 'Take it yourself.', effects: [{ type: 'energy', delta: -20 }, { type: 'morale', delta: 1 }] },
-      { label: 'Draw straws.', effects: [{ type: 'exposure' }] },
+      { label: 'Draw straws.', effects: [{ type: 'wound' }] },
     ] },
   { id: 'xr-snow-angel', title: 'Snow Angels',
     trigger: { type: 'always' },
@@ -142,7 +142,7 @@ export const CROSSROADS = [
     text: 'The road shines like glass. One wrong step and you go down hard.',
     choices: [
       { label: 'Take the long way.', effects: [{ type: 'energy', delta: -20 }] },
-      { label: 'Risk it.', effects: [{ type: 'exposure' }, { type: 'energy', delta: 20 }] },
+      { label: 'Risk it.', effects: [{ type: 'wound' }, { type: 'energy', delta: 20 }] },
     ] },
   { id: 'xr-stashed-rations', title: 'Hidden Rations',
     trigger: { type: 'foodAtLeast', n: 4 },
@@ -155,7 +155,7 @@ export const CROSSROADS = [
     trigger: { type: 'moraleAtLeast', n: 6 },
     text: 'Spirits are high. Someone proposes a fishing trip out on the lake.',
     choices: [
-      { label: 'Go fishing.', effects: [{ type: 'food', delta: 2 }, { type: 'exposure' }] },
+      { label: 'Go fishing.', effects: [{ type: 'food', delta: 2 }, { type: 'wound' }] },
       { label: 'Not today.', effects: [] },
     ] },
   { id: 'xr-final-rounds', title: 'Counting Days',
@@ -177,7 +177,7 @@ export const CROSSROADS = [
     text: 'A drift has buried the west gate overnight. Digging it out will take all morning.',
     choices: [
       { label: 'Dig it out.', effects: [{ type: 'energy', delta: -20 }, { type: 'removeZombies', where: 'colony', n: 1 }] },
-      { label: 'Leave it. A wall of snow is still a wall.', effects: [{ type: 'barricade', where: 'colony', n: 1 }, { type: 'waste', delta: 2 }] },
+      { label: 'Leave it. A wall of snow is still a wall.', effects: [{ type: 'barricade', where: 'colony', n: 1 }, { type: 'morale', delta: -1 }] },
     ] },
   { id: 'xr-fuel-thief', title: 'Who Took the Fuel?',
     trigger: { type: 'hasItem', item: 'fuel' },
@@ -198,7 +198,7 @@ export const CROSSROADS = [
     text: 'One of the colonists is found at the gate at 3 a.m., barefoot, humming.',
     choices: [
       { label: 'Assign someone to watch them.', effects: [{ type: 'energy', delta: -20 }] },
-      { label: 'Lock them in the storage shed at night.', effects: [{ type: 'morale', delta: -1 }, { type: 'waste', delta: 1 }] },
+      { label: 'Lock them in the storage shed at night.', effects: [{ type: 'morale', delta: -1 }] },
     ] },
   { id: 'xr-frost-fever', title: 'Frost Fever',
     trigger: { type: 'notInColony' },
@@ -211,7 +211,7 @@ export const CROSSROADS = [
     trigger: { type: 'notInColony' },
     text: 'Slow footsteps cross the floor above you. They stop right over your head.',
     choices: [
-      { label: 'Go up and deal with it.', effects: [{ type: 'exposure' }, { type: 'drawItem', from: 'here', n: 1 }] },
+      { label: 'Go up and deal with it.', effects: [{ type: 'wound' }, { type: 'drawItem', from: 'here', n: 1 }] },
       { label: 'Barricade the stairwell.', effects: [{ type: 'barricade', where: 'here', n: 1 }] },
     ] },
 ];

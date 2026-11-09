@@ -6,7 +6,6 @@ export const A = Object.freeze({
   ATTACK: 'ATTACK',
   SEARCH: 'SEARCH',
   BARRICADE: 'BARRICADE',
-  CLEAN: 'CLEAN',
   LURE: 'LURE',
   MOVE: 'MOVE',
   PLAY_CARD: 'PLAY_CARD',
@@ -23,7 +22,6 @@ export const resolveCrossroads = (choice) => ({ type: A.RESOLVE_CROSSROADS, choi
 export const attack = (survivorId) => ({ type: A.ATTACK, survivorId });
 export const search = (survivorId) => ({ type: A.SEARCH, survivorId });
 export const barricade = (survivorId) => ({ type: A.BARRICADE, survivorId });
-export const clean = (survivorId) => ({ type: A.CLEAN, survivorId });
 export const lure = (survivorId, toLocation) => ({ type: A.LURE, survivorId, toLocation });
 export const move = (survivorId, toLocation, fuelCardUid) => ({ type: A.MOVE, survivorId, toLocation, fuelCardUid });
 /** Blueprint search: put one of the drawn cards back under the deck. */

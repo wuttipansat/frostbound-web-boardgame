@@ -53,13 +53,6 @@ export function setEnergy(s, n) {
   return c;
 }
 
-/** Put danger cards on top of the danger deck (the last one listed is drawn first). */
-export function topDanger(s, ...kinds) {
-  const c = structuredClone(s);
-  c.danger.deck.push(...kinds);
-  return c;
-}
-
 export function patch(s, fn) {
   const c = structuredClone(s);
   fn(c);

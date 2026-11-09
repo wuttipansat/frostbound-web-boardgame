@@ -7,15 +7,15 @@ import { PHASES, OUTSIDE_LOCATIONS, ENERGY, RULES } from '../core/constants.js';
 import { gearSlot } from '../content/items.js';
 import {
   aliveSurvivors, survivorDef, itemOf, crisisDef, scenarioDef,
-  freeSurvivorSlots, freeZombieSlots, foodNeeded, actionCost, dangerCounts, spawnForecast, crisisRequirement, gearOf,
+  freeSurvivorSlots, freeZombieSlots, foodNeeded, actionCost, spawnForecast, crisisRequirement, gearOf,
 } from '../core/selectors.js';
 import { CROSSROADS_BY_ID } from '../content/crossroads.js';
 
 const EFFECT_SCORE = {
   morale: (e) => 3 * e.delta, food: (e) => e.delta, helpless: (e) => 1.5 * e.delta,
-  waste: (e) => -0.3 * e.delta, spawn: (e) => -1.2 * e.n, removeZombies: (e) => e.n,
+  spawn: (e) => -1.2 * e.n, removeZombies: (e) => e.n,
   barricade: (e) => 0.8 * e.n, drawItem: (e) => e.n, discard: (e) => -0.8 * e.n,
-  wound: () => -2, heal: () => 1.5, exposure: () => -1.5, energy: (e) => e.delta / 20,
+  wound: () => -2, heal: () => 1.5, energy: (e) => e.delta / 20,
   moveHome: () => 0.5, starvation: (e) => -3 * e.delta,
 };
 
@@ -118,13 +118,6 @@ function turnAction(s, p, opts) {
   return pickOne(candidates, opts) ?? act.endTurn();
 }
 
-/** Chance the next danger card is a bite (public counts only). */
-export function biteOdds(s) {
-  const c = dangerCounts(s) ?? {};
-  const total = Object.values(c).reduce((a, b) => a + b, 0);
-  return total ? (c.bite ?? 0) / total : 0;
-}
-
 /**
  * Value per energy. Fight crowds, scavenge, hold the
  * colony against the forecast, then walk (to empty places when possible, home when hurt).
@@ -132,27 +125,24 @@ export function biteOdds(s) {
 function energyActions(s, p, survivors, candidates, cardsOf, opts) {
   const can = (sv, kind, to) => p.energy >= actionCost(s, sv.id, kind, to);
   const forecast = spawnForecast(s);
-  const armed = !!gearOf(s).weapon;
 
   for (const sv of survivors) {
     const loc = s.locations[sv.location];
-    const safeFight = armed || survivorDef(sv.id).ability.type === 'noAttackExposure';
-    // 2. Thin out crowds (bare-handed only when it really matters).
+    // 2. Thin out crowds.
     const hunt = scenarioDef(s).goal.type === 'kills' && sv.wounds < 2;
     if (loc.zombies > 0 && can(sv, 'attack') && hunt) candidates.push(act.attack(sv.id));
-    if (loc.zombies >= 2 && can(sv, 'attack') && (safeFight || loc.zombies >= 3)) candidates.push(act.attack(sv.id));
+    if (loc.zombies >= 2 && can(sv, 'attack') && true) candidates.push(act.attack(sv.id));
     // 3. Scavenge.
     if (sv.location !== 'colony' && loc.deck.length && can(sv, 'search')) candidates.push(act.search(sv.id));
-    if (loc.zombies > 0 && can(sv, 'attack') && safeFight) candidates.push(act.attack(sv.id));
+    if (loc.zombies > 0 && can(sv, 'attack')) candidates.push(act.attack(sv.id));
   }
   for (const sv of survivors) {
     const loc = s.locations[sv.location];
-    // 4. Hold the colony against tonight's zombies; clean when it smells.
+    // 4. Hold the colony against tonight's zombies.
     if (freeZombieSlots(s, sv.location) > 0 && can(sv, 'barricade')
       && ((sv.location === 'colony' && (forecast.colony ?? 0) > s.locations.colony.barricades) || loc.zombies > 0)) {
       candidates.push(act.barricade(sv.id));
     }
-    if (sv.location === 'colony' && s.waste >= 4 && can(sv, 'clean')) candidates.push(act.clean(sv.id));
   }
   // 5. Walk: hurt, done, or carrying the goal home → colony; idle in the colony → out to a stocked place.
   const goal = scenarioDef(s).goal;

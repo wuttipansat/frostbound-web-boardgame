@@ -1,7 +1,6 @@
 // createGame(config) -> a fresh, fully JSON-serializable GameState.
 import { PHASES, LOCATION_IDS, RULES } from './constants.js';
 import { normalizeSeed, shuffle } from './rng.js';
-import { DANGER_DECK } from './constants.js';
 import { assert } from './errors.js';
 import { LOCATIONS } from '../content/locations.js';
 import { SURVIVORS } from '../content/survivors.js';
@@ -9,7 +8,7 @@ import { SCENARIOS_BY_ID } from '../content/scenarios.js';
 import { CRISES } from '../content/crises.js';
 import { CROSSROADS } from '../content/crossroads.js';
 
-export const STATE_VERSION = 3; // 3: solo game (s.team, no players / votes / objectives)
+export const STATE_VERSION = 4; // 4: solo, no waste, no danger deck
 
 /**
  * A solo game: one player controls the whole team of survivors.
@@ -31,7 +30,6 @@ export function createGame(config = {}) {
     morale: scenario.morale,
     maxMorale: 10,
     food: scenario.startFood,
-    waste: 0,
     starvation: 0,
     helpless: scenario.helpless,
     totalKills: 0,
@@ -46,7 +44,6 @@ export function createGame(config = {}) {
     crossroadsDeck: [],
     crossroadsDiscard: [],
     pendingCrossroads: null,
-    lastExposure: null,
     reports: { colony: null, crossroads: null },
     log: [],
     result: null,
@@ -81,7 +78,6 @@ export function createGame(config = {}) {
     drafted: false,
     hand: [],
     energy: 0,       // the survivor's energy (set when the draft ends)
-    regenPenalty: 0, // a frost card: lower regen next turn
     fresh: true,     // the first turn starts full
     gear: { weapon: null, armor: null, book: null }, // equipped item uids
     kills: 0,
@@ -90,8 +86,5 @@ export function createGame(config = {}) {
     pick: null,      // blueprint search: { locationId, uids } until one card is put back
   };
   s.survivorDeck = survivorPool;
-  // The shared danger deck.
-  const deck = Object.entries(DANGER_DECK).flatMap(([kind, n]) => Array(n).fill(kind));
-  s.danger = { deck: shuffle(s, deck), discard: [] };
   return s;
 }

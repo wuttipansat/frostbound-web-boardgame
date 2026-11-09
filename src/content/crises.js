@@ -19,7 +19,7 @@ export const CRISES = [
     fail: [{ type: 'spawn', where: 'colony', n: 2 }, { type: 'morale', delta: -1 }] },
   { id: 'frozen-pipes', name: 'Frozen Pipes', item: 'tools', need: 1,
     text: 'The latrine line burst. Nobody wants to talk about it.',
-    fail: [{ type: 'waste', delta: 5 }, { type: 'morale', delta: -1 }] },
+    fail: [{ type: 'morale', delta: -2 }] },
   { id: 'generator-cough', name: 'Generator Cough', item: 'fuel', need: 1,
     text: 'The old generator sputters. The freezer goes quiet.',
     fail: [{ type: 'morale', delta: -1 }, { type: 'food', delta: -2 }] },
@@ -31,7 +31,7 @@ export const CRISES = [
     fail: [{ type: 'morale', delta: -2 }] },
   { id: 'ration-riot', name: 'Ration Riot', item: 'food', need: 1,
     text: 'A shoving match at the food line turns into something worse.',
-    fail: [{ type: 'morale', delta: -1 }, { type: 'waste', delta: 3 }, { type: 'helpless', delta: -1 }] },
+    fail: [{ type: 'morale', delta: -1 }, { type: 'food', delta: -1 }, { type: 'helpless', delta: -1 }] },
 ];
 
 export const CRISES_BY_ID = Object.fromEntries(CRISES.map((c) => [c.id, c]));

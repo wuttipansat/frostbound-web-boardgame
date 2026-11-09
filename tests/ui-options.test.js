@@ -20,8 +20,7 @@ test('survivor options mirror the engine: enabled only when legal, with the reas
   const tired = Object.fromEntries(survivorOptions(setEnergy(s, 5), 'corwin-daly').map((o) => [o.id, o]));
   assert.equal(tired.attack.error, 'notEnoughEnergy');
   assert.ok(opts.search.ok);
-  assert.equal(opts.clean.ok, false);
-  assert.equal(opts.clean.error, 'mustBeInColony');
+  assert.equal(opts.clean, undefined, 'no cleaning: there is no waste');
   assert.ok(opts.lure.ok);
   const colony = setSurvivors(s, { 'corwin-daly': 'colony' });
   const copt = Object.fromEntries(survivorOptions(colony, 'corwin-daly').map((o) => [o.id, o]));

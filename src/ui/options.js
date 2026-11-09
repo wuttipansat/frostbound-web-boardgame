@@ -24,7 +24,6 @@ export function survivorOptions(state, survivorId, { lureTo = null } = {}) {
   add('attack', act.attack(survivorId));
   add('search', act.search(survivorId));
   add('barricade', act.barricade(survivorId));
-  add('clean', act.clean(survivorId));
   add('lure', act.lure(survivorId, lureTo ?? LOCATION_IDS.find((l) => l !== sv.location)));
   if (def.ability.type === 'healer') {
     const patients = Object.values(state.survivors)

@@ -8,7 +8,7 @@ import { LOCATION_IDS } from '../src/core/constants.js';
 
 function checkInvariants(s) {
   assert.ok(s.morale >= 0 && s.morale <= s.maxMorale, 'morale in range');
-  assert.ok(s.food >= 0 && s.waste >= 0 && s.helpless >= 0, 'non-negative counters');
+  assert.ok(s.food >= 0 && s.helpless >= 0, 'non-negative counters');
   for (const id of LOCATION_IDS) {
     const loc = s.locations[id];
     assert.ok(loc.zombies >= 0 && loc.barricades >= 0);

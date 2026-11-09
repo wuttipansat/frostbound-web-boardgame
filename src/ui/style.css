@@ -1669,3 +1669,6 @@ body:has(.more-menu) #dice-stage { visibility: hidden; } /* the rolled dice neve
 @media (max-width: 760px) { body:has(#locpanel:not(.hidden)) .sv-tokens .gear { display: none; } } /* the location sheet needs that room */
 @media (max-width: 760px) { .sv-tokens .gear { display: none; } } /* phones and tablets: gear is listed on the survivor card (tap the face) */
 body:has(#locpanel:not(.hidden)) .sv-tokens .gear { display: none; } /* an open location sheet takes that room */
+
+/* Rework step 2: items without a picture yet show an empty, dashed frame (public/items/<id>.png replaces it). */
+img.art-item.blank { image-rendering: auto; background: none; }

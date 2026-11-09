@@ -110,7 +110,7 @@ export function roundsRemaining(s) {
   return s.scenario.rounds - s.round + 1;
 }
 
-// ---------------------------------------------------------------- energy (personal), danger, forecast
+// ---------------------------------------------------------------- energy, forecast
 
 export const isNight = (s) => s.round % 2 === 0;
 
@@ -133,8 +133,11 @@ export function actionCost(s, survivorId, kind, to = null) {
   if ((kind === 'search' || kind === 'barricade') && zombies >= 2) cost += ENERGY.CROWDED;
   if (kind === 'search' && DANGEROUS_LOCATIONS.includes(here)) cost += ENERGY.DANGEROUS;
   if (kind === 'attack' && def?.ability.type === 'killTwo') cost += ENERGY.HEAVY;
+  // Cheaper actions from a survivor's ability.
+  const cheaper = { move: 'roadRunner', attack: 'sharpshooter', barricade: 'handy' }[kind];
+  if (cheaper && def?.ability.type === cheaper) cost -= ENERGY.SKILLED;
   const outside = kind === 'move' ? to && to !== 'colony' : here !== 'colony';
-  if (isNight(s) && outside) cost += ENERGY.NIGHT;
+  if (isNight(s) && outside && def?.ability.type !== 'coldProof') cost += ENERGY.NIGHT;
   return Math.max(1, cost);
 }
 
@@ -156,9 +159,8 @@ export function energyMax(s) {
   return Math.max(10, Math.min(ENERGY.MAX, base - (sv.wounds >= 2 ? ENERGY.HURT : 0)));
 }
 
-/** Energy regained at the start of a turn: the survivor's regen, Dot +15, a survival guide, starvation, frost. */
+/** Energy regained at the start of a turn: the survivor's regen, Dot +15, a survival guide, starvation. */
 export function energyRegen(s) {
-  const p = s.team;
   const sv = heroOf(s);
   if (!sv) return 0;
   const def = survivorDef(sv.id);
@@ -166,7 +168,7 @@ export function energyRegen(s) {
   if (def.ability.type === 'extraDie') n += 15;
   if (gearOf(s).book?.passive === 'regenPlus') n += gearOf(s).book.value;
   if (s.starvation > 0) n -= ENERGY.STARVING;
-  return Math.max(0, n - (p.regenPenalty ?? 0));
+  return Math.max(0, n);
 }
 
 /** Zombies each location would get if the round ended now (same formula as the colony phase). */
@@ -181,14 +183,5 @@ export function spawnForecast(s) {
   }
   const n = Math.ceil((survivorsAt(s, 'colony').length + s.helpless) / 3);
   if (n) out.colony = n;
-  return out;
-}
-
-/** Danger cards left to draw, by kind (public: works on a full state and on a player's view). */
-export function dangerCounts(s) {
-  if (!s.danger) return null;
-  if (s.danger.left) return { ...s.danger.left };
-  const out = {};
-  for (const k of s.danger.deck) out[k] = (out[k] ?? 0) + 1;
   return out;
 }

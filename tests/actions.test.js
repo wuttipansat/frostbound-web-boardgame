@@ -4,7 +4,7 @@ import { reduce, tryReduce } from '../src/core/reducer.js';
 import * as a from '../src/core/actions.js';
 import { actionCost, energyMax } from '../src/core/selectors.js';
 import { ENERGY } from '../src/core/constants.js';
-import { startedGame, setSurvivors, setEnergy, giveCard, patch, topDanger } from './_helpers.js';
+import { startedGame, setSurvivors, setEnergy, giveCard, patch } from './_helpers.js';
 
 function setup(placements, energy = 100, opts = {}) {
   let s = startedGame(opts);
@@ -33,27 +33,26 @@ test('costs are personal: attack / search come from the survivor\'s skills (2..6
   assert.equal(actionCost(s, 'corwin-daly', 'move', 'school'), ENERGY.COST.move);
 });
 
-test('attack: needs zombies and energy; kills one and draws a danger card bare-handed', () => {
+test('attack: needs zombies and energy; kills one', () => {
   let { s } = setup({ 'corwin-daly': 'police' });
   assert.equal(tryReduce(s, a.attack('corwin-daly')).error, 'noZombiesHere');
   s = patch(s, (x) => { x.locations.police.zombies = 2; });
   const cost = actionCost(s, 'corwin-daly', 'attack');
   assert.equal(tryReduce(setEnergy(s, cost - 1), a.attack('corwin-daly')).error, 'notEnoughEnergy');
-  const after = reduce(topDanger(s, 'safe'), a.attack('corwin-daly'));
+  const after = reduce(s, a.attack('corwin-daly'));
   assert.equal(after.locations.police.zombies, 1);
   assert.equal(after.totalKills, 1);
   assert.equal(after.team.kills, 1);
   assert.equal(energy(after), 100 - cost);
-  assert.equal(after.lastExposure.survivorId, 'corwin-daly');
-  assert.equal(after.lastExposure.cause, 'attack');
+  assert.equal(after.survivors['corwin-daly'].wounds, 0, 'no danger card any more');
 });
 
-test('attack abilities: sniper never draws, bouncer kills two', () => {
+test('attack abilities: the sharpshooter pays less, the bouncer kills two', () => {
   let { s } = setup({ 'ilse-brandt': 'police', 'teodor-rusu': 'grocery' });
   s = patch(s, (x) => { x.locations.police.zombies = 2; x.locations.grocery.zombies = 3; });
   const sniped = reduce(s, a.attack('ilse-brandt'));
-  assert.equal(sniped.lastExposure, s.lastExposure, 'no danger card');
-  const smashed = reduce(topDanger(s, 'safe'), a.attack('teodor-rusu'));
+  assert.equal(energy(sniped), 100 - actionCost(s, 'ilse-brandt', 'attack'));
+  const smashed = reduce(s, a.attack('teodor-rusu'));
   assert.equal(smashed.locations.grocery.zombies, 1);
   assert.equal(smashed.totalKills, 2);
 });
@@ -84,15 +83,6 @@ test('barricade: limited by free slots; zombies smash barricades first', () => {
   assert.equal(r.locations.colony.barricades, 1);
 });
 
-test('clean: in colony only, removes 3 waste (janitor 5)', () => {
-  let { s } = setup({ 'wren-okafor': 'colony', 'corwin-daly': 'police' });
-  s = patch(s, (x) => { x.waste = 7; });
-  assert.equal(tryReduce(s, a.clean('corwin-daly')).error, 'mustBeInColony');
-  assert.equal(reduce(s, a.clean('wren-okafor')).waste, 2);
-  s = setSurvivors(s, { 'corwin-daly': 'colony' });
-  assert.equal(reduce(s, a.clean('corwin-daly')).waste, 4);
-});
-
 test('lure: moves zombies from your location to another', () => {
   let { s } = setup({ 'lio-fontaine': 'school' });
   s = patch(s, (x) => { x.locations.school.zombies = 3; });
@@ -102,24 +92,24 @@ test('lure: moves zombies from your location to another', () => {
   assert.equal(r.locations.library.zombies, 2);
 });
 
-test('move: costs energy, repeatable, respects slots; a danger card only into zombies (unless fuel/trucker)', () => {
+test('move: costs energy, repeatable, respects slots; fuel drives; the trucker pays less', () => {
   let { s } = setup({ 'corwin-daly': 'colony', 'maren-holt': 'colony' });
   s = patch(s, (x) => { x.locations.hospital.zombies = 1; x.locations.library.zombies = 0; });
-  let r = reduce(topDanger(s, 'safe'), a.move('corwin-daly', 'hospital'));
+  let r = reduce(s, a.move('corwin-daly', 'hospital'));
   assert.equal(r.survivors['corwin-daly'].location, 'hospital');
-  assert.equal(r.lastExposure.cause, 'move');
+  assert.equal(r.log.findLast((e) => e.k === 'move').safe, false, 'zombies there');
   assert.equal(energy(r), 100 - ENERGY.COST.move - (r.round % 2 === 0 ? ENERGY.NIGHT : 0));
   const again = reduce(r, a.move('corwin-daly', 'library'));
-  assert.deepEqual(again.lastExposure, r.lastExposure, 'empty place: no card');
+  assert.equal(again.log.findLast((e) => e.k === 'move').safe, true, 'empty place');
 
   const trucker = reduce(s, a.move('maren-holt', 'hospital'));
-  assert.equal(trucker.lastExposure, s.lastExposure);
+  assert.equal(energy(trucker), 100 - actionCost(s, 'maren-holt', 'move', 'hospital'));
+  assert.equal(actionCost(s, 'maren-holt', 'move', 'hospital'), actionCost(s, 'corwin-daly', 'move', 'hospital') - ENERGY.SKILLED);
 
   let [withFuel, fuel] = giveCard(s, 'jerry-can');
   const fueled = reduce(withFuel, a.move('corwin-daly', 'hospital', fuel));
-  assert.equal(fueled.lastExposure, s.lastExposure);
+  assert.equal(fueled.log.findLast((e) => e.k === 'move').safe, true, 'driving is safe');
   assert.ok(!fueled.team.hand.includes(fuel));
-  assert.equal(fueled.waste, withFuel.waste + 1);
   let [withFood, food] = giveCard(s, 'canned-beans');
   assert.equal(tryReduce(withFood, a.move('corwin-daly', 'gas', food)).error, 'needFuel');
   assert.equal(tryReduce(setEnergy(s, 3), a.move('corwin-daly', 'gas')).error, 'notEnoughEnergy');
@@ -145,7 +135,7 @@ test('playing cards: food, medicine, tools, junk (energy); gear must be equipped
 
   const fed = reduce(s, a.playCard(food));
   assert.equal(fed.food, s.food + 2);
-  assert.equal(fed.waste, s.waste + 1);
+  assert.ok(!fed.team.hand.includes(food), 'a used card is gone');
 
   const healed = reduce(s, a.playCard(med, { targetSurvivorId: 'corwin-daly' }));
   assert.equal(healed.survivors['corwin-daly'].wounds, 0);
@@ -197,13 +187,4 @@ test('ending the turn runs the colony phase and starts the next round', () => {
   s = reduce(s, a.endTurn());
   assert.ok(s.round === 2 || s.phase === 'gameOver');
   assert.ok(s.reports.colony);
-});
-
-test('a move into zombies can draw any danger card', () => {
-  const { s } = setup({ 'corwin-daly': 'colony' });
-  const z = patch(s, (x) => { x.locations.school.zombies = 1; });
-  for (const kind of ['safe', 'scratch', 'frost', 'startle', 'surrounded', 'bite']) {
-    const r = reduce(topDanger(z, kind), a.move('corwin-daly', 'school'));
-    assert.equal(r.lastExposure.danger, kind);
-  }
 });

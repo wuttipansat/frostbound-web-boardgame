@@ -221,7 +221,7 @@ export function pickModal(ctx, pick) {
     })));
 }
 
-/** The colony phase, revealed step by step: food, waste, the crisis cards one by one, verdict, new zombies. */
+/** The colony phase, revealed step by step: food, the crisis cards one by one, verdict, new zombies. */
 export function colonyModal(ctx, item) {
   const r = item.report;
   const crisis = r.crisis;
@@ -232,8 +232,6 @@ export function colonyModal(ctx, item) {
   if (item.round) rows.push(h('p', { class: 'jr-summary reveal', style: next(0.2) }, icon('log'), ` ${daySummary(ctx.state, item.round)}`));
   rows.push(h('p', { class: `step reveal ${r.fed ? '' : 'bad'}`, style: next() },
     icon('food'), ` ${r.fed ? t('colony.fed', { n: r.foodNeeded }) : t('colony.starve', { n: r.starvation })}`));
-  rows.push(h('p', { class: `step reveal ${r.wasteLoss ? 'bad' : 'muted'}`, style: next() },
-    icon('waste'), ` ${r.wasteLoss ? t('colony.waste', { n: r.wasteLoss }) : t('colony.noWaste')}`));
   rows.push(h('h3', { class: 'reveal', style: next(0.3) }, t('colony.crisis', { name: c('crises', def.id, 'name') })));
   rows.push(h('p', { class: 'muted small reveal', style: next(0.3) }, t('colony.needs', { n: crisis.required, item: t(`item.${def.item}`) })));
   if (crisis.cards.length) {

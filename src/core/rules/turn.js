@@ -1,13 +1,13 @@
 // Active-player actions. Everything that takes effort costs the survivor's energy (no dice anywhere);
-// cards, gear and abilities are free. Danger comes from the shared danger deck (helpers.drawDanger).
-import { PHASES, LOCATION_IDS, RULES, ENERGY } from '../constants.js';
+// cards, gear and abilities are free.
+import { PHASES, LOCATION_IDS, ENERGY } from '../constants.js';
 import { assert } from '../errors.js';
 import {
   survivorDef, freeSurvivorSlots, freeZombieSlots, itemOf, scenarioDef, booksHeld, holdsBlueprint,
-  actionCost, gearOf, killsPerAttack, energyMax,
+  actionCost, killsPerAttack, energyMax, teamHasAbility,
 } from '../selectors.js';
 import {
-  log, rollExposure, drawItems, wasteCard, removeFromHand, addZombies, removeZombies,
+  log, drawItems, discardCard, removeFromHand, addZombies, removeZombies,
   addBarricades, creditKills, healSurvivor, changeFood, changeHelpless, changeMorale,
   spendEnergy, gainEnergy,
 } from './helpers.js';
@@ -54,9 +54,6 @@ export function attack(s, { survivorId }) {
   const killed = removeZombies(s, sv.location, killsPerAttack(s, survivorId));
   creditKills(s, killed);
   log(s, 'attack', { survivorId, locationId: sv.location, killed });
-  // A bare-handed fight is risky; a weapon keeps them at bay.
-  const armed = !!gearOf(s).weapon;
-  if (ability(survivorId).type !== 'noAttackExposure' && !armed) rollExposure(s, survivorId, 'attack');
 }
 
 export function search(s, { survivorId }) {
@@ -94,18 +91,6 @@ export function barricade(s, { survivorId }) {
   addBarricades(s, sv.location, n);
 }
 
-export function clean(s, { survivorId }) {
-  requireTurn(s);
-  const sv = requireSurvivor(s, survivorId);
-  assert(sv.location === 'colony', 'mustBeInColony');
-  assert(s.waste > 0, 'nothingToClean');
-  pay(s, survivorId, 'clean');
-  const amount = ability(survivorId).type === 'cleanFive' ? 5 : RULES.CLEAN_AMOUNT;
-  const removed = Math.min(amount, s.waste);
-  s.waste -= removed;
-  log(s, 'clean', { survivorId, removed, value: s.waste });
-}
-
 export function lure(s, { survivorId, toLocation }) {
   requireTurn(s);
   const sv = requireSurvivor(s, survivorId);
@@ -119,8 +104,7 @@ export function lure(s, { survivorId, toLocation }) {
 }
 
 /**
- * Walk somewhere (costs energy, repeatable). Walking into a place with zombies draws a danger card,
- * unless the survivor never draws when moving or burns a fuel card to drive there.
+ * Walk somewhere (costs energy, repeatable). A fuel card drives there instead (marked safe).
  */
 export function move(s, { survivorId, toLocation, fuelCardUid }) {
   const p = requireTurn(s);
@@ -130,16 +114,15 @@ export function move(s, { survivorId, toLocation, fuelCardUid }) {
   assert(freeSurvivorSlots(s, toLocation) > 0, 'locationFull');
   if (fuelCardUid) assert(requireCard(s, p, fuelCardUid).type === 'fuel', 'needFuel');
   pay(s, survivorId, 'move', toLocation);
-  let safe = ability(survivorId).type === 'noMoveExposure' || s.locations[toLocation].zombies === 0;
+  let safe = s.locations[toLocation].zombies === 0;
   if (fuelCardUid) {
-    wasteCard(s, fuelCardUid);
+    discardCard(s, fuelCardUid);
     safe = true;
   }
   const from = sv.location;
   sv.location = toLocation;
   sv.moved = true;
   log(s, 'move', { survivorId, from, to: toLocation, safe });
-  if (!safe) rollExposure(s, survivorId, 'move');
 }
 
 // ---------------------------------------------------------------- gear
@@ -169,7 +152,7 @@ export function equip(s, { cardUid }) {
 export function playCard(s, { cardUid, targetSurvivorId }) {
   const p = requireTurn(s);
   const item = requireCard(s, p, cardUid);
-  const spend = () => { if (!isPermanent(item)) wasteCard(s, cardUid); };
+  const spend = () => { if (!isPermanent(item)) discardCard(s, cardUid); };
   switch (item.type) {
     case 'food':
       spend();
@@ -192,10 +175,10 @@ export function playCard(s, { cardUid, targetSurvivorId }) {
     case 'junk':
       assert(p.energy < energyMax(s), 'energyFull');
       spend();
-      gainEnergy(s, ENERGY.JUNK * item.value, energyMax(s));
+      gainEnergy(s, ENERGY.JUNK * item.value * (teamHasAbility(s, 'haggler') ? 2 : 1), energyMax(s));
       break;
     case 'survivor':
-      removeFromHand(s, cardUid); // they join the colony; the card is not waste
+      removeFromHand(s, cardUid); // they join the colony
       changeHelpless(s, 1 + (item.helpless ?? 0), 'newcomer');
       changeMorale(s, 1, 'newcomer');
       break;

@@ -78,8 +78,9 @@ test('art cache renders each key once, queues lazily and keeps timing stats', ()
   assert.equal(cache.stats.totalMs, 6);
 });
 
-test('every item and survivor has a 64x64 pixel sprite', () => {
-  for (const id of Object.keys(ITEMS)) assert.ok(existsSync(`public/items/${id}.png`), `item sprite ${id}`);
+test('every survivor has a portrait; item pictures are optional (an empty frame until one is added)', () => {
+  const listed = readFileSync('docs/item-art.md', 'utf8');
+  for (const id of Object.keys(ITEMS)) assert.ok(listed.includes(`\`${id}.png\``), `docs/item-art.md lists ${id}`);
   for (const id of Object.keys(SURVIVORS_BY_ID)) assert.ok(existsSync(`public/portraits/${id}.png`), `portrait ${id}`);
 });
 
