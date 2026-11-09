@@ -13,13 +13,14 @@ export function createCameraRig(stage, { board, pieces }) {
   let home = null; // { target, zoom } the player's own view, taken when the rig first moves
   let userTook = false;
   let returning = false;
+  let lastPoint = null; // where the last scene put the camera
   const tmp = new THREE.Vector3();
 
   // The player moved the camera (a real drag or the wheel, not a click): stop driving it,
   // and don't fight to bring it back.
   const canvas = stage.renderer.domElement;
   let down = null;
-  const letGo = () => { if (goal || follow || returning) { userTook = true; goal = null; follow = null; returning = false; home = null; } };
+  const letGo = () => { if (goal || follow || returning) { userTook = true; lastPoint = null; goal = null; follow = null; returning = false; home = null; } };
   canvas.addEventListener('pointerdown', (ev) => { down = [ev.clientX, ev.clientY]; });
   canvas.addEventListener('pointerup', () => { down = null; });
   canvas.addEventListener('pointermove', (ev) => { if (down && ev.buttons && Math.hypot(ev.clientX - down[0], ev.clientY - down[1]) > 6) letGo(); });
@@ -32,7 +33,8 @@ export function createCameraRig(stage, { board, pieces }) {
 
   function pointOf(ev) {
     const obj = ev.survivorId ? pieces.survivorObject(ev.survivorId) : null;
-    if (ev.kind === 'move' && obj) return { obj };
+    // A move: ease to where the survivor is going (following the walking piece made the view
+    // jitter when its path or slot changed mid-walk).
     const lay = ev.at ? board.layout[ev.at] : null;
     if (lay) return { point: lay.center.clone().lerp(lay.label.clone().setY(0), 0.35) };
     return obj ? { point: obj.position.clone().setY(0) } : null;
@@ -58,12 +60,17 @@ export function createCameraRig(stage, { board, pieces }) {
       take();
       returning = false;
       follow = p.obj ?? null;
-      goal = p.point ?? null;
+      const next = p.point ?? null;
+      // Same place as the scene before (more barricades, another search there): stay put, no re-zoom.
+      if (next && lastPoint && next.distanceTo(lastPoint) < 3 && !returning) { lastPoint = next; return; }
+      lastPoint = next;
+      goal = next;
       goalZoom = closeZoom();
     },
     /** Back to the player's own view. */
     home() {
       follow = null;
+      lastPoint = null;
       if (userTook || !home) { goal = null; return; }
       goal = home.target.clone();
       goalZoom = home.zoom;

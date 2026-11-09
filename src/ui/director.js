@@ -69,6 +69,8 @@ export function createDirector({ camera = null, play = () => {}, onChange = () =
   let hold = false;
   let moved = false; // the camera left its home during this run
   let seq = 0;
+  let linger = null; // the queue just emptied: wait a moment before the camera goes home
+  const LINGER_MS = 900;
 
   function cameraFor(ev) {
     const follow = settings().follow ?? 'others';
@@ -82,12 +84,16 @@ export function createDirector({ camera = null, play = () => {}, onChange = () =
     timer = null;
     current = queue.shift() ?? null;
     if (!current) {
-      if (moved) camera?.home();
-      moved = false;
-      camera?.release?.();
       onChange(false, null);
+      // Don't fly home between back-to-back actions (several barricades, a bot's next move):
+      // if nothing new arrives within LINGER_MS, then go home.
+      if (moved) {
+        timers.clear(linger);
+        linger = timers.set(() => { linger = null; camera?.home(); moved = false; camera?.release?.(); }, LINGER_MS);
+      } else camera?.release?.();
       return;
     }
+    if (linger) { timers.clear(linger); linger = null; }
     current.duration = durationFor(current, { speed: settings().speed, scale: settings().scale ?? 1, hold });
     if (current.kind !== 'turn' && cameraFor(current)) { camera.focus(current); moved = true; }
     try { play(current); } catch (err) { console.error(err); }
@@ -109,6 +115,7 @@ export function createDirector({ camera = null, play = () => {}, onChange = () =
     clear() {
       timers.clear(timer);
       timer = null;
+      if (linger) { timers.clear(linger); linger = null; if (moved && !current) camera?.home(); }
       queue.length = 0;
       const was = current;
       current = null;
@@ -118,6 +125,8 @@ export function createDirector({ camera = null, play = () => {}, onChange = () =
       if (was) onChange(false, null);
     },
     get busy() { return !!current || queue.length > 0; },
+    /** The queue is empty but the camera is still waiting to go home. */
+    get settling() { return !!linger; },
     /** Someone else's action is on screen. */
     get watching() { return !!current?.watch && current.kind !== 'turn'; },
     get current() { return current; },

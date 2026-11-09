@@ -69,7 +69,7 @@ const out = process.argv[2] || null;
     }
     // Let the queue run out (scenes are timed in real time), stepping frames so the camera comes home.
     for (let i = 0; i < 80; i++) {
-      const busy = await p.evaluate(() => { const a = window.__frostbound.app; document.querySelector('.backdrop .dialog .btn.primary')?.click(); a.director.skip(); return a.director.busy || a.state.activePlayerId !== 'p0'; });
+      const busy = await p.evaluate(() => { const a = window.__frostbound.app; document.querySelector('.backdrop .dialog .btn.primary')?.click(); a.director.skip(); return a.director.busy || a.director.settling || a.state.activePlayerId !== 'p0'; });
       if (!busy) break;
       await step(1, 0.1);
       await p.waitForTimeout(50);

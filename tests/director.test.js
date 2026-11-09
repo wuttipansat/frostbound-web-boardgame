@@ -119,3 +119,21 @@ test('skip, clear and "camera off"', () => {
   assert.ok(!d.busy && timers.pending === 0);
   assert.equal(focus.length, 0, 'camera off: never moved');
 });
+
+test('back-to-back actions: the camera lingers instead of flying home between them', () => {
+  const timers = fakeTimers();
+  const cam = { focus: 0, home: 0 };
+  const d = createDirector({
+    timers,
+    camera: { focus: () => cam.focus++, home: () => cam.home++, release() {} },
+    settings: () => ({ follow: 'others', speed: 'normal' }),
+  });
+  const barricade = () => eventsFromLog([{ k: 'barricade', playerId: 'p1', locationId: 'police', n: 1 }], state, 'p0');
+  d.push(barricade());
+  timers.runNext(); // scene ends, queue empty → linger timer, not home
+  assert.equal(cam.home, 0);
+  assert.ok(!d.busy, 'not busy while lingering: the bot may act');
+  d.push(barricade()); // the next barricade arrives during the linger
+  while (timers.runNext());
+  assert.equal(cam.home, 1, 'home once, at the very end');
+});
