@@ -178,6 +178,7 @@ test('snow crawler: 4 stages built like upgrades; finishing it wins; seasons get
   for (const id of ['scrap', 'scrap', 'scrap', 'wood', 'wood']) [s, u] = giveCard(s, id, 'stockpile');
   s = reduce(s, build('crawler', 'corwin-daly'));
   assert.equal(scenarioProgress(s), 1, 'frame done');
+  s = patch(s, (x) => { x.survivors['corwin-daly'].ap = 100; });
   assert.equal(tryReduce(s, build('crawler', 'corwin-daly')).error, 'missingMaterials', 'the engine needs 2 engine parts');
   assert.equal(checkScenarioGoal(patch(s, (x) => { x.base.crawler = 3; })), false);
   assert.equal(checkScenarioGoal(patch(s, (x) => { x.base.crawler = 4; })), true);

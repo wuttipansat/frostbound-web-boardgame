@@ -23,9 +23,9 @@ export const CRAWLER = Object.freeze({
   id: 'crawler', name: 'Snow Crawler',
   stages: ['frame', 'engine', 'heater', 'fuel'],
   levels: [
-    L({ scrap: 3, wood: 2 }, 40),
-    L({ 'engine-part': 2, scrap: 1 }, 50),
-    L({ 'heater-part': 2, cloth: 2 }, 40),
-    L({ 'jerry-can': 3 }, 20),
+    L({ scrap: 3, wood: 2 }, 100),
+    L({ 'engine-part': 2, scrap: 1 }, 100),
+    L({ 'heater-part': 2, cloth: 2 }, 100),
+    L({ 'jerry-can': 3 }, 50),
   ],
 });

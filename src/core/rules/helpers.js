@@ -139,8 +139,9 @@ function overrun(s, locationId) {
   log(s, 'overrun', { locationId });
   const victims = survivorsAt(s, locationId);
   if (!victims.length) return;
-  victims.sort((a, b) => survivorDef(a.id).influence - survivorDef(b.id).influence);
-  killSurvivor(s, victims[0].id, 'overrun');
+  // Step 18: an overrun no longer kills outright; the weakest there takes a heavy beating.
+  victims.sort((a, b) => a.hp - b.hp || survivorDef(a.id).influence - survivorDef(b.id).influence);
+  damageSurvivor(s, victims[0].id, RULES.OVERRUN_HP, 'overrun');
 }
 
 export function removeZombies(s, locationId, n) {

@@ -1,3 +1,4 @@
+import { LOCATIONS } from '../../content/locations.js';
 // Game flow (solo): pick survivors -> rounds (crisis, one turn w/ crossroads, energy) -> colony phase -> end checks.
 import { PHASES, OUTSIDE_LOCATIONS, RULES, FIGHT, FOOD, SEASON, SIEGE, BOND, MISSIONS, MISSION_REWARD } from '../constants.js';
 import { shuffle, pick, random } from '../rng.js';
@@ -57,6 +58,7 @@ export function startRound(s) {
     s.mission = { id: m.id, stat: m.stat, target: m.target, base: s.stats[m.stat], until: s.day + 6 };
     log(s, 'missionNew', { id: m.id, target: m.target });
   }
+  restock(s);
   const green = baseLevel(s, 'greenhouse');
   if (green) changeFood(s, green, 'greenhouse');
   if (baseLevel(s, 'radio') && random(s) < 0.1 * baseLevel(s, 'radio')) recruitSurvivor(s);
@@ -218,7 +220,7 @@ export function resolveCrisis(s) {
   const result = { crisisId: crisis.id, required, score, success, cards };
   log(s, 'crisisResolved', { crisisId: crisis.id, required, score, success });
   if (success) {
-    let bonus = score >= required + 2 ? 1 : 0;
+    let bonus = 1; // Step 18: an averted crisis lifts spirits (+1 more is no longer needed for the bonus)
     if (teamHasAbility(s, 'inspire')) bonus += 1;
     if (bonus) changeMorale(s, bonus, 'crisisAverted');
   } else {
@@ -239,6 +241,23 @@ export function nightSiege(s) {
   for (const id of f.targets) damageSurvivor(s, id, SIEGE.HIT_HP, 'siege');
   if (!f.targets.length && f.hits) changeFood(s, -Math.min(s.food, f.hits * SIEGE.NO_ONE_FOOD), 'siege');
   return f;
+}
+
+/** Every dawn each place turns up one more item from its own loot table (the town is big; supplies drift in). */
+const RARE_PARTS = ['engine-part', 'heater-part'];
+export function restock(s) {
+  if (s.day <= 1) return;
+  for (const loc of OUTSIDE_LOCATIONS) {
+    const table = LOCATIONS[loc].deck;
+    if (!table) continue;
+    const ids = Object.keys(table).filter((id) => !RARE_PARTS.includes(id)); // the crawler's rare parts never drift in
+    const total = ids.reduce((n, id) => n + table[id], 0);
+    let r = random(s) * total;
+    const itemId = ids.find((id) => (r -= table[id]) < 0) ?? ids[0];
+    const uid = `r${s.day}${loc}`;
+    s.cards[uid] = itemId;
+    s.locations[loc].deck.unshift(uid); // under the pile: found after what is already there
+  }
 }
 
 export function spawnZombies(s) {

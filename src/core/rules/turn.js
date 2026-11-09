@@ -1,6 +1,6 @@
 // Active-player actions. Everything that takes effort costs the survivor's energy (no dice anywhere);
 // cards, gear and abilities are free.
-import { PHASES, LOCATION_IDS, ENERGY, REST, RULES } from '../constants.js';
+import { PHASES, LOCATION_IDS, ENERGY, REST, RULES, FOOD } from '../constants.js';
 import { random } from '../rng.js';
 import { assert } from '../errors.js';
 import {
@@ -203,7 +203,7 @@ export function playCard(s, { cardUid, targetSurvivorId }) {
     case 'food':
       requireHome(s, cardUid);
       spend();
-      changeFood(s, item.value, 'played');
+      changeFood(s, item.value * FOOD.MEALS, 'played');
       break;
     case 'medicine': {
       const sv = requireSurvivor(s, targetSurvivorId);

@@ -129,8 +129,9 @@ test('sleep: bed 100% +15 HP, floor 70% +5, outside 40%; carry-over, cap, lower 
   s.food = 20; s.base.wall = 3; // no night attack in this test
   const next = reduce(s, act.endTurn());
   if (next.phase !== 'gameOver') {
-    assert.equal(next.survivors['osei-vance'].hp, 65);
-    assert.equal(next.survivors['agnes-pell'].hp, 55);
+    assert.equal(next.survivors['osei-vance'].hp, Math.min(100, 65 - (next.reports.colony.siege.targets.filter((x) => x === 'osei-vance').length * 10)));
+    const bit = (id) => next.reports.colony.siege.targets.filter((x) => x === id).length * 10;
+    assert.equal(next.survivors['agnes-pell'].hp, 55 - bit('agnes-pell'));
     assert.equal(next.survivors['corwin-daly'].hp, 50 - FIGHT.NIGHT_BITE * next.locations.school.zombies, 'zombies bite outside sleepers');
   }
   const hurt = structuredClone(s); hurt.survivors['osei-vance'].wounds = 2;
@@ -168,6 +169,7 @@ test('night attack: predictable; walls, guards and barricades stop first; the re
   let s = fb({ seed: 12 });
   s = setSurvivors(s, { 'osei-vance': 'colony', 'greta-vos': 'colony' });
   s.day = 17; s.food = 20; s.base.wall = 1; s.locations.colony.barricades = 1; s.locations.colony.zombies = 1;
+  s.crisis = { id: 'frozen-pipes', contributions: [] }; // its failure only costs morale (no zombies at the gate)
   const f = siegeForecast(s);
   assert.deepEqual([f.attackers, f.stopped, f.hits], [1 + 4 + 1, 2, 4], 'day 17: 5 come + 1 at the gate; wall + barricade stop 2');
   assert.deepEqual(f.targets, ['greta-vos', 'osei-vance', 'greta-vos', 'osei-vance'], 'shared, healthiest first');

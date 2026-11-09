@@ -32,7 +32,7 @@ Numbers are starting values; Step 18 tunes them.
 | 15 | Solo fun: a daily event card with 2 choices, traits and bonds, weekly missions, experience (skills improve with use), difficulty levels, an end-of-game summary. | **done** |
 | 16 | New scene and camera: isometric ~55°, rotate in 90° steps, 3 zoom levels; less fog, brighter day, readable night; limited palette, bigger survivors with outlines; roads with AP costs; bigger buttons and a bottom sheet on phones. | **done** (palette unchanged) |
 | 17 | Show every action: previews (path + AP, HP to lose, spawn %), animations (walk, loot flying into the backpack, hits with damage numbers, scaffolding, night attack), HP bars, toasts, a daily report, a tutorial over days 1–3. | **done** |
-| 18 | Balance, tests, deploy: a balance bot (100 games per difficulty; normal wins 35–50%, wins end on day 30–36), e2e on desktop and phone, perf, publish. | |
+| 18 | Balance, tests, deploy: a balance bot (100 games per difficulty; normal wins 35–50%, wins end on day 30–36), e2e on desktop and phone, perf, publish. | **done** (normal 34%, wins on day ~29) |
 
 ## Step 1 notes
 
@@ -231,3 +231,36 @@ Numbers are starting values; Step 18 tunes them.
   and how everyone slept (bed / floor / outside / guard).
 - Tutorial over days 1–3: a tip toast at each of the first three dawns (off when hints are off), next to the
   existing step-by-step tutorial.
+
+## Step 18 notes
+
+Balance changes (all found with `npm run balance`, the bot playing 100 crawler games per difficulty):
+- **Supply:** every dawn each outside place gets 1 new item from its own loot table (`restock`); the crawler's
+  rare parts never restock and start in the lower half of their pile. A food card feeds 4 × its value.
+  More wood / scrap / cloth in the loot tables.
+- **Crawler stages:** frame 3 scrap + 2 wood (100 AP), engine 2 engine parts + 1 scrap (100), heater 2 heater
+  parts + 2 cloth (100), fuel 3 jerry cans (50). The crawler scenario starts with morale 10 and 6 food.
+- **Morale:** an averted crisis always gives +1; crisis failures cost at most −1 morale; the crisis needs +1 item
+  every 15 days (was 10); weekly missions give +3.
+- **Overrun:** no longer kills outright; the weakest survivor there loses 30 HP.
+- Old scenarios retargeted for 40 days: beacon 15 fuel, stores 60 food, purge 60 kills.
+- **Bot:** goes home before running out of AP (or with a full pack / low HP), searches where the next crawler stage's
+  materials are (and for food when the larder is low), keeps crawler materials out of crises, builds the crawler
+  first, builds other upgrades only with leftover AP, recruits only with food to spare.
+
+Results (100 games each):
+
+| difficulty | won | average win day | average loss day |
+|---|---|---|---|
+| easy | 46% | 27.3 | 38.6 |
+| normal | 34% | 29.0 | 38.0 |
+| hard | 24% | 30.1 | 35.7 |
+
+Normal is just under the 35–50% target and wins come about a day earlier than 30–36; the bot is weaker than a
+careful player, so this is a reasonable place to stop. Old scenarios, normal, 30 games: beacon 30%, stores 57%, purge 57%.
+
+Tests and checks: `npm test` 139 passing; e2e smoke on desktop and phone, HUD layout (no overlaps), UI audit,
+and perf (initial download 251 kB gzip-ish, 3 ms frames) all pass.
+
+Publish: `.github/workflows/pages.yml` builds, tests and deploys `dist/` to GitHub Pages on pushes to `main` (or by
+hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHub Actions.

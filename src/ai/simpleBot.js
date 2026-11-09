@@ -5,12 +5,23 @@ import { tryReduce } from '../core/reducer.js';
 // candidate actions with that probability (used by fuzz tests to explore odd paths).
 import * as act from '../core/actions.js';
 import { PHASES, OUTSIDE_LOCATIONS, ENERGY, RULES } from '../core/constants.js';
-import { gearSlot } from '../content/items.js';
+import { gearSlot, ITEMS } from '../content/items.js';
 import {
   aliveSurvivors, survivorDef, itemOf, crisisDef, scenarioDef,
   freeSurvivorSlots, freeZombieSlots, foodNeeded, actionCost, fightPreview, siegeForecast, placeOfItem, packFree, leaveDamage, spawnForecast, crisisRequirement, crisisScore, gearOf,
 } from '../core/selectors.js';
 import { CROSSROADS_BY_ID } from '../content/crossroads.js';
+import { LOCATIONS } from '../content/locations.js';
+import { CRAWLER } from '../content/buildings.js';
+
+/** Item ids still missing (at the colony) for the next crawler stage. */
+function crawlerWants(s) {
+  if (s.scenario.id !== 'crawler') return [];
+  const lv = s.base?.crawler ?? 0;
+  if (lv >= CRAWLER.levels.length || s.building?.crawler != null) return [];
+  const needs = CRAWLER.levels[lv].needs;
+  return Object.keys(needs).filter((id) => s.stockpile.filter((u) => s.cards[u] === id).length < needs[id]);
+}
 
 const EFFECT_SCORE = {
   morale: (e) => 3 * e.delta, food: (e) => e.delta, recruit: () => 2,
@@ -74,7 +85,8 @@ function turnAction(s, p, opts) {
   // Crisis contribution.
   if (crisis) {
     const added = s.crisis.contributions.length;
-    const match = cardsOf(crisis.item)[0] ?? items.find((u) => itemOf(s, u).counts === crisis.item);
+    const keep = s.scenario.id === 'crawler' ? [...crawlerWants(s), 'engine-part', 'heater-part'] : [];
+    const match = cardsOf(crisis.item).find((u) => !keep.includes(s.cards[u])) ?? items.find((u) => itemOf(s, u).counts === crisis.item && !keep.includes(s.cards[u]));
     if (match && crisisScore(s) < crisisRequirement(s) + 1 && added < 6) candidates.push(act.contribute(match));
   }
 
@@ -124,15 +136,19 @@ function turnAction(s, p, opts) {
     }
   }
   // Build: one survivor at home with spare AP works on the most useful upgrade it can.
-  const builder = survivors.find((sv) => sv.location === 'colony' && sv.ap >= 15 && !sv.napped);
-  if (builder) for (const b of ['crawler', 'workshop', 'dorm', 'greenhouse', 'wall', 'infirmary', 'radio']) candidates.push(act.build(b, builder.id));
+  const builder = survivors.find((sv) => sv.location === 'colony' && sv.ap >= 10 && sv.ap < 40 && !sv.napped); // leftovers only: building takes all the AP they have
+  // The snow crawler is the win: anyone at home works on it as soon as the next stage's materials are in.
+  const crawlerSv = s.scenario.id === 'crawler' && survivors.find((sv) => sv.location === 'colony' && sv.ap >= 10 && !sv.napped);
+  if (crawlerSv) candidates.unshift(act.build('crawler', crawlerSv.id));
+  const saving = s.scenario.id === 'crawler' && crawlerWants(s).some((id) => ['wood', 'scrap', 'cloth'].includes(id)) || (s.scenario.id === 'crawler' && (s.base?.crawler ?? 0) === 0);
+  if (builder && !saving) for (const b of ['workshop', 'dorm', 'greenhouse', 'wall', 'infirmary', 'radio']) candidates.push(act.build(b, builder.id));
   // Craft at home when the materials are there.
   const crafter = survivors.find((sv) => sv.location === 'colony' && sv.ap >= 20);
-  if (crafter && s.food >= foodNeeded(s)) for (const rid of ['scrap-plate', 'sled', 'baseball-bat', 'bandage']) candidates.push(act.craft(rid, crafter.id));
+  if (crafter && !saving && s.food >= foodNeeded(s)) for (const rid of ['scrap-plate', 'sled', 'baseball-bat', 'bandage']) candidates.push(act.craft(rid, crafter.id));
 
   // Newcomers lift morale (but eat): take them in while the larder holds.
   const recruit = cardsOf('survivor')[0];
-  if (recruit && s.food >= foodNeeded(s)) candidates.push(act.playCard(recruit));
+  if (recruit && s.food >= foodNeeded(s) * 4) candidates.push(act.playCard(recruit));
 
   energyActions(s, p, survivors, candidates, cardsOf, opts);
   return pickOne(candidates.filter((c) => tryReduce(s, c).ok), opts) ?? act.endTurn();
@@ -153,6 +169,12 @@ function energyActions(s, p, survivors, candidates, cardsOf, opts) {
   };
   const forecast = spawnForecast(s);
 
+  // 1. Home before dark: out there with only enough AP to walk back (or a full pack) → go home first.
+  for (const sv of survivors) {
+    if (sv.location === 'colony' || sv.napped) continue;
+    const home = actionCost(s, sv.id, 'move', 'colony');
+    if (sv.ap >= home && (sv.ap < home + ENERGY.SEARCH || packFree(s, sv.id) === 0 || sv.hp < 45)) candidates.push(act.move(sv.id, 'colony'));
+  }
   for (const sv of survivors) {
     const loc = s.locations[sv.location];
     // 2. Thin out crowds.
@@ -197,7 +219,13 @@ function energyActions(s, p, survivors, candidates, cardsOf, opts) {
       // Food short (or stockpiling) → the grocery first; hunting → where the zombies are.
       const hungry = s.food < foodNeeded(s) + 2 || scenarioDef(s).goal.type === 'stockpile';
       const hunting = scenarioDef(s).goal.type === 'kills';
-      const score = (l) => (hunting ? -s.locations[l].zombies * 2 : s.locations[l].zombies) - (hungry && l === 'grocery' ? 3 : 0);
+      // Snow crawler: go where the next stage's missing materials can be found.
+      const want = crawlerWants(s);
+      const loot = (l) => want.reduce((n, id) => n + (LOCATIONS[l].deck?.[id] ?? 0), 0);
+      // Food first when the larder runs low: places whose loot table has the most food.
+      const foodLoot = (l) => Object.entries(LOCATIONS[l].deck ?? {}).reduce((n, [id, k]) => n + (ITEMS[id].type === 'food' ? k : 0), 0);
+      const lowFood = s.food < foodNeeded(s) * 2;
+      const score = (l) => (hunting ? -s.locations[l].zombies * 2 : s.locations[l].zombies) - (hungry && l === 'grocery' ? 3 : 0) - Math.min(4, loot(l)) - (lowFood ? foodLoot(l) * 2 : 0);
       options.sort((a, b) => score(a) - score(b) || opts.random() - 0.5);
       const def = survivorDef(sv.id);
       const preferred = def.ability.type === 'doubleSearch' && options.includes(def.ability.location) ? def.ability.location : options[0];

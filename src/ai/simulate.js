@@ -16,9 +16,9 @@ export function mulberry(seed) {
 }
 
 export function simulate({
-  scenarioId = 'beacon', seed = 1, chaos = 0, maxSteps = 5000, onStep = null,
+  scenarioId = 'beacon', seed = 1, chaos = 0, maxSteps = 5000, onStep = null, difficulty = 'normal',
 } = {}) {
-  let state = createGame({ scenarioId, seed });
+  let state = createGame({ scenarioId, seed, difficulty });
   const random = mulberry(seed * 7919 + 13);
   const errors = [];
   let steps = 0;

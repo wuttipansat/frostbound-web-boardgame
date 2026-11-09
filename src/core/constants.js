@@ -20,7 +20,8 @@ export const OUTSIDE_LOCATIONS = Object.freeze(LOCATION_IDS.filter((l) => l !== 
 export const RULES = Object.freeze({
   TEAM_START: 2,          // survivors picked at the start (solo game)
   TEAM_MAX: 6,
-  CRISIS_STEP_DAYS: 10,   // the daily crisis needs +1 item every 10 days            // the most survivors the team can have
+  CRISIS_STEP_DAYS: 15, // Step 18: was 10
+  OVERRUN_HP: 30,         // a full place hurts the weakest survivor there   // the daily crisis needs +1 item every 10 days            // the most survivors the team can have
   DRAFT_OPTIONS: 6,
   STARTING_HAND: 3,        // items in the stockpile at the start
   PACK: 3,                // backpack slots per survivor
@@ -76,7 +77,7 @@ export const FIGHT = Object.freeze({
 export const RING = Object.freeze({ colony: 0, grocery: 1, school: 1, gas: 2, library: 2, police: 3, hospital: 3 });
 export const SEARCH_SPAWN = Object.freeze({ grocery: 0.1, school: 0.15, library: 0.1, gas: 0.15, police: 0.25, hospital: 0.2, EXTRA: 0.1 });
 // ---------------------------------------------------------------- food (every day)
-export const FOOD = Object.freeze({ HUNGRY_HP: 15, HUNGRY_MORALE: 1 });
+export const FOOD = Object.freeze({ HUNGRY_HP: 15, HUNGRY_MORALE: 1, MEALS: 4 }); // a food card feeds 4 × its value
 // Seasons get harsher: cold nights (sleeping outside −10 HP), brutes (FIGHT.BRUTE_DAY), daily storms.
 export const SEASON = Object.freeze({ COLD: 11, COLD_HP: 10, STORMS: 31 });
 // Night attack on the base: attackers = BASE + 1 per EVERY days (+ zombies already at the colony gate).
@@ -99,6 +100,6 @@ export const MISSIONS = Object.freeze([
   Object.freeze({ id: 'builder', stat: 'builds', target: 1 }),
   Object.freeze({ id: 'maker', stat: 'crafts', target: 2 }),
 ]);
-export const MISSION_REWARD = 2;
+export const MISSION_REWARD = 3;
 export const DANGEROUS_LOCATIONS = Object.freeze(['hospital', 'police']);
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { reduce, tryReduce } from '../src/core/reducer.js';
 import * as a from '../src/core/actions.js';
 import { actionCost, apMax, searchSpawnChance } from '../src/core/selectors.js';
-import { ENERGY } from '../src/core/constants.js';
+import { ENERGY, FOOD } from '../src/core/constants.js';
 import { startedGame, setSurvivors, setEnergy, giveCard, patch } from './_helpers.js';
 
 function setup(placements, energy = 100, opts = {}) {
@@ -140,7 +140,7 @@ test('playing cards: food, medicine, tools, junk (energy); gear must be equipped
   let packed; [s, packed] = giveCard(s, 'rice-sack');
   assert.equal(tryReduce(s, a.playCard(packed)).error, 'notHome', 'food counts once it is home');
   const fed = reduce(s, a.playCard(food));
-  assert.equal(fed.food, s.food + 2);
+  assert.equal(fed.food, s.food + 2 * FOOD.MEALS, 'a food card feeds MEALS × its value');
   assert.ok(!fed.stockpile.includes(food), 'a used card is gone');
 
   const healed = reduce(s, a.playCard(med, { targetSurvivorId: 'corwin-daly' }));

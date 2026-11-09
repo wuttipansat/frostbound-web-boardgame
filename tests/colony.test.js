@@ -57,8 +57,8 @@ test('crisis: matching +1, others -1; tinkerer junk counts; failure applies effe
   const ok = run([fuel, junk]);
   assert.equal(ok.result.score, 2);
   assert.equal(ok.result.success, true);
-  assert.equal(ok.morale, 8, 'beat by 1: no bonus');
-  assert.equal(run([fuel, junk, fuel2]).morale, 9, 'beat by 2+ gives a morale bonus');
+  assert.equal(ok.morale, 9, 'an averted crisis gives +1 morale');
+  assert.equal(run([fuel, junk, fuel2]).morale, 9, 'no extra for beating it by more');
 
   const noTinkerer = patch(setSurvivors(s, { 'greta-vos': 'colony' }), (x) => { x.crisis.contributions = [fuel, junk]; x.result = resolveCrisis(x); });
   assert.equal(noTinkerer.result.score, 0, 'junk counts against without Ambrose');
@@ -71,10 +71,10 @@ test('crisis: matching +1, others -1; tinkerer junk counts; failure applies effe
   assert.equal(wrong.waste, undefined, 'no waste pile');
 });
 
-test('daily crisis: +1 item needed every 10 days; the score is visible while handing in', () => {
+test('daily crisis: +1 item needed every 15 days; the score is visible while handing in', () => {
   let s = team({ 'corwin-daly': 'colony', 'greta-vos': 'colony' });
   s = patch(s, (x) => { x.crisis = { id: 'whiteout', contributions: [] }; });
-  for (const [day, need] of [[1, 1], [10, 1], [11, 2], [21, 3], [31, 4]]) assert.equal(crisisRequirement(patch(s, (x) => { x.day = day; })), need, `day ${day}`);
+  for (const [day, need] of [[1, 1], [15, 1], [16, 2], [31, 3], [40, 3]]) assert.equal(crisisRequirement(patch(s, (x) => { x.day = day; })), need, `day ${day}`);
   let fuel, food;
   [s, fuel] = giveCard(s, 'jerry-can');
   [s, food] = giveCard(s, 'canned-beans');
@@ -89,7 +89,7 @@ test('inspire adds morale when a crisis is averted', () => {
   let fuel;
   [s, fuel] = giveCard(s, 'jerry-can');
   s = patch(s, (x) => { x.morale = 5; x.crisis = { id: 'whiteout', contributions: [fuel] }; resolveCrisis(x); });
-  assert.equal(s.morale, 6);
+  assert.equal(s.morale, 7, '+1 averted, +1 inspire');
 });
 
 test('spawning: ceil(n/2) outside; the colony gets a night attack instead', () => {
@@ -98,14 +98,13 @@ test('spawning: ceil(n/2) outside; the colony gets a night attack instead', () =
   assert.deepEqual(s.spawns, { school: 1 });
 });
 
-test('overrun: a full entrance kills the lowest-influence survivor', () => {
+test('overrun: a full entrance hurts the weakest survivor there for 30 HP', () => {
   let s = team({ 'corwin-daly': 'school', 'dot-ferreira': 'school', 'greta-vos': 'colony' });
-  s = patch(s, (x) => { x.locations.school.zombies = 3; x.morale = 8; addZombies(x, 'school', 1); });
-  assert.equal(s.survivors['dot-ferreira'].alive, false);
-  assert.equal(s.survivors['corwin-daly'].alive, true);
-
-  s = patch(s, (x) => { x.locations.colony.zombies = 12; addZombies(x, 'colony', 1); });
-  assert.equal(s.survivors['greta-vos'].alive, false);
+  s = patch(s, (x) => { x.survivors['dot-ferreira'].hp = 60; x.locations.school.zombies = 3; x.morale = 8; addZombies(x, 'school', 1); });
+  assert.equal(s.survivors['dot-ferreira'].hp, 30);
+  assert.equal(s.survivors['corwin-daly'].hp, 100);
+  s = patch(s, (x) => { x.survivors['greta-vos'].hp = 20; x.locations.colony.zombies = 12; addZombies(x, 'colony', 1); });
+  assert.equal(s.survivors['greta-vos'].alive, false, 'at 0 HP they die');
 });
 
 test('barricades absorb zombies before they fill slots', () => {
@@ -125,7 +124,7 @@ test('the game ends won or lost: there are no secret objectives', () => {
 
 test('scenario goal is checked in the colony phase; time running out ends the game', () => {
   let s = team({ 'corwin-daly': 'colony' });
-  s = patch(s, (x) => { x.scenario.deposited = 8; x.food = 10; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
+  s = patch(s, (x) => { x.scenario.deposited = 15; x.food = 10; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
   assert.equal(s.phase, 'gameOver');
   assert.equal(s.result.reason, 'objectiveComplete');
 
@@ -136,9 +135,9 @@ test('scenario goal is checked in the colony phase; time running out ends the ga
 
 test('kills scenario goal', () => {
   let k = team({ 'corwin-daly': 'colony' }, { scenarioId: 'purge' });
-  k = patch(k, (x) => { x.totalKills = 24; x.food = 10; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
-  assert.notEqual(k.result?.reason, 'objectiveComplete', 'needs 25');
-  k = patch(k, (x) => { x.totalKills = 25; x.phase = 'turn'; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
+  k = patch(k, (x) => { x.totalKills = 59; x.food = 10; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
+  assert.notEqual(k.result?.reason, 'objectiveComplete', 'needs 60');
+  k = patch(k, (x) => { x.totalKills = 60; x.phase = 'turn'; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
   assert.equal(k.result?.reason, 'objectiveComplete');
 });
 
@@ -153,10 +152,10 @@ test('stockpile goal requires food AND a clear gate', () => {
       colonyPhase(x);
     });
   };
-  assert.equal(base(12, 0).result?.reason, 'objectiveComplete');
-  assert.equal(base(12, 3).result?.reason, 'objectiveComplete', 'exactly 3 zombies is allowed');
-  assert.notEqual(base(12, 4).result?.reason, 'objectiveComplete', 'too many zombies at the gate');
-  assert.notEqual(base(11, 0).result?.reason, 'objectiveComplete');
+  assert.equal(base(60, 0).result?.reason, 'objectiveComplete');
+  assert.equal(base(60, 3).result?.reason, 'objectiveComplete', 'exactly 3 zombies is allowed');
+  assert.notEqual(base(60, 4).result?.reason, 'objectiveComplete', 'too many zombies at the gate');
+  assert.notEqual(base(59, 0).result?.reason, 'objectiveComplete');
 });
 
 test('morale hitting 0 mid-turn ends the game immediately', () => {

@@ -4,22 +4,18 @@ A **solo** voxel survival board game for the browser, built with Three.js, Vite 
 You lead a small team of survivors through a frozen, zombie-filled winter: scavenge, fight, feed the
 colony and get through a crisis every round.
 
-> **Status: rework in progress.** The game is being rebuilt step by step into a 30–40 day solo
-> survival game (days instead of rounds, AP per survivor, 100 HP fights, base upgrades, a long main
-> goal). The plan, step by step, is in [`docs/rework-plan.md`](docs/rework-plan.md).
-> **Step 1 (done):** the game is single-player only. Multiplayer, online rooms, hot seat, AI seats,
-> secret objectives, betrayer, item requests and exile votes are gone.
+> **Status:** the 18-step solo rework is done (Step 9, location signs, was skipped). The plan and per-step notes
+> are in [`docs/rework-plan.md`](docs/rework-plan.md).
 
-## Playing (current rules)
+## Playing
 
-- **Setup:** pick a main objective (scenario). Options: tutorial, language (EN/TH), sound, graphics, hints.
-- **Draft:** choose your starting survivor from 3 on offer.
-- **Each round:** a crisis is revealed, a crossroads card may trigger, then your turn: spend energy to
-  move, search, attack, barricade, clean or lure. Cards in hand are played, equipped (weapon / armor /
-  book), added to the crisis or deposited for the goal. **End turn** runs the colony phase: the colony
-  eats, the crisis is scored, zombies arrive.
-- **Danger:** walking into zombies (or fighting bare-handed) draws from the shared danger deck.
-- **Win / lose:** complete the scenario goal before time runs out; morale at 0 loses.
+- **Setup:** pick a scenario (default: *Build the Snow Crawler*) and a difficulty (easy / normal / hard).
+- **Team:** pick 2 of 6 survivors; recruit up to 6. Each has HP 100, their own AP, ATK, a trait, skills that grow
+  with use, gear (weapon / armor / book / tool) and a 3-slot backpack.
+- **Each day:** dawn (crisis, daily event, weekly mission) → day (walk, search, fight, build, craft, nap, guard)
+  → dusk (everyone at the colony eats; the crisis is scored) → night (the base is attacked; everyone sleeps).
+- **Items** count once they are carried home to the colony stockpile. Searching may draw a zombie (the % is shown).
+- **Win:** finish the 4 stages of the snow crawler before day 40. **Lose:** morale 0, everyone dead, or day 40 passes.
 
 ## Commands
 
@@ -28,7 +24,7 @@ npm install
 npm run dev           # http://localhost:5173
 npm test              # rules + UI-helper tests, including full bot-played games checked after every action
 npm run build         # static bundle in dist/
-npm run balance       # bot-played outcome table per scenario
+npm run balance       # bot-played crawler games per difficulty (win %, win day)
 npm run e2e           # smoke test (needs `npx vite preview --port 4173` running): desktop + phone
 ```
 
@@ -41,7 +37,7 @@ Use Node 20 or later. URL options:
 ```
 src/
   core/                 PURE rules engine: no DOM, no Three.js, JSON-serializable state
-    constants.js        phases, item types, energy costs, danger deck, tunables
+    constants.js        phases, item types, AP costs, fights, sleep, food, siege, tunables
     rng.js              seeded RNG; its seed lives in state.rng, so games replay deterministically
     state.js            createGame({ scenarioId, seed }) -> GameState (one `team`)
     actions.js          action types + creators ({ type, ... } — no player ids)
@@ -53,7 +49,7 @@ src/
       turn.js           energy actions + free actions (cards, gear, abilities)
       effects.js        data-driven effect interpreter (crossroads choices, crisis failures)
       conditions.js     predicate language (crossroads triggers)
-      helpers.js        wounds/death/danger cards, zombies/overrun, energy, logging
+      helpers.js        HP/death, zombies/overrun, AP, backpacks, logging
   content/              all original cards and characters, as pure data
   ai/simpleBot.js       botAction(state) -> action: next-move hints, tests, balance runs
   ai/simulate.js        headless bot-played games (tests + balance)

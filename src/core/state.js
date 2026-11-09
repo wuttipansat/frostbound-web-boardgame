@@ -1,6 +1,6 @@
 // createGame(config) -> a fresh, fully JSON-serializable GameState.
 import { PHASES, LOCATION_IDS, RULES, DIFFICULTY } from './constants.js';
-import { normalizeSeed, shuffle } from './rng.js';
+import { random, normalizeSeed, shuffle } from './rng.js';
 import { assert } from './errors.js';
 import { LOCATIONS } from '../content/locations.js';
 import { SURVIVORS } from '../content/survivors.js';
@@ -16,6 +16,8 @@ export const STATE_VERSION = 4; // 4: solo, no waste, no danger deck
  * @param {string} [config.scenarioId='beacon']
  * @param {number|string} [config.seed]
  */
+const RARE = ['engine-part', 'heater-part'];
+
 export function createGame(config = {}) {
   const scenario = SCENARIOS_BY_ID[config.scenarioId ?? 'beacon'];
   assert(scenario, 'noSuchScenario', config.scenarioId);
@@ -67,7 +69,15 @@ export function createGame(config = {}) {
         }
       }
     }
-    s.locations[locId] = { zombies: 0, barricades: 0, deck: def.deck ? shuffle(s, deck) : null };
+    // The crawler's rare parts lie deep: somewhere in the lower half of their pile (decks are drawn from the end).
+    const pile = def.deck ? shuffle(s, deck) : null;
+    if (pile) {
+      for (const uid of pile.filter((u) => RARE.includes(s.cards[u]))) {
+        pile.splice(pile.indexOf(uid), 1);
+        pile.splice(Math.floor(random(s) * (pile.length / 2)), 0, uid);
+      }
+    }
+    s.locations[locId] = { zombies: 0, barricades: 0, deck: pile };
   }
 
   s.crisisDeck = shuffle(s, CRISES.map((c) => c.id));
