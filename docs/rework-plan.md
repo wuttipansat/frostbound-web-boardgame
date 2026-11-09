@@ -23,8 +23,8 @@ Numbers are starting values; Step 18 tunes them.
 | 6 | HP 100 and fights. One attack = one zombie dead, costs 15 AP. HP lost = `max(0, zombie ferocity − (AP left + ATK)) ÷ 3` rounded up, minus armor. Walker ferocity 110, brute 150 (day 21+). Leaving a place with zombies: 5 HP per zombie. Guns: kill without losing HP, 10 AP + 1 ammo, a chance a new zombie appears (pistol 40%, shotgun 50% and kills 2, silenced rifle 15%). | **done** |
 | 7 | Expeditions: walking costs AP by distance (12 / 17 / 23), search 17 AP into the survivor's backpack (3 slots). Items count only once carried home (`s.stockpile`). A search may make a zombie appear (10–25% by place, +10% per extra search there that day; it appears, it does not bite at once). Hand items over for free at the same place. No player hand. | **done** |
 | 8 | Items: weapons (knife +6, crowbar +8, bat +10, bow +12 silent, fire axe +18, guns), armor (−2 / −3 / −5 HP per fight, snow suit), tools (flashlight, map, big backpack, sled, survival guide, tool kit), consumables (bandage +15 HP, first-aid kit +35 HP, painkillers, coffee +20 AP, chocolate, canned food, ammo, firebomb), materials (wood, scrap, cloth, tools, fuel, engine and heater parts). Loot tables per place. Crafting (needs the workshop). | **done** (crafting at the colony; the workshop gate comes in Step 12) |
-| 9 | New location capacity: remove the slot pedestals. One floating sign per place: name, 👤 2/4, 🧟 3/6 bar, search %, cards left. 6 zombies = the place is overrun (no searching, extra zombies walk to the base). | |
-| 10 | Food every day: everyone at the base eats 1. Missing food: −15 HP each, −1 morale, 50% AP next day. "Food for N days" on the HUD. | |
+| 9 | (skipped for now, at the user's request) New location capacity: remove the slot pedestals. One floating sign per place: name, 👤 2/4, 🧟 3/6 bar, search %, cards left. 6 zombies = the place is overrun (no searching, extra zombies walk to the base). | |
+| 10 | Food every day: everyone at the base eats 1. Missing food: −15 HP each, −1 morale, 50% AP next day. "Food for N days" on the HUD. | **done** |
 | 11 | A crisis every day: revealed at dawn, items handed in during the day (face up), scored at dusk. +1 needed every 10 days. | |
 | 12 | Base upgrades (3 levels each, materials + AP, AP carries over): dorm, wall, greenhouse, workshop, infirmary, radio tower. | |
 | 13 | Main goal: the snow crawler in 4 stages (frame, engine, heater, fuel). Rare parts in certain places. Seasons get harsher (cold day 11+, brutes day 21+, storms day 31+). | |
@@ -144,3 +144,12 @@ Numbers are starting values; Step 18 tunes them.
 - Loot: every place got a few new items (about +6 cards each); `docs/item-art.md` lists all 53 picture files.
 - Balance (bot, 30 games): beacon 3% won, stores 10%, purge 3%. Bigger decks mean fewer crisis items, and
   the bot does not plan expeditions well. Step 10 (food), 11 (crises) and 18 retune this.
+
+## Step 10 notes
+
+- Every survivor at the colony eats 1 food at dusk (the cook and the cookbook still save 1 each).
+- Not enough food: the survivors left without food (the healthiest first) lose 15 HP and wake with half
+  their AP after that night; morale −1 (no more escalating starvation tokens; `s.starvation` counts hungry days in a row).
+- The HUD food block shows "food for N day(s)" (`foodDays`), red when it is under 2.
+- Step 9 (location signs) was skipped for now and can be done later.
+- Balance (bot, 30 games): beacon 0% won, stores 3%, purge 3%. The bot needs to plan food runs; Step 18.

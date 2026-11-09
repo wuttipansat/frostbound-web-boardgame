@@ -72,7 +72,7 @@ export function colonyPopulation(s) {
 }
 
 export function foodNeeded(s) {
-  let need = Math.ceil(colonyPopulation(s) / 2);
+  let need = colonyPopulation(s); // everyone at the base eats 1
   const cookHome = survivorsAt(s, 'colony').some((sv) => survivorDef(sv.id).ability.type === 'foodSaver');
   if (cookHome) need -= 1;
   need -= booksHeld(s, 'foodSaver');
@@ -112,6 +112,9 @@ export function roundsRemaining(s) {
 }
 
 // ---------------------------------------------------------------- energy, forecast
+
+/** Whole days the stockpiled food lasts at today's need (Infinity when nobody needs to eat). */
+export const foodDays = (s) => { const n = foodNeeded(s); return n ? Math.floor(s.food / n) : Infinity; };
 
 /** Every third day a storm blows: outside actions cost more. */
 export const isStorm = (s) => s.day % 3 === 0;
@@ -232,12 +235,12 @@ export function sleepPlan(s) {
   const beds = new Set(home.slice(0, RULES.BEDS).map((sv) => sv.id));
   let bonus = 0;
   for (const o of alive) { const b = gearOf(s, o.id).book; if (b?.passive === 'regenPlus') bonus += b.value; }
-  if (s.starvation > 0) bonus -= ENERGY.STARVING;
   for (const sv of alive) {
     const kind = sv.location !== 'colony' ? 'outside' : sv.rest === 'guard' ? 'guard' : beds.has(sv.id) ? 'bed' : 'floor';
     const max = apMax(s, sv.id);
     const extra = bonus + (survivorDef(sv.id).ability.type === 'extraDie' ? 15 : 0);
-    const ap = Math.max(0, Math.min(max, apOf(s, sv.id) + Math.round(max * REST[kind].ap) + extra));
+    let ap = Math.max(0, Math.min(max, apOf(s, sv.id) + Math.round(max * REST[kind].ap) + extra));
+    if (sv.hungry) ap = Math.round(ap * REST.HUNGRY); // went to bed hungry: half AP tomorrow
     out[sv.id] = { kind, ap, hp: REST[kind].hp };
   }
   return out;

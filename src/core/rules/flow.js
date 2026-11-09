@@ -1,5 +1,5 @@
 // Game flow (solo): pick survivors -> rounds (crisis, one turn w/ crossroads, energy) -> colony phase -> end checks.
-import { PHASES, OUTSIDE_LOCATIONS, RULES, FIGHT } from '../constants.js';
+import { PHASES, OUTSIDE_LOCATIONS, RULES, FIGHT, FOOD } from '../constants.js';
 import { shuffle, pick } from '../rng.js';
 import { assert } from '../errors.js';
 import { CROSSROADS_BY_ID } from '../../content/crossroads.js';
@@ -57,7 +57,7 @@ export function startRound(s) {
 
 export function beginTurn(s) {
   const p = s.team;
-  for (const sv of aliveSurvivors(s)) { sv.moved = false; sv.acted = false; sv.napped = false; sv.rest = 'sleep'; }
+  for (const sv of aliveSurvivors(s)) { sv.moved = false; sv.acted = false; sv.napped = false; sv.hungry = false; sv.rest = 'sleep'; }
   p.abilityUsed = {};
   p.usedCards = [];
   p.pick = null;
@@ -115,15 +115,21 @@ export function colonyPhase(s) {
   if (s.food >= need) {
     s.food -= need;
     report.fed = true;
-    // A full meal lets the colony recover from one starvation token.
-    if (s.starvation > 0) s.starvation -= 1;
+    s.starvation = 0;
     log(s, 'fed', { need, value: s.food });
   } else {
+    // Not enough: those at the base who get nothing lose 15 HP and wake with half their AP; morale −1.
+    const short = need - s.food;
     s.food = 0;
     s.starvation += 1;
     report.fed = false;
-    log(s, 'starvation', { need, tokens: s.starvation });
-    changeMorale(s, -s.starvation, 'starvation');
+    report.hungry = [];
+    const home = aliveSurvivors(s).filter((sv) => sv.location === 'colony')
+      .sort((a, b) => b.hp - a.hp || a.id.localeCompare(b.id)); // the strongest go without first
+    for (const sv of home.slice(0, short)) { sv.hungry = true; report.hungry.push(sv.id); }
+    log(s, 'starvation', { need, tokens: short });
+    changeMorale(s, -FOOD.HUNGRY_MORALE, 'starvation');
+    for (const id of report.hungry) damageSurvivor(s, id, FOOD.HUNGRY_HP, 'hunger');
   }
   report.starvation = s.starvation;
 

@@ -4,7 +4,7 @@ import { reduce } from '../src/core/reducer.js';
 import * as a from '../src/core/actions.js';
 import { colonyPhase, resolveCrisis, spawnZombies, endGame } from '../src/core/rules/flow.js';
 import { addZombies } from '../src/core/rules/helpers.js';
-import { foodNeeded, crisisRequirement } from '../src/core/selectors.js';
+import { foodNeeded, foodDays, crisisRequirement } from '../src/core/selectors.js';
 import { startedGame, setSurvivors, giveCard, patch } from './_helpers.js';
 
 /** A started solo game with the team placed as given. */
@@ -12,24 +12,36 @@ function team(placements, opts = {}) {
   return setSurvivors(startedGame(opts), placements);
 }
 
-test('food need: 1 per 2 survivors at the colony; the cook saves 1', () => {
+test('food need: everyone at the colony eats 1; the cook saves 1', () => {
   let s = team({ 'corwin-daly': 'colony', 'agnes-pell': 'colony', 'greta-vos': 'colony', 'nia-calloway': 'colony', 'osei-vance': 'colony', 'bo-lindqvist': 'school' });
-  assert.equal(foodNeeded(s), 3); // 5 at the colony -> 3
+  assert.equal(foodNeeded(s), 5);
   s = setSurvivors(s, { 'corwin-daly': 'colony', 'agnes-pell': 'colony', 'pim-arunrat': 'colony', 'nia-calloway': 'colony', 'osei-vance': 'colony', 'bo-lindqvist': 'school' });
-  assert.equal(foodNeeded(s), 2);
+  assert.equal(foodNeeded(s), 4);
+  s.food = 9;
+  assert.equal(foodDays(s), 2);
 });
 
-test('colony phase pays food or adds escalating starvation', () => {
-  let s = team({ 'corwin-daly': 'colony', 'greta-vos': 'colony', 'agnes-pell': 'colony', 'nia-calloway': 'colony' });
+test('going hungry: −15 HP for those left out, morale −1, half AP the next day', () => {
+  let s = team({ 'corwin-daly': 'colony', 'greta-vos': 'colony', 'agnes-pell': 'colony', 'nia-calloway': 'school' });
   s = patch(s, (x) => { x.food = 5; x.morale = 8; x.crisis.contributions = []; });
   const fed = patch(s, (x) => { x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
   assert.equal(fed.reports.colony.fed, true);
-  assert.equal(fed.food, 3);
+  assert.equal(fed.food, 2);
 
-  const starving = patch(s, (x) => { x.food = 0; x.starvation = 1; x.crisis = { id: 'empty-pantry', contributions: [] }; colonyPhase(x); });
-  assert.equal(starving.starvation, 2);
-  assert.ok(starving.log.some((e) => e.k === 'morale' && e.reason === 'starvation' && e.delta === -2));
-});
+  const hungry = patch(s, (x) => {
+    x.food = 1; x.crisis = { id: 'empty-pantry', contributions: [] };
+    for (const id of x.team.survivors) x.survivors[id].ap = 0;
+    colonyPhase(x);
+  });
+  assert.equal(hungry.reports.colony.hungry.length, 2, '3 at home, 1 food');
+  assert.ok(hungry.log.some((e) => e.k === 'morale' && e.reason === 'starvation' && e.delta === -1));
+  const [a] = hungry.reports.colony.hungry;
+  const fedOne = ['corwin-daly', 'greta-vos', 'agnes-pell'].find((id) => !hungry.reports.colony.hungry.includes(id));
+  assert.equal(hungry.survivors[a].hp, 100 - 15 + 15, 'lost 15, then slept in a bed (+15)');
+  assert.ok(hungry.survivors[a].ap < hungry.survivors[fedOne].ap, 'half AP after a hungry night');
+}
+
+);
 
 test('crisis: matching +1, others -1; tinkerer junk counts; failure applies effects', () => {
   let s = team({ 'ambrose-lark': 'colony', 'greta-vos': 'colony' });

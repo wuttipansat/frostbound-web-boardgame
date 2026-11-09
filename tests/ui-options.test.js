@@ -99,9 +99,9 @@ test('every crossroads card is translated to Thai, and triggers describe cleanly
   assert.equal(crossChoice('xr-frozen-child', 0), 'Bring him home.');
 });
 
-test('starvation log shows the token count, not the food needed', () => {
+test('starvation log shows how many went hungry, not the food needed', () => {
   setLang('en');
   const state = {};
-  assert.equal(formatLog({ k: 'starvation', need: 3, tokens: 1 }, state), 'Not enough food! Starvation 1');
+  assert.equal(formatLog({ k: 'starvation', need: 3, tokens: 2 }, state), 'Not enough food! 2 went hungry (−15 HP, half AP tomorrow)');
   assert.equal(formatLog({ k: 'fed', need: 3, value: 2 }, state), 'The colony eats 3 food');
 });

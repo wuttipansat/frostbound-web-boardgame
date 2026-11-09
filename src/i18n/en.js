@@ -106,6 +106,7 @@ export default {
   'hud.morale': 'Morale',
   'hud.day': 'Day',
   'hud.food': 'Food',
+  'hud.foodDays': 'food for {n} day(s)',
   'hud.foodNeed': 'needs {n}',
   'hud.crisis': 'Crisis',
   'hud.crisisNeed': '{n} × {item}',
@@ -113,7 +114,7 @@ export default {
   'hud.goal': 'Goal',
   'hud.log': 'Log',
   'hud.settings': 'Settings',
-  'hud.starvation': 'Starvation {n}',
+  'hud.starvation': 'Went hungry',
 
   // player panel
   'panel.yourTurn': 'Your turn',
@@ -313,7 +314,7 @@ export default {
   'log.morale': 'Morale {d} → {value} ({reason})',
   'log.food': 'Food {d} → {value}',
   'log.fed': 'The colony eats {n} food',
-  'log.starvation': 'Not enough food! Starvation {n}',
+  'log.starvation': 'Not enough food! {n} went hungry (−15 HP, half AP tomorrow)',
   'log.crisisResolved': '{crisis}: {result} ({score}/{required})',
   'log.crisisOk': 'AVERTED',
   'log.crisisFail': 'FAILED',
@@ -459,7 +460,7 @@ export default {
   // step 8: tooltips, pickers, confirmations
   'tip.morale': 'Morale — the colony’s life. At 0 the game is lost.',
   'tip.day': 'Days left before the winter wins.',
-  'tip.food': 'Food supply. The colony eats 1 per 2 people in the colony each round.',
+  'tip.food': 'Food. Everyone at the colony eats 1 every day. Short: −15 HP each for those left out, half AP the next day, morale −1.',
   'tip.goal': 'Main objective: {text}',
   'tip.crisis': 'Today\'s crisis. Click for details.',
   'tip.attack': "Attack: costs {n} energy",

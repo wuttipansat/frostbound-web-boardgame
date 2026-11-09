@@ -55,6 +55,7 @@ export const REST = Object.freeze({
   floor: Object.freeze({ ap: 0.7, hp: 5 }),
   outside: Object.freeze({ ap: 0.4, hp: 0 }),
   guard: Object.freeze({ ap: 0.5, hp: 0 }),
+  HUNGRY: 0.5,            // went hungry: wake with half the AP
   NAP_AP: 25,
   NAP_HP: 5,
 });
@@ -74,5 +75,7 @@ export const FIGHT = Object.freeze({
 // Distance rings from the colony (1 near … 3 far) and the chance a search makes a zombie appear.
 export const RING = Object.freeze({ colony: 0, grocery: 1, school: 1, gas: 2, library: 2, police: 3, hospital: 3 });
 export const SEARCH_SPAWN = Object.freeze({ grocery: 0.1, school: 0.15, library: 0.1, gas: 0.15, police: 0.25, hospital: 0.2, EXTRA: 0.1 });
+// ---------------------------------------------------------------- food (every day)
+export const FOOD = Object.freeze({ HUNGRY_HP: 15, HUNGRY_MORALE: 1 });
 export const DANGEROUS_LOCATIONS = Object.freeze(['hospital', 'police']);
 

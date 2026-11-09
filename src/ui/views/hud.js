@@ -5,7 +5,7 @@ import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
 import { formatLog, describeEffects } from '../../i18n/format.js';
 import {
-  foodNeeded, isStorm, crisisDef, crisisRequirement, scenarioProgress, scenarioTarget,
+  foodNeeded, foodDays, isStorm, crisisDef, crisisRequirement, scenarioProgress, scenarioTarget,
 } from '../../core/selectors.js';
 import { counter } from '../ticker.js';
 import { RULES } from '../../core/constants.js';
@@ -34,6 +34,7 @@ export function renderTopbar(el, ctx) {
     h('div', { class: 'mini-bar' }, h('i', { style: { width: `${Math.round((s.day / s.scenario.days) * 100)}%` } })));
   const food = block(`food${s.food < need ? ' critical' : ''}`, t('tip.food'), 'food', t('hud.food'), counter('food', s.food),
     h('small', {}, t('hud.foodNeed', { n: need })),
+    h('small', { class: foodDays(s) < 2 ? 'bad' : '' }, foodDays(s) === Infinity ? '' : t('hud.foodDays', { n: foodDays(s) })),
     s.starvation ? h('small', { class: 'bad' }, t('hud.starvation', { n: s.starvation })) : null);
   const team = block('helpless team', t('tip.team', { max: RULES.TEAM_MAX }), 'person', t('hud.team'), counter('team', s.team.survivors.length, { text: (v) => `${v}/${RULES.TEAM_MAX}` }));
 
