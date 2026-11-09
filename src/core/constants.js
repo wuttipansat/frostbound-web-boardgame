@@ -1,10 +1,9 @@
 // Shared enums and tunables for the FROSTBOUND rules engine.
 
 export const PHASES = Object.freeze({
-  DRAFT: 'draft',         // each player chooses 1 of their offered survivors
-  CROSSROADS: 'crossroads', // a triggered crossroads card awaits the active player's choice
-  TURN: 'turn',           // active player spends energy / takes free actions
-  VOTE: 'vote',           // an exile vote is in progress
+  DRAFT: 'draft',         // the player chooses their starting survivor(s)
+  CROSSROADS: 'crossroads', // a triggered crossroads card awaits the player's choice
+  TURN: 'turn',           // the player spends energy / takes free actions
   COLONY: 'colony',       // transient while the colony phase resolves (never observed between actions)
   GAME_OVER: 'gameOver',
 });
@@ -15,15 +14,12 @@ export const LOCATION_IDS = Object.freeze(['colony', 'police', 'grocery', 'schoo
 export const OUTSIDE_LOCATIONS = Object.freeze(LOCATION_IDS.filter((l) => l !== 'colony'));
 
 export const RULES = Object.freeze({
-  MIN_PLAYERS: 2,
-  MAX_PLAYERS: 5,
-  SURVIVORS_PER_PLAYER: 1,
+  TEAM_START: 1,          // survivors picked at the start (solo game)
   DRAFT_OPTIONS: 3,
   STARTING_HAND: 3,
   WOUNDS_TO_DIE: 3,
   WASTE_PER_MORALE: 10,
   CLEAN_AMOUNT: 3,
-  VOTES_PER_PLAYER_PER_ROUND: 1,
   MAX_LOG: 300,
 });
 

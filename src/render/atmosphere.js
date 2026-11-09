@@ -1,4 +1,4 @@
-// Living winter (step 20): the scene reacts to how the game is going — presentation only, from public state.
+// Living winter (step 20): the scene reacts to how the game is going — presentation only.
 // storm 0..1 (snow + fog), dusk 0..1 (day -> night within a round), fire 0..~1.4 (colony bonfire).
 import * as THREE from 'three';
 
@@ -10,9 +10,8 @@ export function atmosphereFor(s) {
   const rounds = s.scenario.rounds || 1;
   const progress = clamp((s.round - 1) / Math.max(1, rounds - 1));
   const morale = clamp(s.morale / (s.maxMorale || 10));
-  const order = s.players?.map((p) => p.id) ?? [];
-  const i = Math.max(0, order.indexOf(s.activePlayerId));
-  let dusk = order.length ? clamp((i + 0.5) / order.length) : 0.5;
+  // Day -> night within a round: the turn is the day, the colony phase the night.
+  let dusk = s.phase === 'turn' ? 0.35 : s.phase === 'crossroads' ? 0.2 : 0.5;
   let storm = clamp(0.2 + progress * 0.45 + (1 - morale) * 0.45);
   let fire = 0.35 + morale * 0.75;
   let mood = storm > 0.7 ? 'storm' : 'calm';

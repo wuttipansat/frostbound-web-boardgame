@@ -54,7 +54,7 @@ test('every tutorial step has a title and text in English and Thai', () => {
 test('sound: every sound a real game asks for exists, and playing without audio is a safe no-op', () => {
   const asked = new Set();
   for (let seed = 1; seed <= 5; seed++) {
-    const { state } = simulate({ players: 4, scenarioId: 'purge', seed, chaos: 0.3, betrayer: 'always' });
+    const { state } = simulate({ scenarioId: 'purge', seed, chaos: 0.3 });
     for (const e of state.log) { const n = soundForLog(e); if (n) asked.add(n); }
   }
   for (const n of asked) assert.ok(SOUND_NAMES.includes(n), n);

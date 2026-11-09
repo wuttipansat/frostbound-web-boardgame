@@ -11,22 +11,22 @@ const SIZES = [
 ];
 
 async function setup(p) {
-  await p.goto('http://localhost:4173/?snow=0&play=HAA&seed=4&ai=fast', { waitUntil: 'networkidle' });
+  await p.goto('http://localhost:4173/?snow=0&play=1&seed=4', { waitUntil: 'networkidle' });
   await p.waitForTimeout(800);
   await p.evaluate(() => {
-    const a = window.__frostbound.app; const me = a.state.players[0];
-    a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 1) });
+    const a = window.__frostbound.app;
+    a.dispatch({ type: 'DRAFT_PICK', survivorIds: a.state.team.draftOptions.slice(0, 1) });
     a.tutorialEvent?.('skip');
     const s = structuredClone(a.state);
-    s.phase = 'turn'; s.pendingCrossroads = null; s.activePlayerId = 'p0'; s.round = 2;
-    const [sv, sv2] = s.players[0].survivors;
+    s.phase = 'turn'; s.pendingCrossroads = null; s.round = 2;
+    const [sv, sv2] = s.team.survivors;
     s.survivors[sv].location = 'grocery'; s.survivors[sv].wounds = 1; s.locations.grocery.zombies = 2;
     // one survivor each now
     for (const type of ['weapon', 'medicine', 'book', 'food', 'junk', 'tools']) for (const loc of Object.values(s.locations)) {
       const i = (loc.deck || []).findIndex((u) => window.__frostbound.itemType(s.cards[u]) === type);
-      if (i >= 0) { s.players[0].hand.push(loc.deck.splice(i, 1)[0]); break; }
+      if (i >= 0) { s.team.hand.push(loc.deck.splice(i, 1)[0]); break; }
     }
-    a.loadState(s, 'p0');
+    a.loadState(s);
     window.__frostbound.stage.stop();
   });
 }
@@ -63,8 +63,8 @@ function boxes() {
     for (const [state, prep] of [
       ['pile', (a) => a.set({ handCompact: true, selLoc: null })],
       ['fan', (a) => a.set({ handCompact: false, selLoc: null })],
-      ['pile-location', (a) => { a.set({ handCompact: true }); a.selectSurvivor(a.state.players[0].survivors[0]); }],
-      ['fan-location', (a) => { a.set({ handCompact: false }); a.selectSurvivor(a.state.players[0].survivors[0]); }],
+      ['pile-location', (a) => { a.set({ handCompact: true }); a.selectSurvivor(a.state.team.survivors[0]); }],
+      ['fan-location', (a) => { a.set({ handCompact: false }); a.selectSurvivor(a.state.team.survivors[0]); }],
     ]) {
       await p.evaluate(`(${prep})(window.__frostbound.app)`);
       await p.waitForTimeout(900); // the pile ↔ fan animation
@@ -82,22 +82,6 @@ function boxes() {
       }
       if (out) await p.screenshot({ path: `${out}/after-${name}-${state}.jpg`, type: 'jpeg', quality: 82 });
     }
-    // Step 19: the secret-objective peek is whole on screen and nothing covers it.
-    await p.evaluate(() => window.__frostbound.app.set({ peek: true, handCompact: false }));
-    await p.waitForTimeout(300);
-    const peek = await p.evaluate(() => {
-      const el = document.querySelector('.objective-peek');
-      if (!el) return 'missing';
-      const r = el.getBoundingClientRect();
-      if (r.left < 0 || r.top < 0 || r.right > innerWidth || r.bottom > innerHeight) return 'off screen';
-      for (const [x, y] of [[r.left + 6, r.top + 6], [r.right - 6, r.top + 6], [r.left + r.width / 2, r.top + r.height / 2], [r.left + 6, r.bottom - 6], [r.right - 6, r.bottom - 6]]) {
-        const hit = document.elementFromPoint(x, y);
-        if (!el.contains(hit)) return `covered by ${hit?.id || hit?.className}`;
-      }
-      return null;
-    });
-    if (peek) problems.push(`${name}: objective peek ${peek}`);
-    await p.evaluate(() => window.__frostbound.app.set({ peek: false }));
     const actions = await p.evaluate(() => document.querySelectorAll('#locpanel .btn.icon-act').length);
     if (actions < 5) problems.push(`${name}: only ${actions} icon actions in the location panel`);
     if (errors.length) problems.push(`${name}: page errors ${errors.join(' | ')}`);

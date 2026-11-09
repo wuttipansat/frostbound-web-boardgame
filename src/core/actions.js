@@ -1,4 +1,5 @@
 // Action type constants and creators. An action is a plain JSON object { type, ...payload }.
+// Solo game: there is one player, so actions carry no player id.
 export const A = Object.freeze({
   DRAFT_PICK: 'DRAFT_PICK',
   RESOLVE_CROSSROADS: 'RESOLVE_CROSSROADS',
@@ -13,32 +14,24 @@ export const A = Object.freeze({
   DEPOSIT: 'DEPOSIT',
   USE_ABILITY: 'USE_ABILITY',
   END_TURN: 'END_TURN',
-  REQUEST_ITEM: 'REQUEST_ITEM',
-  RESPOND_REQUEST: 'RESPOND_REQUEST',
-  CALL_VOTE: 'CALL_VOTE',
-  CAST_VOTE: 'CAST_VOTE',
   RETURN_CARD: 'RETURN_CARD',
   EQUIP: 'EQUIP',
 });
 
-export const draftPick = (playerId, survivorIds) => ({ type: A.DRAFT_PICK, playerId, survivorIds });
-export const resolveCrossroads = (playerId, choice) => ({ type: A.RESOLVE_CROSSROADS, playerId, choice });
-export const attack = (playerId, survivorId) => ({ type: A.ATTACK, playerId, survivorId });
-export const search = (playerId, survivorId) => ({ type: A.SEARCH, playerId, survivorId });
-export const barricade = (playerId, survivorId) => ({ type: A.BARRICADE, playerId, survivorId });
-export const clean = (playerId, survivorId) => ({ type: A.CLEAN, playerId, survivorId });
-export const lure = (playerId, survivorId, toLocation) => ({ type: A.LURE, playerId, survivorId, toLocation });
-export const move = (playerId, survivorId, toLocation, fuelCardUid) => ({ type: A.MOVE, playerId, survivorId, toLocation, fuelCardUid });
+export const draftPick = (survivorIds) => ({ type: A.DRAFT_PICK, survivorIds });
+export const resolveCrossroads = (choice) => ({ type: A.RESOLVE_CROSSROADS, choice });
+export const attack = (survivorId) => ({ type: A.ATTACK, survivorId });
+export const search = (survivorId) => ({ type: A.SEARCH, survivorId });
+export const barricade = (survivorId) => ({ type: A.BARRICADE, survivorId });
+export const clean = (survivorId) => ({ type: A.CLEAN, survivorId });
+export const lure = (survivorId, toLocation) => ({ type: A.LURE, survivorId, toLocation });
+export const move = (survivorId, toLocation, fuelCardUid) => ({ type: A.MOVE, survivorId, toLocation, fuelCardUid });
 /** Blueprint search: put one of the drawn cards back under the deck. */
-export const returnCard = (playerId, cardUid) => ({ type: A.RETURN_CARD, playerId, cardUid });
-export const playCard = (playerId, cardUid, opts = {}) => ({ type: A.PLAY_CARD, playerId, cardUid, ...opts });
-export const contribute = (playerId, cardUid) => ({ type: A.CONTRIBUTE, playerId, cardUid });
-export const deposit = (playerId, cardUid) => ({ type: A.DEPOSIT, playerId, cardUid });
-export const useAbility = (playerId, survivorId, targetSurvivorId) => ({ type: A.USE_ABILITY, playerId, survivorId, targetSurvivorId });
-export const endTurn = (playerId) => ({ type: A.END_TURN, playerId });
-export const requestItem = (playerId, targetId, itemType = null) => ({ type: A.REQUEST_ITEM, playerId, targetId, itemType });
-export const respondRequest = (playerId, requestId, cardUid = null) => ({ type: A.RESPOND_REQUEST, playerId, requestId, cardUid });
-export const callVote = (playerId, targetId) => ({ type: A.CALL_VOTE, playerId, targetId });
-export const castVote = (playerId, yes) => ({ type: A.CAST_VOTE, playerId, yes });
-/** Equip a weapon / armor / book from your hand (free; the slot's old item returns to your hand). */
-export const equip = (playerId, cardUid) => ({ type: A.EQUIP, playerId, cardUid });
+export const returnCard = (cardUid) => ({ type: A.RETURN_CARD, cardUid });
+export const playCard = (cardUid, opts = {}) => ({ type: A.PLAY_CARD, cardUid, ...opts });
+export const contribute = (cardUid) => ({ type: A.CONTRIBUTE, cardUid });
+export const deposit = (cardUid) => ({ type: A.DEPOSIT, cardUid });
+export const useAbility = (survivorId, targetSurvivorId) => ({ type: A.USE_ABILITY, survivorId, targetSurvivorId });
+export const endTurn = () => ({ type: A.END_TURN });
+/** Equip a weapon / armor / book from the hand (free; the slot's old item returns to the hand). */
+export const equip = (cardUid) => ({ type: A.EQUIP, cardUid });

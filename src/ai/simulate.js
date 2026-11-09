@@ -1,7 +1,6 @@
-// Headless game driver: plays a whole game with bots. Used by tests and for balance checks.
+// Headless game driver: the bot plays a whole solo game. Used by tests and for balance checks.
 import { createGame } from '../core/state.js';
 import { tryReduce } from '../core/reducer.js';
-import { pendingActors } from '../core/selectors.js';
 import { PHASES } from '../core/constants.js';
 import { botAction } from './simpleBot.js';
 
@@ -17,19 +16,15 @@ export function mulberry(seed) {
 }
 
 export function simulate({
-  players = 3, scenarioId = 'beacon', seed = 1, chaos = 0, betrayer = 'maybe', maxSteps = 5000, onStep = null,
+  scenarioId = 'beacon', seed = 1, chaos = 0, maxSteps = 5000, onStep = null,
 } = {}) {
-  let state = createGame({
-    players: Array.from({ length: players }, (_, i) => ({ name: `Bot ${i + 1}`, isAI: true })),
-    scenarioId, seed, betrayer,
-  });
+  let state = createGame({ scenarioId, seed });
   const random = mulberry(seed * 7919 + 13);
   const errors = [];
   let steps = 0;
   while (state.phase !== PHASES.GAME_OVER && steps < maxSteps) {
     steps++;
-    const actor = pendingActors(state)[0];
-    const action = botAction(state, actor, { random, chaos });
+    const action = botAction(state, { random, chaos });
     const res = tryReduce(state, action);
     if (res.ok) {
       state = res.state;
@@ -38,7 +33,7 @@ export function simulate({
     }
     errors.push({ action, error: res.error, message: res.message });
     // Recover so the game can continue.
-    const fallback = state.phase === PHASES.TURN ? { type: 'END_TURN', playerId: actor } : null;
+    const fallback = state.phase === PHASES.TURN ? { type: 'END_TURN' } : null;
     if (!fallback) break;
     state = tryReduce(state, fallback).state;
   }

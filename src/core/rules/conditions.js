@@ -1,47 +1,43 @@
-// Predicate language used by crossroads triggers and secret objectives.
-// All predicates are evaluated for a specific player.
-import {
-  getPlayer, aliveSurvivorsOf, itemOf,
-} from '../selectors.js';
+// Predicate language used by crossroads triggers (evaluated for the solo team).
+import { aliveSurvivors, itemOf } from '../selectors.js';
 
-function handCount(s, playerId, type) {
-  return getPlayer(s, playerId).hand.filter((uid) => itemOf(s, uid).type === type).length;
+function handCount(s, type) {
+  return s.team.hand.filter((uid) => itemOf(s, uid).type === type).length;
 }
 
 const PREDICATES = {
   always: () => true,
-  all: (s, pid, c) => c.of.every((sub) => evaluate(s, pid, sub)),
-  any: (s, pid, c) => c.of.some((sub) => evaluate(s, pid, sub)),
+  all: (s, c) => c.of.every((sub) => evaluate(s, sub)),
+  any: (s, c) => c.of.some((sub) => evaluate(s, sub)),
 
   // board / colony state
-  moraleAtMost: (s, _p, c) => s.morale <= c.n,
-  moraleAtLeast: (s, _p, c) => s.morale >= c.n,
-  foodAtMost: (s, _p, c) => s.food <= c.n,
-  foodAtLeast: (s, _p, c) => s.food >= c.n,
-  wasteAtLeast: (s, _p, c) => s.waste >= c.n,
-  roundAtLeast: (s, _p, c) => s.round >= c.n,
-  helplessAtLeast: (s, _p, c) => s.helpless >= c.n,
-  colonyZombiesAtLeast: (s, _p, c) => s.locations.colony.zombies >= c.n,
+  moraleAtMost: (s, c) => s.morale <= c.n,
+  moraleAtLeast: (s, c) => s.morale >= c.n,
+  foodAtMost: (s, c) => s.food <= c.n,
+  foodAtLeast: (s, c) => s.food >= c.n,
+  wasteAtLeast: (s, c) => s.waste >= c.n,
+  roundAtLeast: (s, c) => s.round >= c.n,
+  helplessAtLeast: (s, c) => s.helpless >= c.n,
+  colonyZombiesAtLeast: (s, c) => s.locations.colony.zombies >= c.n,
 
-  // player-specific
-  survivorAt: (s, pid, c) => aliveSurvivorsOf(s, pid).some((sv) => sv.location === c.location),
-  notInColony: (s, pid) => aliveSurvivorsOf(s, pid).some((sv) => sv.location !== 'colony'),
-  hasItem: (s, pid, c) => handCount(s, pid, c.item) >= 1,
-  handHas: (s, pid, c) => handCount(s, pid, c.item) >= c.count,
-  handHasEach: (s, pid, c) => c.items.every((t) => handCount(s, pid, t) >= 1),
-  handSizeAtLeast: (s, pid, c) => getPlayer(s, pid).hand.length >= c.n,
-  hasWounded: (s, pid) => aliveSurvivorsOf(s, pid).some((sv) => sv.wounds > 0 || sv.frostbite),
-  noWoundedSurvivors: (s, pid) => aliveSurvivorsOf(s, pid).every((sv) => sv.wounds === 0 && !sv.frostbite),
-  survivorCountAtLeast: (s, pid, c) => aliveSurvivorsOf(s, pid).length >= c.n,
-  survivorsAlive: (s, pid, c) => aliveSurvivorsOf(s, pid).length >= c.min,
-  killsAtLeast: (s, pid, c) => getPlayer(s, pid).kills >= c.n,
-  isExiled: (s, pid) => getPlayer(s, pid).exiled,
+  // the team
+  survivorAt: (s, c) => aliveSurvivors(s).some((sv) => sv.location === c.location),
+  notInColony: (s) => aliveSurvivors(s).some((sv) => sv.location !== 'colony'),
+  hasItem: (s, c) => handCount(s, c.item) >= 1,
+  handHas: (s, c) => handCount(s, c.item) >= c.count,
+  handHasEach: (s, c) => c.items.every((t) => handCount(s, t) >= 1),
+  handSizeAtLeast: (s, c) => s.team.hand.length >= c.n,
+  hasWounded: (s) => aliveSurvivors(s).some((sv) => sv.wounds > 0 || sv.frostbite),
+  noWoundedSurvivors: (s) => aliveSurvivors(s).every((sv) => sv.wounds === 0 && !sv.frostbite),
+  survivorCountAtLeast: (s, c) => aliveSurvivors(s).length >= c.n,
+  survivorsAlive: (s, c) => aliveSurvivors(s).length >= c.min,
+  killsAtLeast: (s, c) => s.team.kills >= c.n,
 };
 
-export function evaluate(s, playerId, cond) {
+export function evaluate(s, cond) {
   const fn = PREDICATES[cond.type];
   if (!fn) throw new Error(`Unknown condition type: ${cond.type}`);
-  return !!fn(s, playerId, cond);
+  return !!fn(s, cond);
 }
 
 /** For triggers tied to a place, the focus survivor should be the one standing there. */

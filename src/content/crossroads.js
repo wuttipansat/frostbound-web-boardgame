@@ -1,7 +1,7 @@
-// 30 crossroads cards. Drawn by the player to the active player's left before each turn.
-// The card only triggers if `trigger` holds for the ACTIVE player; then the active player picks a choice.
-// Effects reference the "focus survivor": the active player's highest-influence survivor that satisfies
-// the trigger (or simply their highest-influence survivor). 'here' = the focus survivor's location.
+// 30 crossroads cards. One is drawn before each turn.
+// The card only triggers if `trigger` holds for the team; then the player picks a choice.
+// Effects reference the "focus survivor": the team's highest-influence survivor that satisfies
+// the trigger (or simply the highest-influence one). 'here' = the focus survivor's location.
 
 export const CROSSROADS = [
   { id: 'xr-frozen-child', title: 'The Boy in the Freezer',

@@ -1,47 +1,47 @@
-// Game flow: draft -> rounds (crisis, turns w/ crossroads, energy) -> colony phase -> end checks.
-import { PHASES, OUTSIDE_LOCATIONS, RULES } from '../constants.js';
+// Game flow (solo): pick survivors -> rounds (crisis, one turn w/ crossroads, energy) -> colony phase -> end checks.
+import { PHASES, OUTSIDE_LOCATIONS, RULES, DANGER_ESCALATION } from '../constants.js';
 import { shuffle, pick } from '../rng.js';
+import { assert } from '../errors.js';
 import { CROSSROADS_BY_ID } from '../../content/crossroads.js';
 import { CRISES_BY_ID } from '../../content/crises.js';
 import {
-  getPlayer, nextPlayer, survivorDef, survivorsAt, aliveSurvivorsOf, foodNeeded,
-  colonyPopulation, crisisRequirement, itemOf, scenarioDef, scenarioTarget, objectiveDef,
-  focusSurvivor, playerHasAbility, energyMax, energyRegen, spawnForecast,
+  aliveSurvivors, foodNeeded, colonyPopulation, crisisRequirement, itemOf, scenarioDef, scenarioTarget,
+  focusSurvivor, teamHasAbility, energyMax, energyRegen, spawnForecast,
 } from '../selectors.js';
 import {
   log, changeMorale, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems, addDangerCard,
 } from './helpers.js';
-import { DANGER_ESCALATION } from '../constants.js';
 import { applyEffects } from './effects.js';
 import { evaluate, focusFilterFor } from './conditions.js';
 
 // ---------------------------------------------------------------- draft
 
+/** Pick the starting survivor(s) from the options on offer. */
+export function draftPick(s, { survivorIds }) {
+  assert(s.phase === PHASES.DRAFT, 'wrongPhase', s.phase);
+  const t = s.team;
+  assert(!t.drafted, 'alreadyDrafted');
+  assert(Array.isArray(survivorIds) && survivorIds.length === RULES.TEAM_START
+    && new Set(survivorIds).size === survivorIds.length, 'badDraft');
+  assert(survivorIds.every((id) => t.draftOptions.includes(id)), 'notInDraftOptions');
+  t.survivors = survivorIds.slice();
+  t.drafted = true;
+  finishDraft(s);
+}
+
 export function finishDraft(s) {
-  for (const p of s.players) {
-    for (const id of p.survivors) s.survivors[id] = newSurvivor(id, p.id, 'colony');
-    // Unpicked options go back into the survivor deck.
-    s.survivorDeck.push(...p.draftOptions.filter((id) => !p.survivors.includes(id)));
-    p.draftOptions = [];
-  }
+  const t = s.team;
+  for (const id of t.survivors) s.survivors[id] = newSurvivor(id, 'colony');
+  // Unpicked options go back into the survivor deck.
+  s.survivorDeck.push(...t.draftOptions.filter((id) => !t.survivors.includes(id)));
+  t.draftOptions = [];
   s.survivorDeck = shuffle(s, s.survivorDeck);
-  // First player: whoever controls the most influential survivor.
-  let best = null;
-  for (const p of s.players) {
-    for (const id of p.survivors) {
-      const inf = survivorDef(id).influence;
-      if (!best || inf > best.inf) best = { inf, pid: p.id };
-    }
-  }
-  s.leaderId = best.pid;
-  log(s, 'draftDone', { leaderId: s.leaderId });
-  for (const p of s.players) p.energy = energyMax(s, p.id); // everyone starts full
-  // Everyone starts with a few scavenged items from random locations.
-  for (const p of s.players) {
-    for (let i = 0; i < RULES.STARTING_HAND; i++) {
-      const stocked = OUTSIDE_LOCATIONS.filter((l) => s.locations[l].deck.length);
-      if (stocked.length) drawItems(s, p.id, pick(s, stocked), 1);
-    }
+  log(s, 'draftDone', { survivorIds: t.survivors.slice() });
+  t.energy = energyMax(s); // the team starts full
+  // A few scavenged items from random locations.
+  for (let i = 0; i < RULES.STARTING_HAND; i++) {
+    const stocked = OUTSIDE_LOCATIONS.filter((l) => s.locations[l].deck.length);
+    if (stocked.length) drawItems(s, pick(s, stocked), 1);
   }
   startRound(s);
 }
@@ -49,58 +49,60 @@ export function finishDraft(s) {
 // ---------------------------------------------------------------- round
 
 export function startRound(s) {
-  s.turnsTaken = 0;
-  s.requests = [];
   const crisisId = drawFromDeck(s, 'crisisDeck', 'crisisDiscard');
   s.crisis = { id: crisisId, contributions: [] };
-  log(s, 'roundStart', { round: s.round, crisisId, leaderId: s.leaderId });
-  s.activePlayerId = s.leaderId;
+  log(s, 'roundStart', { round: s.round, crisisId });
   beginTurn(s);
 }
 
 export function beginTurn(s) {
-  const p = getPlayer(s, s.activePlayerId);
-  for (const sv of aliveSurvivorsOf(s, p.id)) sv.moved = false;
+  const p = s.team;
+  for (const sv of aliveSurvivors(s)) sv.moved = false;
   p.abilityUsed = {};
   p.usedCards = [];
   p.pick = null;
-  // Regain energy (carry-over stays, capped by the survivor's pool); a frost card's penalty applies once.
+  // Regain energy (carry-over stays, capped by the pool); a frost card's penalty applies once.
   // The first turn of the game starts full, so it gets nothing extra.
-  const max = energyMax(s, p.id);
+  const max = energyMax(s);
   if (p.fresh) p.fresh = false;
-  else p.energy = Math.min(max, p.energy + energyRegen(s, p.id));
+  else p.energy = Math.min(max, p.energy + energyRegen(s));
   p.energy = Math.min(p.energy, max);
   p.regenPenalty = 0;
-  log(s, 'energy', { playerId: p.id, value: p.energy, max });
+  log(s, 'energy', { value: p.energy, max });
   s.pendingCrossroads = null;
 
-  const reader = nextPlayer(s, p.id);
   const cardId = drawFromDeck(s, 'crossroadsDeck', 'crossroadsDiscard');
   const card = CROSSROADS_BY_ID[cardId];
-  const triggered = card && evaluate(s, p.id, card.trigger);
-  log(s, 'turnStart', { playerId: p.id });
+  const triggered = card && evaluate(s, card.trigger);
+  log(s, 'turnStart', {});
   if (triggered) {
-    const focusSv = focusSurvivor(s, p.id, focusFilterFor(card.trigger)) ?? focusSurvivor(s, p.id);
-    s.pendingCrossroads = {
-      cardId, activePlayerId: p.id, readerId: reader.id, focusSurvivorId: focusSv?.id ?? null,
-    };
+    const focusSv = focusSurvivor(s, focusFilterFor(card.trigger)) ?? focusSurvivor(s);
+    s.pendingCrossroads = { cardId, focusSurvivorId: focusSv?.id ?? null };
     s.phase = PHASES.CROSSROADS;
-    log(s, 'crossroadsTriggered', { cardId, playerId: p.id, readerId: reader.id });
+    log(s, 'crossroadsTriggered', { cardId });
   } else {
     if (cardId) s.crossroadsDiscard.push(cardId);
     s.phase = PHASES.TURN;
   }
 }
 
+/** The player picks one of the two choices on a triggered crossroads card. */
+export function resolveCrossroads(s, { choice }) {
+  assert(s.phase === PHASES.CROSSROADS && s.pendingCrossroads, 'wrongPhase', s.phase);
+  const pending = s.pendingCrossroads;
+  const card = CROSSROADS_BY_ID[pending.cardId];
+  assert(choice === 0 || choice === 1, 'badChoice');
+  log(s, 'crossroadsChoice', { cardId: card.id, choice });
+  s.reports.crossroads = { cardId: card.id, choice };
+  s.pendingCrossroads = null;
+  s.crossroadsDiscard.push(card.id);
+  s.phase = PHASES.TURN;
+  applyEffects(s, card.choices[choice].effects, { focusSurvivorId: pending.focusSurvivorId, reason: 'crossroads' });
+}
+
 export function endTurn(s) {
-  log(s, 'turnEnd', { playerId: s.activePlayerId });
-  s.turnsTaken += 1;
-  if (s.turnsTaken >= s.players.length) {
-    colonyPhase(s);
-    return;
-  }
-  s.activePlayerId = nextPlayer(s, s.activePlayerId).id;
-  beginTurn(s);
+  log(s, 'turnEnd', {});
+  colonyPhase(s);
 }
 
 // ---------------------------------------------------------------- colony phase
@@ -156,8 +158,6 @@ export function colonyPhase(s) {
   if (checkScenarioGoal(s)) return endGame(s, 'objectiveComplete');
   s.round += 1;
   if (s.round > s.scenario.rounds) return endGame(s, 'timeOut');
-
-  s.leaderId = nextPlayer(s, s.leaderId).id;
   startRound(s);
 }
 
@@ -166,11 +166,11 @@ export function resolveCrisis(s) {
   const required = crisisRequirement(s);
   const revealed = shuffle(s, s.crisis.contributions);
   let score = 0;
-  const cards = revealed.map(({ uid, playerId }) => {
+  const cards = revealed.map((uid) => {
     const item = itemOf(s, uid);
     let delta = -1;
     if (item.type === crisis.item || item.wild) delta = 1;
-    else if (item.type === 'junk' && playerHasAbility(s, playerId, 'tinkerer')) delta = 1;
+    else if (item.type === 'junk' && teamHasAbility(s, 'tinkerer')) delta = 1;
     score += delta;
     return { card: s.cards[uid], type: item.type, delta };
   });
@@ -180,7 +180,7 @@ export function resolveCrisis(s) {
   log(s, 'crisisResolved', { crisisId: crisis.id, required, score, success });
   if (success) {
     let bonus = score >= required + 2 ? 1 : 0;
-    if (s.players.some((p) => playerHasAbility(s, p.id, 'inspire'))) bonus += 1;
+    if (teamHasAbility(s, 'inspire')) bonus += 1;
     if (bonus) changeMorale(s, bonus, 'crisisAverted');
   } else {
     applyEffects(s, crisis.fail, { reason: 'crisisFailed' });
@@ -212,18 +212,11 @@ export function checkScenarioGoal(s) {
 // ---------------------------------------------------------------- end of game
 
 export function endGame(s, reason) {
-  const colonyFell = reason !== 'objectiveComplete';
-  const outcomes = s.players.map((p) => {
-    const obj = objectiveDef(p.objectiveId);
-    const met = evaluate(s, p.id, obj.condition);
-    const won = obj.kind === 'betrayer' ? colonyFell && met : !colonyFell && met;
-    return { playerId: p.id, objectiveId: obj.id, kind: obj.kind, objectiveMet: met, won };
-  });
+  const won = reason === 'objectiveComplete';
   s.phase = PHASES.GAME_OVER;
   s.pendingCrossroads = null;
-  s.vote = null;
-  s.result = { reason, winners: outcomes.filter((o) => o.won).map((o) => o.playerId), outcomes };
-  log(s, 'gameOver', { reason, winners: s.result.winners });
+  s.result = { reason, won };
+  log(s, 'gameOver', { reason, won });
 }
 
 /** Called by the reducer after every action: morale can collapse mid-turn. */

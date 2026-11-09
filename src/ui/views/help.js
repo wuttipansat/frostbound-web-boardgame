@@ -3,27 +3,23 @@ import { h, mount } from '../dom.js';
 import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
 import { botAction } from '../../ai/simpleBot.js';
-import { getPlayer, itemOf, survivorDef, foodNeeded, crisisDef, crisisRequirement, actionCost } from '../../core/selectors.js';
+import { itemOf, survivorDef, foodNeeded, crisisDef, crisisRequirement, actionCost } from '../../core/selectors.js';
 import { LOCATIONS } from '../../content/locations.js';
 import { RULES } from '../../core/constants.js';
 
 const fixedRandom = () => 0.5;
-let cache = { state: null, viewer: null, hint: null };
+let cache = { state: null, hint: null };
 
-/** The move the (cooperative) bot logic would make for this player, as text + a reason + where to point. */
-export function suggestion(s, viewer) {
-  if (cache.state === s && cache.viewer === viewer) return cache.hint;
-  let hint = null;
-  try {
-    const a = botAction(s, viewer, { random: fixedRandom, cooperative: true });
-    hint = a ? describe(s, viewer, a) : null;
-  } catch { hint = null; } // an online view lacks hidden data: no hint rather than a wrong one
-  cache = { state: s, viewer, hint };
+/** The move the bot logic would make, as text + a reason + where to point. */
+export function suggestion(s) {
+  if (cache.state === s) return cache.hint;
+  const a = botAction(s, { random: fixedRandom });
+  const hint = a ? describe(s, a) : null;
+  cache = { state: s, hint };
   return hint;
 }
 
-function describe(s, me, a) {
-  const p = getPlayer(s, me);
+function describe(s, a) {
   const sv = a.survivorId ? survivorDef(a.survivorId).name : '';
   const at = a.survivorId ? s.survivors[a.survivorId]?.location : null;
   const place = (id) => c('locations', id, 'name');
@@ -53,7 +49,7 @@ function describe(s, me, a) {
 /** Floating bar with the suggested next move; "Show me" points at the place, survivor, die or card. */
 export function renderHint(el, ctx) {
   const { state: s, ui } = ctx;
-  const hint = s && ctx.canAct && ui.hints !== false && !ctx.watching && !ui.selCard ? suggestion(s, ctx.viewer) : null;
+  const hint = s && ctx.canAct && ui.hints !== false && !ctx.watching && !ui.selCard ? suggestion(s) : null;
   el.classList.toggle('hidden', !hint);
   if (!hint) { mount(el); el.dataset.key = ''; return; }
   const key = `${hint.text}|${hint.why}`;
@@ -96,9 +92,9 @@ export function checklistView(s, { onlyBad = false } = {}) {
     icon(r.ok ? 'check' : 'exposure'), h('span', {}, r.text))));
 }
 
-const RULE_CARDS = [['turn', 'hand'], ['dice', 'dice'], ['move', 'snowflake'], ['cards', 'lock'], ['crisis', 'crisis'], ['morale', 'morale'], ['secret', 'star'], ['vote', 'vote']];
+const RULE_CARDS = [['turn', 'hand'], ['dice', 'dice'], ['move', 'snowflake'], ['cards', 'lock'], ['crisis', 'crisis'], ['morale', 'morale']];
 
-/** Quick rules: eight small cards. Opening them does not pause the game. */
+/** Quick rules: six small cards. Opening them does not pause the game. */
 export function rulesModal(ctx) {
   return h('div', { class: 'backdrop rules', onclick: (ev) => { if (ev.target === ev.currentTarget) ctx.set({ modal: null }); } },
     h('div', { class: 'dialog panel rules-dialog', role: 'dialog', 'aria-label': t('rules.title') },

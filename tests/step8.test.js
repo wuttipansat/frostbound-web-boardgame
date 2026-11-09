@@ -4,47 +4,42 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import {
   cardNeeds, cardTargets, lureTargets, moveTargets, actingSurvivors, shouldConfirmEndTurn, cardOptions,
 } from '../src/ui/options.js';
-import { whoMustHold, currentActor } from '../src/ui/seat.js';
 import { ArtCache, artKey } from '../src/render/art.js';
 import { ITEMS } from '../src/content/items.js';
 import { SURVIVORS_BY_ID } from '../src/content/survivors.js';
-import { reduce } from '../src/core/reducer.js';
-import * as A from '../src/core/actions.js';
 import { startedGame, setSurvivors, setEnergy, giveCard, patch } from './_helpers.js';
 
 test('card play needs an explicit target: one entry per survivor, legal only where it applies', () => {
   let s = startedGame();
-  const pid = s.activePlayerId;
-  s = setSurvivors(s, pid, { 'corwin-daly': 'police', 'agnes-pell': 'colony' });
+  s = setSurvivors(s, { 'corwin-daly': 'police', 'agnes-pell': 'colony' });
   s = patch(s, (x) => { x.survivors['agnes-pell'].wounds = 1; x.locations.police.zombies = 1; });
-  let med; [s, med] = giveCard(s, pid, 'antibiotics');
-  let gun; [s, gun] = giveCard(s, pid, 'riot-baton');
-  let junk; [s, junk] = giveCard(s, pid, 'bedpan');
-  let food; [s, food] = giveCard(s, pid, 'canned-beans');
+  let med; [s, med] = giveCard(s, 'antibiotics');
+  let gun; [s, gun] = giveCard(s, 'riot-baton');
+  let junk; [s, junk] = giveCard(s, 'bedpan');
+  let food; [s, food] = giveCard(s, 'canned-beans');
   assert.equal(cardNeeds(s, med), 'survivor');
   assert.equal(cardNeeds(s, junk), null, 'junk is scrapped for energy, no target');
   assert.equal(cardNeeds(s, gun), null, 'gear is equipped, no target');
   assert.equal(cardNeeds(s, food), null);
-  const medT = Object.fromEntries(cardTargets(s, pid, med).map((x) => [x.survivorId, x]));
+  const medT = Object.fromEntries(cardTargets(s, med).map((x) => [x.survivorId, x]));
   assert.equal(medT['agnes-pell'].ok, true, 'only the wounded survivor can be healed');
   assert.equal(medT['corwin-daly'].error, 'notWounded');
-  assert.deepEqual(cardOptions(s, pid, gun).map((o) => o.id), ['equip', 'contribute', 'deposit']);
-  assert.ok(cardOptions(s, pid, gun)[0].ok);
+  assert.deepEqual(cardOptions(s, gun).map((o) => o.id), ['equip', 'contribute', 'deposit']);
+  assert.ok(cardOptions(s, gun)[0].ok);
 });
 
 test('lure and move targets for the board highlights', () => {
   let s = startedGame();
-  const pid = s.activePlayerId;
-  s = setSurvivors(s, pid, { 'lio-fontaine': 'school' });
+  s = setSurvivors(s, { 'lio-fontaine': 'school' });
   s = patch(s, (x) => { x.locations.school.zombies = 2; });
-  const lure = lureTargets(s, pid, 'lio-fontaine');
+  const lure = lureTargets(s, 'lio-fontaine');
   assert.equal(lure.length, 6);
   assert.ok(lure.every((l) => l.ok && l.to !== 'school'));
   // Hospital (3 slots) full of other survivors -> 'full'.
   s = patch(s, (x) => {
-    for (const id of ['agnes-pell', 'rafael-quist', 'greta-vos']) x.survivors[id] = { id, owner: x.players[1].id, location: 'hospital', wounds: 0, frostbite: false, alive: true, moved: false };
+    for (const id of ['agnes-pell', 'rafael-quist', 'greta-vos']) x.survivors[id] = { id, location: 'hospital', wounds: 0, frostbite: false, alive: true, moved: false };
   });
-  const mt = moveTargets(s, pid, 'lio-fontaine');
+  const mt = moveTargets(s, 'lio-fontaine');
   assert.equal(mt.hospital, 'full');
   assert.equal(mt.colony, 'ok');
   assert.equal(mt.school, undefined, 'no entry for where it already stands');
@@ -52,30 +47,14 @@ test('lure and move targets for the board highlights', () => {
 
 test('acting survivors and the end-turn confirmation follow the energy left', () => {
   let s = startedGame();
-  const pid = s.activePlayerId;
-  s = setSurvivors(s, pid, { 'corwin-daly': 'colony' });
-  s = setEnergy(s, pid, 60);
-  assert.deepEqual(actingSurvivors(s, pid), ['corwin-daly']);
-  assert.equal(shouldConfirmEndTurn(s, pid), true);
-  assert.equal(shouldConfirmEndTurn(s, pid, { skip: true }), false);
-  s = setEnergy(s, pid, 2);
-  assert.equal(shouldConfirmEndTurn(s, pid), false, 'nothing affordable: just end');
-  assert.deepEqual(actingSurvivors(s, pid), []);
-});
-
-test('hot seat: an item request to another human hands them the device, then back', () => {
-  let s = startedGame({ players: 3 });
-  s = patch(s, (x) => { x.players[2].isAI = true; x.activePlayerId = 'p0'; });
-  assert.equal(currentActor(s), 'p0');
-  assert.equal(whoMustHold(s, { seat: 'p0' }), null);
-  assert.equal(whoMustHold(s, { seat: 'p1' }), 'p0', 'pass to the active player');
-  s = reduce(s, A.requestItem('p0', 'p1', null));
-  assert.equal(whoMustHold(s, { seat: 'p0' }), 'p1', 'the asked human must answer now');
-  s = reduce(s, A.respondRequest('p1', s.requests[0].id, null));
-  assert.equal(whoMustHold(s, { seat: 'p1' }), 'p0', 'and the device goes back');
-  // A request to an AI never needs a hand-over.
-  s = reduce(s, A.requestItem('p0', 'p2', null));
-  assert.equal(whoMustHold(s, { seat: 'p0' }), null);
+  s = setSurvivors(s, { 'corwin-daly': 'colony' });
+  s = setEnergy(s, 60);
+  assert.deepEqual(actingSurvivors(s), ['corwin-daly']);
+  assert.equal(shouldConfirmEndTurn(s), true);
+  assert.equal(shouldConfirmEndTurn(s, { skip: true }), false);
+  s = setEnergy(s, 2);
+  assert.equal(shouldConfirmEndTurn(s), false, 'nothing affordable: just end');
+  assert.deepEqual(actingSurvivors(s), []);
 });
 
 test('art cache renders each key once, queues lazily and keeps timing stats', () => {

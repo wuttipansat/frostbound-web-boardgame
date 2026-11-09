@@ -1,9 +1,9 @@
 // Presentation queue (step 15): turns new log entries into short "scenes" that play one after another —
-// the camera goes there, an effect plays, a small callout shows the result — so the table can follow
-// what someone else did without reading the log. Built from log entries only, which are public text
-// (the same on every online client), so a scene never knows a hidden card.
+// the camera goes there, an effect plays, a small callout shows the result — so the player can follow
+// what happened without reading the log. Built from log entries only.
+// `watch` scenes hold longer and block input briefly (none in the solo game yet: every move is the player's own).
 
-/** Seconds each scene holds at normal speed: [watched (someone else), own move]. */
+/** Seconds each scene holds at normal speed: [watched, own move]. */
 const DURATION = {
   move: [1.5, 0.15], attack: [1.3, 0.25], search: [1.35, 0.25], barricade: [1.05, 0.2], clean: [0.95, 0.2],
   lure: [1.35, 0.2], play: [1.0, 0.15], contribute: [0.9, 0.15], deposit: [1.0, 0.15], exposure: [2.9, 2.5], turn: [0.55, 0],
@@ -11,34 +11,31 @@ const DURATION = {
 const MAX_SCENE = 4; // seconds: nothing may hold the queue longer, whatever the frame rate
 export const SPEED = { normal: 1, fast: 0.55 };
 
-/** Map new log entries to scenes. `viewer` is who holds this screen (null: watching everyone). */
-export function eventsFromLog(entries, state, viewer = null) {
+/** Map new log entries to scenes (the solo player's own moves). */
+export function eventsFromLog(entries, state) {
   const out = [];
-  const ownerOf = (svId) => state.survivors?.[svId]?.owner ?? null;
   const locOf = (svId) => state.survivors?.[svId]?.location ?? null;
   for (const e of entries) {
     let ev = null;
     switch (e.k) {
       case 'move':
         if (e.from === e.to) break;
-        ev = { kind: 'move', playerId: e.playerId ?? ownerOf(e.survivorId), survivorId: e.survivorId, from: e.from, to: e.to, at: e.to, safe: !!e.safe };
+        ev = { kind: 'move', survivorId: e.survivorId, from: e.from, to: e.to, at: e.to, safe: !!e.safe };
         break;
-      case 'attack': ev = { kind: 'attack', playerId: e.playerId, survivorId: e.survivorId, at: e.locationId, n: e.killed ?? 0 }; break;
-      // Only how many cards were found: never which.
-      case 'search': ev = { kind: 'search', playerId: e.playerId, survivorId: e.survivorId, at: e.locationId, n: e.count ?? 0 }; break;
-      case 'barricade': ev = { kind: 'barricade', playerId: e.playerId ?? state.activePlayerId ?? null, at: e.locationId, n: e.n ?? 1 }; break;
-      case 'clean': ev = { kind: 'clean', playerId: e.playerId, survivorId: e.survivorId, at: 'colony', n: e.removed ?? 0 }; break;
-      case 'lure': ev = { kind: 'lure', playerId: e.playerId, survivorId: e.survivorId, from: e.from, to: e.to, at: e.to, n: e.n ?? 0 }; break;
-      // Played and deposited cards are public; contributed ones are face down (no card at all).
-      case 'play': ev = { kind: 'play', playerId: e.playerId, at: 'colony', card: e.card, type: e.type }; break;
-      case 'contribute': ev = { kind: 'contribute', playerId: e.playerId, at: 'colony' }; break;
-      case 'deposit': ev = { kind: 'deposit', playerId: e.playerId, at: 'colony', card: e.card }; break;
-      case 'exposure': ev = { kind: 'exposure', playerId: ownerOf(e.survivorId), survivorId: e.survivorId, at: locOf(e.survivorId), face: e.face }; break;
-      case 'turnStart': ev = { kind: 'turn', playerId: e.playerId, at: null }; break;
+      case 'attack': ev = { kind: 'attack', survivorId: e.survivorId, at: e.locationId, n: e.killed ?? 0 }; break;
+      case 'search': ev = { kind: 'search', survivorId: e.survivorId, at: e.locationId, n: e.count ?? 0 }; break;
+      case 'barricade': ev = { kind: 'barricade', at: e.locationId, n: e.n ?? 1 }; break;
+      case 'clean': ev = { kind: 'clean', survivorId: e.survivorId, at: 'colony', n: e.removed ?? 0 }; break;
+      case 'lure': ev = { kind: 'lure', survivorId: e.survivorId, from: e.from, to: e.to, at: e.to, n: e.n ?? 0 }; break;
+      case 'play': ev = { kind: 'play', at: 'colony', card: e.card, type: e.type }; break;
+      case 'contribute': ev = { kind: 'contribute', at: 'colony' }; break;
+      case 'deposit': ev = { kind: 'deposit', at: 'colony', card: e.card }; break;
+      case 'exposure': ev = { kind: 'exposure', survivorId: e.survivorId, at: locOf(e.survivorId), face: e.face }; break;
+      case 'turnStart': ev = { kind: 'turn', at: null }; break;
       default: break;
     }
     if (!ev) continue;
-    ev.watch = !viewer || (ev.playerId != null && ev.playerId !== viewer);
+    ev.watch = false;
     out.push(ev);
   }
   return out;
@@ -59,7 +56,7 @@ export function durationFor(ev, { speed = 'normal', hold = false, scale = 1 } = 
  *   camera: { focus(ev), home(), release() }   (may be null: no camera moves)
  *   play(ev): effects + callout for a scene
  *   onChange(busy, ev): the UI redraws its "watching" state
- *   settings(): { follow: 'others' | 'all' | 'off', speed: 'normal' | 'fast' }
+ *   settings(): { follow: 'all' | 'off', speed: 'normal' | 'fast' }
  *   timers: { set, clear } (injectable for tests)
  */
 export function createDirector({ camera = null, play = () => {}, onChange = () => {}, settings = () => ({}), timers = { set: (fn, ms) => setTimeout(fn, ms), clear: (id) => clearTimeout(id) } } = {}) {
@@ -73,9 +70,8 @@ export function createDirector({ camera = null, play = () => {}, onChange = () =
   const LINGER_MS = 900;
 
   function cameraFor(ev) {
-    const follow = settings().follow ?? 'others';
+    const follow = settings().follow ?? 'all';
     if (!camera || follow === 'off') return false;
-    if (follow === 'others' && !ev.watch) return false;
     return !!ev.at || !!ev.survivorId;
   }
 

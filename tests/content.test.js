@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SURVIVORS } from '../src/content/survivors.js';
-import { SECRET_OBJECTIVES, EXILE_OBJECTIVES } from '../src/content/objectives.js';
 import { SCENARIOS } from '../src/content/scenarios.js';
 import { CRISES } from '../src/content/crises.js';
 import { CROSSROADS } from '../src/content/crossroads.js';
@@ -15,16 +14,13 @@ const unique = (arr) => new Set(arr).size === arr.length;
 
 test('content counts match the design brief', () => {
   assert.equal(SURVIVORS.length, 20);
-  assert.equal(SECRET_OBJECTIVES.filter((o) => o.kind === 'loyal').length, 8);
-  assert.equal(SECRET_OBJECTIVES.filter((o) => o.kind === 'betrayer').length, 2);
-  assert.equal(EXILE_OBJECTIVES.length, 3);
   assert.equal(SCENARIOS.length, 3);
   assert.equal(CRISES.length, 10);
   assert.equal(CROSSROADS.length, 30);
 });
 
 test('ids and names are unique', () => {
-  for (const list of [SURVIVORS, [...SECRET_OBJECTIVES, ...EXILE_OBJECTIVES], SCENARIOS, CRISES, CROSSROADS]) {
+  for (const list of [SURVIVORS, SCENARIOS, CRISES, CROSSROADS]) {
     assert.ok(unique(list.map((x) => x.id)));
   }
   assert.ok(unique(SURVIVORS.map((s) => s.name)));
@@ -69,14 +65,12 @@ test('all crossroads have known triggers, two choices and known effects', () => 
   }
 });
 
-test('crises, objectives and scenarios reference known types', () => {
+test('crises and scenarios reference known types', () => {
   for (const c of CRISES) {
     assert.ok(ITEM_TYPES.includes(c.item));
     for (const e of c.fail) assert.ok(EFFECT_TYPES.includes(e.type));
   }
-  for (const o of [...SECRET_OBJECTIVES, ...EXILE_OBJECTIVES]) {
-    walkConditions(o.condition, (x) => assert.ok(CONDITION_TYPES.includes(x.type), `${o.id}: ${x.type}`));
-  }
+  for (const sc of SCENARIOS) assert.ok(sc.goal.target > 0, `${sc.id}: a fixed solo target`);
   const lengths = SCENARIOS.map((s) => s.rounds);
   assert.ok(unique(lengths), 'scenarios differ in length');
 });

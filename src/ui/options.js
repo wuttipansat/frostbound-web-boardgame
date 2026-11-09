@@ -2,83 +2,69 @@
 // rules engine itself (tryReduce), so the UI can never offer an illegal move or hide a legal one.
 import * as act from '../core/actions.js';
 import { tryReduce } from '../core/reducer.js';
-import { getPlayer, survivorDef, itemOf, scenarioDef, actionCost } from '../core/selectors.js';
+import { survivorDef, itemOf, scenarioDef, actionCost } from '../core/selectors.js';
 import { gearSlot } from '../content/items.js';
 import { LOCATION_IDS } from '../core/constants.js';
 
 const check = (state, action) => {
-  try {
-    const r = tryReduce(state, action);
-    return { action, ok: r.ok, error: r.ok ? null : r.error };
-  } catch {
-    // Online, the UI only holds a player's view (hidden cards, placeholder decks). A simulated move that
-    // trips over hidden data is not known to be illegal: offer it and let the server decide.
-    return { action, ok: true, error: null };
-  }
+  const r = tryReduce(state, action);
+  return { action, ok: r.ok, error: r.ok ? null : r.error };
 };
 
 /**
  * Energy actions + ability for one survivor. Each option: { id, action, ok, error, cost }.
  * Legality (including "not enough energy") comes from the engine.
  */
-export function survivorOptions(state, playerId, survivorId, { lureTo = null } = {}) {
+export function survivorOptions(state, survivorId, { lureTo = null } = {}) {
   const sv = state.survivors[survivorId];
   if (!sv?.alive) return [];
   const def = survivorDef(survivorId);
   const out = [];
   const add = (id, action) => out.push({ id, cost: actionCost(state, survivorId, id), ...check(state, action) });
-  add('attack', act.attack(playerId, survivorId));
-  add('search', act.search(playerId, survivorId));
-  add('barricade', act.barricade(playerId, survivorId));
-  add('clean', act.clean(playerId, survivorId));
-  add('lure', act.lure(playerId, survivorId, lureTo ?? LOCATION_IDS.find((l) => l !== sv.location)));
+  add('attack', act.attack(survivorId));
+  add('search', act.search(survivorId));
+  add('barricade', act.barricade(survivorId));
+  add('clean', act.clean(survivorId));
+  add('lure', act.lure(survivorId, lureTo ?? LOCATION_IDS.find((l) => l !== sv.location)));
   if (def.ability.type === 'healer') {
     const patients = Object.values(state.survivors)
       .filter((o) => o.alive && o.location === sv.location && (o.wounds > 0 || o.frostbite));
     const target = patients[0];
-    const action = act.useAbility(playerId, survivorId, target?.id ?? survivorId);
+    const action = act.useAbility(survivorId, target?.id ?? survivorId);
     out.push({ id: 'ability', cost: 0, ...(target ? check(state, action) : { action, ok: false, error: 'notWounded' }) });
   }
   return out;
 }
 
 /** Move option for a survivor to a location (with or without a fuel card). */
-export function moveOption(state, playerId, survivorId, to, useFuel = false) {
-  const fuel = useFuel ? getPlayer(state, playerId).hand.find((u) => itemOf(state, u).type === 'fuel') : undefined;
-  return { to, fuel: fuel ?? null, ...check(state, act.move(playerId, survivorId, to, fuel)) };
+export function moveOption(state, survivorId, to, useFuel = false) {
+  const fuel = useFuel ? state.team.hand.find((u) => itemOf(state, u).type === 'fuel') : undefined;
+  return { to, fuel: fuel ?? null, ...check(state, act.move(survivorId, to, fuel)) };
 }
 
-export function hasFuel(state, playerId) {
-  return getPlayer(state, playerId).hand.some((u) => itemOf(state, u).type === 'fuel');
+export function hasFuel(state) {
+  return state.team.hand.some((u) => itemOf(state, u).type === 'fuel');
 }
 
 /**
  * What can be done with a card: equip (gear), play (some need a target survivor), contribute, deposit.
  */
-export function cardOptions(state, playerId, uid, { survivorId = null } = {}) {
+export function cardOptions(state, uid, { survivorId = null } = {}) {
   const item = itemOf(state, uid);
   const out = [];
-  if (gearSlot(item)) out.push({ id: 'equip', ...check(state, act.equip(playerId, uid)) });
+  if (gearSlot(item)) out.push({ id: 'equip', ...check(state, act.equip(uid)) });
   else if (item.type !== 'fuel') {
     const opts = {};
     if (['medicine', 'tools'].includes(item.type)) opts.targetSurvivorId = survivorId;
-    out.push({ id: 'play', ...check(state, act.playCard(playerId, uid, opts)) });
+    out.push({ id: 'play', ...check(state, act.playCard(uid, opts)) });
   }
-  out.push({ id: 'contribute', ...check(state, act.contribute(playerId, uid)) });
-  if (scenarioDef(state).goal.type === 'deposit') out.push({ id: 'deposit', ...check(state, act.deposit(playerId, uid)) });
+  out.push({ id: 'contribute', ...check(state, act.contribute(uid)) });
+  if (scenarioDef(state).goal.type === 'deposit') out.push({ id: 'deposit', ...check(state, act.deposit(uid)) });
   return out;
 }
 
-export function endTurnOption(state, playerId) {
-  return check(state, act.endTurn(playerId));
-}
-
-/** Players this player may call an exile vote on right now (empty if a vote can't be called). */
-export function voteTargets(state, playerId) {
-  return state.players
-    .filter((p) => p.id !== playerId)
-    .filter((p) => tryReduce(state, act.callVote(playerId, p.id)).ok)
-    .map((p) => p.id);
+export function endTurnOption(state) {
+  return check(state, act.endTurn());
 }
 
 // ---------------------------------------------------------------- step 8: explicit targets & board hints
@@ -91,52 +77,52 @@ export function cardNeeds(state, uid) {
 }
 
 /** Every survivor the card could be played on, with legality and the action to dispatch. */
-export function cardTargets(state, playerId, uid) {
+export function cardTargets(state, uid) {
   if (cardNeeds(state, uid) !== 'survivor') return [];
-  return getPlayer(state, playerId).survivors
+  return state.team.survivors
     .filter((id) => state.survivors[id]?.alive)
-    .map((survivorId) => ({ survivorId, ...check(state, act.playCard(playerId, uid, { targetSurvivorId: survivorId })) }));
+    .map((survivorId) => ({ survivorId, ...check(state, act.playCard(uid, { targetSurvivorId: survivorId })) }));
 }
 
 /** Where a survivor could lure zombies to. */
-export function lureTargets(state, playerId, survivorId) {
+export function lureTargets(state, survivorId) {
   const sv = state.survivors[survivorId];
   if (!sv?.alive) return [];
-  return LOCATION_IDS.filter((l) => l !== sv.location).map((to) => ({ to, ...check(state, act.lure(playerId, survivorId, to)) }));
+  return LOCATION_IDS.filter((l) => l !== sv.location).map((to) => ({ to, ...check(state, act.lure(survivorId, to)) }));
 }
 
 /** Board hint for a selected survivor: each location -> 'ok' | 'full' | 'blocked' (no entry for its own location). */
-export function moveTargets(state, playerId, survivorId) {
+export function moveTargets(state, survivorId) {
   const sv = state.survivors[survivorId];
-  if (!sv?.alive || sv.owner !== playerId) return {};
+  if (!sv?.alive) return {};
   const out = {};
   for (const to of LOCATION_IDS) {
     if (to === sv.location) continue;
-    const r = moveOption(state, playerId, survivorId, to);
+    const r = moveOption(state, survivorId, to);
     out[to] = r.ok ? 'ok' : r.error === 'locationFull' ? 'full' : 'blocked';
   }
   return out;
 }
 
-/** Survivors of the player who can still do something this turn (move, a die action, or their ability). */
-export function actingSurvivors(state, playerId) {
-  if (state.phase !== 'turn' || state.activePlayerId !== playerId) return [];
-  return getPlayer(state, playerId).survivors.filter((id) => {
+/** Survivors who can still do something this turn (move, an energy action, or their ability). */
+export function actingSurvivors(state) {
+  if (state.phase !== 'turn') return [];
+  return state.team.survivors.filter((id) => {
     const sv = state.survivors[id];
     if (!sv?.alive) return false;
-    if (Object.values(moveTargets(state, playerId, id)).includes('ok')) return true;
-    return survivorOptions(state, playerId, id).some((o) => o.ok);
+    if (Object.values(moveTargets(state, id)).includes('ok')) return true;
+    return survivorOptions(state, id).some((o) => o.ok);
   });
 }
 
 /** Can the player's survivor still afford an action or a move? */
-export function hasEnergyLeft(state, playerId) {
-  return actingSurvivors(state, playerId).length > 0;
+export function hasEnergyLeft(state) {
+  return actingSurvivors(state).length > 0;
 }
 
 /** Ask before ending a turn while something can still be done (unless the player opted out this game). */
-export function shouldConfirmEndTurn(state, playerId, { skip = false } = {}) {
-  return !skip && hasEnergyLeft(state, playerId);
+export function shouldConfirmEndTurn(state, { skip = false } = {}) {
+  return !skip && hasEnergyLeft(state);
 }
 
 // ---------------------------------------------------------------- step 11: card availability
@@ -146,10 +132,10 @@ export function shouldConfirmEndTurn(state, playerId, { skip = false } = {}) {
  * { ok, reason } — reason is the first error key when nothing is legal. Passive books are "ok"
  * as long as they can still be contributed or deposited; otherwise their reason is passiveItem.
  */
-export function cardUsable(state, playerId, uid) {
+export function cardUsable(state, uid) {
   const need = cardNeeds(state, uid);
-  const plays = need === 'survivor' ? cardTargets(state, playerId, uid) : [];
-  const opts = cardOptions(state, playerId, uid);
+  const plays = need === 'survivor' ? cardTargets(state, uid) : [];
+  const opts = cardOptions(state, uid);
   const all = [...plays, ...opts];
   if (all.some((o) => o.ok)) return { ok: true, reason: null };
   return { ok: false, reason: (plays[0] ?? opts[0])?.error ?? 'unplayable' };

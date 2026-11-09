@@ -3,14 +3,13 @@
 // names, places and counts, never which card was found.
 import { t, c } from '../i18n/index.js';
 
-const W = { death: 5, exiled: 5, crisisFail: 4, overrun: 3, infection: 4, recruit: 3, crisisOk: 2, starvation: 3, kills: 2, search: 1, barricadeBroken: 2, vote: 2 };
+const W = { death: 5, crisisFail: 4, overrun: 3, infection: 4, recruit: 3, crisisOk: 2, starvation: 3, kills: 2, search: 1, barricadeBroken: 2 };
 
 /** Journal events: [{ round, key, params, weight }] in log order. */
 export function journalEntries(state) {
   if (!state?.log) return [];
   const sv = (id) => c('survivors', id, 'name');
   const loc = (id) => c('locations', id, 'name');
-  const pl = (id) => state.players.find((p) => p.id === id)?.name ?? '?';
   const out = [];
   const add = (e, key, params, weight) => out.push({ round: e.r ?? 1, key, params, weight });
   for (const e of state.log) {
@@ -19,8 +18,6 @@ export function journalEntries(state) {
       case 'attack': if (e.killed >= 2) add(e, 'kills', { name: sv(e.survivorId), place: loc(e.locationId), n: e.killed }, W.kills); break;
       case 'death': add(e, 'death', { name: sv(e.survivorId), place: loc(e.location), cause: t(`cause.${e.cause}`) }, W.death); break;
       case 'recruit': add(e, 'recruit', { name: sv(e.survivorId), place: loc(e.location) }, W.recruit); break;
-      case 'exiled': add(e, 'exiled', { player: pl(e.playerId) }, W.exiled); break;
-      case 'voteResult': if (!e.passed) add(e, 'voteFailed', { player: pl(e.targetId) }, W.vote); break;
       case 'overrun': add(e, 'overrun', { place: loc(e.locationId) }, W.overrun); break;
       case 'barricadeBroken': add(e, 'barricadeBroken', { place: loc(e.locationId) }, W.barricadeBroken); break;
       case 'infectionSpreads': add(e, 'infection', { name: sv(e.from), other: sv(e.to) }, W.infection); break;

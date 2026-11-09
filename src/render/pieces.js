@@ -56,14 +56,11 @@ export function barricadeSlotIndex(locationId, j) {
 
 /**
  * Survivor figures that no longer belong on the board: their survivor is not in this state at all
- * (a different game) or belongs to a different owner. Dead survivors are handled by the death animation.
+ * (a different game). Dead survivors are handled by the death animation.
  */
-export function staleSurvivors(visIds, state, owners = null) {
+export function staleSurvivors(visIds, state) {
   const out = [];
-  for (const id of visIds) {
-    const sv = state.survivors?.[id];
-    if (!sv || (owners && owners.get(id) !== sv.owner)) out.push(id);
-  }
+  for (const id of visIds) if (!state.survivors?.[id]) out.push(id);
   return out;
 }
 
@@ -383,8 +380,6 @@ export function createPieces(board, tweens) {
   // ---------------- sync
 
   function sync(state, { animate = true } = {}) {
-    const ownerIdx = Object.fromEntries(state.players.map((p, i) => [p.id, i]));
-
     // Figures from another game (new game, load, draft) are dropped at once, without a death animation.
     for (const id of staleSurvivors(survivors.keys(), state)) {
       const vis = survivors.get(id);
@@ -408,14 +403,13 @@ export function createPieces(board, tweens) {
       const pos = survivorSlotPos(sv.location, slot);
       const facing = faceToward(pos, layout[sv.location].center);
       if (!vis) {
-        vis = createSurvivor(sv.id, ownerIdx[sv.owner] ?? 0);
+        vis = createSurvivor(sv.id, 0);
         survivors.set(sv.id, vis);
         appear(vis, pos, facing, animate);
       } else if (vis.loc !== sv.location || vis.slot !== slot) {
         if (animate) hop(vis, route(vis.group.position, vis.loc, pos, sv.location), facing);
         else { vis.group.position.copy(pos); vis.group.rotation.y = facing; }
       }
-      vis.disc.material = discMats[(ownerIdx[sv.owner] ?? 0) % discMats.length];
       vis.loc = sv.location;
       vis.slot = slot;
     }

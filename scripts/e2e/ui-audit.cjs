@@ -5,20 +5,20 @@ const { chromium } = require('playwright');
 
 const setupTurn = (opts = {}) => `(() => {
   const a = window.__frostbound.app;
-  for (const p of a.state.players.filter((x) => !x.isAI && !x.drafted)) a.dispatch({ type: 'DRAFT_PICK', playerId: p.id, survivorIds: p.draftOptions.slice(0, 1) });
+  if (a.state.phase === 'draft') a.dispatch({ type: 'DRAFT_PICK', survivorIds: a.state.team.draftOptions.slice(0, 1) });
   a.tutorialEvent?.('skip');
   const s = structuredClone(a.state);
-  s.phase = 'turn'; s.pendingCrossroads = null; s.activePlayerId = 'p0';
-  const sv = s.players[0].survivors[0];
+  s.phase = 'turn'; s.pendingCrossroads = null;
+  const sv = s.team.survivors[0];
   s.survivors[sv].location = ${JSON.stringify(opts.loc ?? 'grocery')};
   s.survivors[sv].wounds = 1;
   s.locations[${JSON.stringify(opts.loc ?? 'grocery')}].zombies = 2;
-  s.players[0].energy = 80;
+  s.team.energy = 80;
   for (const type of ['medicine', 'weapon', 'food', 'tools', 'junk', 'fuel', 'medicine', 'food']) for (const loc of Object.values(s.locations)) {
     const i = (loc.deck || []).findIndex((u) => window.__frostbound.itemType(s.cards[u]) === type);
-    if (i >= 0) { s.players[0].hand.push(loc.deck.splice(i, 1)[0]); break; }
+    if (i >= 0) { s.team.hand.push(loc.deck.splice(i, 1)[0]); break; }
   }
-  a.loadState(s, 'p0');
+  a.loadState(s);
   return sv;
 })()`;
 
@@ -27,18 +27,10 @@ async function audit(browser, device, vp) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const f = {};
-  await page.goto('http://localhost:4173/?snow=0&play=HHA&seed=4&ai=fast', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:4173/?snow=0&play=1&seed=4', { waitUntil: 'networkidle' });
   await page.waitForTimeout(800);
 
-  // Pass screen: keyboard can't continue?
-  f.passScreenShown = !!(await page.$('.backdrop.pass'));
-  if (f.passScreenShown) {
-    await page.focus('.backdrop.pass').catch(() => {});
-    await page.keyboard.press('Enter');
-    await page.waitForTimeout(300);
-    f.passScreenEnterWorks = !(await page.$('.backdrop.pass'));
-    if (!f.passScreenEnterWorks) await page.click('.backdrop.pass');
-  }
+
 
   const sv = await page.evaluate(setupTurn());
   await page.evaluate((id) => window.__frostbound.app.selectSurvivor(id), sv);
@@ -98,7 +90,7 @@ async function audit(browser, device, vp) {
   await page.evaluate(() => window.__frostbound.app.selectSurvivor(null));
   f.silentTarget = await page.evaluate(() => {
     const a = window.__frostbound.app;
-    const med = a.state.players[0].hand.find((u) => window.__frostbound.itemType(a.state.cards[u]) === 'medicine');
+    const med = a.state.team.hand.find((u) => window.__frostbound.itemType(a.state.cards[u]) === 'medicine');
     a.set({ selCard: med });
     const play = [...document.querySelectorAll('.card-bar .btn, .cd-actions .btn')].find((b) => /Play|Use|ใช้/.test(b.textContent));
     const picker = document.querySelector('[data-target-picker]');
@@ -138,18 +130,12 @@ async function audit(browser, device, vp) {
 
   // End turn with energy left: confirmation?
   f.endTurnUnusedDiceConfirm = await page.evaluate(() => {
-    const before = window.__frostbound.app.state.turnsTaken;
+    const before = window.__frostbound.app.state.round;
     const btn = [...document.querySelectorAll('#pp-actions .btn.primary')].pop();
     btn?.click();
-    const after = window.__frostbound.app.state.turnsTaken;
+    const after = window.__frostbound.app.state.round;
     return { endedImmediately: after !== before, confirmShown: !!document.querySelector('.dialog.confirm-end') };
   });
-
-  // Request item between humans: does the target get asked right away?
-  await page.evaluate(setupTurn());
-  await page.evaluate(() => window.__frostbound.app.dispatch({ type: 'REQUEST_ITEM', playerId: 'p0', targetId: 'p1', itemType: null }));
-  await page.waitForTimeout(300);
-  f.requestHandedToTarget = !!(await page.$('.backdrop.pass')) || !!(await page.$('.backdrop.incoming'));
 
   // Colony survivors overlap on the board (screen-space distance between figures).
   f.colonyOverlap = await page.evaluate(() => {
@@ -157,7 +143,7 @@ async function audit(browser, device, vp) {
     const s = structuredClone(f.app.state);
     const ids = Object.keys(s.survivors);
     for (const id of ids) s.survivors[id].location = 'colony';
-    f.app.loadState(s, 'p0');
+    f.app.loadState(s);
     const pos = ids.map((id) => f.pieces.survivorObject(id)?.position).filter(Boolean);
     let min = Infinity;
     for (let i = 0; i < pos.length; i++) for (let j = i + 1; j < pos.length; j++) min = Math.min(min, pos[i].distanceTo(pos[j]));

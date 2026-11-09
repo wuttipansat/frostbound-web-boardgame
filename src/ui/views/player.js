@@ -1,13 +1,12 @@
-// Floating player HUD (step 14): name tag, survivor tokens, dice chips, a floating hand (pile ↔ fan),
+// Floating team HUD (step 14): status tag, survivor tokens, energy meter, a floating hand (pile ↔ fan),
 // the card sheet with round targets, and the round "more" button next to End turn.
-import { h, mount, hex } from '../dom.js';
+import { h, mount } from '../dom.js';
 import { icon, heart } from '../icons.js';
 import { t, c, getLang } from '../../i18n/index.js';
 import { flashTip } from '../tooltip.js';
-import { getPlayer, aliveSurvivorsOf, survivorDef, itemOf, woundLimit, objectiveDef, energyMax, energyRegen, gearOf, actionCost, killsPerAttack, heroOf } from '../../core/selectors.js';
-import { PLAYER_COLORS } from '../../render/pieces.js';
+import { aliveSurvivors, survivorDef, itemOf, woundLimit, energyMax, energyRegen, gearOf, actionCost, killsPerAttack, heroOf } from '../../core/selectors.js';
 import {
-  cardOptions, endTurnOption, voteTargets, cardNeeds, cardTargets, shouldConfirmEndTurn, cardUsable, actingSurvivors,
+  cardOptions, endTurnOption, cardNeeds, cardTargets, shouldConfirmEndTurn, cardUsable, actingSurvivors,
 } from '../options.js';
 import * as act from '../../core/actions.js';
 import { itemPlay, itemShort } from '../itemText.js';
@@ -30,7 +29,7 @@ function cardDetail(ctx, shown, uid) {
   const { state: s, art } = ctx;
   const item = itemOf(s, uid);
   const need = cardNeeds(s, uid);
-  const opts = cardOptions(s, shown.id, uid).filter((o) => o.id !== 'play' || !need);
+  const opts = cardOptions(s, uid).filter((o) => o.id !== 'play' || !need);
   const close = () => ctx.set({ selCard: null });
   // Every use goes through the legal action; the card flies to where it went (board, crisis, goal).
   const go = (action, kind = 'play') => { flyCard(uid, kind); if (ctx.dispatch(action)) close(); };
@@ -38,7 +37,7 @@ function cardDetail(ctx, shown, uid) {
   if (need === 'survivor') {
     picker = h('div', { class: 'picker', 'data-target-picker': '' },
       h('h4', {}, t('act.pickTarget')),
-      h('div', { class: 'picker-row round-row' }, cardTargets(s, shown.id, uid).map((tg) => roundTarget(art, tg.survivorId, tg.ok,
+      h('div', { class: 'picker-row round-row' }, cardTargets(s, uid).map((tg) => roundTarget(art, tg.survivorId, tg.ok,
         `${survivorDef(tg.survivorId).name} — ${tg.ok ? t(...itemShort(item)) : t(`err.${tg.error}`)}`, () => go(tg.action)))));
   }
   const flavour = [c('items', item.id, 'text'), isPermanent(item) ? t(`itemPlay.permanent.${item.type}`) : null].filter(Boolean).join(' — ');
@@ -75,48 +74,40 @@ function placeSheet(container, uid) {
 
 /** refs: { head, survivors, chips, hand, actions } floating HUD pieces. */
 export function renderPlayerPanel(refs, ctx) {
-  const { state: s, ui, viewer, actor, art } = ctx;
-  const shown = viewer ? getPlayer(s, viewer) : (s.activePlayerId ? getPlayer(s, s.activePlayerId) : null);
-  if (!shown) {
+  const { state: s, ui, art } = ctx;
+  const shown = s.team;
+  if (!shown || s.phase === 'draft') {
     for (const el of Object.values(refs)) mount(el);
     document.body.classList.remove('hand-full');
     return;
   }
-  const idx = s.players.indexOf(shown);
   const isActor = ctx.canAct;
-  const actorP = actor ? getPlayer(s, actor) : null;
 
-  // ---- name tag: colour dot, name, a small "your turn" light
-  const status = isActor || (viewer && viewer === actor) ? t('panel.yourTurn')
-    : !viewer ? t('panel.spectating', { name: shown.name })
-      : actorP?.isAI ? t('waitingAi', { name: actorP.name })
-        : t('panel.waiting', { name: actorP?.name ?? '' });
+  // ---- status tag: day, a small "your turn" light
+  const status = isActor ? t('panel.yourTurn') : t('panel.waitingColony');
   mount(refs.head,
-    h('span', { class: 'dot', style: { background: hex(PLAYER_COLORS[idx]) } }),
-    h('b', { class: 'pname', tip: shown.name }, shown.name),
-    h('span', { class: `turn-light${isActor ? ' go' : ''}`, tip: status, 'aria-label': status, role: 'status' }),
-    shown.isAI ? h('span', { class: 'tag' }, t('panel.aiTag')) : null,
-    shown.exiled ? h('span', { class: 'tag bad' }, t('panel.exiled')) : null);
+    h('b', { class: 'pname', tip: status }, t('panel.team')),
+    h('span', { class: `turn-light${isActor ? ' go' : ''}`, tip: status, 'aria-label': status, role: 'status' }));
 
   // ---- survivors: round tokens
-  const acting = new Set(isActor ? actingSurvivors(s, shown.id) : []);
+  const acting = new Set(isActor ? actingSurvivors(s) : []);
 
   // ---- energy meter + worn gear (weapon / armor / book), with the survivor's personal costs in the tooltip
-  const max = energyMax(s, shown.id);
+  const max = energyMax(s);
   const e = shown.energy ?? 0;
-  const hero = heroOf(s, shown.id);
+  const hero = heroOf(s);
   const costs = hero ? t('panel.costs', {
     move: actionCost(s, hero.id, 'move', 'school'), search: actionCost(s, hero.id, 'search'), attack: actionCost(s, hero.id, 'attack'), kills: killsPerAttack(s, hero.id),
   }) : '';
-  const tip = `${t('panel.energyTip', { n: e, max, regen: energyRegen(s, shown.id) })}\n${costs}`;
-  const gear = gearOf(s, shown.id);
+  const tip = `${t('panel.energyTip', { n: e, max, regen: energyRegen(s) })}\n${costs}`;
+  const gear = gearOf(s);
   mount(refs.chips,
     h('div', { class: 'energy', role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': String(max), 'aria-valuenow': String(e), 'aria-label': tip, tip },
       icon('exposure', 'en-ico'),
       h('span', { class: 'en-bar' }, h('i', { style: { width: `${Math.round((Math.min(e, max) / Math.max(1, max)) * 100)}%` } })),
       h('b', { class: 'en-num' }, `${e}`), h('small', {}, `/${max}`)));
   // The survivor's round face, with the worn gear (weapon / armor / book) beside it.
-  mount(refs.survivors, aliveSurvivorsOf(s, shown.id).map((sv) => survivorToken(ctx, sv, { canAct: acting.has(sv.id), color: hex(PLAYER_COLORS[idx]) })),
+  mount(refs.survivors, aliveSurvivors(s).map((sv) => survivorToken(ctx, sv, { canAct: acting.has(sv.id), color: '#f2b33d' })),
     h('div', { class: 'gear', role: 'group', 'aria-label': t('panel.gear') }, ['weapon', 'armor', 'book'].map((slot) => {
       const it = gear[slot];
       const label = it ? `${t(`item.${slot}`)}: ${c('items', it.id, 'name')} — ${t(...itemShort(it))}` : t('panel.gearEmpty', { slot: t(`item.${slot}`) });
@@ -124,8 +115,8 @@ export function renderPlayerPanel(refs, ctx) {
         it ? art.item(it.id, 's', { alt: '' }) : icon(slot === 'weapon' ? 'attack' : slot === 'armor' ? 'barricade' : 'log'));
     })));
 
-  // ---- hand (only ever the viewer's own): a floating pile or a fan
-  const hand = viewer && !ctx.passing ? shown.hand : [];
+  // ---- hand: a floating pile or a fan
+  const hand = shown.hand;
   // Phones: an open location sheet takes the room, so the hand folds into its pile.
   const phoneLoc = window.innerWidth <= 760 && !!ui.selLoc;
   // A card picked by other means (keyboard, tutorial, a test) opens the fan while its sheet is up.
@@ -135,26 +126,12 @@ export function renderPlayerPanel(refs, ctx) {
   renderHand(refs.hand, ctx, shown, hand, { isActor, compact, phoneLoc });
 
   // ---- actions: End turn, everything else behind the round "more" button
-  const objective = viewer ? objectiveDef(getPlayer(s, viewer).objectiveId) : null;
-  const end = isActor ? endTurnOption(s, shown.id) : null;
+  const end = isActor ? endTurnOption(s) : null;
   const endTurn = () => {
-    if (shouldConfirmEndTurn(s, shown.id, { skip: ui.skipEndConfirm })) ctx.set({ modal: 'confirmEnd' });
-    else ctx.dispatch(act.endTurn(shown.id));
+    if (shouldConfirmEndTurn(s, { skip: ui.skipEndConfirm })) ctx.set({ modal: 'confirmEnd' });
+    else ctx.dispatch(act.endTurn());
   };
-  const canVote = isActor && voteTargets(s, shown.id).length > 0;
   const menu = [
-    objective ? h('button', {
-      class: 'menu-item hold', role: 'menuitem',
-      onpointerdown: (ev) => { ev.preventDefault(); ctx.set({ peek: true }); },
-      onpointerup: () => ctx.set({ peek: false }),
-      onpointerleave: () => ui.peek && ctx.set({ peek: false }),
-      onpointercancel: () => ctx.set({ peek: false }),
-      onkeydown: (ev) => { if (ev.key === ' ' || ev.key === 'Enter') { ev.preventDefault(); if (!ui.peek) ctx.set({ peek: true }); } },
-      onkeyup: () => ctx.set({ peek: false }),
-      oncontextmenu: (ev) => ev.preventDefault(),
-    }, icon('lock'), h('span', {}, t('panel.objectiveShort')), h('small', {}, t('panel.hold'))) : null,
-    isActor ? h('button', { class: 'menu-item', role: 'menuitem', onclick: () => ctx.set({ modal: 'request', moreOpen: false }) }, icon('request'), h('span', {}, t('panel.request'))) : null,
-    canVote ? h('button', { class: 'menu-item', role: 'menuitem', onclick: () => ctx.set({ modal: 'callVote', voteTarget: null, moreOpen: false }) }, icon('vote'), h('span', {}, t('vote.call'))) : null,
     // Quick rules are also here (on phones the top bar has no room for the ? button).
     // Step 21: mute right where you are (also in settings; the choice is saved).
     h('button', { class: `menu-item sound-item${ctx.ui.sound ? ' on' : ''}`, role: 'menuitemcheckbox', 'aria-checked': ctx.ui.sound ? 'true' : 'false', onclick: () => ctx.setSound(!ctx.ui.sound) }, icon(ctx.ui.sound ? 'sound' : 'mute'), h('span', {}, `${t('settings.sound')}: ${t(ctx.ui.sound ? 'settings.on' : 'settings.off')}`)),
@@ -171,11 +148,7 @@ export function renderPlayerPanel(refs, ctx) {
       tip: end.ok ? null : t(`err.${end.error}`),
       onclick: (ev) => (end.ok ? endTurn() : flashTip(ev.currentTarget)),
     }, t('panel.endTurn')) : null,
-    ui.moreOpen && menu.length ? h('div', { class: 'more-menu panel', role: 'menu', onclick: (ev) => ev.stopPropagation() }, menu) : null,
-    ui.peek && objective ? h('div', { class: `objective-peek panel k-${objective.kind}` },
-      h('small', {}, t(`kind.${objective.kind}`)),
-      h('h3', {}, c('objectives', objective.id, 'name')),
-      h('p', {}, c('objectives', objective.id, 'text'))) : null);
+    ui.moreOpen && menu.length ? h('div', { class: 'more-menu panel', role: 'menu', onclick: (ev) => ev.stopPropagation() }, menu) : null);
 }
 
 // ---------------------------------------------------------------- step 14: floating hand
@@ -271,7 +244,7 @@ function updateCard(el, ctx, shown, uid, { isActor, compact }) {
   const item = itemOf(s, uid);
   const selected = ui.selCard === uid && !compact;
   const used = (shown.usedCards ?? []).includes(uid);
-  const usable = isActor ? cardUsable(s, shown.id, uid) : { ok: true };
+  const usable = isActor ? cardUsable(s, uid) : { ok: true };
   if (!el) {
     el = h('button', {
       dataset: { uid },
@@ -330,7 +303,7 @@ export function flyCard(uid, kind) {
 
 // ---------------------------------------------------------------- step 13: survivor tokens
 
-/** A round portrait token: ring in the owner's colour, health pips, frostbite, "can act" and moved marks.
+/** A round portrait token: ring in the team colour, health pips, frostbite, "can act" and moved marks.
  * No text on it; hovering or focusing shows a small card with the details. */
 function survivorToken(ctx, sv, { canAct = false, color = '#888' } = {}) {
   const { ui, art } = ctx;
@@ -355,14 +328,14 @@ function survivorToken(ctx, sv, { canAct = false, color = '#888' } = {}) {
     h('b', {}, d.name),
     h('small', {}, `${c('survivors', sv.id, 'occupation')} · ${where}`),
     h('span', { class: 'sv-stats' },
-      h('span', { class: 'need' }, icon('exposure'), `${energyMax(ctx.state, sv.owner)}`),
+      h('span', { class: 'need' }, icon('exposure'), `${energyMax(ctx.state)}`),
       h('span', { class: 'need' }, icon('attack'), actionCost(ctx.state, sv.id, 'attack')),
       h('span', { class: 'need' }, icon('search'), actionCost(ctx.state, sv.id, 'search'))),
     h('span', { class: 'sv-health' }, Array.from({ length: limit }, (_, i) => heart(i < left)), sv.moved ? h('small', {}, ` · ${t('panel.moved')}`) : null),
     h('span', { class: 'tok-ability' }, icon('ability'), c('survivors', sv.id, 'abilityText')),
     // Worn gear (phones hide the gear slots in the HUD, so it is listed here too).
     (() => {
-      const g = gearOf(ctx.state, sv.owner);
+      const g = gearOf(ctx.state);
       const worn = ['weapon', 'armor', 'book'].map((k) => g[k]).filter(Boolean);
       return worn.length ? h('span', { class: 'tok-gear' }, icon('hand'), worn.map((it) => c('items', it.id, 'name')).join(' · ')) : null;
     })()));

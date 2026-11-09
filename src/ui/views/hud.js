@@ -1,14 +1,13 @@
 // Top bar (morale, round, food, waste, crisis, goal, turn) and the log panel — drawn icons, no emoji.
 import { journalEntries, daySummary } from '../journal.js';
-import { h, mount, hex, TYPE_REP } from '../dom.js';
+import { h, mount, TYPE_REP } from '../dom.js';
 import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
 import { formatLog, describeEffects } from '../../i18n/format.js';
 import {
-  foodNeeded, crisisDef, crisisRequirement, scenarioProgress, scenarioTarget, getPlayer,
+  foodNeeded, crisisDef, crisisRequirement, scenarioProgress, scenarioTarget,
 } from '../../core/selectors.js';
 import { RULES } from '../../core/constants.js';
-import { PLAYER_COLORS } from '../../render/pieces.js';
 import { counter } from '../ticker.js';
 import { checklistView } from './help.js';
 import { PHASES } from '../../core/constants.js';
@@ -16,8 +15,6 @@ import { PHASES } from '../../core/constants.js';
 export function renderTopbar(el, ctx) {
   const { state: s, ui, art } = ctx;
   const crisis = crisisDef(s);
-  const active = s.activePlayerId ? getPlayer(s, s.activePlayerId) : null;
-  const activeIdx = active ? s.players.indexOf(active) : 0;
   const need = foodNeeded(s);
 
   // A gauge: icon, label, value. `c` is a counter() result; while it is fresh the icon pulses.
@@ -54,13 +51,9 @@ export function renderTopbar(el, ctx) {
   const goal = block('goal', t('tip.goal', { text: c('scenarios', s.scenario.id, 'goalText') }), 'goal', t('hud.goal'),
     counter('goal', scenarioProgress(s), { text: (v) => `${v}/${scenarioTarget(s)}` }));
 
-  const turn = active ? h('div', { class: 'stat-block turn' },
-    h('span', { class: 'dot', style: { background: hex(PLAYER_COLORS[activeIdx]) } }),
-    h('b', {}, t('hud.turn', { name: active.name }))) : null;
-
   mount(el,
     h('div', { class: 'brand-mini' }, 'FROSTBOUND'),
-    morale, food, waste, helpless, round, goal, crisisChip, turn,
+    morale, food, waste, helpless, round, goal, crisisChip,
     h('div', { class: 'spacer' }),
     h('button', { class: 'icon-btn rules-btn', tip: t('hud.rules'), 'aria-label': t('hud.rules'), onclick: () => ctx.set({ modal: 'rules' }) }, '?'),
     h('button', { class: `icon-btn${ui.logOpen ? ' on' : ''}`, tip: t('hud.log'), 'aria-label': t('hud.log'), onclick: () => ctx.set({ logOpen: !ui.logOpen }) }, icon('log')),
@@ -85,24 +78,6 @@ const FEED_MS = 6000;
 const FEED_MAX = 3;
 const feed = { last: null, first: null, items: [] }; // items: { e, at }
 
-// Entries the colony / round produce on their own: never attributed to a player.
-const SYSTEM_KEYS = new Set(['roundStart', 'crisisResolved', 'fed', 'starvation', 'spawn', 'zombies', 'overrun', 'crisisDrawn', 'gameOver', 'voteResult']);
-
-/**
- * Who did each log entry: its playerId, the owner of its survivor, or else whoever's turn it was
- * (a barricade or a card draw has no playerId of its own). Colony-phase and system entries: null.
- */
-function attribute(log, s) {
-  let turnOf = null;
-  return log.map((e) => {
-    if (e.k === 'turnStart') turnOf = e.playerId;
-    if (e.k === 'roundStart' || e.k === 'turnEnd' || e.k === 'crisisResolved') { const was = e.k === 'turnEnd' ? e.playerId : null; turnOf = null; if (was) return was; }
-    if (e.playerId) return e.playerId;
-    if (e.survivorId) return s.survivors[e.survivorId]?.owner ?? null;
-    return SYSTEM_KEYS.has(e.k) ? null : turnOf;
-  });
-}
-
 /** Track entries as they arrive (client side), so the feed can fade them after a few seconds. */
 function trackFeed(s, now) {
   const first = s.log[0] ? JSON.stringify(s.log[0]) : null;
@@ -111,33 +86,27 @@ function trackFeed(s, now) {
   if (feed.last === null) { feed.last = s.log.length ? JSON.stringify(s.log.at(-1)) : ''; return; } // first sight: no flood
   let i = s.log.length - 1;
   while (i >= 0 && JSON.stringify(s.log[i]) !== feed.last) i--;
-  const who = attribute(s.log, s);
-  for (let k = i + 1; k < s.log.length; k++) feed.items.push({ e: s.log[k], at: now, pid: who[k] });
+  for (let k = i + 1; k < s.log.length; k++) feed.items.push({ e: s.log[k], at: now });
   feed.last = s.log.length ? JSON.stringify(s.log.at(-1)) : '';
   feed.items = feed.items.filter((x) => now - x.at < FEED_MS).slice(-12);
 }
 
-function feedLine(e, s, ctx, { age = null, pid = null } = {}) {
+function feedLine(e, s, ctx, { age = null } = {}) {
   const text = formatLog(e, s);
   if (!text) return null;
-  const p = pid ? s.players.find((x) => x.id === pid) : null;
-  const idx = p ? s.players.indexOf(p) : -1;
   const cls = e.k === 'roundStart' ? 'round' : e.k === 'turnStart' ? 'turn'
     : ['death', 'overrun', 'infectionSpreads'].includes(e.k) ? 'bad' : e.k === 'exposure' && e.face !== 'blank' ? 'warn' : '';
-  const mine = pid && pid === s.activePlayerId;
   return h('li', {
-    class: `feed-item ${cls}${mine ? ' actor' : pid ? '' : ' system'}`,
-    style: age != null ? { animationDelay: `${-Math.round(age)}ms`, '--accent-p': p ? hex(PLAYER_COLORS[idx]) : 'transparent' } : { '--accent-p': p ? hex(PLAYER_COLORS[idx]) : 'transparent' },
+    class: `feed-item ${cls}`,
+    style: age != null ? { animationDelay: `${-Math.round(age)}ms` } : {},
   },
-  // The acting player leads every line (turn-start lines already say who, so just the colour dot).
-  p ? h('span', { class: 'who' }, h('i', { class: 'dot', style: { background: hex(PLAYER_COLORS[idx]) } }), e.k === 'turnStart' ? null : p.name) : null,
   e.survivorId && s.survivors[e.survivorId] ? ctx.art.portrait(e.survivorId, 's', { cls: `log-face${e.k === 'death' ? ' dead' : ''}` }) : null,
   h('span', { class: 'txt' }, text));
 }
 
 /**
  * Top-centre feed: the last few actions fade in and out; hovering, focusing or pinning (log button)
- * opens the history. Only public information (formatLog) is ever shown.
+ * opens the history.
  */
 export function renderLog(el, ctx) {
   const { state: s, ui } = ctx;
@@ -148,11 +117,10 @@ export function renderLog(el, ctx) {
   el.tabIndex = 0;
   el.setAttribute('aria-label', t('hud.log'));
   const recent = feed.items.slice(-FEED_MAX).reverse()
-    .map((x) => feedLine(x.e, s, ctx, { age: now - x.at, pid: x.pid })).filter(Boolean);
+    .map((x) => feedLine(x.e, s, ctx, { age: now - x.at })).filter(Boolean);
   const history = [];
-  const who = attribute(s.log, s);
   for (let i = s.log.length - 1; i >= 0 && history.length < 40; i--) {
-    const li = feedLine(s.log[i], s, ctx, { pid: who[i] });
+    const li = feedLine(s.log[i], s, ctx);
     if (li) history.push(li);
   }
   const journal = ui.logTab === 'journal';
@@ -183,22 +151,18 @@ function journalView(s) {
 
 const PHASE_STEPS = ['draft', 'crossroads', 'turn', 'colony'];
 
-/** Where the round is: Draft → (Crossroads) → Turn of <player> → Colony phase, plus whose move it is. */
+/** Where the round is: Draft → (Crossroads) → Your turn → Colony phase. */
 export function renderPhase(el, ctx) {
   const s = ctx.state;
-  const active = s.activePlayerId ? getPlayer(s, s.activePlayerId) : null;
-  const now = s.phase === PHASES.VOTE ? 'turn' : s.phase === PHASES.GAME_OVER ? null : s.phase;
+  const now = s.phase === PHASES.GAME_OVER ? null : s.phase;
   const who = s.phase === PHASES.DRAFT ? t('phase.draftWho')
-    : s.phase === PHASES.VOTE ? t('phase.vote')
-      : s.phase === PHASES.GAME_OVER ? t('phase.over')
-        : active ? t(s.phase === PHASES.CROSSROADS ? 'phase.crossroadsWho' : 'phase.turnWho', { name: active.name }) : '';
-  const idx = active ? s.players.indexOf(active) : -1;
+    : s.phase === PHASES.GAME_OVER ? t('phase.over')
+      : s.phase === PHASES.CROSSROADS ? t('phase.crossroadsWho') : ''; // the step list already says "Your turn"
   mount(el,
     h('span', { class: 'phase-round' }, t('phase.round', { n: s.round, total: s.scenario.rounds })),
     h('ol', { class: 'phase-steps' }, PHASE_STEPS.map((k) => h('li', { class: k === now ? 'now' : '' }, t(`phase.${k}`)))),
-    h('span', { class: 'phase-who' },
-      idx >= 0 && s.phase !== PHASES.DRAFT ? h('span', { class: 'dot', style: { background: hex(PLAYER_COLORS[idx]) } }) : null, who),
-    // Step 15: while someone else's move plays out.
+    who ? h('span', { class: 'phase-who' }, who) : null,
+    // Step 15: while a move plays out.
     ctx.watching ? h('span', { class: 'skip-hint' }, t('scene.skip')) : null);
 }
 

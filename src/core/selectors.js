@@ -2,37 +2,20 @@
 import { SURVIVORS_BY_ID } from '../content/survivors.js';
 import { LOCATIONS } from '../content/locations.js';
 import { ITEMS } from '../content/items.js';
-import { ALL_OBJECTIVES } from '../content/objectives.js';
 import { SCENARIOS_BY_ID } from '../content/scenarios.js';
 import { CRISES_BY_ID } from '../content/crises.js';
 import { RULES, ENERGY, DANGEROUS_LOCATIONS, OUTSIDE_LOCATIONS } from './constants.js';
 
 export const survivorDef = (id) => SURVIVORS_BY_ID[id];
 export const itemOf = (s, uid) => ITEMS[s.cards[uid]];
-export const objectiveDef = (id) => ALL_OBJECTIVES[id];
 export const scenarioDef = (s) => SCENARIOS_BY_ID[s.scenario.id];
 export const crisisDef = (s) => (s.crisis ? CRISES_BY_ID[s.crisis.id] : null);
 
-export function getPlayer(s, playerId) {
-  return s.players.find((p) => p.id === playerId);
-}
+/** The solo player's team: hand, gear, energy and the survivors they control. */
+export const team = (s) => s.team;
 
-export function activePlayer(s) {
-  return getPlayer(s, s.activePlayerId);
-}
-
-export function playerIndex(s, playerId) {
-  return s.players.findIndex((p) => p.id === playerId);
-}
-
-/** The player seated after `playerId` (wraps around). */
-export function nextPlayer(s, playerId) {
-  const i = playerIndex(s, playerId);
-  return s.players[(i + 1) % s.players.length];
-}
-
-export function aliveSurvivorsOf(s, playerId) {
-  return getPlayer(s, playerId).survivors.map((id) => s.survivors[id]).filter((sv) => sv && sv.alive);
+export function aliveSurvivors(s) {
+  return s.team.survivors.map((id) => s.survivors[id]).filter((sv) => sv && sv.alive);
 }
 
 export function survivorsAt(s, locationId) {
@@ -44,32 +27,26 @@ export function hasAbility(s, survivorId, type) {
   return !!sv && sv.alive && survivorDef(survivorId).ability.type === type;
 }
 
-/** Does this player control a living survivor with the given ability type? */
-/** How many copies of a passive book (by passive key) the colony's players hold. Exiles don't share. */
-/** Equipped gear of a player: { weapon, armor, book } item defs (or null). Hidden from no one: gear is worn. */
-export function gearOf(s, playerId) {
-  const g = getPlayer(s, playerId)?.gear ?? {};
+/** Equipped gear: { weapon, armor, book } item defs (or null). */
+export function gearOf(s) {
+  const g = s.team?.gear ?? {};
   const def = (uid) => (uid ? ITEMS[s.cards[uid]] ?? null : null);
   return { weapon: def(g.weapon), armor: def(g.armor), book: def(g.book) };
 }
 
-/** How many equipped books with this passive (one player, or every non-exiled player). */
-export function booksHeld(s, passive, playerId = null) {
-  let n = 0;
-  for (const p of s.players) {
-    if (playerId ? p.id !== playerId : p.exiled) continue;
-    if (gearOf(s, p.id).book?.passive === passive) n += 1;
-  }
-  return n;
+/** 1 if the equipped book has this passive, else 0. */
+export function booksHeld(s, passive) {
+  return gearOf(s).book?.passive === passive ? 1 : 0;
 }
 
 /** An equipped blueprint for this location. */
-export function holdsBlueprint(s, playerId, locationId) {
-  return gearOf(s, playerId).book?.blueprint === locationId;
+export function holdsBlueprint(s, locationId) {
+  return gearOf(s).book?.blueprint === locationId;
 }
 
-export function playerHasAbility(s, playerId, type) {
-  return aliveSurvivorsOf(s, playerId).some((sv) => survivorDef(sv.id).ability.type === type);
+/** Does a living survivor of the team have this ability? */
+export function teamHasAbility(s, type) {
+  return aliveSurvivors(s).some((sv) => survivorDef(sv.id).ability.type === type);
 }
 
 export function woundLimit(survivorId) {
@@ -104,25 +81,18 @@ export function foodNeeded(s) {
 export function crisisRequirement(s) {
   const c = crisisDef(s);
   if (!c) return 0;
-  return Math.max(1, Math.ceil(c.base + c.perPlayer * s.players.length));
+  return Math.max(1, c.need ?? 1);
 }
 
 /** The survivor a crossroads card is "about": highest influence, optionally filtered. */
-export function focusSurvivor(s, playerId, filter = () => true) {
-  const list = aliveSurvivorsOf(s, playerId).filter(filter);
+export function focusSurvivor(s, filter = () => true) {
+  const list = aliveSurvivors(s).filter(filter);
   list.sort((a, b) => survivorDef(b.id).influence - survivorDef(a.id).influence);
   return list[0] || null;
 }
 
 export function scenarioTarget(s) {
-  const g = scenarioDef(s).goal;
-  const n = s.players.length;
-  switch (g.type) {
-    case 'deposit': return g.base + g.perPlayer * n;
-    case 'stockpile': return g.foodBase + g.foodPerPlayer * n;
-    case 'kills': return g.base + g.perPlayer * n;
-    default: return 0;
-  }
+  return scenarioDef(s).goal.target ?? 0;
 }
 
 /** Current progress towards the main objective (same unit as scenarioTarget). */
@@ -140,19 +110,6 @@ export function roundsRemaining(s) {
   return s.scenario.rounds - s.round + 1;
 }
 
-/** Which players must provide input right now (for hot-seat prompts and AI driving). */
-export function pendingActors(s) {
-  switch (s.phase) {
-    case 'draft': return s.players.filter((p) => !p.drafted).map((p) => p.id);
-    case 'crossroads':
-    case 'turn': return [s.activePlayerId];
-    case 'vote': return s.players
-      .filter((p) => p.id !== s.vote.targetId && !(p.id in s.vote.votes))
-      .map((p) => p.id);
-    default: return [];
-  }
-}
-
 // ---------------------------------------------------------------- energy (personal), danger, forecast
 
 export const isNight = (s) => s.round % 2 === 0;
@@ -165,7 +122,7 @@ export const isNight = (s) => s.round % 2 === 0;
 export function actionCost(s, survivorId, kind, to = null) {
   const sv = s.survivors[survivorId];
   const def = survivorDef(survivorId);
-  const gear = sv ? gearOf(s, sv.owner) : {};
+  const gear = sv ? gearOf(s) : {};
   let cost = ENERGY.COST[kind] ?? 0;
   if (kind === 'attack') cost = ENERGY.ATTACK_BASE + ENERGY.PER_SKILL * (def?.attack ?? 4) + (gear.weapon?.attackMod ?? 0);
   if (kind === 'search') cost = ENERGY.SEARCH_BASE + ENERGY.PER_SKILL * (def?.search ?? 4);
@@ -184,30 +141,30 @@ export function actionCost(s, survivorId, kind, to = null) {
 /** Zombies one attack kills: the weapon's value (bare hands 1), +1 for Teodor. */
 export function killsPerAttack(s, survivorId) {
   const sv = s.survivors[survivorId];
-  const weapon = sv ? gearOf(s, sv.owner).weapon : null;
+  const weapon = sv ? gearOf(s).weapon : null;
   return Math.max(1, weapon?.value ?? 1) + (survivorDef(survivorId)?.ability.type === 'killTwo' ? 1 : 0);
 }
 
-/** The player's survivor (one per player). */
-export const heroOf = (s, playerId) => aliveSurvivorsOf(s, playerId)[0] ?? null;
+/** The team's lead survivor (the one whose energy pool the team uses for now). */
+export const heroOf = (s) => aliveSurvivors(s)[0] ?? null;
 
 /** Energy cap: the survivor's own pool, lower while badly hurt (2+ wounds). */
-export function energyMax(s, playerId) {
-  const sv = heroOf(s, playerId);
+export function energyMax(s) {
+  const sv = heroOf(s);
   if (!sv) return 0;
   const base = survivorDef(sv.id).energy ?? ENERGY.MAX;
   return Math.max(10, Math.min(ENERGY.MAX, base - (sv.wounds >= 2 ? ENERGY.HURT : 0)));
 }
 
 /** Energy regained at the start of a turn: the survivor's regen, Dot +15, a survival guide, starvation, frost. */
-export function energyRegen(s, playerId) {
-  const p = getPlayer(s, playerId);
-  const sv = heroOf(s, playerId);
+export function energyRegen(s) {
+  const p = s.team;
+  const sv = heroOf(s);
   if (!sv) return 0;
   const def = survivorDef(sv.id);
   let n = def.regen ?? 65;
   if (def.ability.type === 'extraDie') n += 15;
-  if (gearOf(s, playerId).book?.passive === 'regenPlus') n += gearOf(s, playerId).book.value;
+  if (gearOf(s).book?.passive === 'regenPlus') n += gearOf(s).book.value;
   if (s.starvation > 0) n -= ENERGY.STARVING;
   return Math.max(0, n - (p.regenPenalty ?? 0));
 }

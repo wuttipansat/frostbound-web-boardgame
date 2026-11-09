@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { atmosphereFor } from '../src/render/atmosphere.js';
 import { createPrintPool, pathPrints } from '../src/render/footprints.js';
 
-const base = (o = {}) => ({ scenario: { rounds: 7 }, round: 1, morale: 8, maxMorale: 10, phase: 'turn', players: [{ id: 'a' }, { id: 'b' }], activePlayerId: 'a', ...o });
+const base = (o = {}) => ({ scenario: { rounds: 7 }, round: 1, morale: 8, maxMorale: 10, phase: 'turn', ...o });
 
 test('storm grows with rounds and falling morale; fire follows morale', () => {
   const early = atmosphereFor(base());
@@ -13,8 +13,8 @@ test('storm grows with rounds and falling morale; fire follows morale', () => {
   assert.ok(late.storm <= 1 && early.storm >= 0);
 });
 
-test('dusk moves through the round with the active player', () => {
-  assert.ok(atmosphereFor(base({ activePlayerId: 'b' })).dusk > atmosphereFor(base()).dusk);
+test('dusk: the turn is daytime, the colony phase is night', () => {
+  assert.ok(atmosphereFor(base({ phase: 'colony' })).dusk > atmosphereFor(base()).dusk);
 });
 
 test('ending: won = calm + blazing fire, lost = blizzard + fire out', () => {

@@ -3,7 +3,7 @@
 import { PHASES, LOCATION_IDS, RULES, ENERGY } from '../constants.js';
 import { assert } from '../errors.js';
 import {
-  getPlayer, survivorDef, freeSurvivorSlots, freeZombieSlots, itemOf, scenarioDef, booksHeld, holdsBlueprint,
+  survivorDef, freeSurvivorSlots, freeZombieSlots, itemOf, scenarioDef, booksHeld, holdsBlueprint,
   actionCost, gearOf, killsPerAttack, energyMax,
 } from '../selectors.js';
 import {
@@ -16,24 +16,23 @@ import { isPermanent, gearSlot } from '../../content/items.js';
 
 // ---------------------------------------------------------------- guards
 
-function requireTurn(s, playerId, { picking = false } = {}) {
+function requireTurn(s, { picking = false } = {}) {
   assert(s.phase === PHASES.TURN, 'wrongPhase', s.phase);
-  assert(playerId === s.activePlayerId, 'notYourTurn');
-  const p = getPlayer(s, playerId);
+  const p = s.team;
   assert(picking || !p.pick, 'pickPending');
   return p;
 }
 
-function requireSurvivor(s, playerId, survivorId) {
+function requireSurvivor(s, survivorId) {
   const sv = s.survivors[survivorId];
   assert(sv && sv.alive, 'noSuchSurvivor', survivorId);
-  assert(sv.owner === playerId, 'notYourSurvivor', survivorId);
+  assert(s.team.survivors.includes(survivorId), 'notYourSurvivor', survivorId);
   return sv;
 }
 
 /** Pay an action's energy. */
-function pay(s, p, survivorId, kind, to = null) {
-  spendEnergy(s, p.id, actionCost(s, survivorId, kind, to));
+function pay(s, survivorId, kind, to = null) {
+  spendEnergy(s, actionCost(s, survivorId, kind, to));
 }
 
 function requireCard(s, p, uid) {
@@ -47,75 +46,75 @@ function ability(survivorId) {
 
 // ---------------------------------------------------------------- energy actions
 
-export function attack(s, { playerId, survivorId }) {
-  const p = requireTurn(s, playerId);
-  const sv = requireSurvivor(s, playerId, survivorId);
+export function attack(s, { survivorId }) {
+  requireTurn(s);
+  const sv = requireSurvivor(s, survivorId);
   assert(s.locations[sv.location].zombies > 0, 'noZombiesHere');
-  pay(s, p, survivorId, 'attack');
+  pay(s, survivorId, 'attack');
   const killed = removeZombies(s, sv.location, killsPerAttack(s, survivorId));
-  creditKills(s, playerId, killed);
-  log(s, 'attack', { playerId, survivorId, locationId: sv.location, killed });
+  creditKills(s, killed);
+  log(s, 'attack', { survivorId, locationId: sv.location, killed });
   // A bare-handed fight is risky; a weapon keeps them at bay.
-  const armed = !!gearOf(s, playerId).weapon;
+  const armed = !!gearOf(s).weapon;
   if (ability(survivorId).type !== 'noAttackExposure' && !armed) rollExposure(s, survivorId, 'attack');
 }
 
-export function search(s, { playerId, survivorId }) {
-  const p = requireTurn(s, playerId);
-  const sv = requireSurvivor(s, playerId, survivorId);
+export function search(s, { survivorId }) {
+  const p = requireTurn(s);
+  const sv = requireSurvivor(s, survivorId);
   assert(sv.location !== 'colony', 'cannotSearchColony');
   assert(s.locations[sv.location].deck.length > 0, 'deckEmpty');
-  pay(s, p, survivorId, 'search');
+  pay(s, survivorId, 'search');
   const a = ability(survivorId);
   const n = a.type === 'doubleSearch' && a.location === sv.location ? 2 : 1;
   // A blueprint for this place: draw one extra, then put one back (returnCard).
-  const blueprint = holdsBlueprint(s, playerId, sv.location);
-  const drawn = drawItems(s, playerId, sv.location, blueprint ? n + 1 : n);
-  log(s, 'search', { playerId, survivorId, locationId: sv.location, count: drawn.length });
+  const blueprint = holdsBlueprint(s, sv.location);
+  const drawn = drawItems(s, sv.location, blueprint ? n + 1 : n);
+  log(s, 'search', { survivorId, locationId: sv.location, count: drawn.length });
   if (blueprint && drawn.length > n) p.pick = { locationId: sv.location, uids: drawn };
   return drawn;
 }
 
 /** Resolve a blueprint search: the chosen card goes back to the bottom of that location's deck. */
-export function returnCard(s, { playerId, cardUid }) {
-  const p = requireTurn(s, playerId, { picking: true });
+export function returnCard(s, { cardUid }) {
+  const p = requireTurn(s, { picking: true });
   assert(p.pick, 'notPicking');
   assert(p.pick.uids.includes(cardUid), 'cardNotInHand', cardUid);
-  removeFromHand(s, playerId, cardUid);
+  removeFromHand(s, cardUid);
   s.locations[p.pick.locationId].deck.unshift(cardUid);
   p.pick = null;
 }
 
-export function barricade(s, { playerId, survivorId }) {
-  const p = requireTurn(s, playerId);
-  const sv = requireSurvivor(s, playerId, survivorId);
+export function barricade(s, { survivorId }) {
+  requireTurn(s);
+  const sv = requireSurvivor(s, survivorId);
   assert(freeZombieSlots(s, sv.location) > 0, 'noBarricadeSpace');
-  pay(s, p, survivorId, 'barricade');
-  const n = (ability(survivorId).type === 'barricadeTwo' ? 2 : 1) + Math.min(1, booksHeld(s, 'barricadePlus', playerId));
+  pay(s, survivorId, 'barricade');
+  const n = (ability(survivorId).type === 'barricadeTwo' ? 2 : 1) + Math.min(1, booksHeld(s, 'barricadePlus'));
   addBarricades(s, sv.location, n);
 }
 
-export function clean(s, { playerId, survivorId }) {
-  const p = requireTurn(s, playerId);
-  const sv = requireSurvivor(s, playerId, survivorId);
+export function clean(s, { survivorId }) {
+  requireTurn(s);
+  const sv = requireSurvivor(s, survivorId);
   assert(sv.location === 'colony', 'mustBeInColony');
   assert(s.waste > 0, 'nothingToClean');
-  pay(s, p, survivorId, 'clean');
+  pay(s, survivorId, 'clean');
   const amount = ability(survivorId).type === 'cleanFive' ? 5 : RULES.CLEAN_AMOUNT;
   const removed = Math.min(amount, s.waste);
   s.waste -= removed;
-  log(s, 'clean', { playerId, survivorId, removed, value: s.waste });
+  log(s, 'clean', { survivorId, removed, value: s.waste });
 }
 
-export function lure(s, { playerId, survivorId, toLocation }) {
-  const p = requireTurn(s, playerId);
-  const sv = requireSurvivor(s, playerId, survivorId);
+export function lure(s, { survivorId, toLocation }) {
+  requireTurn(s);
+  const sv = requireSurvivor(s, survivorId);
   assert(LOCATION_IDS.includes(toLocation), 'noSuchLocation', toLocation);
   assert(toLocation !== sv.location, 'sameLocation');
   assert(s.locations[sv.location].zombies > 0, 'noZombiesHere');
-  pay(s, p, survivorId, 'lure');
+  pay(s, survivorId, 'lure');
   const moved = removeZombies(s, sv.location, ability(survivorId).type === 'lureTwo' ? 2 : 1);
-  log(s, 'lure', { playerId, survivorId, from: sv.location, to: toLocation, n: moved });
+  log(s, 'lure', { survivorId, from: sv.location, to: toLocation, n: moved });
   addZombies(s, toLocation, moved, 'lure');
 }
 
@@ -123,41 +122,40 @@ export function lure(s, { playerId, survivorId, toLocation }) {
  * Walk somewhere (costs energy, repeatable). Walking into a place with zombies draws a danger card,
  * unless the survivor never draws when moving or burns a fuel card to drive there.
  */
-export function move(s, { playerId, survivorId, toLocation, fuelCardUid }) {
-  const p = requireTurn(s, playerId);
-  const sv = requireSurvivor(s, playerId, survivorId);
+export function move(s, { survivorId, toLocation, fuelCardUid }) {
+  const p = requireTurn(s);
+  const sv = requireSurvivor(s, survivorId);
   assert(LOCATION_IDS.includes(toLocation), 'noSuchLocation', toLocation);
   assert(toLocation !== sv.location, 'sameLocation');
-  assert(!(p.exiled && toLocation === 'colony'), 'exiledFromColony');
   assert(freeSurvivorSlots(s, toLocation) > 0, 'locationFull');
   if (fuelCardUid) assert(requireCard(s, p, fuelCardUid).type === 'fuel', 'needFuel');
-  pay(s, p, survivorId, 'move', toLocation);
+  pay(s, survivorId, 'move', toLocation);
   let safe = ability(survivorId).type === 'noMoveExposure' || s.locations[toLocation].zombies === 0;
   if (fuelCardUid) {
-    wasteCard(s, playerId, fuelCardUid);
+    wasteCard(s, fuelCardUid);
     safe = true;
   }
   const from = sv.location;
   sv.location = toLocation;
   sv.moved = true;
-  log(s, 'move', { playerId, survivorId, from, to: toLocation, safe });
+  log(s, 'move', { survivorId, from, to: toLocation, safe });
   if (!safe) rollExposure(s, survivorId, 'move');
 }
 
 // ---------------------------------------------------------------- gear
 
 /** Equip a weapon, armor or book from your hand (free). Whatever was in that slot goes back to your hand. */
-export function equip(s, { playerId, cardUid }) {
-  const p = requireTurn(s, playerId);
+export function equip(s, { cardUid }) {
+  const p = requireTurn(s);
   const item = requireCard(s, p, cardUid);
   const slot = gearSlot(item);
   assert(slot, 'notGear');
   p.gear = p.gear ?? { weapon: null, armor: null, book: null };
   const old = p.gear[slot];
-  removeFromHand(s, playerId, cardUid);
+  removeFromHand(s, cardUid);
   if (old) p.hand.push(old);
   p.gear[slot] = cardUid;
-  log(s, 'equip', { playerId, card: s.cards[cardUid], slot });
+  log(s, 'equip', { card: s.cards[cardUid], slot });
 }
 
 // ---------------------------------------------------------------- cards
@@ -168,38 +166,36 @@ export function equip(s, { playerId, cardUid }) {
  * junk -> energy; survivor -> a newcomer joins the colony (helpless, but hope: +1 morale).
  * Gear is equipped (equip), fuel is burnt when moving.
  */
-export function playCard(s, { playerId, cardUid, targetSurvivorId }) {
-  const p = requireTurn(s, playerId);
+export function playCard(s, { cardUid, targetSurvivorId }) {
+  const p = requireTurn(s);
   const item = requireCard(s, p, cardUid);
-  const spend = () => { if (!isPermanent(item)) wasteCard(s, playerId, cardUid); };
+  const spend = () => { if (!isPermanent(item)) wasteCard(s, cardUid); };
   switch (item.type) {
     case 'food':
-      assert(!p.exiled, 'exiledFromColony');
       spend();
       changeFood(s, item.value, 'played');
       break;
     case 'medicine': {
-      const sv = requireSurvivor(s, playerId, targetSurvivorId);
+      const sv = requireSurvivor(s, targetSurvivorId);
       assert(sv.wounds > 0 || sv.frostbite, 'notWounded');
       spend();
       for (let i = 0; i < item.value; i++) healSurvivor(s, sv.id);
       break;
     }
     case 'tools': {
-      const sv = requireSurvivor(s, playerId, targetSurvivorId);
+      const sv = requireSurvivor(s, targetSurvivorId);
       assert(freeZombieSlots(s, sv.location) > 0, 'noBarricadeSpace');
       spend();
       addBarricades(s, sv.location, item.value);
       break;
     }
     case 'junk':
-      assert(p.energy < energyMax(s, playerId), 'energyFull');
+      assert(p.energy < energyMax(s), 'energyFull');
       spend();
-      gainEnergy(s, playerId, ENERGY.JUNK * item.value, energyMax(s, playerId));
+      gainEnergy(s, ENERGY.JUNK * item.value, energyMax(s));
       break;
     case 'survivor':
-      assert(!p.exiled, 'exiledFromColony');
-      removeFromHand(s, playerId, cardUid); // they join the colony; the card is not waste
+      removeFromHand(s, cardUid); // they join the colony; the card is not waste
       changeHelpless(s, 1 + (item.helpless ?? 0), 'newcomer');
       changeMorale(s, 1, 'newcomer');
       break;
@@ -212,36 +208,34 @@ export function playCard(s, { playerId, cardUid, targetSurvivorId }) {
     default:
       assert(false, 'unplayable');
   }
-  log(s, 'play', { playerId, card: s.cards[cardUid], type: item.type });
+  log(s, 'play', { card: s.cards[cardUid], type: item.type });
 }
 
-export function contribute(s, { playerId, cardUid }) {
-  const p = requireTurn(s, playerId);
-  assert(!p.exiled, 'exiledFromColony');
+export function contribute(s, { cardUid }) {
+  const p = requireTurn(s);
   requireCard(s, p, cardUid);
   assert(s.crisis, 'noCrisis');
-  removeFromHand(s, playerId, cardUid);
-  s.crisis.contributions.push({ uid: cardUid, playerId });
-  log(s, 'contribute', { playerId }); // face down: the card is NOT logged
+  removeFromHand(s, cardUid);
+  s.crisis.contributions.push(cardUid);
+  log(s, 'contribute', { card: s.cards[cardUid] });
 }
 
-/** Scenario deposit (e.g. fuel for the beacon). Requires your survivor in the colony. */
-export function deposit(s, { playerId, cardUid }) {
-  const p = requireTurn(s, playerId);
+/** Scenario deposit (e.g. fuel for the beacon). Requires a survivor in the colony. */
+export function deposit(s, { cardUid }) {
+  const p = requireTurn(s);
   const goal = scenarioDef(s).goal;
   assert(goal.type === 'deposit', 'scenarioHasNoDeposit');
-  assert(!p.exiled, 'exiledFromColony');
-  assert(p.survivors.some((id) => s.survivors[id].location === 'colony'), 'mustBeInColony');
+  assert(p.survivors.some((id) => s.survivors[id]?.alive && s.survivors[id].location === 'colony'), 'mustBeInColony');
   assert(requireCard(s, p, cardUid).type === goal.item, 'wrongItemType');
-  removeFromHand(s, playerId, cardUid);
+  removeFromHand(s, cardUid);
   s.scenario.deposited += 1;
-  log(s, 'deposit', { playerId, card: s.cards[cardUid], total: s.scenario.deposited });
+  log(s, 'deposit', { card: s.cards[cardUid], total: s.scenario.deposited });
 }
 
 /** Activated abilities (currently: healer). */
-export function useAbility(s, { playerId, survivorId, targetSurvivorId }) {
-  const p = requireTurn(s, playerId);
-  const sv = requireSurvivor(s, playerId, survivorId);
+export function useAbility(s, { survivorId, targetSurvivorId }) {
+  const p = requireTurn(s);
+  const sv = requireSurvivor(s, survivorId);
   assert(ability(survivorId).type === 'healer', 'noActiveAbility');
   assert(!p.abilityUsed[survivorId], 'abilityUsed');
   const target = s.survivors[targetSurvivorId];
@@ -251,7 +245,7 @@ export function useAbility(s, { playerId, survivorId, targetSurvivorId }) {
   healSurvivor(s, targetSurvivorId);
 }
 
-export function finishTurn(s, { playerId }) {
-  requireTurn(s, playerId);
+export function finishTurn(s) {
+  requireTurn(s);
   endTurn(s);
 }

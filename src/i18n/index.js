@@ -5,7 +5,6 @@ import contentTh from './content.th.js';
 import { LOCATIONS } from '../content/locations.js';
 import { ITEMS } from '../content/items.js';
 import { SURVIVORS_BY_ID } from '../content/survivors.js';
-import { ALL_OBJECTIVES } from '../content/objectives.js';
 import { SCENARIOS_BY_ID } from '../content/scenarios.js';
 import { CRISES_BY_ID } from '../content/crises.js';
 import { CROSSROADS_BY_ID } from '../content/crossroads.js';
@@ -16,7 +15,6 @@ const SOURCES = {
   locations: LOCATIONS,
   items: ITEMS,
   survivors: SURVIVORS_BY_ID,
-  objectives: ALL_OBJECTIVES,
   scenarios: SCENARIOS_BY_ID,
   crises: CRISES_BY_ID,
   crossroads: CROSSROADS_BY_ID,

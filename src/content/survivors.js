@@ -45,7 +45,7 @@ export const SURVIVORS = [
   { id: 'dot-ferreira', name: 'Dot Ferreira', occupation: 'Bike Courier', influence: 15, energy: 70, regen: 80, attack: 4, search: 3,
     ability: { type: 'extraDie' }, abilityText: 'Never runs out of steam: +15 energy at the start of each turn.', accent: '#39c16c' },
   { id: 'ambrose-lark', name: 'Ambrose Lark', occupation: 'Scrap Sculptor', influence: 34, energy: 100, regen: 70, attack: 4, search: 3,
-    ability: { type: 'tinkerer' }, abilityText: 'Junk that Ambrose\'s player contributes to a crisis counts as a matching item.', accent: '#9c8f7a' },
+    ability: { type: 'tinkerer' }, abilityText: 'Junk added to a crisis counts as a matching item while Ambrose lives.', accent: '#9c8f7a' },
 ];
 
 export const SURVIVORS_BY_ID = Object.fromEntries(SURVIVORS.map((s) => [s.id, s]));

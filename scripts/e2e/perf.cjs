@@ -60,13 +60,13 @@ const BUDGET = { entry: 130, three: 135, initial: 300 }; // KB gzip
     const reqs = [];
     p.on('request', (r) => reqs.push(r.url()));
     p.on('pageerror', (e) => problems.push(`saver: ${e.message}`));
-    await p.goto('http://localhost:4173/?snow=0&play=HH&seed=3', { waitUntil: 'networkidle' });
+    await p.goto('http://localhost:4173/?snow=0&play=1&seed=3', { waitUntil: 'networkidle' });
     await p.waitForTimeout(600);
     if (reqs.some((u) => /post-.*\.js/.test(u))) problems.push('saver downloaded post-processing');
     if ((await p.evaluate(() => document.body.dataset.gfx)) !== 'saver') problems.push('saver not restored after reload');
-    // 3. Hot seat: the pass-the-device screen covers the board → draw 1 frame in 4.
+    // 3. The draft screen covers the board → draw 1 frame in 4.
     await p.evaluate(() => window.__frostbound.app.set({ modal: null }));
-    const passing = await p.locator('.backdrop.pass, .draft-screen').count();
+    const passing = await p.locator('.draft-screen').count();
     await p.waitForTimeout(800);
     const every = await p.evaluate(() => window.__frostbound.stage.drawEvery);
     report.coveredDrawEvery = every;

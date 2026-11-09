@@ -122,8 +122,6 @@ const SOUNDS = {
   roundStart: () => [220, 440, 660].forEach((f, i) => tone({ f, dur: 1.6 - i * 0.4, gain: 0.09 / (i + 1), attack: 0.002 })),
   turnStart: () => tone({ f: 740, dur: 0.12, type: 'triangle', gain: 0.05 }),
   crossroadsTriggered: () => [659, 784, 988, 1319].forEach((f, i) => tone({ f, dur: 0.6, gain: 0.04, delay: i * 0.09 })),
-  voteCalled: () => { noise({ dur: 0.08, freq: 400, q: 2, gain: 0.4 }); noise({ dur: 0.08, freq: 400, q: 2, gain: 0.4, delay: 0.25 }); },
-  exiled: () => tone({ f: 110, to: 55, dur: 1.0, type: 'sawtooth', gain: 0.12 }),
   gameOver: () => chord([262, 311, 392, 466, 523], { type: 'triangle', spread: 0.15, dur: 1.4, gain: 0.08 }),
   starvation: () => tone({ f: 200, to: 120, dur: 0.6, type: 'triangle', gain: 0.12 }),
 };
@@ -136,7 +134,7 @@ export function soundForLog(e) {
     case 'roll': return 'roll';
     case 'move': case 'attack': case 'search': case 'barricade': case 'clean': case 'lure': case 'play':
     case 'contribute': case 'spawn': case 'death': case 'roundStart': case 'turnStart':
-    case 'crossroadsTriggered': case 'voteCalled': case 'exiled': case 'gameOver': case 'starvation':
+    case 'crossroadsTriggered': case 'gameOver': case 'starvation':
       return e.k;
     default: return null;
   }

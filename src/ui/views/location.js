@@ -1,11 +1,10 @@
 // Right-hand location panel: details, who is here (portraits), zombies (art), and illustrated actions
 // for the selected survivor. Lure picks its destination on the board.
-import { h, mount, hex } from '../dom.js';
+import { h, mount } from '../dom.js';
 import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
 import { LOCATIONS } from '../../content/locations.js';
-import { survivorsAt, survivorDef, getPlayer, aliveSurvivorsOf, spawnForecast } from '../../core/selectors.js';
-import { PLAYER_COLORS } from '../../render/pieces.js';
+import { survivorsAt, survivorDef, aliveSurvivors, spawnForecast } from '../../core/selectors.js';
 import { flashTip } from '../tooltip.js';
 import { survivorOptions, lureTargets } from '../options.js';
 
@@ -22,7 +21,6 @@ export function renderLocationPanel(el, ctx) {
   // Step 17: a location at its zombie limit gets blood on its panel.
   el.classList.toggle('overrun', loc.zombies >= def.zombieSlots);
   const here = survivorsAt(s, id);
-  const ownerIdx = (pid) => s.players.findIndex((p) => p.id === pid);
 
   // One inline row: icon + number; the labels are tooltips.
   const stats = h('div', { class: 'stats inline' },
@@ -36,22 +34,19 @@ export function renderLocationPanel(el, ctx) {
   const people = h('div', { class: 'here' },
     here.length ? h('div', { class: 'chips' }, here.map((sv) => h('button', {
       class: `chip person face-only${ui.selSurvivor === sv.id ? ' selected' : ''}`,
-      style: { '--owner': hex(PLAYER_COLORS[ownerIdx(sv.owner)]) },
-      tip: `${survivorDef(sv.id).name} · ${s.players.find((p) => p.id === sv.owner)?.name ?? ''}`,
+      style: { '--owner': '#f2b33d' },
+      tip: survivorDef(sv.id).name,
       'aria-label': survivorDef(sv.id).name,
-      onclick: () => sv.owner === ctx.viewer && ctx.selectSurvivor(sv.id),
-    }, art.portrait(sv.id, 's', { alt: '', cls: `${sv.wounds ? 'wounded' : ''}${sv.frostbite ? ' frosty' : ''}` }),
-    s.players.find((p) => p.id === sv.owner)?.exiled ? h('span', { class: 'exile-badge inline', tip: t('panel.exiled') }, icon('door')) : null))) : null);
+      onclick: () => ctx.selectSurvivor(sv.id),
+    }, art.portrait(sv.id, 's', { alt: '', cls: `${sv.wounds ? 'wounded' : ''}${sv.frostbite ? ' frosty' : ''}` })))) : null);
 
   const actions = [];
   if (ctx.canAct) {
-    const me = ctx.viewer;
-    const sel = ui.selSurvivor && s.survivors[ui.selSurvivor]?.alive && s.survivors[ui.selSurvivor].owner === me
-      ? s.survivors[ui.selSurvivor] : null;
+    const sel = ui.selSurvivor && s.survivors[ui.selSurvivor]?.alive ? s.survivors[ui.selSurvivor] : null;
 
     // Lure picking mode: choose the destination on the board (or from these buttons).
     if (ui.picking?.type === 'lure' && sel) {
-      const targets = lureTargets(s, me, ui.picking.survivorId);
+      const targets = lureTargets(s, ui.picking.survivorId);
       actions.push(h('div', { class: 'pick-box' },
         h('h4', {}, icon('lure'), ` ${t('loc.lurePick')}`),
         h('p', { class: 'small muted' }, t('loc.pickDestination')),
@@ -62,10 +57,10 @@ export function renderLocationPanel(el, ctx) {
         h('button', { class: 'btn ghost', onclick: () => ctx.set({ picking: null }) }, t('act.cancel'))));
     } else {
       // Moving is done from the round faces that float by the location (views/movepick.js).
-      const mine = aliveSurvivorsOf(s, me).filter((sv) => sv.location === id);
+      const mine = aliveSurvivors(s).filter((sv) => sv.location === id);
       const focus = sel && sel.location === id ? [sel] : mine;
       for (const sv of focus) {
-        const opts = survivorOptions(s, me, sv.id);
+        const opts = survivorOptions(s, sv.id);
         const risky = (o) => o.id === 'attack' && survivorDef(sv.id).ability.type !== 'noAttackExposure';
         actions.push(h('div', { class: 'act-box' },
           h('h4', { tip: t('loc.actionsFor', { name: survivorDef(sv.id).name }) }, art.portrait(sv.id, 's', { cls: 'h4-face', alt: survivorDef(sv.id).name })),
@@ -73,7 +68,7 @@ export function renderLocationPanel(el, ctx) {
             const isLure = o.id === 'lure';
             // Icon only; the name, the energy it costs and why it can't be done now are in the tooltip.
             const tip = [t(`act.${o.id}`),
-              o.cost != null ? t('act.cost', { n: o.cost, have: getPlayer(s, me).energy }) : null,
+              o.cost != null ? t('act.cost', { n: o.cost, have: s.team.energy }) : null,
               !o.ok ? t(`err.${o.error}`) : null,
               risky(o) && o.ok ? t('tip.exposure') : null,
               isLure && o.ok ? t('act.pickOnBoard') : null].filter(Boolean).join(' · ');

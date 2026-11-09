@@ -11,7 +11,6 @@ import { createApp } from './ui/app.js';
 import { createCameraRig } from './render/camera.js';
 import { createAtmosphere, atmosphereFor } from './render/atmosphere.js';
 import { createFootprints } from './render/footprints.js';
-import { PLAYER_COLORS } from './render/pieces.js';
 import { createArtStudio } from './render/art.js';
 import { icon } from './ui/icons.js';
 import { installTooltips } from './ui/tooltip.js';
@@ -19,7 +18,6 @@ import { sound } from './audio/sound.js';
 import { c, t as tr } from './i18n/index.js';
 import { LOCATION_IDS } from './core/constants.js';
 import { ITEMS } from './content/items.js';
-import { SECRET_OBJECTIVES } from './content/objectives.js';
 import { tryReduce } from './core/reducer.js';
 
 const params = new URLSearchParams(location.search);
@@ -109,18 +107,12 @@ function refreshLabels(state) {
   }
 }
 
-const hex = (n) => `#${n.toString(16).padStart(6, '0')}`;
 const SCENE_ICON = { move: 'move', attack: 'attack', search: 'search', barricade: 'barricade', clean: 'clean', lure: 'lure', play: 'check', contribute: 'crisis', deposit: 'goal' };
 
-/** A short floating callout over where a scene happens: who (colour + face), what (icon), the result. */
+/** A short floating callout over where a scene happens: who (face), what (icon), the result. */
 function sceneCallout(ev, state) {
   const el = document.createElement('div');
   el.className = `scene-callout k-${ev.kind}`;
-  const pIdx = state.players.findIndex((p) => p.id === ev.playerId);
-  const dot = document.createElement('span');
-  dot.className = 'dot';
-  if (pIdx >= 0) dot.style.background = hex(PLAYER_COLORS[pIdx]);
-  el.append(dot);
   if (ev.survivorId) el.append(art.portrait(ev.survivorId, 's', { cls: 'sc-face', alt: '' }));
   el.append(icon(SCENE_ICON[ev.kind] ?? 'check'));
   const res = document.createElement('b');
@@ -185,7 +177,6 @@ function exposureFx(survivorId, face) {
 const app = createApp({
   board, pieces, art,
   graphics: governor,
-  aiFast: params.get('ai') === 'fast', // debug/testing: AI doesn't wait for animations
   sceneScale: Math.max(0.1, Math.min(20, Number(params.get('scenes') ?? 1) || 1)), // testing: slower scenes
   fx: { exposure: exposureFx },
   scene: { camera: rig, play: playScene },
@@ -204,11 +195,11 @@ const app = createApp({
 refreshLabels(null);
 updateWinter(null);
 
-// Step 22: behind an opaque full-screen panel (pass the device, draft, objective reveal) draw 1 frame in 4.
+// Step 22: behind an opaque full-screen panel (the draft) draw 1 frame in 4.
 let coverCheck = 0;
 stage.onFrame(() => {
   if (++coverCheck % 15) return;
-  stage.setIdle(document.querySelector('.backdrop.pass, .draft-screen, .obj-reveal') ? 4 : 1);
+  stage.setIdle(document.querySelector('.draft-screen') ? 4 : 1);
 });
 stage.onFrame((t, dt) => {
   tweens.update(dt);
@@ -317,7 +308,7 @@ canvas.addEventListener('pointerup', (ev) => {
 });
 
 // ---------------------------------------------------------------- dev / screenshot helpers
-// ?play=HHA  quick-starts a game (H = human seat, A = AI seat); ?scenario=, ?seed=, ?lang=th
+// ?play=1  quick-starts a solo game; ?scenario=, ?seed=, ?lang=th
 
 // ---------------------------------------------------------------- dev: character line-up (?lineup)
 
@@ -349,7 +340,7 @@ if (params.has('lineup')) {
 
 if (params.get('play')) {
   app.quickStart({
-    seats: params.get('play'), scenarioId: params.get('scenario') ?? 'beacon',
+    scenarioId: params.get('scenario') ?? 'beacon',
     seed: Number(params.get('seed') ?? 1), lang: params.get('lang') ?? undefined,
   });
 }
@@ -357,7 +348,7 @@ if (params.get('play')) {
 window.addEventListener('pointerdown', () => sound.unlock());
 document.addEventListener('click', (ev) => { if (ev.target.closest?.('button')) sound.play('ui'); });
 
-window.__frostbound = { OBJECTIVES: SECRET_OBJECTIVES, rig, stage, atmosphere, footprints, groundAt, ray, board, pieces, tweens, app, art, tryReduce, itemType: (defId) => ITEMS[defId]?.type };
+window.__frostbound = { rig, stage, atmosphere, footprints, groundAt, ray, board, pieces, tweens, app, art, tryReduce, itemType: (defId) => ITEMS[defId]?.type };
 
 // Step 22: the first frame is on screen — drop the loading screen. A hidden tab draws nothing and
 // pauses the ambience.

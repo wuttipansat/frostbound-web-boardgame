@@ -5,16 +5,16 @@ const { chromium } = require('playwright');
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
   const errors = []; p.on('pageerror', (e) => errors.push(e.message));
-  await p.goto('http://localhost:4173/?play=AAA&seed=3&ai=fast');
+  await p.goto('http://localhost:4173/?play=1&seed=3');
   await p.waitForTimeout(6000); // let the AI play a while
   const rounds = [];
   for (const seed of [11, 12, 13, 14, 15]) {
     const r = await p.evaluate(async (seed) => {
       const f = window.__frostbound;
-      f.app.quickStart({ seats: 'HA', seed });
-      const me = f.app.state.players[0];
+      f.app.quickStart({ seed });
+      const me = f.app.state.team;
       const draftBoard = f.pieces.counts().survivors;
-      f.app.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 1) });
+      f.app.dispatch({ type: 'DRAFT_PICK', survivorIds: me.draftOptions.slice(0, 1) });
       await new Promise((r) => setTimeout(r, 1500));
       const alive = Object.values(f.app.state.survivors).filter((s) => s.alive).length;
       const info = f.stage.renderer?.info?.memory ?? {};

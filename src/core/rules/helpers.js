@@ -1,6 +1,6 @@
 // Low-level state mutations shared by all rule modules.
 // Every function here mutates the draft `s` (a private clone made by the reducer).
-import { OUTSIDE_LOCATIONS, RULES } from '../constants.js';
+import { RULES } from '../constants.js';
 import { shuffle } from '../rng.js';
 import { assert } from '../errors.js';
 import { LOCATIONS } from '../../content/locations.js';
@@ -9,7 +9,7 @@ import { ENERGY } from '../constants.js';
 
 const ENERGY_REGEN_FROST = ENERGY.REGEN_FROST;
 import {
-  getPlayer, survivorDef, survivorsAt, woundLimit, freeSurvivorSlots, aliveSurvivorsOf,
+  survivorDef, survivorsAt, woundLimit,
 } from '../selectors.js';
 
 export function log(s, key, params = {}) {
@@ -47,19 +47,19 @@ export function changeHelpless(s, delta, reason) {
 
 // ---------------------------------------------------------------- cards
 
-/** Draw up to n cards from a location deck into a player's hand. Returns drawn uids. */
-export function drawItems(s, playerId, locationId, n) {
+/** Draw up to n cards from a location deck into the hand. Returns drawn uids. */
+export function drawItems(s, locationId, n) {
   const deck = s.locations[locationId]?.deck;
   const drawn = [];
   if (!deck) return drawn;
   for (let i = 0; i < n && deck.length; i++) drawn.push(deck.pop());
-  getPlayer(s, playerId).hand.push(...drawn);
-  if (drawn.length) log(s, 'draw', { playerId, locationId, count: drawn.length });
+  s.team.hand.push(...drawn);
+  if (drawn.length) log(s, 'draw', { locationId, count: drawn.length });
   return drawn;
 }
 
-export function removeFromHand(s, playerId, uid) {
-  const hand = getPlayer(s, playerId).hand;
+export function removeFromHand(s, uid) {
+  const hand = s.team.hand;
   const i = hand.indexOf(uid);
   if (i === -1) return false;
   hand.splice(i, 1);
@@ -67,8 +67,8 @@ export function removeFromHand(s, playerId, uid) {
 }
 
 /** A card used up goes onto the waste pile. */
-export function wasteCard(s, playerId, uid) {
-  removeFromHand(s, playerId, uid);
+export function wasteCard(s, uid) {
+  removeFromHand(s, uid);
   s.waste += 1;
 }
 
@@ -79,45 +79,25 @@ export function killSurvivor(s, survivorId, cause) {
   if (!sv || !sv.alive) return;
   sv.alive = false;
   sv.deathCause = cause;
-  const owner = getPlayer(s, sv.owner);
-  owner.survivors = owner.survivors.filter((id) => id !== survivorId);
-  owner.fallen.push(survivorId);
-  log(s, 'death', { survivorId, playerId: owner.id, cause, location: sv.location });
+  const t = s.team;
+  t.survivors = t.survivors.filter((id) => id !== survivorId);
+  t.fallen.push(survivorId);
+  log(s, 'death', { survivorId, cause, location: sv.location });
   changeMorale(s, -1, 'survivorDied');
-  if (owner.survivors.length === 0) recruitReplacement(s, owner.id);
+  if (t.survivors.length === 0) recruitSurvivor(s);
 }
 
-/** A player who loses everyone recruits a fresh survivor from the deck. */
-export function recruitReplacement(s, playerId) {
-  recruitSurvivor(s, playerId);
-}
-
-/** Add the top survivor of the deck to a player's group (colony, or a safe spot for exiles). */
-export function recruitSurvivor(s, playerId) {
+/** Add the top survivor of the deck to the team, in the colony. */
+export function recruitSurvivor(s) {
   if (!s.survivorDeck.length) return;
-  const p = getPlayer(s, playerId);
   const id = s.survivorDeck.pop();
-  const location = p.exiled ? safestOutsideLocation(s) : 'colony';
-  if (!location) return;
-  s.survivors[id] = newSurvivor(id, playerId, location);
-  p.survivors.push(id);
-  log(s, 'recruit', { playerId, survivorId: id, location });
+  s.survivors[id] = newSurvivor(id, 'colony');
+  s.team.survivors.push(id);
+  log(s, 'recruit', { survivorId: id, location: 'colony' });
 }
 
-export function newSurvivor(id, owner, location) {
-  return { id, owner, location, wounds: 0, frostbite: false, alive: true, moved: false };
-}
-
-/** Outside location with the most free survivor slots (ties: fewest zombies, then board order). */
-export function safestOutsideLocation(s) {
-  let best = null;
-  for (const loc of OUTSIDE_LOCATIONS) {
-    const free = freeSurvivorSlots(s, loc);
-    if (free <= 0) continue;
-    const z = s.locations[loc].zombies;
-    if (!best || free > best.free || (free === best.free && z < best.z)) best = { loc, free, z };
-  }
-  return best?.loc ?? null;
+export function newSurvivor(id, location) {
+  return { id, location, wounds: 0, frostbite: false, alive: true, moved: false };
 }
 
 export function woundSurvivor(s, survivorId, cause = 'wound') {
@@ -187,10 +167,10 @@ export function addBarricades(s, locationId, n) {
   return added;
 }
 
-export function creditKills(s, playerId, n) {
+export function creditKills(s, n) {
   if (!n) return;
   s.totalKills += n;
-  if (playerId) getPlayer(s, playerId).kills += n;
+  s.team.kills += n;
 }
 
 // ---------------------------------------------------------------- dice & decks
@@ -231,7 +211,7 @@ export function drawDanger(s, survivorId, cause) {
     s.danger.discard.push(second);
   }
   s.danger.discard.push(kind);
-  const owner = getPlayer(s, sv.owner);
+  const owner = s.team;
   // Personal protection: Bo or a padded parka shrug off frost; a riot vest stops the first scratch each round.
   const armor = owner.gear?.armor ? ITEMS[s.cards[owner.gear.armor]] : null;
   if (kind === 'frost' && (ability === 'ignoreFrostbite' || armor?.frostProof)) kind = 'safe';
@@ -271,13 +251,13 @@ export function addDangerCard(s, kind, reason) {
   log(s, 'dangerAdded', { kind, reason });
 }
 
-export function spendEnergy(s, playerId, cost) {
-  const p = getPlayer(s, playerId);
+export function spendEnergy(s, cost) {
+  const p = s.team;
   assert(p.energy >= cost, 'notEnoughEnergy', `${p.energy} < ${cost}`);
   p.energy -= cost;
 }
 
-export function gainEnergy(s, playerId, n, max = Infinity) {
-  const p = getPlayer(s, playerId);
+export function gainEnergy(s, n, max = Infinity) {
+  const p = s.team;
   p.energy = Math.max(0, Math.min(max, (p.energy ?? 0) + n));
 }
