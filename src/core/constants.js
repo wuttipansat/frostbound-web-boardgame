@@ -36,7 +36,6 @@ export const ENERGY = Object.freeze({
   HURT: 20,               // 2+ wounds: the pool's max is this much lower
   STORM: 4,               // storm days (every 3rd day): actions outside the colony cost more
   COST: Object.freeze({ move: 13, barricade: 19, lure: 11 }),
-  ATTACK_BASE: 9,         // attack cost = 9 + 2 × the survivor's attack skill (2..6 → 13..21)
   SEARCH_BASE: 15,        // search cost = 15 + 2 × search skill (2..6 → 19..27)
   PER_SKILL: 2,
   CROWDED: 7,             // 2+ zombies here: search / barricade cost more
@@ -55,6 +54,19 @@ export const REST = Object.freeze({
   guard: Object.freeze({ ap: 0.5, hp: 0 }),
   NAP_AP: 25,
   NAP_HP: 5,
+});
+// ---------------------------------------------------------------- fights (HP 100)
+// Melee: one attack kills one zombie for sure; HP lost = ceil(max(0, ferocity − (AP left + ATK)) / 3) − armor.
+// Guns: no HP lost, cost less AP, use 1 ammo, and the noise may draw a new zombie here.
+export const FIGHT = Object.freeze({
+  MELEE_AP: 15,
+  GUN_AP: 10,
+  WALKER: 110,
+  BRUTE: 150,
+  BRUTE_DAY: 21,
+  ATK_PER_SKILL: 4,       // survivor ATK = (7 − attack skill) × 4 → 4..20
+  LEAVE_HP: 5,            // leaving a place with zombies: HP per zombie
+  NIGHT_BITE: 5,          // sleeping outside: HP per zombie there
 });
 export const DANGEROUS_LOCATIONS = Object.freeze(['hospital', 'police']);
 

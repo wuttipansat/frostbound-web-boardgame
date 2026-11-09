@@ -3,8 +3,8 @@
 // tier: 1 common (white), 2 uncommon (blue), 3 rare (gold). Higher tiers are stronger and scarcer.
 // value: food tokens / wounds healed / barricades / zombies killed per attack / energy (junk: × 12).
 // Gear (weapon, armor, book) is EQUIPPED to a slot (free action) and changes its wearer's personal stats:
-//   weapon: kills per attack (value), attack cost (attackMod);
-//   armor:  moveMod (move cost; armor gets HP protection in rework step 6);
+//   weapon: melee adds ATK (atk); a gun kills `value` zombies per shot without HP loss, uses ammo, may draw a zombie;
+//   armor:  value = HP saved per fight; boots: moveMod (move cost);
 //   book:   blueprint (search a place: draw 1 more, put 1 back) | foodSaver | barricadePlus | regenPlus.
 
 export const GEAR_SLOTS = Object.freeze({ weapon: 'weapon', armor: 'armor', book: 'book' });
@@ -29,15 +29,15 @@ export const ITEMS = {
   'zip-ties':        { id: 'zip-ties', type: 'tools', tier: 1, value: 1, name: 'Bundle of Zip Ties', text: 'Holds a fence together.' },
   'socket-set':      { id: 'socket-set', type: 'tools', tier: 2, value: 2, name: 'Socket Set', text: 'One socket missing, naturally.' },
   // WEAPONS (equip; value = zombies killed per attack, attackMod = energy cost change)
-  'riot-baton':      { id: 'riot-baton', type: 'weapon', tier: 1, value: 1, attackMod: -2, name: 'Riot Baton', text: 'Reliable, quiet, cold to hold.' },
-  'glock-19':        { id: 'glock-19', type: 'weapon', tier: 1, value: 1, attackMod: -4, name: 'Glock 19', text: 'Fifteen rounds, if you count carefully.' },
-  'remington-870':   { id: 'remington-870', type: 'weapon', tier: 2, value: 2, attackMod: 2, name: 'Remington 870', text: 'Pump, aim, pray.' },
-  'fire-axe':        { id: 'fire-axe', type: 'weapon', tier: 2, value: 2, attackMod: 3, name: 'Fire Axe', text: 'Red paint, sharp edge, heavy swing.' },
-  'mosin-nagant':    { id: 'mosin-nagant', type: 'weapon', tier: 3, value: 1, attackMod: -6, name: 'Mosin-Nagant', text: 'Built for winters worse than this.' },
+  'riot-baton':      { id: 'riot-baton', type: 'weapon', tier: 1, value: 1, atk: 8, name: 'Riot Baton', text: 'Reliable, quiet, cold to hold.' },
+  'glock-19':        { id: 'glock-19', type: 'weapon', tier: 1, value: 1, gun: { spawn: 0.4, ammo: 6 }, name: 'Glock 19', text: 'Fifteen rounds, if you count carefully.' },
+  'remington-870':   { id: 'remington-870', type: 'weapon', tier: 2, value: 2, gun: { spawn: 0.5, ammo: 4 }, name: 'Remington 870', text: 'Pump, aim, pray.' },
+  'fire-axe':        { id: 'fire-axe', type: 'weapon', tier: 2, value: 1, atk: 18, name: 'Fire Axe', text: 'Red paint, sharp edge, heavy swing.' },
+  'mosin-nagant':    { id: 'mosin-nagant', type: 'weapon', tier: 3, value: 1, gun: { spawn: 0.15, ammo: 5 }, name: 'Mosin-Nagant', text: 'Built for winters worse than this.' },
   // ARMOR (equip)
-  'padded-parka':    { id: 'padded-parka', type: 'armor', tier: 1, value: 0, moveMod: -2, name: 'Padded Parka', text: 'Goose down and a fur hood.' },
+  'padded-parka':    { id: 'padded-parka', type: 'armor', tier: 1, value: 2, name: 'Padded Parka', text: 'Goose down and a fur hood.' },
   'winter-boots':    { id: 'winter-boots', type: 'armor', tier: 1, value: 0, moveMod: -5, name: 'Winter Boots', text: 'Laced tight, dry inside.' },
-  'riot-vest':       { id: 'riot-vest', type: 'armor', tier: 2, value: 0, moveMod: -3, name: 'Riot Vest', text: 'Kevlar plates. Teeth do not get through.' },
+  'riot-vest':       { id: 'riot-vest', type: 'armor', tier: 2, value: 3, name: 'Riot Vest', text: 'Kevlar plates. Teeth do not get through.' },
   // JUNK (value × 12 energy)
   bedpan:            { id: 'bedpan', type: 'junk', tier: 1, value: 1, name: 'Steel Bedpan', text: 'Unused. Probably.' },
   'motor-junk':      { id: 'motor-junk', type: 'junk', tier: 2, value: 2, wild: true, name: 'Motor Odds & Ends', text: 'Springs, gaskets, mystery bolts.' },

@@ -1,15 +1,16 @@
 // Active-player actions. Everything that takes effort costs the survivor's energy (no dice anywhere);
 // cards, gear and abilities are free.
 import { PHASES, LOCATION_IDS, ENERGY, REST } from '../constants.js';
+import { random } from '../rng.js';
 import { assert } from '../errors.js';
 import {
-  survivorDef, freeSurvivorSlots, freeZombieSlots, itemOf, scenarioDef, booksHeld, holdsBlueprint,
-  actionCost, killsPerAttack, apMax, teamHasAbility,
+  survivorDef, gearOf, freeSurvivorSlots, freeZombieSlots, itemOf, scenarioDef, booksHeld, holdsBlueprint,
+  actionCost, killsPerAttack, apMax, fightPreview, leaveDamage, teamHasAbility,
 } from '../selectors.js';
 import {
   log, drawItems, discardCard, removeFromHand, addZombies, removeZombies,
   addBarricades, creditKills, healSurvivor, changeFood, changeMorale, recruitSurvivor,
-  spendEnergy, gainEnergy, healHp,
+  spendEnergy, gainEnergy, healHp, damageSurvivor,
 } from './helpers.js';
 import { endTurn } from './flow.js';
 import { isPermanent, gearSlot } from '../../content/items.js';
@@ -58,10 +59,19 @@ export function attack(s, { survivorId }) {
   requireTurn(s);
   const sv = requireActive(s, survivorId);
   assert(s.locations[sv.location].zombies > 0, 'noZombiesHere');
+  const gun = gearOf(s, survivorId).weapon?.gun;
+  if (gun) assert((sv.ammo ?? 0) > 0, 'noAmmo');
+  const preview = fightPreview(s, survivorId); // HP loss uses the AP left after paying
   pay(s, survivorId, 'attack');
   const killed = removeZombies(s, sv.location, killsPerAttack(s, survivorId));
   creditKills(s, killed);
-  log(s, 'attack', { survivorId, locationId: sv.location, killed });
+  let drawn = 0;
+  if (gun) {
+    sv.ammo -= 1;
+    if (random(s) < gun.spawn) { drawn = 1; addZombies(s, sv.location, 1, 'noise'); }
+  }
+  log(s, 'attack', { survivorId, locationId: sv.location, killed, hp: preview.hp, drawn });
+  damageSurvivor(s, survivorId, preview.hp, 'fight');
 }
 
 export function search(s, { survivorId }) {
@@ -128,9 +138,11 @@ export function move(s, { survivorId, toLocation, fuelCardUid }) {
     safe = true;
   }
   const from = sv.location;
+  const bite = fuelCardUid ? 0 : leaveDamage(s, survivorId);
   sv.location = toLocation;
   sv.moved = true;
   log(s, 'move', { survivorId, from, to: toLocation, safe });
+  damageSurvivor(s, survivorId, bite, 'escape');
 }
 
 // ---------------------------------------------------------------- gear
@@ -147,6 +159,7 @@ export function equip(s, { cardUid, survivorId = null }) {
   removeFromHand(s, cardUid);
   if (old) p.hand.push(old);
   sv.gear[slot] = cardUid;
+  if (item.gun) sv.ammo = (sv.ammo ?? 0) + item.gun.ammo; // a gun comes loaded
   log(s, 'equip', { survivorId: sv.id, card: s.cards[cardUid], slot });
 }
 

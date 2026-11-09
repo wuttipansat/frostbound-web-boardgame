@@ -1,5 +1,5 @@
 // Game flow (solo): pick survivors -> rounds (crisis, one turn w/ crossroads, energy) -> colony phase -> end checks.
-import { PHASES, OUTSIDE_LOCATIONS, RULES } from '../constants.js';
+import { PHASES, OUTSIDE_LOCATIONS, RULES, FIGHT } from '../constants.js';
 import { shuffle, pick } from '../rng.js';
 import { assert } from '../errors.js';
 import { CROSSROADS_BY_ID } from '../../content/crossroads.js';
@@ -9,7 +9,7 @@ import {
   focusSurvivor, teamHasAbility, apMax, sleepPlan, spawnForecast,
 } from '../selectors.js';
 import {
-  log, changeMorale, healHp, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems,
+  log, changeMorale, healHp, damageSurvivor, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems,
 } from './helpers.js';
 import { applyEffects } from './effects.js';
 import { evaluate, focusFilterFor } from './conditions.js';
@@ -146,6 +146,10 @@ export function colonyPhase(s) {
     if (r.hp) healHp(s, id, r.hp);
   }
   log(s, 'sleep', { plan: report.sleep });
+  // Sleeping outside: the zombies there bite.
+  for (const [id, r] of Object.entries(report.sleep)) {
+    if (r.kind === 'outside') damageSurvivor(s, id, FIGHT.NIGHT_BITE * (s.locations[s.survivors[id].location]?.zombies ?? 0), 'night');
+  }
 
   s.reports.colony = report;
   if (s.morale <= 0) return endGame(s, 'moraleCollapse');

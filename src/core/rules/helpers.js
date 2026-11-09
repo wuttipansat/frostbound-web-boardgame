@@ -83,7 +83,7 @@ export function recruitSurvivor(s) {
 }
 
 export function newSurvivor(id, location) {
-  return { id, location, wounds: 0, frostbite: false, alive: true, moved: false, acted: false, ap: 0, hp: RULES.HP_MAX, rest: 'sleep', napped: false, gear: { weapon: null, armor: null, book: null } };
+  return { id, location, wounds: 0, frostbite: false, alive: true, moved: false, acted: false, ap: 0, hp: RULES.HP_MAX, ammo: 0, rest: 'sleep', napped: false, gear: { weapon: null, armor: null, book: null } };
 }
 
 export function woundSurvivor(s, survivorId, cause = 'wound') {
@@ -174,6 +174,15 @@ export function gainEnergy(s, n, survivorId) {
   const sv = s.survivors[survivorId];
   if (!sv?.alive) return;
   sv.ap = Math.max(0, Math.min(apMax(s, survivorId), (sv.ap ?? 0) + n));
+}
+
+/** Take HP from a survivor; at 0 they die. */
+export function damageSurvivor(s, survivorId, n, cause = 'fight') {
+  const sv = s.survivors[survivorId];
+  if (!sv?.alive || n <= 0) return;
+  sv.hp = Math.max(0, (sv.hp ?? RULES.HP_MAX) - n);
+  log(s, 'hurt', { survivorId, n, hp: sv.hp, cause });
+  if (sv.hp <= 0) killSurvivor(s, survivorId, cause);
 }
 
 export function healHp(s, survivorId, n) {

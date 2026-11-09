@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import { newGame, startedGame, setSurvivors, patch } from './_helpers.js';
 import { reduce, tryReduce } from '../src/core/reducer.js';
 import * as act from '../src/core/actions.js';
-import { ENERGY } from '../src/core/constants.js';
-import { actionCost, spawnForecast, apMax, sleepPlan, killsPerAttack, gearOf } from '../src/core/selectors.js';
+import { ENERGY, FIGHT } from '../src/core/constants.js';
+import { actionCost, spawnForecast, apMax, sleepPlan, atkOf, fightPreview, killsPerAttack, gearOf } from '../src/core/selectors.js';
 import { SURVIVORS } from '../src/content/survivors.js';
 import { giveCard, setEnergy } from './_helpers.js';
 import { spawnZombies } from '../src/core/rules/flow.js';
@@ -48,7 +48,8 @@ test('gear: equip is free, swaps back to hand, changes personal stats, and is wo
   const e0 = ap(s, 'corwin-daly');
   s = reduce(s, act.equip(baton));
   assert.equal(ap(s, 'corwin-daly'), e0, 'free');
-  assert.equal(actionCost(s, 'corwin-daly', 'attack'), bare - 2);
+  assert.equal(actionCost(s, 'corwin-daly', 'attack'), bare, 'melee always costs 15');
+  assert.equal(atkOf(s, 'corwin-daly'), 16 + 8, 'the baton adds ATK');
   assert.ok(!me(s).hand.includes(baton));
   s = reduce(s, act.equip(shotgun));
   assert.ok(me(s).hand.includes(baton), 'the baton goes back to hand');
@@ -70,7 +71,7 @@ test('actions cost energy: odd numbers, modifiers, and not enough energy is ille
   s = setSurvivors(s, { 'osei-vance': 'grocery', 'greta-vos': 'hospital' });
   s.day = 1;
   const search = (id) => ENERGY.SEARCH_BASE + ENERGY.PER_SKILL * SURVIVORS.find((x) => x.id === id).search;
-  const attack = (id) => ENERGY.ATTACK_BASE + ENERGY.PER_SKILL * SURVIVORS.find((x) => x.id === id).attack;
+  const attack = () => FIGHT.MELEE_AP;
   assert.equal(actionCost(s, 'osei-vance', 'search'), search('osei-vance'));
   assert.equal(actionCost(s, 'greta-vos', 'search'), search('greta-vos') + ENERGY.DANGEROUS);
   s.locations.grocery.zombies = 2;
@@ -102,7 +103,7 @@ test('new abilities: cheaper moves, attacks and barricades, cold-proof nights, d
   let s = fb({ seed: 7 });
   s = setSurvivors(s, { 'maren-holt': 'colony', 'ilse-brandt': 'police', 'wren-okafor': 'school', 'bo-lindqvist': 'gas', 'corwin-daly': 'school' });
   assert.equal(actionCost(s, 'maren-holt', 'move', 'colony'), ENERGY.COST.move - ENERGY.SKILLED);
-  assert.equal(actionCost(s, 'ilse-brandt', 'attack'), ENERGY.ATTACK_BASE + ENERGY.PER_SKILL * SURVIVORS.find((x) => x.id === 'ilse-brandt').attack - ENERGY.SKILLED);
+  assert.equal(actionCost(s, 'ilse-brandt', 'attack'), FIGHT.MELEE_AP - ENERGY.SKILLED);
   assert.equal(actionCost(s, 'wren-okafor', 'barricade'), actionCost(s, 'corwin-daly', 'barricade') - ENERGY.SKILLED);
   s.day = 3; // storm
   assert.equal(actionCost(s, 'bo-lindqvist', 'barricade'), ENERGY.COST.barricade, 'no storm cost for Bo');
@@ -130,7 +131,7 @@ test('sleep: bed 100% +15 HP, floor 70% +5, outside 40%; carry-over, cap, lower 
   if (next.phase !== 'gameOver') {
     assert.equal(next.survivors['osei-vance'].hp, 65);
     assert.equal(next.survivors['agnes-pell'].hp, 55);
-    assert.equal(next.survivors['corwin-daly'].hp, 50);
+    assert.equal(next.survivors['corwin-daly'].hp, 50 - FIGHT.NIGHT_BITE * next.locations.school.zombies, 'zombies bite outside sleepers');
   }
   const hurt = structuredClone(s); hurt.survivors['osei-vance'].wounds = 2;
   assert.equal(apMax(hurt, 'osei-vance'), SURVIVORS.find((x) => x.id === 'osei-vance').energy - ENERGY.HURT);
@@ -179,4 +180,50 @@ test('bots play whole frostbound games without illegal moves', () => {
   }
   const { errors } = simulate({ seed: 2, chaos: 0.3 });
   assert.ok(errors.every((e) => e.error !== undefined), 'chaos bots only make rule errors');
+});
+
+test('melee: one zombie dies for sure; HP lost = ceil((ferocity − (AP left + ATK)) / 3) − armor', () => {
+  let s = fb({ seed: 3 });
+  s = setSurvivors(s, { 'corwin-daly': 'police', 'osei-vance': 'colony' });
+  s.locations.police.zombies = 2;
+  setAp(s, 'corwin-daly', 75);
+  // AP left 60, ATK (7−3)×4 = 16 → 110 − 76 = 34 → 12 HP.
+  assert.equal(fightPreview(s, 'corwin-daly').hp, 12);
+  let r = reduce(s, act.attack('corwin-daly'));
+  assert.equal(r.locations.police.zombies, 1);
+  assert.equal(r.survivors['corwin-daly'].hp, 88);
+  assert.equal(ap(r, 'corwin-daly'), 60);
+  let vest; [s, vest] = giveCard(s, 'riot-vest');
+  s = reduce(s, act.equip(vest, 'corwin-daly'));
+  assert.equal(fightPreview(s, 'corwin-daly').hp, 9, 'armor saves 3');
+  s.day = 22; // not a storm day
+  assert.equal(fightPreview(s, 'corwin-daly').hp, Math.ceil((150 - 76) / 3) - 3, 'brutes from day 21');
+  // Walking away from 2 zombies: 10 HP.
+  r = reduce(s, act.move('corwin-daly', 'colony'));
+  assert.equal(r.survivors['corwin-daly'].hp, 90);
+  // HP 0 = dead.
+  const weak = structuredClone(s); weak.survivors['corwin-daly'].hp = 5; weak.day = 1;
+  assert.equal(reduce(weak, act.attack('corwin-daly')).survivors['corwin-daly'].alive, false);
+});
+
+test('guns: no HP lost, 10 AP and 1 ammo; noise may draw a zombie', () => {
+  let s = fb({ seed: 3 });
+  s = setSurvivors(s, { 'corwin-daly': 'police', 'osei-vance': 'colony' });
+  s.locations.police.zombies = 3;
+  let glock; [s, glock] = giveCard(s, 'glock-19');
+  s = reduce(s, act.equip(glock, 'corwin-daly'));
+  assert.equal(s.survivors['corwin-daly'].ammo, 6);
+  const f = fightPreview(s, 'corwin-daly');
+  assert.deepEqual([f.cost, f.hp, f.spawn], [10, 0, 0.4]);
+  let drew = 0;
+  for (let seed = 1; seed <= 30; seed++) {
+    const t = structuredClone(s); t.rng = seed;
+    const r = reduce(t, act.attack('corwin-daly'));
+    assert.equal(r.survivors['corwin-daly'].hp, 100);
+    assert.equal(r.survivors['corwin-daly'].ammo, 5);
+    if (r.locations.police.zombies === 3) drew++;
+  }
+  assert.ok(drew > 3 && drew < 25, `noise drew ${drew}/30`);
+  s.survivors['corwin-daly'].ammo = 0;
+  assert.equal(tryReduce(s, act.attack('corwin-daly')).error, 'noAmmo');
 });

@@ -4,7 +4,7 @@ import { h, mount } from '../dom.js';
 import { icon, heart } from '../icons.js';
 import { t, c, getLang } from '../../i18n/index.js';
 import { flashTip } from '../tooltip.js';
-import { aliveSurvivors, survivorDef, itemOf, woundLimit, apMax, sleepPlan, gearOf, actionCost, killsPerAttack, heroOf } from '../../core/selectors.js';
+import { aliveSurvivors, survivorDef, itemOf, woundLimit, apMax, sleepPlan, atkOf, gearOf, actionCost, killsPerAttack, heroOf } from '../../core/selectors.js';
 import {
   cardOptions, endTurnOption, cardNeeds, cardTargets, shouldConfirmEndTurn, cardUsable, actingSurvivors,
 } from '../options.js';
@@ -328,11 +328,14 @@ function survivorToken(ctx, sv, { canAct = false, color = '#888' } = {}) {
   sv.frostbite ? h('span', { class: 'tok-frost', 'aria-hidden': 'true' }, icon('snowflake')) : null,
   canAct ? h('span', { class: 'tok-ready', 'aria-hidden': 'true' }) : null,
   h('span', { class: 'tok-ap', 'aria-hidden': 'true' }, `${sv.ap}`),
+  h('span', { class: 'tok-hpbar', 'aria-hidden': 'true' }, h('i', { style: { width: `${sv.hp ?? 100}%` } })),
   h('span', { class: 'tok-card', 'aria-hidden': 'true' },
     h('b', {}, d.name),
     h('small', {}, `${c('survivors', sv.id, 'occupation')} · ${where}`),
     h('span', { class: 'sv-stats' },
+      h('span', { class: 'need' }, icon('heal'), `${sv.hp ?? 100}`),
       h('span', { class: 'need' }, icon('exposure'), `${sv.ap}/${apMax(ctx.state, sv.id)}`),
+      h('span', { class: 'need' }, 'ATK ', `${atkOf(ctx.state, sv.id)}`),
       h('span', { class: 'need' }, icon('attack'), actionCost(ctx.state, sv.id, 'attack')),
       h('span', { class: 'need' }, icon('search'), actionCost(ctx.state, sv.id, 'search'))),
     h('span', { class: 'sv-health' }, Array.from({ length: limit }, (_, i) => heart(i < left)), sv.moved ? h('small', {}, ` · ${t('panel.moved')}`) : null, sv.napped ? h('small', {}, ` · ${t('act.nap')}`) : null, sv.rest === 'guard' ? h('small', {}, ` · ${t('act.guard')}`) : null),

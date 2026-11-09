@@ -7,7 +7,7 @@ import { PHASES, OUTSIDE_LOCATIONS, ENERGY, RULES } from '../core/constants.js';
 import { gearSlot } from '../content/items.js';
 import {
   aliveSurvivors, survivorDef, itemOf, crisisDef, scenarioDef,
-  freeSurvivorSlots, freeZombieSlots, foodNeeded, actionCost, spawnForecast, crisisRequirement, gearOf,
+  freeSurvivorSlots, freeZombieSlots, foodNeeded, actionCost, fightPreview, spawnForecast, crisisRequirement, gearOf,
 } from '../core/selectors.js';
 import { CROSSROADS_BY_ID } from '../content/crossroads.js';
 
@@ -123,7 +123,13 @@ function turnAction(s, p, opts) {
  * colony against the forecast, then walk (to empty places when possible, home when hurt).
  */
 function energyActions(s, p, survivors, candidates, cardsOf, opts) {
-  const can = (sv, kind, to) => !sv.napped && sv.ap >= actionCost(s, sv.id, kind, to);
+  const can = (sv, kind, to) => {
+    if (sv.napped || sv.ap < actionCost(s, sv.id, kind, to)) return false;
+    if (kind !== 'attack') return true;
+    // Fight only when it is safe enough: a loaded gun, or a melee hit that leaves plenty of HP.
+    const f = fightPreview(s, sv.id);
+    return f.gun ? f.ammo > 0 : f.hp < sv.hp - 25;
+  };
   const forecast = spawnForecast(s);
 
   for (const sv of survivors) {

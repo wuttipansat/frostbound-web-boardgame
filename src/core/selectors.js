@@ -4,7 +4,7 @@ import { LOCATIONS } from '../content/locations.js';
 import { ITEMS } from '../content/items.js';
 import { SCENARIOS_BY_ID } from '../content/scenarios.js';
 import { CRISES_BY_ID } from '../content/crises.js';
-import { RULES, ENERGY, REST, DANGEROUS_LOCATIONS, OUTSIDE_LOCATIONS } from './constants.js';
+import { RULES, ENERGY, REST, FIGHT, DANGEROUS_LOCATIONS, OUTSIDE_LOCATIONS } from './constants.js';
 
 export const survivorDef = (id) => SURVIVORS_BY_ID[id];
 export const itemOf = (s, uid) => ITEMS[s.cards[uid]];
@@ -126,7 +126,7 @@ export function actionCost(s, survivorId, kind, to = null) {
   const def = survivorDef(survivorId);
   const gear = sv ? gearOf(s, survivorId) : {};
   let cost = ENERGY.COST[kind] ?? 0;
-  if (kind === 'attack') cost = ENERGY.ATTACK_BASE + ENERGY.PER_SKILL * (def?.attack ?? 4) + (gear.weapon?.attackMod ?? 0);
+  if (kind === 'attack') cost = gear.weapon?.gun ? FIGHT.GUN_AP : FIGHT.MELEE_AP;
   if (kind === 'search') cost = ENERGY.SEARCH_BASE + ENERGY.PER_SKILL * (def?.search ?? 4);
   if (kind === 'move') cost += gear.armor?.moveMod ?? 0;
   if (!sv) return cost;
@@ -143,12 +143,36 @@ export function actionCost(s, survivorId, kind, to = null) {
   return Math.max(1, cost);
 }
 
-/** Zombies one attack kills: the weapon's value (bare hands 1), +1 for Teodor. */
+/** Zombies one attack kills: a gun's value (shotgun 2); melee 1, +1 for Teodor. */
 export function killsPerAttack(s, survivorId) {
-  const sv = s.survivors[survivorId];
-  const weapon = sv ? gearOf(s, survivorId).weapon : null;
-  return Math.max(1, weapon?.value ?? 1) + (survivorDef(survivorId)?.ability.type === 'killTwo' ? 1 : 0);
+  const weapon = s.survivors[survivorId] ? gearOf(s, survivorId).weapon : null;
+  if (weapon?.gun) return weapon.value;
+  return 1 + (survivorDef(survivorId)?.ability.type === 'killTwo' ? 1 : 0);
 }
+
+/** Zombie ferocity today: walkers, then brutes from day 21. */
+export const ferocity = (s) => (s.day >= FIGHT.BRUTE_DAY ? FIGHT.BRUTE : FIGHT.WALKER);
+
+/** A survivor's ATK: their attack skill (2 best → 20, 6 worst → 4) plus a melee weapon. */
+export function atkOf(s, survivorId) {
+  const w = gearOf(s, survivorId).weapon;
+  return (7 - (survivorDef(survivorId)?.attack ?? 4)) * FIGHT.ATK_PER_SKILL + (w && !w.gun ? (w.atk ?? 0) : 0);
+}
+
+/** What one attack would do now: { cost, kills, hp (lost), gun, spawn (chance), ammo }. */
+export function fightPreview(s, survivorId) {
+  const sv = s.survivors[survivorId];
+  const gear = gearOf(s, survivorId);
+  const cost = actionCost(s, survivorId, 'attack');
+  const kills = killsPerAttack(s, survivorId);
+  if (gear.weapon?.gun) return { cost, kills, hp: 0, gun: true, spawn: gear.weapon.gun.spawn, ammo: sv?.ammo ?? 0 };
+  const left = Math.max(0, (sv?.ap ?? 0) - cost);
+  const raw = Math.ceil(Math.max(0, ferocity(s) - (left + atkOf(s, survivorId))) / 3);
+  return { cost, kills, hp: Math.max(0, raw - (gear.armor?.value ?? 0)), gun: false, spawn: 0, ammo: 0 };
+}
+
+/** HP lost walking out of a place with zombies. */
+export const leaveDamage = (s, survivorId) => FIGHT.LEAVE_HP * (s.locations[s.survivors[survivorId]?.location]?.zombies ?? 0);
 
 /** The team's lead survivor (first alive). */
 export const heroOf = (s) => aliveSurvivors(s)[0] ?? null;
