@@ -29,7 +29,7 @@ Numbers are starting values; Step 18 tunes them.
 | 12 | Base upgrades (3 levels each, materials + AP, AP carries over): dorm, wall, greenhouse, workshop, infirmary, radio tower. | **done** |
 | 13 | Main goal: the snow crawler in 4 stages (frame, engine, heater, fuel). Rare parts in certain places. Seasons get harsher (cold day 11+, brutes day 21+, storms day 31+). | **done** |
 | 14 | Night attacks on the base: dawn forecast; at night walls and guards stop zombies first; the rest hurt people at the base. Fully predictable ("5 attack, 4 stopped"). | **done** |
-| 15 | Solo fun: a daily event card with 2 choices, traits and bonds, weekly missions, experience (skills improve with use), difficulty levels, an end-of-game summary. | |
+| 15 | Solo fun: a daily event card with 2 choices, traits and bonds, weekly missions, experience (skills improve with use), difficulty levels, an end-of-game summary. | **done** |
 | 16 | New scene and camera: isometric ~55°, rotate in 90° steps, 3 zoom levels; less fog, brighter day, readable night; limited palette, bigger survivors with outlines; roads with AP costs; bigger buttons and a bottom sheet on phones. | |
 | 17 | Show every action: previews (path + AP, HP to lose, spawn %), animations (walk, loot flying into the backpack, hits with damage numbers, scaffolding, night attack), HP bars, toasts, a daily report, a tutorial over days 1–3. | |
 | 18 | Balance, tests, deploy: a balance bot (100 games per difficulty; normal wins 35–50%, wins end on day 30–36), e2e on desktop and phone, perf, publish. | |
@@ -192,3 +192,18 @@ Numbers are starting values; Step 18 tunes them.
   Zombies at the gate stay there until killed.
 - HUD block "Tonight: 5 attack, 4 stopped · 1 bite (−10 HP)", with the wall / guard / barricade numbers in the tooltip.
 - Balance (bot, 30 games): crawler 0%, beacon 3%, stores 0%, purge 7%; Step 18.
+
+## Step 15 notes
+
+- **Daily event:** each dawn the crossroads deck is drawn until a card's trigger fits today (up to 6 tries),
+  so almost every day brings a 2-choice event.
+- **Traits** (one per survivor, seeded when they join): strong +4 ATK, quick walk −2, scavenger −5% search
+  spawn chance, medic consumables +5 HP, night owl wakes at 70% after guard duty.
+- **Bonds:** survivors who end the day at the same place gain a bond point (max 5); at 3 they are close friends and
+  each one's fights cost 2 HP less while the other is there.
+- **Experience:** every attack / search is +1 XP; each 5 is a level (max 3): fighting +2 ATK, searching −2 AP.
+- **Weekly missions** (days 1, 8, 15, …): kill 6, search 8, finish 1 upgrade level or craft 2 items within 7 days → +2 morale.
+  HUD "Mission" block with progress.
+- **Difficulty** (setup screen): easy +3 food +2 morale −1 attacker a night; hard −1 food −2 morale +1 attacker.
+- **End-of-game summary:** days, kills, searches, levels built, items crafted, missions, survivors lost, difficulty.
+- Balance (bot, normal, 30 games): crawler 0%, beacon 0%, stores 7%, purge 23%; Step 18.

@@ -1,5 +1,5 @@
 // createGame(config) -> a fresh, fully JSON-serializable GameState.
-import { PHASES, LOCATION_IDS, RULES } from './constants.js';
+import { PHASES, LOCATION_IDS, RULES, DIFFICULTY } from './constants.js';
 import { normalizeSeed, shuffle } from './rng.js';
 import { assert } from './errors.js';
 import { LOCATIONS } from '../content/locations.js';
@@ -23,14 +23,18 @@ export function createGame(config = {}) {
   const s = {
     version: STATE_VERSION,
     rng: normalizeSeed(config.seed),
-    config: { scenarioId: scenario.id },
+    config: { scenarioId: scenario.id, difficulty: config.difficulty ?? 'normal' },
+    difficulty: DIFFICULTY[config.difficulty] ? config.difficulty : 'normal',
     phase: PHASES.DRAFT,
     day: 1,
     time: 'dawn', // dawn | day | dusk | night
     scenario: { id: scenario.id, days: scenario.days, deposited: 0 },
-    morale: scenario.morale,
+    morale: Math.min(10, scenario.morale + (DIFFICULTY[config.difficulty]?.morale ?? 0)),
     maxMorale: 10,
-    food: scenario.startFood,
+    food: Math.max(0, scenario.startFood + (DIFFICULTY[config.difficulty]?.food ?? 0)),
+    stats: { kills: 0, searches: 0, builds: 0, crafts: 0, missions: 0 },
+    bonds: {},     // 'a|b' -> nights spent at the same place (max 5)
+    mission: null, // { id, stat, target, base, until }
     starvation: 0,
     totalKills: 0,
     team: null,

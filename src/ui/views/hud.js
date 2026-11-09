@@ -5,7 +5,7 @@ import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
 import { formatLog, describeEffects } from '../../i18n/format.js';
 import {
-  foodNeeded, foodDays, isStorm, season, siegeForecast, crisisDef, crisisRequirement, crisisScore, scenarioProgress, scenarioTarget,
+  foodNeeded, foodDays, isStorm, season, siegeForecast, missionStatus, crisisDef, crisisRequirement, crisisScore, scenarioProgress, scenarioTarget,
 } from '../../core/selectors.js';
 import { counter } from '../ticker.js';
 import { RULES } from '../../core/constants.js';
@@ -41,6 +41,9 @@ export function renderTopbar(el, ctx) {
   const siege = block(`siege${sf.hits ? ' critical' : ''}`, t('tip.siege', { wall: sf.wall, guards: sf.guards, barricades: sf.barricades }), 'skull', t('hud.siege'), null,
     h('b', {}, t('hud.siegeShort', { n: sf.attackers, k: sf.stopped })),
     sf.hits ? h('small', { class: 'bad' }, t('hud.siegeHits', { n: sf.hits, hp: sf.hits * 10 })) : null);
+  const ms = missionStatus(s);
+  const mission = ms ? block('mission', t('tip.mission', { days: ms.daysLeft, n: 2 }), 'star', t('hud.mission'), null,
+    h('b', {}, `${Math.min(ms.progress, ms.target)}/${ms.target}`), h('small', {}, t(`mission.${ms.id}`, { n: ms.target }))) : null;
   const team = block('helpless team', t('tip.team', { max: RULES.TEAM_MAX }), 'person', t('hud.team'), counter('team', s.team.survivors.length, { text: (v) => `${v}/${RULES.TEAM_MAX}` }));
 
   const crisisChip = crisis ? h('button', {
@@ -58,7 +61,7 @@ export function renderTopbar(el, ctx) {
 
   mount(el,
     h('div', { class: 'brand-mini' }, 'FROSTBOUND'),
-    morale, food, team, siege, round, goal, crisisChip,
+    morale, food, team, siege, round, goal, mission, crisisChip,
     h('div', { class: 'spacer' }),
     h('button', { class: 'icon-btn rules-btn', tip: t('hud.rules'), 'aria-label': t('hud.rules'), onclick: () => ctx.set({ modal: 'rules' }) }, '?'),
     h('button', { class: `icon-btn${ui.logOpen ? ' on' : ''}`, tip: t('hud.log'), 'aria-label': t('hud.log'), onclick: () => ctx.set({ logOpen: !ui.logOpen }) }, icon('log')),

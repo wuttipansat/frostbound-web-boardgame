@@ -191,7 +191,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
 
   function startGame() {
     const cfg = ui.setup;
-    state = createGame({ scenarioId: cfg.scenarioId, seed: cfg.seed ?? Date.now() });
+    state = createGame({ scenarioId: cfg.scenarioId, difficulty: cfg.difficulty ?? 'normal', seed: cfg.seed ?? Date.now() });
     Object.assign(ui, { modal: null, selLoc: null, queue: [], draftPicks: [] });
     ui.tutStep = ui.tutorial ? 0 : DONE;
     sound.unlock();

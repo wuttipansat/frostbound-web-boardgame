@@ -10,7 +10,7 @@ import {
 import {
   log, drawItems, discardCard, removeFromHand, addZombies, removeZombies,
   addBarricades, creditKills, healSurvivor, changeFood, changeMorale, recruitSurvivor,
-  spendEnergy, gainEnergy, healHp, damageSurvivor, unpack,
+  spendEnergy, gainEnergy, healHp, damageSurvivor, unpack, gainXp,
 } from './helpers.js';
 import { endTurn } from './flow.js';
 import { isPermanent, gearSlot, RECIPES } from '../../content/items.js';
@@ -82,6 +82,7 @@ export function attack(s, { survivorId }) {
     if (random(s) < gun.spawn) { drawn = 1; addZombies(s, sv.location, 1, 'noise'); }
   }
   log(s, 'attack', { survivorId, locationId: sv.location, killed, hp: preview.hp, drawn });
+  gainXp(s, survivorId, 'fight');
   damageSurvivor(s, survivorId, preview.hp, 'fight');
 }
 
@@ -93,12 +94,14 @@ export function search(s, { survivorId }) {
   const a = ability(survivorId);
   const n = Math.min(packFree(s, survivorId), a.type === 'doubleSearch' && a.location === sv.location ? 2 : 1);
   assert(n > 0, 'packFull');
-  const chance = searchSpawnChance(s, sv.location);
+  const chance = Math.max(0, searchSpawnChance(s, sv.location) - (sv.trait === 'scavenger' ? 0.05 : 0));
   pay(s, survivorId, 'search');
   // A blueprint for this place: draw one extra, then put one back (returnCard).
   const blueprint = holdsBlueprint(s, survivorId, sv.location);
   const drawn = drawItems(s, sv.location, blueprint ? n + 1 : n, survivorId);
   s.searches[sv.location] = (s.searches[sv.location] ?? 0) + 1;
+  s.stats.searches += 1;
+  gainXp(s, survivorId, 'search');
   // The noise may make a zombie appear (it does not bite at once).
   const spawned = random(s) < chance;
   log(s, 'search', { survivorId, locationId: sv.location, count: drawn.length, spawned });
@@ -236,7 +239,7 @@ export function playCard(s, { cardUid, targetSurvivorId }) {
       if (u.burn) assert(s.locations[sv.location].zombies > 0, 'noZombiesHere');
       if (!u.ammo && !u.burn) assert((u.hp && sv.hp < RULES.HP_MAX) || (u.ap && sv.ap < apMax(s, sv.id)), 'energyFull');
       spend();
-      if (u.hp) healHp(s, sv.id, u.hp);
+      if (u.hp) healHp(s, sv.id, u.hp + (holderTrait(s, h) === 'medic' ? 5 : 0));
       if (u.ap) gainEnergy(s, u.ap, sv.id);
       if (u.ammo) sv.ammo = (sv.ammo ?? 0) + u.ammo;
       if (u.burn) creditKills(s, removeZombies(s, sv.location, u.burn));
@@ -341,6 +344,7 @@ export function craft(s, { recipeId, survivorId }) {
   const uid = `k${Object.keys(s.cards).length}`;
   s.cards[uid] = r.makes;
   s.stockpile.push(uid);
+  s.stats.crafts += 1;
   log(s, 'craft', { survivorId, card: r.makes });
 }
 
@@ -372,6 +376,7 @@ export function build(s, { buildingId, survivorId }) {
   if (s.building[buildingId] >= next.ap) {
     delete s.building[buildingId];
     s.base[buildingId] = next.level;
+    s.stats.builds += 1;
     log(s, 'built', { buildingId, level: next.level });
   } else log(s, 'building', { survivorId, buildingId, n: put });
 }
@@ -402,4 +407,10 @@ export function setRest(s, { survivorId, mode }) {
 export function finishTurn(s) {
   requireTurn(s);
   endTurn(s);
+}
+
+/** The trait of whoever applies a consumable: its carrier, or (from the stockpile) anyone at the colony with that trait. */
+function holderTrait(s, holder) {
+  if (holder && holder !== 'stockpile') return s.survivors[holder]?.trait;
+  return Object.values(s.survivors).some((v) => v.alive && v.location === 'colony' && v.trait === 'medic') ? 'medic' : null;
 }

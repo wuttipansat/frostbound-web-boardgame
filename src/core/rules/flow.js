@@ -1,15 +1,15 @@
 // Game flow (solo): pick survivors -> rounds (crisis, one turn w/ crossroads, energy) -> colony phase -> end checks.
-import { PHASES, OUTSIDE_LOCATIONS, RULES, FIGHT, FOOD, SEASON, SIEGE } from '../constants.js';
+import { PHASES, OUTSIDE_LOCATIONS, RULES, FIGHT, FOOD, SEASON, SIEGE, BOND, MISSIONS, MISSION_REWARD } from '../constants.js';
 import { shuffle, pick, random } from '../rng.js';
 import { assert } from '../errors.js';
 import { CROSSROADS_BY_ID } from '../../content/crossroads.js';
 import { CRISES_BY_ID } from '../../content/crises.js';
 import {
   aliveSurvivors, foodNeeded, colonyPopulation, crisisRequirement, itemOf, scenarioDef, scenarioTarget,
-  focusSurvivor, teamHasAbility, crisisMatches, baseLevel, siegeForecast, apMax, sleepPlan, spawnForecast,
+  focusSurvivor, teamHasAbility, crisisMatches, baseLevel, siegeForecast, bondKey, missionStatus, apMax, sleepPlan, spawnForecast,
 } from '../selectors.js';
 import {
-  log, changeMorale, changeFood, recruitSurvivor, healHp, damageSurvivor, unpack, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems,
+  log, changeMorale, giveTrait, changeFood, recruitSurvivor, healHp, damageSurvivor, unpack, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems,
 } from './helpers.js';
 import { applyEffects } from './effects.js';
 import { evaluate, focusFilterFor } from './conditions.js';
@@ -31,7 +31,7 @@ export function draftPick(s, { survivorIds }) {
 
 export function finishDraft(s) {
   const t = s.team;
-  for (const id of t.survivors) { s.survivors[id] = newSurvivor(id, 'colony'); s.survivors[id].ap = apMax(s, id); }
+  for (const id of t.survivors) { s.survivors[id] = newSurvivor(id, 'colony'); s.survivors[id].ap = apMax(s, id); giveTrait(s, id); }
   // Unpicked options go back into the survivor deck.
   s.survivorDeck.push(...t.draftOptions.filter((id) => !t.survivors.includes(id)));
   t.draftOptions = [];
@@ -52,6 +52,11 @@ export function startRound(s) {
   s.time = 'dawn';
   s.crisis = { id: crisisId, contributions: [] };
   log(s, 'roundStart', { day: s.day, crisisId });
+  if (!s.mission && (s.day - 1) % 7 === 0) {
+    const m = MISSIONS[Math.floor(random(s) * MISSIONS.length)];
+    s.mission = { id: m.id, stat: m.stat, target: m.target, base: s.stats[m.stat], until: s.day + 6 };
+    log(s, 'missionNew', { id: m.id, target: m.target });
+  }
   const green = baseLevel(s, 'greenhouse');
   if (green) changeFood(s, green, 'greenhouse');
   if (baseLevel(s, 'radio') && random(s) < 0.1 * baseLevel(s, 'radio')) recruitSurvivor(s);
@@ -67,9 +72,14 @@ export function beginTurn(s) {
   s.searches = {};
   s.pendingCrossroads = null;
 
-  const cardId = drawFromDeck(s, 'crossroadsDeck', 'crossroadsDiscard');
-  const card = CROSSROADS_BY_ID[cardId];
-  const triggered = card && evaluate(s, card.trigger);
+  // A daily event: draw until a card's trigger fits today (up to 6 tries).
+  let cardId = null, card = null, triggered = false;
+  for (let i = 0; i < 6 && !triggered; i++) {
+    if (cardId) s.crossroadsDiscard.push(cardId);
+    cardId = drawFromDeck(s, 'crossroadsDeck', 'crossroadsDiscard');
+    card = CROSSROADS_BY_ID[cardId];
+    triggered = !!card && evaluate(s, card.trigger);
+  }
   log(s, 'turnStart', {});
   if (triggered) {
     const focusSv = focusSurvivor(s, focusFilterFor(card.trigger)) ?? focusSurvivor(s);
@@ -161,6 +171,26 @@ export function colonyPhase(s) {
   // Sleeping outside: the zombies there bite.
   for (const [id, r] of Object.entries(report.sleep)) {
     if (r.kind === 'outside') damageSurvivor(s, id, FIGHT.NIGHT_BITE * (s.locations[s.survivors[id].location]?.zombies ?? 0) + (s.day >= SEASON.COLD ? SEASON.COLD_HP : 0), 'night');
+  }
+
+  // Bonds: survivors who end the day at the same place grow closer.
+  const alive = aliveSurvivors(s);
+  for (let i = 0; i < alive.length; i++) for (let j = i + 1; j < alive.length; j++) {
+    if (alive[i].location !== alive[j].location) continue;
+    const k = bondKey(alive[i].id, alive[j].id);
+    s.bonds[k] = Math.min(BOND.MAX, (s.bonds[k] ?? 0) + 1);
+    if (s.bonds[k] === BOND.CLOSE) log(s, 'bond', { a: alive[i].id, b: alive[j].id });
+  }
+  // The weekly mission: done → +2 morale; out of time → it lapses.
+  const ms = missionStatus(s);
+  if (ms && ms.progress >= ms.target) {
+    s.stats.missions += 1;
+    s.mission = null;
+    log(s, 'missionDone', { id: ms.id });
+    changeMorale(s, MISSION_REWARD, 'mission');
+  } else if (ms && ms.daysLeft <= 0) {
+    s.mission = null;
+    log(s, 'missionFailed', { id: ms.id });
   }
 
   s.reports.colony = report;

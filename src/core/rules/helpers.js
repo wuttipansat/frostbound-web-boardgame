@@ -1,7 +1,7 @@
 // Low-level state mutations shared by all rule modules.
 // Every function here mutates the draft `s` (a private clone made by the reducer).
-import { RULES } from '../constants.js';
-import { shuffle } from '../rng.js';
+import { RULES, TRAITS, XP } from '../constants.js';
+import { shuffle, random } from '../rng.js';
 import { assert } from '../errors.js';
 import { LOCATIONS } from '../../content/locations.js';
 
@@ -91,13 +91,14 @@ export function recruitSurvivor(s) {
   const id = s.survivorDeck.pop();
   s.survivors[id] = newSurvivor(id, 'colony');
   s.survivors[id].ap = apMax(s, id); // newcomers arrive rested
+  giveTrait(s, id);
   s.team.survivors.push(id);
   log(s, 'recruit', { survivorId: id, location: 'colony' });
   return true;
 }
 
 export function newSurvivor(id, location) {
-  return { id, location, wounds: 0, frostbite: false, alive: true, moved: false, acted: false, ap: 0, hp: RULES.HP_MAX, ammo: 0, pack: [], rest: 'sleep', napped: false, gear: { weapon: null, armor: null, book: null, tool: null } };
+  return { id, location, wounds: 0, frostbite: false, alive: true, moved: false, acted: false, ap: 0, hp: RULES.HP_MAX, ammo: 0, pack: [], xp: { fight: 0, search: 0 }, rest: 'sleep', napped: false, gear: { weapon: null, armor: null, book: null, tool: null } };
 }
 
 export function woundSurvivor(s, survivorId, cause = 'wound') {
@@ -161,6 +162,7 @@ export function addBarricades(s, locationId, n) {
 export function creditKills(s, n) {
   if (!n) return;
   s.totalKills += n;
+  if (s.stats) s.stats.kills += n;
   s.team.kills += n;
 }
 
@@ -202,4 +204,21 @@ export function damageSurvivor(s, survivorId, n, cause = 'fight') {
 export function healHp(s, survivorId, n) {
   const sv = s.survivors[survivorId];
   if (sv?.alive) sv.hp = Math.min(RULES.HP_MAX, (sv.hp ?? RULES.HP_MAX) + n);
+}
+
+/** Each survivor gets one trait (seeded) when they join. */
+export function giveTrait(s, id) {
+  const sv = s.survivors[id];
+  if (sv && !sv.trait) sv.trait = TRAITS[Math.floor(random(s) * TRAITS.length)];
+}
+
+/** Experience: +1 per use; every 5 is a level (max 3). */
+export function gainXp(s, survivorId, kind) {
+  const sv = s.survivors[survivorId];
+  if (!sv) return;
+  sv.xp = sv.xp ?? { fight: 0, search: 0 };
+  const before = Math.floor(sv.xp[kind] / XP.PER_LEVEL);
+  sv.xp[kind] += 1;
+  const after = Math.floor(sv.xp[kind] / XP.PER_LEVEL);
+  if (after > before && after <= XP.MAX_LEVEL) log(s, 'levelUp', { survivorId, kind, level: after });
 }

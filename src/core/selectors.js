@@ -5,7 +5,7 @@ import { LOCATIONS } from '../content/locations.js';
 import { ITEMS } from '../content/items.js';
 import { SCENARIOS_BY_ID } from '../content/scenarios.js';
 import { CRISES_BY_ID } from '../content/crises.js';
-import { RULES, ENERGY, REST, FIGHT, SEASON, SIEGE, RING, SEARCH_SPAWN, DANGEROUS_LOCATIONS, OUTSIDE_LOCATIONS } from './constants.js';
+import { RULES, ENERGY, REST, FIGHT, SEASON, SIEGE, XP, BOND, DIFFICULTY, RING, SEARCH_SPAWN, DANGEROUS_LOCATIONS, OUTSIDE_LOCATIONS } from './constants.js';
 
 export const survivorDef = (id) => SURVIVORS_BY_ID[id];
 export const itemOf = (s, uid) => ITEMS[s.cards[uid]];
@@ -147,8 +147,8 @@ export function actionCost(s, survivorId, kind, to = null) {
   let cost = ENERGY.COST[kind] ?? 0;
   if (kind === 'attack') cost = gear.weapon?.gun ? FIGHT.GUN_AP : FIGHT.MELEE_AP;
   if (kind === 'search') cost = ENERGY.SEARCH;
-  if (kind === 'move') cost = walkCost(sv?.location ?? 'colony', to ?? 'colony') + (gear.armor?.moveMod ?? 0) + (gear.tool?.walkMod ?? 0);
-  if (kind === 'search') cost += gear.tool?.searchMod ?? 0;
+  if (kind === 'move') cost = walkCost(sv?.location ?? 'colony', to ?? 'colony') + (gear.armor?.moveMod ?? 0) + (gear.tool?.walkMod ?? 0) - (sv?.trait === 'quick' ? 2 : 0);
+  if (kind === 'search') cost += (gear.tool?.searchMod ?? 0) - XP.SEARCH_AP * xpLevel(sv, 'search');
   if (kind === 'barricade') cost += gear.tool?.barricadeMod ?? 0;
   if (!sv) return cost;
   const here = sv.location;
@@ -173,7 +173,7 @@ export function walkCost(from, to) {
 
 /** Chance (0..1) that searching here makes a zombie appear: by place, +10% per extra search there today. */
 export function searchSpawnChance(s, locationId) {
-  return Math.min(1, (SEARCH_SPAWN[locationId] ?? 0) + SEARCH_SPAWN.EXTRA * (s.searches?.[locationId] ?? 0));
+  return Math.max(0, Math.min(1, (SEARCH_SPAWN[locationId] ?? 0) + SEARCH_SPAWN.EXTRA * (s.searches?.[locationId] ?? 0)));
 }
 
 /** Who holds an item: 'stockpile' (at the colony), a survivor id (backpack), or null. */
@@ -206,7 +206,9 @@ export const ferocity = (s) => (s.day >= FIGHT.BRUTE_DAY ? FIGHT.BRUTE : FIGHT.W
 /** A survivor's ATK: their attack skill (2 best → 20, 6 worst → 4) plus a melee weapon. */
 export function atkOf(s, survivorId) {
   const w = gearOf(s, survivorId).weapon;
-  return (7 - (survivorDef(survivorId)?.attack ?? 4)) * FIGHT.ATK_PER_SKILL + (w && !w.gun ? (w.atk ?? 0) : 0);
+  const sv = s.survivors[survivorId];
+  return (7 - (survivorDef(survivorId)?.attack ?? 4)) * FIGHT.ATK_PER_SKILL + (w && !w.gun ? (w.atk ?? 0) : 0)
+    + XP.ATK * xpLevel(sv, 'fight') + (sv?.trait === 'strong' ? 4 : 0);
 }
 
 /** What one attack would do now: { cost, kills, hp (lost), gun, spawn (chance), ammo }. */
@@ -218,7 +220,8 @@ export function fightPreview(s, survivorId) {
   if (gear.weapon?.gun) return { cost, kills, hp: 0, gun: true, spawn: gear.weapon.gun.spawn, ammo: sv?.ammo ?? 0 };
   const left = Math.max(0, (sv?.ap ?? 0) - cost);
   const raw = Math.ceil(Math.max(0, ferocity(s) - (left + atkOf(s, survivorId))) / 3);
-  return { cost, kills, hp: Math.max(0, raw - (gear.armor?.value ?? 0)), gun: false, spawn: 0, ammo: 0 };
+  const bond = closeBond(s, survivorId) ? BOND.HP_SAVED : 0;
+  return { cost, kills, hp: Math.max(0, raw - (gear.armor?.value ?? 0) - bond), gun: false, spawn: 0, ammo: 0 };
 }
 
 /** HP lost walking out of a place with zombies. */
@@ -255,11 +258,30 @@ export function sleepPlan(s) {
     const kind = sv.location !== 'colony' ? 'outside' : sv.rest === 'guard' ? 'guard' : beds.has(sv.id) ? 'bed' : 'floor';
     const max = apMax(s, sv.id);
     const extra = bonus + (survivorDef(sv.id).ability.type === 'extraDie' ? 15 : 0);
-    let ap = Math.max(0, Math.min(max, apOf(s, sv.id) + Math.round(max * REST[kind].ap) + extra));
+    const share = kind === 'guard' && sv.trait === 'nightOwl' ? 0.7 : REST[kind].ap;
+    let ap = Math.max(0, Math.min(max, apOf(s, sv.id) + Math.round(max * share) + extra));
     if (sv.hungry) ap = Math.round(ap * REST.HUNGRY); // went to bed hungry: half AP tomorrow
     out[sv.id] = { kind, ap, hp: REST[kind].hp + (sv.location === 'colony' ? 5 * baseLevel(s, 'infirmary') : 0) };
   }
   return out;
+}
+
+/** Skill level from experience (0..3). */
+export const xpLevel = (sv, kind) => Math.min(XP.MAX_LEVEL, Math.floor((sv?.xp?.[kind] ?? 0) / XP.PER_LEVEL));
+
+export const bondKey = (a, b) => [a, b].sort().join('|');
+/** A close friend (bond 3+) at the same place: fights cost 2 HP less. */
+export function closeBond(s, survivorId) {
+  const sv = s.survivors[survivorId];
+  if (!sv) return null;
+  return aliveSurvivors(s).find((o) => o.id !== sv.id && o.location === sv.location && (s.bonds?.[bondKey(sv.id, o.id)] ?? 0) >= BOND.CLOSE)?.id ?? null;
+}
+
+/** This week's mission progress: { def, progress, target, daysLeft } or null. */
+export function missionStatus(s) {
+  const m = s.mission;
+  if (!m) return null;
+  return { ...m, progress: Math.max(0, (s.stats?.[m.stat] ?? 0) - m.base), daysLeft: m.until - s.day };
 }
 
 /** Base upgrade level (0..3). */
@@ -298,7 +320,7 @@ export function spawnForecast(s) {
  * Hits go round-robin to the survivors at the colony, healthiest first; with nobody home each hit eats 1 food.
  */
 export function siegeForecast(s) {
-  const attackers = SIEGE.BASE + Math.floor((s.day - 1) / SIEGE.EVERY) + (s.locations.colony?.zombies ?? 0);
+  const attackers = Math.max(0, SIEGE.BASE + Math.floor((s.day - 1) / SIEGE.EVERY) + (DIFFICULTY[s.difficulty]?.siege ?? 0)) + (s.locations.colony?.zombies ?? 0);
   const wall = baseLevel(s, 'wall');
   const guards = guardsOnDuty(s) * SIEGE.GUARD;
   const barricades = s.locations.colony?.barricades ?? 0;

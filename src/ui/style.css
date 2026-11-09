@@ -1675,3 +1675,7 @@ body:has(#locpanel:not(.hidden)) .sv-tokens .gear { display: none; } /* an open 
 
 /* Rework step 2: items without a picture yet show an empty, dashed frame (public/items/<id>.png replaces it). */
 img.art-item.blank { image-rendering: auto; background: none; }
+.over-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 8px 0; }
+.over-stats .ov-stat { display: flex; flex-direction: column; align-items: center; padding: 6px 4px; border-radius: 8px; background: rgba(255,255,255,.06); }
+.over-stats .ov-stat b { font-size: 1.2em; }
+@media (max-width: 480px) { .over-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

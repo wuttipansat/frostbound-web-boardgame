@@ -45,6 +45,11 @@ export function setupScreen(ctx) {
       h('p', { class: 'tagline' }, t('app.tagline'))),
     step(1, t('setup.scenario'),
       h('div', { class: 'scenario-cards' }, SCENARIOS.map((sc) => scenarioCard(ctx, sc, { on: cfg.scenarioId === sc.id, onclick: () => update({ scenarioId: sc.id }) })))),
+    step(2, t('setup.difficulty'),
+      h('div', { class: 'seg' }, ['easy', 'normal', 'hard'].map((d) => h('button', {
+        class: (cfg.difficulty ?? 'normal') === d ? 'on' : '', 'data-difficulty': d, tip: t(`diff.${d}.tip`),
+        onclick: () => update({ difficulty: d }),
+      }, t(`diff.${d}`))))),
     h('details', { class: 'setup-more' },
       h('summary', {}, t('setup.more')),
       h('div', { class: 'row' },
@@ -283,6 +288,11 @@ export function gameOverModal(ctx) {
     h('h2', {}, t(`over.reason.${r.reason}`)),
     h('p', { class: 'over-epitaph' }, t(`over.epitaph.${won ? 'won' : 'lost'}`)),
     (() => { const hl = highlights(s); return hl.length ? h('div', { class: 'jr-story' }, h('h4', {}, t('jr.story')), h('ul', {}, hl.map((j) => h('li', {}, journalLine(j))))) : null; })(),
+    h('div', { class: 'over-stats' }, [
+      ['over.days', s.day], ['over.kills', s.totalKills], ['over.searches', s.stats?.searches ?? 0],
+      ['over.builds', s.stats?.builds ?? 0], ['over.crafts', s.stats?.crafts ?? 0], ['over.missions', s.stats?.missions ?? 0],
+      ['over.lost', s.team.fallen.length], ['over.difficulty', t(`diff.${s.difficulty ?? 'normal'}`)],
+    ].map(([k, v]) => h('div', { class: 'ov-stat' }, h('b', {}, String(v)), h('small', {}, t(k))))),
     h('h4', {}, t('over.team')),
     h('div', { class: 'mini-faces big over-team' },
       aliveSurvivors(s).map((sv) => ctx.art.portrait(sv.id, 'l', { alt: survivorDef(sv.id).name })),
