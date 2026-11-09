@@ -87,6 +87,8 @@ export function renderLocationPanel(el, ctx) {
             },
             icon(ACTION_ICON[o.id] ?? 'ability', 'act-ico'),
             o.cost ? h('span', { class: 'need-badge cost', 'aria-hidden': 'true' }, String(o.cost)) : null,
+            o.id === 'attack' && o.ok && o.fight ? h('span', { class: `need-badge risk${o.fight.hp || o.fight.spawn ? ' bad' : ''}`, 'aria-hidden': 'true' }, o.fight.gun ? `${Math.round(o.fight.spawn * 100)}%` : `−${o.fight.hp}`) : null,
+            o.id === 'search' && o.ok ? h('span', { class: 'need-badge risk', 'aria-hidden': 'true' }, `${Math.round(searchSpawnChance(s, sv.location) * 100)}%`) : null,
             null);
           }))));
       }

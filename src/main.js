@@ -124,8 +124,12 @@ function sceneCallout(ev, state) {
   const cardBacks = (n) => Array.from({ length: Math.min(n, 3) }, (_, i) => { const cb = document.createElement('i'); cb.className = 'card-back'; cb.style.setProperty('--k', i); return cb; });
   switch (ev.kind) {
     case 'move': res.append(c('locations', ev.to, 'name')); break;
-    case 'attack': res.append(`−${ev.n}`, icon('skull')); break;
-    case 'search': el.append(...cardBacks(ev.n)); res.append(tr('scene.cards', { n: ev.n })); break;
+    case 'attack': res.append(`−${ev.n}`, icon('skull')); if (ev.hp) { const d = document.createElement('em'); d.className = 'dmg'; d.textContent = `−${ev.hp} HP`; el.append(d); } if (ev.drawn) res.append(' ', tr('scene.noise')); break;
+    case 'search': el.append(...cardBacks(ev.n)); res.append(tr('scene.cards', { n: ev.n })); if (ev.spawned) { const d = document.createElement('em'); d.className = 'dmg'; d.textContent = tr('scene.spawned'); el.append(d); } break;
+    case 'craft': case 'give': if (ev.card) { el.append(art.item(ev.card, 's', { cls: 'sc-item', alt: '' })); res.append(c('items', ev.card, 'name')); } break;
+    case 'build': el.append(icon('barricade')); res.append(tr(`bld.${ev.building}`), ev.level ? ` ${tr('scene.level', { n: ev.level })}` : ` +${ev.n} AP`); break;
+    case 'unpack': el.append(...cardBacks(ev.n)); res.append(tr('scene.unpack', { n: ev.n })); break;
+    case 'nap': el.append(icon('hourglass')); res.append(tr('act.nap')); break;
     case 'barricade': res.append(`+${ev.n}`); break;
     case 'lure': res.append(`${ev.n}`, icon('skull'), ' → ', c('locations', ev.to, 'name')); break;
     case 'contribute': el.append(...cardBacks(1)); break;

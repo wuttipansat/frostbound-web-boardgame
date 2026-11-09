@@ -31,7 +31,7 @@ Numbers are starting values; Step 18 tunes them.
 | 14 | Night attacks on the base: dawn forecast; at night walls and guards stop zombies first; the rest hurt people at the base. Fully predictable ("5 attack, 4 stopped"). | **done** |
 | 15 | Solo fun: a daily event card with 2 choices, traits and bonds, weekly missions, experience (skills improve with use), difficulty levels, an end-of-game summary. | **done** |
 | 16 | New scene and camera: isometric ~55°, rotate in 90° steps, 3 zoom levels; less fog, brighter day, readable night; limited palette, bigger survivors with outlines; roads with AP costs; bigger buttons and a bottom sheet on phones. | **done** (palette unchanged) |
-| 17 | Show every action: previews (path + AP, HP to lose, spawn %), animations (walk, loot flying into the backpack, hits with damage numbers, scaffolding, night attack), HP bars, toasts, a daily report, a tutorial over days 1–3. | |
+| 17 | Show every action: previews (path + AP, HP to lose, spawn %), animations (walk, loot flying into the backpack, hits with damage numbers, scaffolding, night attack), HP bars, toasts, a daily report, a tutorial over days 1–3. | **done** |
 | 18 | Balance, tests, deploy: a balance bot (100 games per difficulty; normal wins 35–50%, wins end on day 30–36), e2e on desktop and phone, perf, publish. | |
 
 ## Step 1 notes
@@ -218,3 +218,16 @@ Numbers are starting values; Step 18 tunes them.
 - Touch: buttons are at least 44 px on touch screens; the location panel was already a bottom sheet on phones.
 - Fixed: the draft cards showed "NaN" for the attack cost since Step 6; they now show the survivor's ATK.
 - The palette was not changed in this step.
+
+## Step 17 notes
+
+- Previews: walking AP on every place's label (Step 16); the attack button shows a badge with the HP it will cost
+  (red when > 0) or the noise % for guns; the search button shows the zombie chance; tooltips keep the details.
+- Scenes / callouts for every action: attacks show the kills and a rising red "−12 HP" (plus "the noise drew one"),
+  searches show "A zombie appears!" when one does, crafting, building ("+10 AP" scaffolding, "level 2!"),
+  unpacking into the stockpile, hand-overs and naps.
+- Tokens have HP bars (Step 6) and AP numbers (Step 5).
+- The daily report (dusk) now also shows the night attack ("5 came, 4 stopped, 1 got in"), who went hungry,
+  and how everyone slept (bed / floor / outside / guard).
+- Tutorial over days 1–3: a tip toast at each of the first three dawns (off when hints are off), next to the
+  existing step-by-step tutorial.

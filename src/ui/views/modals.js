@@ -235,7 +235,15 @@ export function colonyModal(ctx, item) {
   const rows = [];
   if (item.day) rows.push(h('p', { class: 'jr-summary reveal', style: next(0.2) }, icon('log'), ` ${daySummary(ctx.state, item.day)}`));
   rows.push(h('p', { class: `step reveal ${r.fed ? '' : 'bad'}`, style: next() },
-    icon('food'), ` ${r.fed ? t('colony.fed', { n: r.foodNeeded }) : t('colony.starve', { n: r.starvation })}`));
+    icon('food'), ` ${r.fed ? t('colony.fed', { n: r.foodNeeded }) : t('colony.starve', { n: r.hungry?.length ?? 0 })}`));
+  // Step 17: the daily report also covers the night attack, how everyone slept and the weekly mission.
+  if (r.siege) rows.push(h('p', { class: `step reveal ${r.siege.hits ? 'bad' : ''}`, style: next() }, icon('skull'),
+    ` ${t('colony.siege', { n: r.siege.attackers, k: r.siege.stopped, hits: r.siege.hits, hp: r.siege.hits * 10 })}`));
+  if (r.sleep) {
+    const kinds = {};
+    for (const x of Object.values(r.sleep)) kinds[x.kind] = (kinds[x.kind] ?? 0) + 1;
+    rows.push(h('p', { class: 'step reveal', style: next() }, icon('hourglass'), ` ${Object.entries(kinds).map(([k, n]) => `${n}× ${t(`sleep.${k}`)}`).join(' · ')}`));
+  }
   rows.push(h('h3', { class: 'reveal', style: next(0.3) }, t('colony.crisis', { name: c('crises', def.id, 'name') })));
   rows.push(h('p', { class: 'muted small reveal', style: next(0.3) }, t('colony.needs', { n: crisis.required, item: t(`item.${def.item}`) })));
   if (crisis.cards.length) {

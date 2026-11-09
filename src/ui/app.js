@@ -138,6 +138,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
     sound.play(soundForLog(e));
     if (e.k === 'crisisResolved' && state.reports.colony) ui.queue.push({ type: 'colony', report: structuredClone(state.reports.colony), morale: null, day: e.r });
     // What was chosen and what it did (the choice buttons only show the words).
+    if (e.k === 'roundStart' && e.day <= 3 && ui.hints !== false) toast(t(`tut.day${e.day}`), 'tip');
     if (e.k === 'crossroadsChoice') ui.queue.push({ type: 'cross', cardId: e.cardId, choice: e.choice });
     if (TOAST_KEYS.has(e.k) && e.k !== 'crisisResolved') {
       const text = formatLog(e, state);

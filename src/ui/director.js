@@ -6,7 +6,7 @@
 /** Seconds each scene holds at normal speed: [watched, own move]. */
 const DURATION = {
   move: [1.5, 0.15], attack: [1.3, 0.25], search: [1.35, 0.25], barricade: [1.05, 0.2],
-  lure: [1.35, 0.2], play: [1.0, 0.15], contribute: [0.9, 0.15], deposit: [1.0, 0.15], exposure: [2.9, 2.5], turn: [0.55, 0],
+  lure: [1.35, 0.2], play: [1.0, 0.15], craft: [1.0, 0.2], build: [1.1, 0.25], unpack: [0.9, 0.2], give: [0.8, 0.15], nap: [0.8, 0.15], contribute: [0.9, 0.15], deposit: [1.0, 0.15], exposure: [2.9, 2.5], turn: [0.55, 0],
 };
 const MAX_SCENE = 4; // seconds: nothing may hold the queue longer, whatever the frame rate
 export const SPEED = { normal: 1, fast: 0.55 };
@@ -22,8 +22,14 @@ export function eventsFromLog(entries, state) {
         if (e.from === e.to) break;
         ev = { kind: 'move', survivorId: e.survivorId, from: e.from, to: e.to, at: e.to, safe: !!e.safe };
         break;
-      case 'attack': ev = { kind: 'attack', survivorId: e.survivorId, at: e.locationId, n: e.killed ?? 0 }; break;
-      case 'search': ev = { kind: 'search', survivorId: e.survivorId, at: e.locationId, n: e.count ?? 0 }; break;
+      case 'attack': ev = { kind: 'attack', survivorId: e.survivorId, at: e.locationId, n: e.killed ?? 0, hp: e.hp ?? 0, drawn: e.drawn ?? 0 }; break;
+      case 'search': ev = { kind: 'search', survivorId: e.survivorId, at: e.locationId, n: e.count ?? 0, spawned: !!e.spawned }; break;
+      case 'craft': ev = { kind: 'craft', survivorId: e.survivorId, at: 'colony', card: e.card }; break;
+      case 'building': ev = { kind: 'build', survivorId: e.survivorId, at: 'colony', building: e.buildingId, n: e.n }; break;
+      case 'built': ev = { kind: 'build', at: 'colony', building: e.buildingId, level: e.level }; break;
+      case 'unpack': ev = { kind: 'unpack', survivorId: e.survivorId, at: 'colony', n: e.count }; break;
+      case 'give': ev = { kind: 'give', survivorId: e.survivorId, at: locOf(e.survivorId), card: e.card }; break;
+      case 'nap': ev = { kind: 'nap', survivorId: e.survivorId, at: 'colony' }; break;
       case 'barricade': ev = { kind: 'barricade', at: e.locationId, n: e.n ?? 1 }; break;
       case 'lure': ev = { kind: 'lure', survivorId: e.survivorId, from: e.from, to: e.to, at: e.to, n: e.n ?? 0 }; break;
       case 'play': ev = { kind: 'play', at: 'colony', card: e.card, type: e.type }; break;

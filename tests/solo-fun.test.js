@@ -48,3 +48,19 @@ test('difficulty changes food, morale and the night attack', () => {
   const h = patch(e, (x) => { x.difficulty = 'hard'; });
   assert.equal(siegeForecast(h).attackers - siegeForecast(e).attackers, 2);
 });
+
+test('every new action becomes a scene: damage, spawns, crafting, building, unpacking', async () => {
+  const { eventsFromLog } = await import('../src/ui/director.js');
+  const state = startedGame();
+  const evs = eventsFromLog([
+    { k: 'attack', survivorId: 'a', locationId: 'police', killed: 1, hp: 12, drawn: 1 },
+    { k: 'search', survivorId: 'a', locationId: 'police', count: 1, spawned: true },
+    { k: 'craft', survivorId: 'a', card: 'bandage' },
+    { k: 'building', survivorId: 'a', buildingId: 'dorm', n: 10 },
+    { k: 'built', buildingId: 'dorm', level: 1 },
+    { k: 'unpack', survivorId: 'a', count: 2 },
+  ], state);
+  assert.deepEqual(evs.map((e) => e.kind), ['attack', 'search', 'craft', 'build', 'build', 'unpack']);
+  assert.equal(evs[0].hp, 12);
+  assert.equal(evs[1].spawned, true);
+});

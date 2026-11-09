@@ -1692,3 +1692,10 @@ img.art-item.blank { image-rendering: auto; background: none; }
   #view-ctl { left: 8px; top: 150px; flex-direction: row; }
 }
 #view-ctl.hidden { display: none; }
+/* Step 17: damage numbers on callouts, risk badges on action buttons */
+.scene-callout .dmg { display: block; font-style: normal; font-weight: 800; color: #ff6b5e; animation: dmg-rise 1.1s ease-out both; }
+@keyframes dmg-rise { from { transform: translateY(6px); opacity: 0; } 30% { opacity: 1; } to { transform: translateY(-10px); opacity: 1; } }
+.icon-act .need-badge.risk { position: absolute; left: -4px; bottom: -4px; background: #2b3a4a; color: #dfe8f2; font-size: 10px; padding: 0 4px; border-radius: 6px; }
+.icon-act .need-badge.risk.bad { background: #b8433a; color: #fff; }
+.toast.tip { background: #22324a; border-left: 3px solid #f2b33d; }
+@media (prefers-reduced-motion: reduce) { .scene-callout .dmg { animation: none; } }
