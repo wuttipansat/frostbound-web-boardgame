@@ -20,7 +20,7 @@ import {
   setupScreen, settingsModal, draftModal, crossroadsModal, gameOverModal, toastLayer, colonyModal,
   confirmEndModal, pickModal, crossResultModal,
 } from './views/modals.js';
-import { moveTargets, lureTargets, actingSurvivors } from './options.js';
+import { moveTargets, lureTargets, actingSurvivors, allItems } from './options.js';
 
 /** Log entries added since `prev` (the log is capped at RULES.MAX_LOG, so it may have shifted). */
 export function newLogEntries(prev, next) {
@@ -150,7 +150,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
     if (ui.picking && (!state.survivors[ui.picking.survivorId]?.alive || state.phase !== PHASES.TURN)) ui.picking = null;
     // Drop stale selections.
     if (ui.selSurvivor && !state.survivors[ui.selSurvivor]?.alive) ui.selSurvivor = null;
-    if (ui.selCard && !state.team.hand.includes(ui.selCard)) ui.selCard = null;
+    if (ui.selCard && !allItems(state).includes(ui.selCard)) ui.selCard = null;
     pieces.sync(state, { animate });
     pieces.setHighlight?.(ui.selSurvivor);
     storage.set(SAVE_KEY, { state });

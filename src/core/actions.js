@@ -16,6 +16,7 @@ export const A = Object.freeze({
   RETURN_CARD: 'RETURN_CARD',
   EQUIP: 'EQUIP',
   NAP: 'NAP',
+  GIVE: 'GIVE',
   SET_REST: 'SET_REST',
 });
 
@@ -39,3 +40,5 @@ export const equip = (cardUid, survivorId = null) => ({ type: A.EQUIP, cardUid, 
 export const nap = (survivorId) => ({ type: A.NAP, survivorId });
 /** Tonight's plan for a survivor: 'sleep' (default) or 'guard' (at the colony; helps defend, wakes at 50%). */
 export const setRest = (survivorId, mode) => ({ type: A.SET_REST, survivorId, mode });
+/** Hand an item to a survivor at the same place (free); no survivor = into the stockpile at the colony. */
+export const give = (cardUid, toSurvivorId = null) => ({ type: A.GIVE, cardUid, toSurvivorId });

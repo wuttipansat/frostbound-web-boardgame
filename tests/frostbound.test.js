@@ -5,7 +5,7 @@ import { newGame, startedGame, setSurvivors, patch } from './_helpers.js';
 import { reduce, tryReduce } from '../src/core/reducer.js';
 import * as act from '../src/core/actions.js';
 import { ENERGY, FIGHT } from '../src/core/constants.js';
-import { actionCost, spawnForecast, apMax, sleepPlan, atkOf, fightPreview, killsPerAttack, gearOf } from '../src/core/selectors.js';
+import { actionCost, spawnForecast, holderOf, apMax, sleepPlan, atkOf, fightPreview, killsPerAttack, gearOf } from '../src/core/selectors.js';
 import { SURVIVORS } from '../src/content/survivors.js';
 import { giveCard, setEnergy } from './_helpers.js';
 import { spawnZombies } from '../src/core/rules/flow.js';
@@ -50,14 +50,14 @@ test('gear: equip is free, swaps back to hand, changes personal stats, and is wo
   assert.equal(ap(s, 'corwin-daly'), e0, 'free');
   assert.equal(actionCost(s, 'corwin-daly', 'attack'), bare, 'melee always costs 15');
   assert.equal(atkOf(s, 'corwin-daly'), 16 + 8, 'the baton adds ATK');
-  assert.ok(!me(s).hand.includes(baton));
+  assert.equal(holderOf(s, baton), null, 'worn, not carried');
   s = reduce(s, act.equip(shotgun));
-  assert.ok(me(s).hand.includes(baton), 'the baton goes back to hand');
+  assert.ok(holderOf(s, baton), 'the baton goes back where the shotgun was');
   assert.equal(killsPerAttack(s, 'corwin-daly'), 2);
   const r = reduce(s, act.attack('corwin-daly'));
   assert.equal(r.locations.police.zombies, 1);
   s = reduce(s, act.equip(boots));
-  assert.equal(actionCost(s, 'corwin-daly', 'move', 'colony'), ENERGY.COST.move - 5);
+  assert.equal(actionCost(s, 'corwin-daly', 'move', 'colony'), ENERGY.WALK[2] - 5);
   const wake = sleepPlan(s)['corwin-daly'].ap;
   s = reduce(s, act.equip(guide));
   assert.equal(sleepPlan(s)['corwin-daly'].ap, Math.min(apMax(s, 'corwin-daly'), wake + 10));
@@ -70,10 +70,10 @@ test('actions cost energy: odd numbers, modifiers, and not enough energy is ille
   let s = fb({ seed: 5 });
   s = setSurvivors(s, { 'osei-vance': 'grocery', 'greta-vos': 'hospital' });
   s.day = 1;
-  const search = (id) => ENERGY.SEARCH_BASE + ENERGY.PER_SKILL * SURVIVORS.find((x) => x.id === id).search;
+  const search = () => ENERGY.SEARCH;
   const attack = () => FIGHT.MELEE_AP;
   assert.equal(actionCost(s, 'osei-vance', 'search'), search('osei-vance'));
-  assert.equal(actionCost(s, 'greta-vos', 'search'), search('greta-vos') + ENERGY.DANGEROUS);
+  assert.equal(actionCost(s, 'greta-vos', 'search'), search('greta-vos'), 'search is 17 everywhere');
   s.locations.grocery.zombies = 2;
   assert.equal(actionCost(s, 'osei-vance', 'search'), search('osei-vance') + ENERGY.CROWDED);
   s.day = 3; // storm day: outside costs more
@@ -81,7 +81,7 @@ test('actions cost energy: odd numbers, modifiers, and not enough energy is ille
   s.day = 1;
   setAp(s, 'greta-vos', 100);
   const after = reduce(s, act.search('greta-vos'));
-  assert.equal(ap(after, 'greta-vos'), 100 - search('greta-vos') - ENERGY.DANGEROUS);
+  assert.equal(ap(after, 'greta-vos'), 100 - search('greta-vos'));
   const broke = structuredClone(s); setAp(broke, 'greta-vos', 5);
   assert.equal(tryReduce(broke, act.search('greta-vos')).error, 'notEnoughEnergy');
 });
@@ -102,7 +102,7 @@ test('moving: costs energy, repeatable, and walking in among zombies is safe for
 test('new abilities: cheaper moves, attacks and barricades, cold-proof nights, double junk', () => {
   let s = fb({ seed: 7 });
   s = setSurvivors(s, { 'maren-holt': 'colony', 'ilse-brandt': 'police', 'wren-okafor': 'school', 'bo-lindqvist': 'gas', 'corwin-daly': 'school' });
-  assert.equal(actionCost(s, 'maren-holt', 'move', 'colony'), ENERGY.COST.move - ENERGY.SKILLED);
+  assert.equal(actionCost(s, 'maren-holt', 'move', 'school'), ENERGY.WALK[0] - ENERGY.SKILLED);
   assert.equal(actionCost(s, 'ilse-brandt', 'attack'), FIGHT.MELEE_AP - ENERGY.SKILLED);
   assert.equal(actionCost(s, 'wren-okafor', 'barricade'), actionCost(s, 'corwin-daly', 'barricade') - ENERGY.SKILLED);
   s.day = 3; // storm

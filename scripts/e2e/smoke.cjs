@@ -21,7 +21,8 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
     if (s.players || s.activePlayerId) out.push('state still has player seats');
     if (document.querySelector('.backdrop.pass, .obj-reveal, .lobby, .backdrop.incoming, .dialog.vote, .mode-cards')) out.push('multiplayer UI on screen');
     const shownUids = [...document.querySelectorAll('.item-card[data-uid]')].map((e) => e.dataset.uid);
-    if (shownUids.some((u) => !s.team.hand.includes(u))) out.push('a card on screen is not in the hand');
+    const held = [...s.stockpile, ...Object.values(s.survivors).flatMap((v) => (v.alive ? v.pack ?? [] : []))];
+    if (shownUids.some((u) => !held.includes(u))) out.push('a card on screen is not in the hand');
     return out;
   });
 

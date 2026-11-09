@@ -21,7 +21,8 @@ export const RULES = Object.freeze({
   TEAM_START: 2,          // survivors picked at the start (solo game)
   TEAM_MAX: 6,            // the most survivors the team can have
   DRAFT_OPTIONS: 6,
-  STARTING_HAND: 3,
+  STARTING_HAND: 3,        // items in the stockpile at the start
+  PACK: 3,                // backpack slots per survivor
   WOUNDS_TO_DIE: 3,
   BEDS: 2,                // beds at the colony (the dorm adds more in Step 12)
   HP_MAX: 100,
@@ -35,7 +36,9 @@ export const ENERGY = Object.freeze({
   STARVING: 20,           // the colony is starving: regen this much less
   HURT: 20,               // 2+ wounds: the pool's max is this much lower
   STORM: 4,               // storm days (every 3rd day): actions outside the colony cost more
-  COST: Object.freeze({ move: 13, barricade: 19, lure: 11 }),
+  COST: Object.freeze({ move: 12, barricade: 19, lure: 11 }),
+  WALK: Object.freeze([12, 17, 23]), // walking: near / mid / far
+  SEARCH: 17,
   SEARCH_BASE: 15,        // search cost = 15 + 2 × search skill (2..6 → 19..27)
   PER_SKILL: 2,
   CROWDED: 7,             // 2+ zombies here: search / barricade cost more
@@ -68,5 +71,8 @@ export const FIGHT = Object.freeze({
   LEAVE_HP: 5,            // leaving a place with zombies: HP per zombie
   NIGHT_BITE: 5,          // sleeping outside: HP per zombie there
 });
+// Distance rings from the colony (1 near … 3 far) and the chance a search makes a zombie appear.
+export const RING = Object.freeze({ colony: 0, grocery: 1, school: 1, gas: 2, library: 2, police: 3, hospital: 3 });
+export const SEARCH_SPAWN = Object.freeze({ grocery: 0.1, school: 0.15, library: 0.1, gas: 0.15, police: 0.25, hospital: 0.2, EXTRA: 0.1 });
 export const DANGEROUS_LOCATIONS = Object.freeze(['hospital', 'police']);
 

@@ -42,12 +42,12 @@ export function survivorOptions(state, survivorId, { lureTo = null } = {}) {
 
 /** Move option for a survivor to a location (with or without a fuel card). */
 export function moveOption(state, survivorId, to, useFuel = false) {
-  const fuel = useFuel ? state.team.hand.find((u) => itemOf(state, u).type === 'fuel') : undefined;
+  const fuel = useFuel ? state.stockpile.find((u) => itemOf(state, u).type === 'fuel') : undefined;
   return { to, fuel: fuel ?? null, ...check(state, act.move(survivorId, to, fuel)) };
 }
 
 export function hasFuel(state) {
-  return state.team.hand.some((u) => itemOf(state, u).type === 'fuel');
+  return state.stockpile.some((u) => itemOf(state, u).type === 'fuel');
 }
 
 /**
@@ -87,6 +87,21 @@ export function cardTargets(state, uid) {
   return state.team.survivors
     .filter((id) => state.survivors[id]?.alive)
     .map((survivorId) => ({ survivorId, ...check(state, gear ? act.equip(uid, survivorId) : act.playCard(uid, { targetSurvivorId: survivorId })) }));
+}
+
+/** Hand-over targets for an item: other survivors at the same place, plus the stockpile from a backpack at the colony. */
+export function giveTargets(state, uid) {
+  const out = state.team.survivors.filter((id) => state.survivors[id]?.alive)
+    .map((survivorId) => ({ survivorId, ...check(state, act.give(uid, survivorId)) }))
+    .filter((x) => x.ok);
+  const home = check(state, act.give(uid, null));
+  if (home.ok) out.push({ survivorId: null, ...home });
+  return out;
+}
+
+/** Every item the team has: the stockpile first, then each backpack. */
+export function allItems(state) {
+  return [...state.stockpile, ...state.team.survivors.flatMap((id) => (state.survivors[id]?.alive ? state.survivors[id].pack ?? [] : []))];
 }
 
 /** Where a survivor could lure zombies to. */

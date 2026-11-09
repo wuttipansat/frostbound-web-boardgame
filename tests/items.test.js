@@ -4,7 +4,7 @@ import { reduce, tryReduce } from '../src/core/reducer.js';
 import * as a from '../src/core/actions.js';
 import { ITEMS } from '../src/content/items.js';
 import { LOCATIONS } from '../src/content/locations.js';
-import { foodNeeded, killsPerAttack, actionCost } from '../src/core/selectors.js';
+import { foodNeeded, killsPerAttack, actionCost, holderOf } from '../src/core/selectors.js';
 import { startedGame, setSurvivors, setEnergy, giveCard, patch } from './_helpers.js';
 
 const turn = (placements, energy = 100) => {
@@ -13,7 +13,7 @@ const turn = (placements, energy = 100) => {
   s = setEnergy(s, energy);
   return { s };
 };
-const hand = (s) => s.team.hand;
+const hand = (s) => s.stockpile;
 
 test('items have tiers 1-3 and higher tiers are scarcer in the decks', () => {
   const copies = { 1: 0, 2: 0, 3: 0 };
@@ -40,7 +40,7 @@ test('weapons are worn: each attack kills the weapon\'s value, at the weapon\'s 
   r = reduce(r, a.equip(rifle));
   assert.equal(killsPerAttack(r, 'corwin-daly'), 1);
   assert.ok(bare > 10);
-  assert.ok(r.team.hand.includes(shotgun) && r.team.hand.includes(glock));
+  assert.ok(holderOf(r, shotgun) && holderOf(r, glock));
 });
 
 test('tier scales medicine, tools and junk; motor junk is wild in a crisis', () => {
@@ -55,7 +55,7 @@ test('tier scales medicine, tools and junk; motor junk is wild in a crisis', () 
   assert.equal(healed.survivors['corwin-daly'].frostbite, false);
   assert.equal(reduce(s, a.playCard(set, { targetSurvivorId: 'corwin-daly' })).locations.police.barricades, 2);
   const re = reduce(s, a.playCard(junk, { targetSurvivorId: 'corwin-daly' }));
-  assert.ok(!re.team.hand.includes(junk));
+  assert.ok(!re.stockpile.includes(junk));
   assert.equal(re.survivors['corwin-daly'].ap, 20 + 24, 'motor junk = 2 × 12 energy');
   assert.equal(ITEMS['motor-junk'].wild, true);
 });
@@ -68,7 +68,7 @@ test('survivor cards: a newcomer joins the team (+1 morale); a full team gives +
   assert.equal(r.team.survivors.length, 2);
   assert.equal(r.survivors[r.team.survivors[1]].location, 'colony');
   assert.equal(r.morale, 6);
-  assert.ok(!r.team.hand.includes(card));
+  assert.ok(!r.stockpile.includes(card));
   let full = setSurvivors(s, { 'corwin-daly': 'colony', 'agnes-pell': 'colony', 'greta-vos': 'colony', 'bo-lindqvist': 'colony', 'nia-calloway': 'colony', 'osei-vance': 'colony' });
   let lone; [full, lone] = giveCard(full, 'lone-wanderer');
   const f = reduce(full, a.playCard(lone));
@@ -90,7 +90,7 @@ test('a blueprint draws one extra card when searching its location, then one goe
   assert.equal(r.team.pick, null);
   assert.equal(r.locations.police.deck.length, n - 1);
   assert.equal(r.locations.police.deck[0], pick.uids[0], 'returned to the bottom');
-  assert.ok(r.team.hand.includes(pick.uids[1]));
+  assert.ok(r.survivors['maren-holt'].pack.includes(pick.uids[1]));
   assert.equal(r.survivors['maren-holt'].gear.book, bp);
   // Elsewhere the blueprint does nothing.
   let { s: s2 } = turn({ 'maren-holt': 'school' });
@@ -114,5 +114,5 @@ test('books work while equipped (one book slot per survivor): cookbook saves foo
   s = reduce(s, a.equip(manual));
   assert.equal(foodNeeded(s), need, 'the cookbook went back to the hand');
   assert.equal(reduce(s, a.barricade('corwin-daly')).locations.police.barricades, 2);
-  assert.ok(s.team.hand.includes(book));
+  assert.ok(holderOf(s, book));
 });

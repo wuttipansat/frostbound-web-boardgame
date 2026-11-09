@@ -17,7 +17,7 @@ function checkInvariants(s) {
   // Each card instance lives in at most one zone.
   const seen = new Set();
   const zones = [
-    ...s.team.hand,
+    ...s.stockpile,
     ...Object.values(s.survivors).flatMap((sv) => Object.values(sv.gear ?? {}).filter(Boolean)),
     ...Object.values(s.locations).flatMap((l) => l.deck ?? []),
     ...(s.crisis?.contributions ?? []),

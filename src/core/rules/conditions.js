@@ -2,7 +2,7 @@
 import { aliveSurvivors, itemOf } from '../selectors.js';
 
 function handCount(s, type) {
-  return s.team.hand.filter((uid) => itemOf(s, uid).type === type).length;
+  return s.stockpile.filter((uid) => itemOf(s, uid).type === type).length;
 }
 
 const PREDICATES = {
@@ -24,7 +24,7 @@ const PREDICATES = {
   hasItem: (s, c) => handCount(s, c.item) >= 1,
   handHas: (s, c) => handCount(s, c.item) >= c.count,
   handHasEach: (s, c) => c.items.every((t) => handCount(s, t) >= 1),
-  handSizeAtLeast: (s, c) => s.team.hand.length >= c.n,
+  handSizeAtLeast: (s, c) => s.stockpile.length >= c.n,
   hasWounded: (s) => aliveSurvivors(s).some((sv) => sv.wounds > 0 || sv.frostbite),
   noWoundedSurvivors: (s) => aliveSurvivors(s).every((sv) => sv.wounds === 0 && !sv.frostbite),
   survivorCountAtLeast: (s, c) => aliveSurvivors(s).length >= c.n,

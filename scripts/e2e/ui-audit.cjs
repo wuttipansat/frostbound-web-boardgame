@@ -16,7 +16,7 @@ const setupTurn = (opts = {}) => `(() => {
   for (const id of s.team.survivors) s.survivors[id].ap = 80;
   for (const type of ['medicine', 'weapon', 'food', 'tools', 'junk', 'fuel', 'medicine', 'food']) for (const loc of Object.values(s.locations)) {
     const i = (loc.deck || []).findIndex((u) => window.__frostbound.itemType(s.cards[u]) === type);
-    if (i >= 0) { s.team.hand.push(loc.deck.splice(i, 1)[0]); break; }
+    if (i >= 0) { s.stockpile.push(loc.deck.splice(i, 1)[0]); break; }
   }
   a.loadState(s);
   return sv;
@@ -90,7 +90,7 @@ async function audit(browser, device, vp) {
   await page.evaluate(() => window.__frostbound.app.selectSurvivor(null));
   f.silentTarget = await page.evaluate(() => {
     const a = window.__frostbound.app;
-    const med = a.state.team.hand.find((u) => window.__frostbound.itemType(a.state.cards[u]) === 'medicine');
+    const med = a.state.stockpile.find((u) => window.__frostbound.itemType(a.state.cards[u]) === 'medicine');
     a.set({ selCard: med });
     const play = [...document.querySelectorAll('.card-bar .btn, .cd-actions .btn')].find((b) => /Play|Use|ใช้/.test(b.textContent));
     const picker = document.querySelector('[data-target-picker]');

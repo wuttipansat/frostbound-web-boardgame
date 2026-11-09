@@ -44,7 +44,7 @@ const EFFECTS = {
   },
   discard: (s, ctx, e) => {
     for (let i = 0; i < e.n; i++) {
-      const uid = s.team.hand.find((u) => !e.item || itemOf(s, u).type === e.item);
+      const uid = s.stockpile.find((u) => !e.item || itemOf(s, u).type === e.item);
       if (!uid) break;
       discardCard(s, uid);
       log(s, 'discard', { card: s.cards[uid] });

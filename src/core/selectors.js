@@ -4,7 +4,7 @@ import { LOCATIONS } from '../content/locations.js';
 import { ITEMS } from '../content/items.js';
 import { SCENARIOS_BY_ID } from '../content/scenarios.js';
 import { CRISES_BY_ID } from '../content/crises.js';
-import { RULES, ENERGY, REST, FIGHT, DANGEROUS_LOCATIONS, OUTSIDE_LOCATIONS } from './constants.js';
+import { RULES, ENERGY, REST, FIGHT, RING, SEARCH_SPAWN, DANGEROUS_LOCATIONS, OUTSIDE_LOCATIONS } from './constants.js';
 
 export const survivorDef = (id) => SURVIVORS_BY_ID[id];
 export const itemOf = (s, uid) => ITEMS[s.cards[uid]];
@@ -127,13 +127,12 @@ export function actionCost(s, survivorId, kind, to = null) {
   const gear = sv ? gearOf(s, survivorId) : {};
   let cost = ENERGY.COST[kind] ?? 0;
   if (kind === 'attack') cost = gear.weapon?.gun ? FIGHT.GUN_AP : FIGHT.MELEE_AP;
-  if (kind === 'search') cost = ENERGY.SEARCH_BASE + ENERGY.PER_SKILL * (def?.search ?? 4);
-  if (kind === 'move') cost += gear.armor?.moveMod ?? 0;
+  if (kind === 'search') cost = ENERGY.SEARCH;
+  if (kind === 'move') cost = walkCost(sv?.location ?? 'colony', to ?? 'colony') + (gear.armor?.moveMod ?? 0);
   if (!sv) return cost;
   const here = sv.location;
   const zombies = s.locations[here]?.zombies ?? 0;
   if ((kind === 'search' || kind === 'barricade') && zombies >= 2) cost += ENERGY.CROWDED;
-  if (kind === 'search' && DANGEROUS_LOCATIONS.includes(here)) cost += ENERGY.DANGEROUS;
   if (kind === 'attack' && def?.ability.type === 'killTwo') cost += ENERGY.HEAVY;
   // Cheaper actions from a survivor's ability.
   const cheaper = { move: 'roadRunner', attack: 'sharpshooter', barricade: 'handy' }[kind];
@@ -142,6 +141,34 @@ export function actionCost(s, survivorId, kind, to = null) {
   if (isStorm(s) && outside && def?.ability.type !== 'coldProof') cost += ENERGY.STORM;
   return Math.max(1, cost);
 }
+
+/** Walking cost between two places by distance: near 12, mid 17, far 23. */
+export function walkCost(from, to) {
+  if (from === to) return 0;
+  const a = RING[from] ?? 1, b = RING[to] ?? 1;
+  const tier = a === 0 || b === 0 ? Math.max(a, b) : Math.min(3, Math.ceil((a + b) / 2));
+  return ENERGY.WALK[tier - 1];
+}
+
+/** Chance (0..1) that searching here makes a zombie appear: by place, +10% per extra search there today. */
+export function searchSpawnChance(s, locationId) {
+  return Math.min(1, (SEARCH_SPAWN[locationId] ?? 0) + SEARCH_SPAWN.EXTRA * (s.searches?.[locationId] ?? 0));
+}
+
+/** Who holds an item: 'stockpile' (at the colony), a survivor id (backpack), or null. */
+export function holderOf(s, uid) {
+  if (s.stockpile.includes(uid)) return 'stockpile';
+  for (const sv of Object.values(s.survivors)) if (sv.alive && sv.pack?.includes(uid)) return sv.id;
+  return null;
+}
+
+/** Where an item is: the colony for the stockpile, else its carrier's location. */
+export function placeOfItem(s, uid) {
+  const h = holderOf(s, uid);
+  return h === 'stockpile' ? 'colony' : h ? s.survivors[h].location : null;
+}
+
+export const packFree = (s, survivorId) => RULES.PACK - (s.survivors[survivorId]?.pack?.length ?? 0);
 
 /** Zombies one attack kills: a gun's value (shotgun 2); melee 1, +1 for Teodor. */
 export function killsPerAttack(s, survivorId) {

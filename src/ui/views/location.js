@@ -4,7 +4,7 @@ import { h, mount } from '../dom.js';
 import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
 import { LOCATIONS } from '../../content/locations.js';
-import { survivorsAt, survivorDef, aliveSurvivors, spawnForecast } from '../../core/selectors.js';
+import { survivorsAt, survivorDef, aliveSurvivors, spawnForecast, searchSpawnChance } from '../../core/selectors.js';
 import { flashTip } from '../tooltip.js';
 import { survivorOptions, lureTargets } from '../options.js';
 
@@ -68,6 +68,7 @@ export function renderLocationPanel(el, ctx) {
             // Icon only; the name, the energy it costs and why it can't be done now are in the tooltip.
             const tip = [t(`act.${o.id}`),
               o.cost != null ? t('act.cost', { n: o.cost, have: sv.ap }) : null,
+              o.id === 'search' && o.ok ? t('act.searchChance', { p: Math.round(searchSpawnChance(s, sv.location) * 100) }) : null,
               o.id === 'attack' && o.fight ? (o.fight.gun ? t('act.shot', { p: Math.round(o.fight.spawn * 100), ammo: o.fight.ammo }) : t('act.fight', { hp: o.fight.hp })) : null,
               !o.ok ? t(`err.${o.error}`) : null,
               isLure && o.ok ? t('act.pickOnBoard') : null].filter(Boolean).join(' · ');

@@ -13,7 +13,7 @@ test('card play needs an explicit target: one entry per survivor, legal only whe
   let s = startedGame();
   s = setSurvivors(s, { 'corwin-daly': 'police', 'agnes-pell': 'colony' });
   s = patch(s, (x) => { x.survivors['agnes-pell'].wounds = 1; x.locations.police.zombies = 1; });
-  let med; [s, med] = giveCard(s, 'antibiotics');
+  let med; [s, med] = giveCard(s, 'antibiotics', 'stockpile');
   let gun; [s, gun] = giveCard(s, 'riot-baton');
   let junk; [s, junk] = giveCard(s, 'bedpan');
   let food; [s, food] = giveCard(s, 'canned-beans');
@@ -25,7 +25,8 @@ test('card play needs an explicit target: one entry per survivor, legal only whe
   assert.equal(medT['agnes-pell'].ok, true, 'only the wounded survivor can be healed');
   assert.equal(medT['corwin-daly'].error, 'notWounded');
   assert.deepEqual(cardOptions(s, gun).map((o) => o.id), ['contribute', 'deposit']);
-  assert.ok(cardTargets(s, gun).every((x) => x.ok && x.action.type === 'EQUIP'));
+  assert.ok(cardTargets(s, gun).every((x) => x.action.type === 'EQUIP'));
+  assert.deepEqual(cardTargets(s, gun).filter((x) => x.ok).map((x) => x.survivorId), ['corwin-daly'], 'only who is where the item is');
 });
 
 test('lure and move targets for the board highlights', () => {

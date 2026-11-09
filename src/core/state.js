@@ -76,12 +76,13 @@ export function createGame(config = {}) {
     fallen: [],
     draftOptions: survivorPool.splice(0, RULES.DRAFT_OPTIONS),
     drafted: false,
-    hand: [],
     kills: 0,
     abilityUsed: {},
     usedCards: [],
     pick: null,      // blueprint search: { locationId, uids } until one card is put back
   };
+  s.stockpile = []; // items at the colony (they count only once carried home)
+  s.searches = {};  // searches per location today (each extra one raises the zombie chance)
   s.survivorDeck = survivorPool;
   return s;
 }

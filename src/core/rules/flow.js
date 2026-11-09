@@ -9,7 +9,7 @@ import {
   focusSurvivor, teamHasAbility, apMax, sleepPlan, spawnForecast,
 } from '../selectors.js';
 import {
-  log, changeMorale, healHp, damageSurvivor, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems,
+  log, changeMorale, healHp, damageSurvivor, unpack, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems,
 } from './helpers.js';
 import { applyEffects } from './effects.js';
 import { evaluate, focusFilterFor } from './conditions.js';
@@ -61,6 +61,7 @@ export function beginTurn(s) {
   p.abilityUsed = {};
   p.usedCards = [];
   p.pick = null;
+  s.searches = {};
   s.pendingCrossroads = null;
 
   const cardId = drawFromDeck(s, 'crossroadsDeck', 'crossroadsDiscard');
@@ -106,6 +107,7 @@ export function colonyPhase(s) {
   s.phase = PHASES.COLONY;
   s.time = 'dusk';
 
+  for (const sv of aliveSurvivors(s)) unpack(s, sv.id);
   // 1. Food
   const need = foodNeeded(s);
   report.population = colonyPopulation(s);

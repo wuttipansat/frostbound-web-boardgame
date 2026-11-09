@@ -40,6 +40,7 @@ export function formatLog(e, state) {
     case 'crisisResolved': return t('log.crisisResolved', { ...p, result: t(e.success ? 'log.crisisOk' : 'log.crisisFail') });
     case 'infectionSpreads': return t('log.infectionSpreads', p);
     case 'lure': return t('log.lure', p);
+    case 'unpack': return t('log.unpack', { ...p, count: e.count });
     case 'hurt': return t('log.hurt', { ...p, n: e.n, hp: e.hp });
     case 'crossroadsChoice': return t('log.crossroadsChoice', { ...p, choice: crossChoice(e.cardId, e.choice) });
     case 'starvation': return t('log.starvation', { n: e.tokens });

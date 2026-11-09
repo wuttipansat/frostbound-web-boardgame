@@ -24,7 +24,7 @@ async function setup(p) {
     // one survivor each now
     for (const type of ['weapon', 'medicine', 'book', 'food', 'junk', 'tools']) for (const loc of Object.values(s.locations)) {
       const i = (loc.deck || []).findIndex((u) => window.__frostbound.itemType(s.cards[u]) === type);
-      if (i >= 0) { s.team.hand.push(loc.deck.splice(i, 1)[0]); break; }
+      if (i >= 0) { s.stockpile.push(loc.deck.splice(i, 1)[0]); break; }
     }
     a.loadState(s);
     window.__frostbound.stage.stop();

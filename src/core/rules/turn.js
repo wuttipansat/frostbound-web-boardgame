@@ -5,12 +5,12 @@ import { random } from '../rng.js';
 import { assert } from '../errors.js';
 import {
   survivorDef, gearOf, freeSurvivorSlots, freeZombieSlots, itemOf, scenarioDef, booksHeld, holdsBlueprint,
-  actionCost, killsPerAttack, apMax, fightPreview, leaveDamage, teamHasAbility,
+  actionCost, killsPerAttack, apMax, fightPreview, leaveDamage, holderOf, placeOfItem, packFree, searchSpawnChance, teamHasAbility,
 } from '../selectors.js';
 import {
   log, drawItems, discardCard, removeFromHand, addZombies, removeZombies,
   addBarricades, creditKills, healSurvivor, changeFood, changeMorale, recruitSurvivor,
-  spendEnergy, gainEnergy, healHp, damageSurvivor,
+  spendEnergy, gainEnergy, healHp, damageSurvivor, unpack,
 } from './helpers.js';
 import { endTurn } from './flow.js';
 import { isPermanent, gearSlot } from '../../content/items.js';
@@ -44,9 +44,20 @@ function pay(s, survivorId, kind, to = null) {
   spendEnergy(s, actionCost(s, survivorId, kind, to), survivorId);
 }
 
-function requireCard(s, p, uid) {
-  assert(p.hand.includes(uid), 'cardNotInHand', uid);
+/** An item in the stockpile or a backpack. */
+function requireCard(s, _p, uid) {
+  assert(holderOf(s, uid), 'cardNotInHand', uid);
   return itemOf(s, uid);
+}
+
+/** An item that is at the colony (stockpile or a backpack there): only those count for crises and goals. */
+function requireHome(s, uid) {
+  assert(placeOfItem(s, uid) === 'colony', 'notHome');
+}
+
+/** The item must be where the survivor is. */
+function requireSamePlace(s, uid, survivorId) {
+  assert(placeOfItem(s, uid) === s.survivors[survivorId].location, 'notHere');
 }
 
 function ability(survivorId) {
@@ -79,13 +90,19 @@ export function search(s, { survivorId }) {
   const sv = requireActive(s, survivorId);
   assert(sv.location !== 'colony', 'cannotSearchColony');
   assert(s.locations[sv.location].deck.length > 0, 'deckEmpty');
-  pay(s, survivorId, 'search');
   const a = ability(survivorId);
-  const n = a.type === 'doubleSearch' && a.location === sv.location ? 2 : 1;
+  const n = Math.min(packFree(s, survivorId), a.type === 'doubleSearch' && a.location === sv.location ? 2 : 1);
+  assert(n > 0, 'packFull');
+  const chance = searchSpawnChance(s, sv.location);
+  pay(s, survivorId, 'search');
   // A blueprint for this place: draw one extra, then put one back (returnCard).
   const blueprint = holdsBlueprint(s, survivorId, sv.location);
-  const drawn = drawItems(s, sv.location, blueprint ? n + 1 : n);
-  log(s, 'search', { survivorId, locationId: sv.location, count: drawn.length });
+  const drawn = drawItems(s, sv.location, blueprint ? n + 1 : n, survivorId);
+  s.searches[sv.location] = (s.searches[sv.location] ?? 0) + 1;
+  // The noise may make a zombie appear (it does not bite at once).
+  const spawned = random(s) < chance;
+  log(s, 'search', { survivorId, locationId: sv.location, count: drawn.length, spawned });
+  if (spawned) addZombies(s, sv.location, 1, 'search');
   if (blueprint && drawn.length > n) p.pick = { locationId: sv.location, uids: drawn };
   return drawn;
 }
@@ -130,7 +147,7 @@ export function move(s, { survivorId, toLocation, fuelCardUid }) {
   assert(LOCATION_IDS.includes(toLocation), 'noSuchLocation', toLocation);
   assert(toLocation !== sv.location, 'sameLocation');
   assert(freeSurvivorSlots(s, toLocation) > 0, 'locationFull');
-  if (fuelCardUid) assert(requireCard(s, p, fuelCardUid).type === 'fuel', 'needFuel');
+  if (fuelCardUid) { assert(requireCard(s, p, fuelCardUid).type === 'fuel', 'needFuel'); requireSamePlace(s, fuelCardUid, survivorId); }
   pay(s, survivorId, 'move', toLocation);
   let safe = s.locations[toLocation].zombies === 0;
   if (fuelCardUid) {
@@ -143,6 +160,7 @@ export function move(s, { survivorId, toLocation, fuelCardUid }) {
   sv.moved = true;
   log(s, 'move', { survivorId, from, to: toLocation, safe });
   damageSurvivor(s, survivorId, bite, 'escape');
+  unpack(s, survivorId);
 }
 
 // ---------------------------------------------------------------- gear
@@ -153,11 +171,14 @@ export function equip(s, { cardUid, survivorId = null }) {
   const item = requireCard(s, p, cardUid);
   const slot = gearSlot(item);
   assert(slot, 'notGear');
-  const sv = requireSurvivor(s, survivorId ?? p.survivors.find((id) => s.survivors[id]?.alive));
+  const holder = holderOf(s, cardUid);
+  const sv = requireSurvivor(s, survivorId ?? (holder !== 'stockpile' ? holder : p.survivors.find((id) => s.survivors[id]?.alive && s.survivors[id].location === 'colony')) ?? '');
+  requireSamePlace(s, cardUid, sv.id);
   sv.gear = sv.gear ?? { weapon: null, armor: null, book: null };
   const old = sv.gear[slot];
   removeFromHand(s, cardUid);
-  if (old) p.hand.push(old);
+  // The old item goes where the new one came from.
+  if (old) (holder === 'stockpile' ? s.stockpile : s.survivors[holder].pack).push(old);
   sv.gear[slot] = cardUid;
   if (item.gun) sv.ammo = (sv.ammo ?? 0) + item.gun.ammo; // a gun comes loaded
   log(s, 'equip', { survivorId: sv.id, card: s.cards[cardUid], slot });
@@ -177,12 +198,14 @@ export function playCard(s, { cardUid, targetSurvivorId }) {
   const spend = () => { if (!isPermanent(item)) discardCard(s, cardUid); };
   switch (item.type) {
     case 'food':
+      requireHome(s, cardUid);
       spend();
       changeFood(s, item.value, 'played');
       break;
     case 'medicine': {
       const sv = requireSurvivor(s, targetSurvivorId);
       assert(sv.wounds > 0 || sv.frostbite, 'notWounded');
+      requireSamePlace(s, cardUid, sv.id);
       spend();
       for (let i = 0; i < item.value; i++) healSurvivor(s, sv.id);
       break;
@@ -190,12 +213,15 @@ export function playCard(s, { cardUid, targetSurvivorId }) {
     case 'tools': {
       const sv = requireSurvivor(s, targetSurvivorId);
       assert(freeZombieSlots(s, sv.location) > 0, 'noBarricadeSpace');
+      requireSamePlace(s, cardUid, sv.id);
       spend();
       addBarricades(s, sv.location, item.value);
       break;
     }
     case 'junk': {
-      const sv = requireSurvivor(s, targetSurvivorId ?? p.survivors.find((id) => s.survivors[id]?.alive));
+      const h = holderOf(s, cardUid);
+      const sv = requireSurvivor(s, targetSurvivorId ?? (h !== 'stockpile' ? h : p.survivors.find((id) => s.survivors[id]?.alive && s.survivors[id].location === 'colony')) ?? '');
+      requireSamePlace(s, cardUid, sv.id);
       assert(sv.ap < apMax(s, sv.id), 'energyFull');
       spend();
       gainEnergy(s, ENERGY.JUNK * item.value * (teamHasAbility(s, 'haggler') ? 2 : 1), sv.id);
@@ -220,6 +246,7 @@ export function playCard(s, { cardUid, targetSurvivorId }) {
 export function contribute(s, { cardUid }) {
   const p = requireTurn(s);
   requireCard(s, p, cardUid);
+  requireHome(s, cardUid);
   assert(s.crisis, 'noCrisis');
   removeFromHand(s, cardUid);
   s.crisis.contributions.push(cardUid);
@@ -231,8 +258,8 @@ export function deposit(s, { cardUid }) {
   const p = requireTurn(s);
   const goal = scenarioDef(s).goal;
   assert(goal.type === 'deposit', 'scenarioHasNoDeposit');
-  assert(p.survivors.some((id) => s.survivors[id]?.alive && s.survivors[id].location === 'colony'), 'mustBeInColony');
   assert(requireCard(s, p, cardUid).type === goal.item, 'wrongItemType');
+  requireHome(s, cardUid);
   removeFromHand(s, cardUid);
   s.scenario.deposited += 1;
   log(s, 'deposit', { card: s.cards[cardUid], total: s.scenario.deposited });
@@ -249,6 +276,29 @@ export function useAbility(s, { survivorId, targetSurvivorId }) {
   assert(target.wounds > 0 || target.frostbite, 'notWounded');
   p.abilityUsed[survivorId] = true;
   healSurvivor(s, targetSurvivorId);
+}
+
+/**
+ * Hand an item over (free) to a survivor at the same place: from a backpack or, at the colony, from the stockpile.
+ * toSurvivorId null = put it in the stockpile (at the colony).
+ */
+export function give(s, { cardUid, toSurvivorId = null }) {
+  const p = requireTurn(s);
+  requireCard(s, p, cardUid);
+  const from = holderOf(s, cardUid);
+  if (!toSurvivorId) {
+    assert(from !== 'stockpile' && placeOfItem(s, cardUid) === 'colony', 'notHome');
+    removeFromHand(s, cardUid);
+    s.stockpile.push(cardUid);
+    return;
+  }
+  const to = requireSurvivor(s, toSurvivorId);
+  assert(from !== toSurvivorId, 'sameHolder');
+  requireSamePlace(s, cardUid, toSurvivorId);
+  assert(packFree(s, toSurvivorId) > 0, 'packFull');
+  removeFromHand(s, cardUid);
+  to.pack.push(cardUid);
+  log(s, 'give', { survivorId: from === 'stockpile' ? toSurvivorId : from, card: s.cards[cardUid], to: toSurvivorId });
 }
 
 // ---------------------------------------------------------------- rest

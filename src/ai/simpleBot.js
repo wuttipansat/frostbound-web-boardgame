@@ -1,3 +1,4 @@
+import { tryReduce } from '../core/reducer.js';
 // A simple rule-based bot that plays the solo team. Pure: returns an action, never mutates state.
 // Used for the next-move hint, headless simulation tests and balance runs.
 // opts.random: () => number in [0,1). When opts.chaos > 0, the bot picks randomly among
@@ -7,7 +8,7 @@ import { PHASES, OUTSIDE_LOCATIONS, ENERGY, RULES } from '../core/constants.js';
 import { gearSlot } from '../content/items.js';
 import {
   aliveSurvivors, survivorDef, itemOf, crisisDef, scenarioDef,
-  freeSurvivorSlots, freeZombieSlots, foodNeeded, actionCost, fightPreview, spawnForecast, crisisRequirement, gearOf,
+  freeSurvivorSlots, freeZombieSlots, foodNeeded, actionCost, fightPreview, placeOfItem, packFree, spawnForecast, crisisRequirement, gearOf,
 } from '../core/selectors.js';
 import { CROSSROADS_BY_ID } from '../content/crossroads.js';
 
@@ -60,7 +61,8 @@ function turnAction(s, p, opts) {
   const candidates = [];
   const survivors = aliveSurvivors(s);
   const crisis = crisisDef(s);
-  const cardsOf = (type) => p.hand.filter((u) => itemOf(s, u).type === type);
+  const items = [...s.stockpile, ...survivors.flatMap((sv) => sv.pack ?? [])];
+  const cardsOf = (type) => items.filter((u) => itemOf(s, u).type === type);
 
   // Blueprint search: put back the weakest card (lowest tier, then lowest value).
   if (p.pick) {
@@ -102,11 +104,12 @@ function turnAction(s, p, opts) {
   }
 
   // Gear: wear what you find (an empty slot, or a better tier).
-  for (const uid of p.hand) {
+  for (const uid of items) {
     const item = itemOf(s, uid);
     const slot = gearSlot(item);
     if (!slot) continue;
-    const who = survivors.find((sv) => { const w = gearOf(s, sv.id)[slot]; return !w || item.tier > w.tier; });
+    const at = placeOfItem(s, uid);
+    const who = survivors.find((sv) => { const w = gearOf(s, sv.id)[slot]; return sv.location === at && (!w || item.tier > w.tier); });
     if (who) { candidates.unshift(act.equip(uid, who.id)); break; }
   }
 
@@ -115,7 +118,7 @@ function turnAction(s, p, opts) {
   if (recruit && s.food >= foodNeeded(s)) candidates.push(act.playCard(recruit));
 
   energyActions(s, p, survivors, candidates, cardsOf, opts);
-  return pickOne(candidates, opts) ?? act.endTurn();
+  return pickOne(candidates.filter((c) => tryReduce(s, c).ok), opts) ?? act.endTurn();
 }
 
 /**
@@ -157,7 +160,7 @@ function energyActions(s, p, survivors, candidates, cardsOf, opts) {
   for (const sv of survivors) {
     const loc = s.locations[sv.location];
     const bringHome = carrying >= 2 || (carrying >= 1 && lateRound);
-    if (sv.location !== 'colony' && (sv.wounds >= 2 || !loc.deck.length || bringHome) && can(sv, 'move', 'colony')) {
+    if (sv.location !== 'colony' && (sv.wounds >= 2 || !loc.deck.length || bringHome || packFree(s, sv.id) === 0 || sv.hp < 40) && can(sv, 'move', 'colony')) {
       candidates.push(act.move(sv.id, 'colony', s.locations.colony.zombies ? cardsOf('fuel')[0] : undefined));
     } else if (goal.type === 'kills' && sv.wounds < 2) {
       // Hunting: go where the dead are thickest (a weapon makes it safe and cheap).

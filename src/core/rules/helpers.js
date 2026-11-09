@@ -30,22 +30,34 @@ export function changeFood(s, delta, reason) {
 // ---------------------------------------------------------------- cards
 
 /** Draw up to n cards from a location deck into the hand. Returns drawn uids. */
-export function drawItems(s, locationId, n) {
+/** Draw items from a location deck into a survivor's backpack (or the stockpile when no survivor is given). */
+export function drawItems(s, locationId, n, survivorId = null) {
   const deck = s.locations[locationId]?.deck;
   const drawn = [];
   if (!deck) return drawn;
   for (let i = 0; i < n && deck.length; i++) drawn.push(deck.pop());
-  s.team.hand.push(...drawn);
+  (survivorId ? s.survivors[survivorId].pack : s.stockpile).push(...drawn);
   if (drawn.length) log(s, 'draw', { locationId, count: drawn.length });
   return drawn;
 }
 
+/** Take an item out of the stockpile or whichever backpack holds it. */
 export function removeFromHand(s, uid) {
-  const hand = s.team.hand;
-  const i = hand.indexOf(uid);
-  if (i === -1) return false;
-  hand.splice(i, 1);
-  return true;
+  const lists = [s.stockpile, ...Object.values(s.survivors).map((sv) => sv.pack ?? [])];
+  for (const list of lists) {
+    const i = list.indexOf(uid);
+    if (i !== -1) { list.splice(i, 1); return true; }
+  }
+  return false;
+}
+
+/** A survivor at the colony empties their backpack into the stockpile. */
+export function unpack(s, survivorId) {
+  const sv = s.survivors[survivorId];
+  if (!sv?.alive || sv.location !== 'colony' || !sv.pack?.length) return;
+  log(s, 'unpack', { survivorId, count: sv.pack.length });
+  s.stockpile.push(...sv.pack);
+  sv.pack = [];
 }
 
 /** A card used up is gone. */
@@ -62,7 +74,9 @@ export function killSurvivor(s, survivorId, cause) {
   sv.deathCause = cause;
   const t = s.team;
   // Their gear goes back to the team's hand.
-  for (const uid of Object.values(sv.gear ?? {})) if (uid) t.hand.push(uid);
+  // Gear and backpack: home if they die at the colony, lost out there.
+  if (sv.location === 'colony') for (const uid of [...Object.values(sv.gear ?? {}), ...(sv.pack ?? [])]) if (uid) s.stockpile.push(uid);
+  sv.pack = [];
   sv.gear = { weapon: null, armor: null, book: null };
   t.survivors = t.survivors.filter((id) => id !== survivorId);
   t.fallen.push(survivorId);
@@ -83,7 +97,7 @@ export function recruitSurvivor(s) {
 }
 
 export function newSurvivor(id, location) {
-  return { id, location, wounds: 0, frostbite: false, alive: true, moved: false, acted: false, ap: 0, hp: RULES.HP_MAX, ammo: 0, rest: 'sleep', napped: false, gear: { weapon: null, armor: null, book: null } };
+  return { id, location, wounds: 0, frostbite: false, alive: true, moved: false, acted: false, ap: 0, hp: RULES.HP_MAX, ammo: 0, pack: [], rest: 'sleep', napped: false, gear: { weapon: null, armor: null, book: null } };
 }
 
 export function woundSurvivor(s, survivorId, cause = 'wound') {

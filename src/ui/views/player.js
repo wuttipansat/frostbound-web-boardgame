@@ -4,9 +4,9 @@ import { h, mount } from '../dom.js';
 import { icon, heart } from '../icons.js';
 import { t, c, getLang } from '../../i18n/index.js';
 import { flashTip } from '../tooltip.js';
-import { aliveSurvivors, survivorDef, itemOf, woundLimit, apMax, sleepPlan, atkOf, gearOf, actionCost, killsPerAttack, heroOf } from '../../core/selectors.js';
+import { aliveSurvivors, survivorDef, itemOf, woundLimit, holderOf, apMax, sleepPlan, atkOf, gearOf, actionCost, killsPerAttack, heroOf } from '../../core/selectors.js';
 import {
-  cardOptions, endTurnOption, cardNeeds, cardTargets, shouldConfirmEndTurn, cardUsable, actingSurvivors,
+  cardOptions, endTurnOption, cardNeeds, cardTargets, giveTargets, allItems, shouldConfirmEndTurn, cardUsable, actingSurvivors,
 } from '../options.js';
 import * as act from '../../core/actions.js';
 import { itemPlay, itemShort } from '../itemText.js';
@@ -40,6 +40,12 @@ function cardDetail(ctx, shown, uid) {
       h('div', { class: 'picker-row round-row' }, cardTargets(s, uid).map((tg) => roundTarget(art, tg.survivorId, tg.ok,
         `${survivorDef(tg.survivorId).name} — ${tg.ok ? t(...itemShort(item)) : t(`err.${tg.error}`)}`, () => go(tg.action)))));
   }
+  const gives = giveTargets(s, uid);
+  const holder = holderOf(s, uid);
+  const where = h('p', { class: 'cd-where' }, holder === 'stockpile' ? t('pack.stockpile') : holder ? t('pack.carried', { name: survivorDef(holder).name, place: c('locations', s.survivors[holder].location, 'name') }) : '');
+  const giveRow = gives.length ? h('div', { class: 'picker' }, h('h4', {}, t('act.give')),
+    h('div', { class: 'picker-row' }, gives.map((g) => h('button', { class: 'btn small-act', onclick: () => go(g.action, 'play') },
+      g.survivorId ? survivorDef(g.survivorId).name : t('pack.toStockpile'))))) : null;
   const flavour = [c('items', item.id, 'text'), isPermanent(item) ? t(`itemPlay.permanent.${item.type}`) : null].filter(Boolean).join(' — ');
   return h('div', { class: `card-detail panel t-${item.type} tier-${item.tier}`, role: 'dialog', 'aria-label': t('panel.cardDetail') },
     h('button', { class: 'close', 'aria-label': t('act.close'), onclick: close }, icon('close')),
@@ -51,7 +57,9 @@ function cardDetail(ctx, shown, uid) {
           h('span', { class: 'ic-tier', 'aria-label': t(`tier.${item.tier}`) }, Array.from({ length: item.tier }, () => h('i'))),
           isPermanent(item) ? icon('lock') : null))),
     h('p', { class: 'cd-rule' }, t(...itemPlay(item))),
+    where,
     picker,
+    giveRow,
     h('div', { class: 'cd-actions' }, opts.map((o) => h('button', {
       class: `btn small-act${o.id === 'play' || o.id === 'equip' ? ' primary' : ''}${o.ok ? '' : ' off'}`, 'aria-disabled': o.ok ? null : 'true',
       tip: o.ok ? t(`act.${o.id}`) : `${t(`act.${o.id}`)} — ${t(`err.${o.error}`)}`,
@@ -119,7 +127,7 @@ export function renderPlayerPanel(refs, ctx) {
     })));
 
   // ---- hand: a floating pile or a fan
-  const hand = shown.hand;
+  const hand = allItems(s);
   // Phones: an open location sheet takes the room, so the hand folds into its pile.
   const phoneLoc = window.innerWidth <= 760 && !!ui.selLoc;
   // A card picked by other means (keyboard, tutorial, a test) opens the fan while its sheet is up.

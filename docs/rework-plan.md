@@ -21,7 +21,7 @@ Numbers are starting values; Step 18 tunes them.
 | 4 | Several survivors: pick 2 of 6 at the start; recruit up to 6. Each survivor has location, HP, AP, ATK, gear, backpack. Remove "helpless". | **done** (AP, HP, ATK, backpack come in Steps 5–7) |
 | 5 | AP per survivor (max 60–95, odd numbers) and sleep. Night: bed 100% AP +15 HP, no bed 70% +5 HP, outside 40% +0 HP (and the zombies there attack). Guard duty (helps defend, 50% AP next day). Nap: +25 AP +5 HP, skips the day. | **done** (HP is tracked; zombie bites outside come in Step 6) |
 | 6 | HP 100 and fights. One attack = one zombie dead, costs 15 AP. HP lost = `max(0, zombie ferocity − (AP left + ATK)) ÷ 3` rounded up, minus armor. Walker ferocity 110, brute 150 (day 21+). Leaving a place with zombies: 5 HP per zombie. Guns: kill without losing HP, 10 AP + 1 ammo, a chance a new zombie appears (pistol 40%, shotgun 50% and kills 2, silenced rifle 15%). | **done** |
-| 7 | Expeditions: walking costs AP by distance (12 / 17 / 23), search 17 AP into the survivor's backpack (3 slots). Items count only once carried home (`s.stockpile`). A search may make a zombie appear (10–25% by place, +10% per extra search there that day; it appears, it does not bite at once). Hand items over for free at the same place. No player hand. | |
+| 7 | Expeditions: walking costs AP by distance (12 / 17 / 23), search 17 AP into the survivor's backpack (3 slots). Items count only once carried home (`s.stockpile`). A search may make a zombie appear (10–25% by place, +10% per extra search there that day; it appears, it does not bite at once). Hand items over for free at the same place. No player hand. | **done** |
 | 8 | Items: weapons (knife +6, crowbar +8, bat +10, bow +12 silent, fire axe +18, guns), armor (−2 / −3 / −5 HP per fight, snow suit), tools (flashlight, map, big backpack, sled, survival guide, tool kit), consumables (bandage +15 HP, first-aid kit +35 HP, painkillers, coffee +20 AP, chocolate, canned food, ammo, firebomb), materials (wood, scrap, cloth, tools, fuel, engine and heater parts). Loot tables per place. Crafting (needs the workshop). | |
 | 9 | New location capacity: remove the slot pedestals. One floating sign per place: name, 👤 2/4, 🧟 3/6 bar, search %, cards left. 6 zombies = the place is overrun (no searching, extra zombies walk to the base). | |
 | 10 | Food every day: everyone at the base eats 1. Missing food: −15 HP each, −1 morale, 50% AP next day. "Food for N days" on the HUD. | |
@@ -111,3 +111,16 @@ Numbers are starting values; Step 18 tunes them.
 - `fightPreview(s, id)` drives the attack button tooltip (HP to lose / noise %) and the bot. Tokens show an HP bar.
 - Wounds and medicine cards still work as before; Step 8 moves healing to HP items.
 - Balance (bot, 30 games): beacon 63% won, stores 73%, purge 67%.
+
+## Step 7 notes
+
+- No player hand: items are in the colony **stockpile** (`s.stockpile`) or a survivor's **backpack**
+  (`survivor.pack`, 3 slots). Searching puts items in the searcher's backpack; walking into the colony
+  (or being there at dusk) unpacks it. Crises, deposits and eating food only take items that are home.
+  Medicine, tools, junk, fuel and gear work where the item is (same place as the survivor).
+- `give(cardUid, toSurvivorId)` hands an item over for free at the same place (null = into the stockpile).
+- Walking costs by distance (`RING`): near 12 (grocery, school), mid 17 (gas, library), far 23 (police, hospital).
+- Search costs 17 AP. The chance a zombie appears: grocery / library 10%, school / gas 15%, hospital 20%,
+  police 25%, +10% for every earlier search there today (`searchSpawnChance`, shown on the search button).
+- A survivor who dies at the colony leaves gear and backpack in the stockpile; out there they are lost.
+- Balance (bot, 30 games): beacon 23% won, stores 27%, purge 43%.

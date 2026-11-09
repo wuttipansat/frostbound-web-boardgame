@@ -41,11 +41,17 @@ export function setSurvivors(s, placements) {
 
 let extraCard = 0;
 /** Put a brand-new card instance of itemId into the hand; returns [state, uid]. */
-export function giveCard(s, itemId) {
+/** Put a brand-new item where it can be used: the first survivor's backpack when they are out, else the stockpile. */
+export function giveCard(s, itemId, holder = undefined) {
   const c = structuredClone(s);
   const uid = `t${extraCard++}`;
   c.cards[uid] = itemId;
-  c.team.hand.push(uid);
+  if (holder === undefined) {
+    const first = c.team.survivors.map((id) => c.survivors[id]).find((sv) => sv?.alive);
+    holder = first && first.location !== 'colony' ? first.id : 'stockpile';
+  }
+  if (holder === 'stockpile') c.stockpile.push(uid);
+  else c.survivors[holder].pack.push(uid);
   return [c, uid];
 }
 
