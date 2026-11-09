@@ -6,10 +6,10 @@ import { CROSSROADS_BY_ID } from '../../content/crossroads.js';
 import { CRISES_BY_ID } from '../../content/crises.js';
 import {
   aliveSurvivors, foodNeeded, colonyPopulation, crisisRequirement, itemOf, scenarioDef, scenarioTarget,
-  focusSurvivor, teamHasAbility, energyMax, energyRegen, spawnForecast,
+  focusSurvivor, teamHasAbility, apMax, sleepPlan, spawnForecast,
 } from '../selectors.js';
 import {
-  log, changeMorale, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems,
+  log, changeMorale, healHp, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems,
 } from './helpers.js';
 import { applyEffects } from './effects.js';
 import { evaluate, focusFilterFor } from './conditions.js';
@@ -31,13 +31,12 @@ export function draftPick(s, { survivorIds }) {
 
 export function finishDraft(s) {
   const t = s.team;
-  for (const id of t.survivors) s.survivors[id] = newSurvivor(id, 'colony');
+  for (const id of t.survivors) { s.survivors[id] = newSurvivor(id, 'colony'); s.survivors[id].ap = apMax(s, id); }
   // Unpicked options go back into the survivor deck.
   s.survivorDeck.push(...t.draftOptions.filter((id) => !t.survivors.includes(id)));
   t.draftOptions = [];
   s.survivorDeck = shuffle(s, s.survivorDeck);
   log(s, 'draftDone', { survivorIds: t.survivors.slice() });
-  t.energy = energyMax(s); // the team starts full
   // A few scavenged items from random locations.
   for (let i = 0; i < RULES.STARTING_HAND; i++) {
     const stocked = OUTSIDE_LOCATIONS.filter((l) => s.locations[l].deck.length);
@@ -58,17 +57,10 @@ export function startRound(s) {
 
 export function beginTurn(s) {
   const p = s.team;
-  for (const sv of aliveSurvivors(s)) sv.moved = false;
+  for (const sv of aliveSurvivors(s)) { sv.moved = false; sv.acted = false; sv.napped = false; sv.rest = 'sleep'; }
   p.abilityUsed = {};
   p.usedCards = [];
   p.pick = null;
-  // Regain energy (carry-over stays, capped by the pool).
-  // The first turn of the game starts full, so it gets nothing extra.
-  const max = energyMax(s);
-  if (p.fresh) p.fresh = false;
-  else p.energy = Math.min(max, p.energy + energyRegen(s));
-  p.energy = Math.min(p.energy, max);
-  log(s, 'energy', { value: p.energy, max });
   s.pendingCrossroads = null;
 
   const cardId = drawFromDeck(s, 'crossroadsDeck', 'crossroadsDiscard');
@@ -146,6 +138,14 @@ export function colonyPhase(s) {
     if (sv.location === 'colony') sv.frostbite = false;
     else woundSurvivor(s, sv.id, 'frostbite');
   }
+
+  // 6. Sleep: bed 100% AP +15 HP, floor 70% +5, outside 40%, guard 50%.
+  report.sleep = sleepPlan(s);
+  for (const [id, r] of Object.entries(report.sleep)) {
+    s.survivors[id].ap = r.ap;
+    if (r.hp) healHp(s, id, r.hp);
+  }
+  log(s, 'sleep', { plan: report.sleep });
 
   s.reports.colony = report;
   if (s.morale <= 0) return endGame(s, 'moraleCollapse');

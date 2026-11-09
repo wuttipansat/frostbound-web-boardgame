@@ -13,7 +13,7 @@ const setupTurn = (opts = {}) => `(() => {
   s.survivors[sv].location = ${JSON.stringify(opts.loc ?? 'grocery')};
   s.survivors[sv].wounds = 1;
   s.locations[${JSON.stringify(opts.loc ?? 'grocery')}].zombies = 2;
-  s.team.energy = 80;
+  for (const id of s.team.survivors) s.survivors[id].ap = 80;
   for (const type of ['medicine', 'weapon', 'food', 'tools', 'junk', 'fuel', 'medicine', 'food']) for (const loc of Object.values(s.locations)) {
     const i = (loc.deck || []).findIndex((u) => window.__frostbound.itemType(s.cards[u]) === type);
     if (i >= 0) { s.team.hand.push(loc.deck.splice(i, 1)[0]); break; }

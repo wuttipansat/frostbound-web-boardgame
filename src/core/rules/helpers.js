@@ -6,7 +6,7 @@ import { assert } from '../errors.js';
 import { LOCATIONS } from '../../content/locations.js';
 
 import {
-  survivorDef, survivorsAt, woundLimit,
+  survivorDef, survivorsAt, woundLimit, apMax,
 } from '../selectors.js';
 
 export function log(s, key, params = {}) {
@@ -76,13 +76,14 @@ export function recruitSurvivor(s) {
   if (!s.survivorDeck.length || s.team.survivors.length >= RULES.TEAM_MAX) return false;
   const id = s.survivorDeck.pop();
   s.survivors[id] = newSurvivor(id, 'colony');
+  s.survivors[id].ap = apMax(s, id); // newcomers arrive rested
   s.team.survivors.push(id);
   log(s, 'recruit', { survivorId: id, location: 'colony' });
   return true;
 }
 
 export function newSurvivor(id, location) {
-  return { id, location, wounds: 0, frostbite: false, alive: true, moved: false, gear: { weapon: null, armor: null, book: null } };
+  return { id, location, wounds: 0, frostbite: false, alive: true, moved: false, acted: false, ap: 0, hp: RULES.HP_MAX, rest: 'sleep', napped: false, gear: { weapon: null, armor: null, book: null } };
 }
 
 export function woundSurvivor(s, survivorId, cause = 'wound') {
@@ -161,13 +162,21 @@ export function drawFromDeck(s, deckKey, discardKey) {
 
 // ---------------------------------------------------------------- energy
 
-export function spendEnergy(s, cost) {
-  const p = s.team;
-  assert(p.energy >= cost, 'notEnoughEnergy', `${p.energy} < ${cost}`);
-  p.energy -= cost;
+/** Pay AP from one survivor. */
+export function spendEnergy(s, cost, survivorId) {
+  const sv = s.survivors[survivorId];
+  assert(sv && sv.ap >= cost, 'notEnoughEnergy', `${sv?.ap} < ${cost}`);
+  sv.ap -= cost;
 }
 
-export function gainEnergy(s, n, max = Infinity) {
-  const p = s.team;
-  p.energy = Math.max(0, Math.min(max, (p.energy ?? 0) + n));
+/** Give (or take, n < 0) AP to one survivor, capped by their max. */
+export function gainEnergy(s, n, survivorId) {
+  const sv = s.survivors[survivorId];
+  if (!sv?.alive) return;
+  sv.ap = Math.max(0, Math.min(apMax(s, survivorId), (sv.ap ?? 0) + n));
+}
+
+export function healHp(s, survivorId, n) {
+  const sv = s.survivors[survivorId];
+  if (sv?.alive) sv.hp = Math.min(RULES.HP_MAX, (sv.hp ?? RULES.HP_MAX) + n);
 }

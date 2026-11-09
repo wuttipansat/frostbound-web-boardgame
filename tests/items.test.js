@@ -53,9 +53,9 @@ test('tier scales medicine, tools and junk; motor junk is wild in a crisis', () 
   assert.equal(healed.survivors['corwin-daly'].wounds, 0);
   assert.equal(healed.survivors['corwin-daly'].frostbite, false);
   assert.equal(reduce(s, a.playCard(set, { targetSurvivorId: 'corwin-daly' })).locations.police.barricades, 2);
-  const re = reduce(s, a.playCard(junk));
+  const re = reduce(s, a.playCard(junk, { targetSurvivorId: 'corwin-daly' }));
   assert.ok(!re.team.hand.includes(junk));
-  assert.equal(re.team.energy, 20 + 24, 'motor junk = 2 × 12 energy');
+  assert.equal(re.survivors['corwin-daly'].ap, 20 + 24, 'motor junk = 2 × 12 energy');
   assert.equal(ITEMS['motor-junk'].wild, true);
 });
 

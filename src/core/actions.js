@@ -15,6 +15,8 @@ export const A = Object.freeze({
   END_TURN: 'END_TURN',
   RETURN_CARD: 'RETURN_CARD',
   EQUIP: 'EQUIP',
+  NAP: 'NAP',
+  SET_REST: 'SET_REST',
 });
 
 export const draftPick = (survivorIds) => ({ type: A.DRAFT_PICK, survivorIds });
@@ -33,3 +35,7 @@ export const useAbility = (survivorId, targetSurvivorId) => ({ type: A.USE_ABILI
 export const endTurn = () => ({ type: A.END_TURN });
 /** Equip a weapon / armor / book from the hand on a survivor (free; the slot's old item returns to the hand). */
 export const equip = (cardUid, survivorId = null) => ({ type: A.EQUIP, cardUid, survivorId });
+/** Nap at the colony: +25 AP +5 HP, but that survivor does nothing else today. */
+export const nap = (survivorId) => ({ type: A.NAP, survivorId });
+/** Tonight's plan for a survivor: 'sleep' (default) or 'guard' (at the colony; helps defend, wakes at 50%). */
+export const setRest = (survivorId, mode) => ({ type: A.SET_REST, survivorId, mode });

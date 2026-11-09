@@ -23,11 +23,13 @@ export const RULES = Object.freeze({
   DRAFT_OPTIONS: 6,
   STARTING_HAND: 3,
   WOUNDS_TO_DIE: 3,
+  BEDS: 2,                // beds at the colony (the dorm adds more in Step 12)
+  HP_MAX: 100,
   MAX_LOG: 300,
 });
 
 // ---------------------------------------------------------------- energy (no dice, no danger deck)
-// Each survivor has a personal energy pool (survivor.energy = max, survivor.regen per turn); gear changes it.
+// Each survivor has their own AP (survivor.ap, max = the survivor's `energy`); sleep refills it at night.
 export const ENERGY = Object.freeze({
   MAX: 100,               // hard ceiling for any pool
   STARVING: 20,           // the colony is starving: regen this much less
@@ -43,6 +45,16 @@ export const ENERGY = Object.freeze({
   SKILLED: 5,             // roadRunner / sharpshooter / handy: that action costs this much less               // attacking with the killTwo ability
   CARD: 20,               // default size of an 'energy' effect (crossroads)
   JUNK: 12,               // a junk card (was a reroll) gives this much energy per value
+});
+// ---------------------------------------------------------------- sleep (night) and naps
+// Share of max AP refilled overnight, and HP healed. Guards stay awake (they help defend) and wake at 50%.
+export const REST = Object.freeze({
+  bed: Object.freeze({ ap: 1, hp: 15 }),
+  floor: Object.freeze({ ap: 0.7, hp: 5 }),
+  outside: Object.freeze({ ap: 0.4, hp: 0 }),
+  guard: Object.freeze({ ap: 0.5, hp: 0 }),
+  NAP_AP: 25,
+  NAP_HP: 5,
 });
 export const DANGEROUS_LOCATIONS = Object.freeze(['hospital', 'police']);
 

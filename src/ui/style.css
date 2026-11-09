@@ -928,6 +928,7 @@ body:not(.in-game) .sv-tokens, body.passing .sv-tokens { display: none; }
 .tok-frost { position: absolute; left: -4px; bottom: -2px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: #1b1d1e; color: var(--ice); box-shadow: 0 0 0 1px #000; }
 .tok-frost .icon { width: 12px; height: 12px; }
 .tok-ready { position: absolute; right: 0; top: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--good); border: 2px solid #1b1d1e; }
+.tok-ap { position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); font: 700 10px/1 var(--font, sans-serif); padding: 1px 4px; border-radius: 6px; background: #1b1d1e; color: #f2b33d; pointer-events: none; }
 .tok-card { position: absolute; left: 0; bottom: calc(100% + 14px); width: 250px; padding: 10px 12px; display: none; flex-direction: column; gap: 4px; text-align: left;
   background: var(--panel-solid); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); color: var(--text); font-size: 12px; pointer-events: none; z-index: 5; }
 .sv-token:hover .tok-card, .sv-token:focus .tok-card { display: flex; }

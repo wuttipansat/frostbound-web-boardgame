@@ -36,7 +36,7 @@ export function botAction(s, opts = {}) {
   switch (s.phase) {
     case PHASES.DRAFT: {
       // Best skills (low attack / search costs) and a big energy pool.
-      const rank = (id) => { const d = survivorDef(id); return d.attack + d.search - (d.energy + d.regen) / 25; };
+      const rank = (id) => { const d = survivorDef(id); return d.attack + d.search - d.energy / 25; };
       const ranked = p.draftOptions.slice().sort((a, b) => rank(a) - rank(b));
       const n = RULES.TEAM_START;
       const picks = opts.chaos && opts.random() < opts.chaos ? ranked.slice(-n) : ranked.slice(0, n);
@@ -123,7 +123,7 @@ function turnAction(s, p, opts) {
  * colony against the forecast, then walk (to empty places when possible, home when hurt).
  */
 function energyActions(s, p, survivors, candidates, cardsOf, opts) {
-  const can = (sv, kind, to) => p.energy >= actionCost(s, sv.id, kind, to);
+  const can = (sv, kind, to) => !sv.napped && sv.ap >= actionCost(s, sv.id, kind, to);
   const forecast = spawnForecast(s);
 
   for (const sv of survivors) {
@@ -156,7 +156,7 @@ function energyActions(s, p, survivors, candidates, cardsOf, opts) {
     } else if (goal.type === 'kills' && sv.wounds < 2) {
       // Hunting: go where the dead are thickest (a weapon makes it safe and cheap).
       const prey = OUTSIDE_LOCATIONS.concat(['colony']).filter((l) => l !== sv.location && s.locations[l].zombies >= 2
-        && freeSurvivorSlots(s, l) > 0 && p.energy >= actionCost(s, sv.id, 'move', l) + actionCost(s, sv.id, 'attack'))
+        && freeSurvivorSlots(s, l) > 0 && sv.ap >= actionCost(s, sv.id, 'move', l) + actionCost(s, sv.id, 'attack'))
         .sort((a, b) => s.locations[b].zombies - s.locations[a].zombies)[0];
       if (prey && loc.zombies === 0) candidates.push(act.move(sv.id, prey));
       else if (sv.location === 'colony') pushOut(sv);
@@ -175,10 +175,17 @@ function energyActions(s, p, survivors, candidates, cardsOf, opts) {
       const def = survivorDef(sv.id);
       const preferred = def.ability.type === 'doubleSearch' && options.includes(def.ability.location) ? def.ability.location : options[0];
       // Leave enough energy to search when we get there.
-      if (preferred && p.energy >= actionCost(s, sv.id, 'move', preferred) + ENERGY.SEARCH_BASE + ENERGY.PER_SKILL * def.search) candidates.push(act.move(sv.id, preferred));
+      if (preferred && !sv.napped && sv.ap >= actionCost(s, sv.id, 'move', preferred) + ENERGY.SEARCH_BASE + ENERGY.PER_SKILL * def.search) candidates.push(act.move(sv.id, preferred));
     }
   }
   // 6. Junk is energy now.
   const junk = cardsOf('junk')[0];
-  if (junk && p.energy < 30) candidates.push(act.playCard(junk));
+  const tired = survivors.slice().sort((a, b) => a.ap - b.ap)[0];
+  if (junk && tired && tired.ap < 30) candidates.push(act.playCard(junk, { targetSurvivorId: tired.id }));
+  // 7. Rest: a worn-out survivor at home naps before doing anything; one spent survivor guards when zombies are due.
+  for (const sv of survivors) {
+    if (sv.location === 'colony' && !sv.acted && !sv.moved && !sv.napped && sv.ap < 30) candidates.push(act.nap(sv.id));
+  }
+  const guard = survivors.find((sv) => sv.location === 'colony' && sv.ap < 15 && sv.rest !== 'guard');
+  if (guard && (forecast.colony ?? 0) > 0 && !survivors.some((sv) => sv.rest === 'guard')) candidates.push(act.setRest(guard.id, 'guard'));
 }

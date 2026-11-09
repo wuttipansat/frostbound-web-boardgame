@@ -77,8 +77,6 @@ export function createGame(config = {}) {
     draftOptions: survivorPool.splice(0, RULES.DRAFT_OPTIONS),
     drafted: false,
     hand: [],
-    energy: 0,       // the survivor's energy (set when the draft ends)
-    fresh: true,     // the first turn starts full
     kills: 0,
     abilityUsed: {},
     usedCards: [],

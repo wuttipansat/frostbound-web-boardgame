@@ -1,3 +1,4 @@
+import { apMax } from '../src/core/selectors.js';
 // Test utilities: build solo games and surgically patch plain-object state.
 import { createGame } from '../src/core/state.js';
 import { reduce } from '../src/core/reducer.js';
@@ -32,6 +33,7 @@ export function setSurvivors(s, placements) {
   p.survivors = [];
   for (const [id, location] of Object.entries(placements)) {
     c.survivors[id] = newSurvivor(id, location);
+    c.survivors[id].ap = apMax(c, id);
     p.survivors.push(id);
   }
   return c;
@@ -49,7 +51,7 @@ export function giveCard(s, itemId) {
 
 export function setEnergy(s, n) {
   const c = structuredClone(s);
-  c.team.energy = n;
+  for (const id of c.team.survivors) if (c.survivors[id]?.alive) c.survivors[id].ap = n;
   return c;
 }
 

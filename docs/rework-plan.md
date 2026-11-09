@@ -19,7 +19,7 @@ Numbers are starting values; Step 18 tunes them.
 | 2 | Remove waste and the danger deck. Item art becomes empty frames (name + type colour); `public/items/<item-id>.png` is used when it exists (`docs/item-art.md` lists the files, 128×128, transparent). | **done** |
 | 3 | Rounds → days (`s.day` 1–40), parts of the day, calendar on the HUD, light follows the time of day. | **done** |
 | 4 | Several survivors: pick 2 of 6 at the start; recruit up to 6. Each survivor has location, HP, AP, ATK, gear, backpack. Remove "helpless". | **done** (AP, HP, ATK, backpack come in Steps 5–7) |
-| 5 | AP per survivor (max 60–95, odd numbers) and sleep. Night: bed 100% AP +15 HP, no bed 70% +5 HP, outside 40% +0 HP (and the zombies there attack). Guard duty (helps defend, 50% AP next day). Nap: +25 AP +5 HP, skips the day. | |
+| 5 | AP per survivor (max 60–95, odd numbers) and sleep. Night: bed 100% AP +15 HP, no bed 70% +5 HP, outside 40% +0 HP (and the zombies there attack). Guard duty (helps defend, 50% AP next day). Nap: +25 AP +5 HP, skips the day. | **done** (HP is tracked; zombie bites outside come in Step 6) |
 | 6 | HP 100 and fights. One attack = one zombie dead, costs 15 AP. HP lost = `max(0, zombie ferocity − (AP left + ATK)) ÷ 3` rounded up, minus armor. Walker ferocity 110, brute 150 (day 21+). Leaving a place with zombies: 5 HP per zombie. Guns: kill without losing HP, 10 AP + 1 ammo, a chance a new zombie appears (pistol 40%, shotgun 50% and kills 2, silenced rifle 15%). | |
 | 7 | Expeditions: walking costs AP by distance (12 / 17 / 23), search 17 AP into the survivor's backpack (3 slots). Items count only once carried home (`s.stockpile`). A search may make a zombie appear (10–25% by place, +10% per extra search there that day; it appears, it does not bite at once). Hand items over for free at the same place. No player hand. | |
 | 8 | Items: weapons (knife +6, crowbar +8, bat +10, bow +12 silent, fire axe +18, guns), armor (−2 / −3 / −5 HP per fight, snow suit), tools (flashlight, map, big backpack, sled, survival guide, tool kit), consumables (bandage +15 HP, first-aid kit +35 HP, painkillers, coffee +20 AP, chocolate, canned food, ammo, firebomb), materials (wood, scrap, cloth, tools, fuel, engine and heater parts). Loot tables per place. Crafting (needs the workshop). | |
@@ -84,3 +84,18 @@ Numbers are starting values; Step 18 tunes them.
   drops their gear back into the hand.
 - The energy pool is still shared by the team (the lead survivor's pool) until Step 5 gives each survivor AP.
 - HUD: a Team counter (n/6) replaces Helpless; the draft screen shows 6 cards and asks for 2.
+
+## Step 5 notes
+
+- Each survivor has their own AP (`survivor.ap`, max = the survivor's `energy`: odd numbers 69–95, −20 with 2+ wounds).
+  No more shared team pool or per-turn regen. Actions spend the acting survivor's AP.
+- Night (after the zombies arrive): **bed** 100% of max AP +15 HP, **floor** 70% +5 HP (the colony has
+  `RULES.BEDS` = 2 beds, given to the most tired first; the dorm adds more in Step 12), **outside** 40%,
+  **guard** 50%. Dot +15, a survival guide +value, starving −20. AP carries over, capped at the max.
+- **Guard duty** (`setRest(id, 'guard')`, at the colony): each guard stops one colony zombie tonight.
+- **Nap** (`nap(id)`, at the colony, before acting): +25 AP +5 HP, no more actions for that survivor today.
+- `survivor.hp` (100) exists and is healed by sleep and naps; fights start using it in Step 6.
+- Junk cards and crossroads `energy` give AP to a chosen survivor / everyone.
+- UI: AP on each token, the meter shows the selected survivor and tonight's sleep, nap and guard buttons.
+- Balance (bot, 30 games): beacon 80% won, stores 90%, purge 90% — far too easy now that every survivor has a
+  full pool; HP fights (Step 6), food (Step 10) and night attacks (Step 14) bring the danger back.

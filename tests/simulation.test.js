@@ -33,7 +33,8 @@ function checkInvariants(s) {
   for (const sv of Object.values(s.survivors)) {
     assert.equal(owned.includes(sv.id), sv.alive, `${sv.id} team membership matches alive`);
   }
-  assert.ok(s.team.energy >= 0 && s.team.energy <= 100, 'energy in range');
+  for (const id of owned) assert.ok(s.survivors[id].ap >= 0 && s.survivors[id].ap <= 100, 'AP in range');
+  for (const id of owned) assert.ok(s.survivors[id].hp > 0 && s.survivors[id].hp <= 100, 'HP in range');
   if (s.phase === 'crossroads') assert.ok(s.pendingCrossroads);
   assert.notEqual(s.phase, 'colony', 'colony phase never leaks between actions');
 }

@@ -32,6 +32,10 @@ export function survivorOptions(state, survivorId, { lureTo = null } = {}) {
     const action = act.useAbility(survivorId, target?.id ?? survivorId);
     out.push({ id: 'ability', cost: 0, ...(target ? check(state, action) : { action, ok: false, error: 'notWounded' }) });
   }
+  // Rest: a nap now (skips the day), or tonight's guard duty (toggle).
+  out.push({ id: 'nap', cost: null, ...check(state, act.nap(survivorId)) });
+  out.push({ id: sv.rest === 'guard' ? 'unguard' : 'guard', cost: null,
+    ...check(state, act.setRest(survivorId, sv.rest === 'guard' ? 'sleep' : 'guard')) });
   return out;
 }
 
@@ -111,7 +115,7 @@ export function actingSurvivors(state) {
     const sv = state.survivors[id];
     if (!sv?.alive) return false;
     if (Object.values(moveTargets(state, id)).includes('ok')) return true;
-    return survivorOptions(state, id).some((o) => o.ok);
+    return survivorOptions(state, id).some((o) => o.ok && !['nap', 'guard', 'unguard'].includes(o.id));
   });
 }
 

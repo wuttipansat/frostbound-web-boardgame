@@ -4,7 +4,7 @@ import { LOCATIONS } from '../content/locations.js';
 import { ITEMS } from '../content/items.js';
 import { SCENARIOS_BY_ID } from '../content/scenarios.js';
 import { CRISES_BY_ID } from '../content/crises.js';
-import { RULES, ENERGY, DANGEROUS_LOCATIONS, OUTSIDE_LOCATIONS } from './constants.js';
+import { RULES, ENERGY, REST, DANGEROUS_LOCATIONS, OUTSIDE_LOCATIONS } from './constants.js';
 
 export const survivorDef = (id) => SURVIVORS_BY_ID[id];
 export const itemOf = (s, uid) => ITEMS[s.cards[uid]];
@@ -150,28 +150,46 @@ export function killsPerAttack(s, survivorId) {
   return Math.max(1, weapon?.value ?? 1) + (survivorDef(survivorId)?.ability.type === 'killTwo' ? 1 : 0);
 }
 
-/** The team's lead survivor (the one whose energy pool the team uses for now). */
+/** The team's lead survivor (first alive). */
 export const heroOf = (s) => aliveSurvivors(s)[0] ?? null;
 
-/** Energy cap: the survivor's own pool, lower while badly hurt (2+ wounds). */
-export function energyMax(s) {
-  const sv = heroOf(s);
+/** A survivor's AP max: their own pool, lower while badly hurt (2+ wounds). */
+export function apMax(s, survivorId) {
+  const sv = s.survivors[survivorId];
   if (!sv) return 0;
-  const base = survivorDef(sv.id).energy ?? ENERGY.MAX;
+  const base = survivorDef(survivorId).energy ?? ENERGY.MAX;
   return Math.max(10, Math.min(ENERGY.MAX, base - (sv.wounds >= 2 ? ENERGY.HURT : 0)));
 }
 
-/** Energy regained at the start of a turn: the survivor's regen, Dot +15, a survival guide, starvation. */
-export function energyRegen(s) {
-  const sv = heroOf(s);
-  if (!sv) return 0;
-  const def = survivorDef(sv.id);
-  let n = def.regen ?? 65;
-  if (def.ability.type === 'extraDie') n += 15;
-  for (const o of aliveSurvivors(s)) { const b = gearOf(s, o.id).book; if (b?.passive === 'regenPlus') n += b.value; }
-  if (s.starvation > 0) n -= ENERGY.STARVING;
-  return Math.max(0, n);
+/** A survivor's AP now. */
+export const apOf = (s, survivorId) => s.survivors[survivorId]?.ap ?? 0;
+
+/**
+ * Tonight's sleep for every alive survivor: { [id]: { kind, ap, hp } } where kind is
+ * bed / floor (colony, no bed left) / outside / guard; ap is the AP they will wake with.
+ * Beds go to the most tired first. Dot +15, a survival guide (+value), starving −20.
+ */
+export function sleepPlan(s) {
+  const out = {};
+  const alive = aliveSurvivors(s);
+  const home = alive.filter((sv) => sv.location === 'colony' && sv.rest !== 'guard')
+    .sort((a, b) => apOf(s, a.id) / apMax(s, a.id) - apOf(s, b.id) / apMax(s, b.id) || a.id.localeCompare(b.id));
+  const beds = new Set(home.slice(0, RULES.BEDS).map((sv) => sv.id));
+  let bonus = 0;
+  for (const o of alive) { const b = gearOf(s, o.id).book; if (b?.passive === 'regenPlus') bonus += b.value; }
+  if (s.starvation > 0) bonus -= ENERGY.STARVING;
+  for (const sv of alive) {
+    const kind = sv.location !== 'colony' ? 'outside' : sv.rest === 'guard' ? 'guard' : beds.has(sv.id) ? 'bed' : 'floor';
+    const max = apMax(s, sv.id);
+    const extra = bonus + (survivorDef(sv.id).ability.type === 'extraDie' ? 15 : 0);
+    const ap = Math.max(0, Math.min(max, apOf(s, sv.id) + Math.round(max * REST[kind].ap) + extra));
+    out[sv.id] = { kind, ap, hp: REST[kind].hp };
+  }
+  return out;
 }
+
+/** Guards on duty at the colony tonight. */
+export const guardsOnDuty = (s) => aliveSurvivors(s).filter((sv) => sv.location === 'colony' && sv.rest === 'guard').length;
 
 /** Zombies each location would get if the round ended now (same formula as the colony phase). */
 export function spawnForecast(s) {
@@ -183,7 +201,7 @@ export function spawnForecast(s) {
     const n = Math.max(0, Math.ceil(here.length / 2) - quiet);
     if (n) out[loc] = n;
   }
-  const n = Math.ceil(survivorsAt(s, 'colony').length / 3);
+  const n = Math.max(0, Math.ceil(survivorsAt(s, 'colony').length / 3) - guardsOnDuty(s));
   if (n) out.colony = n;
   return out;
 }

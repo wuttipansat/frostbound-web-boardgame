@@ -3,7 +3,7 @@
 import { ENERGY } from '../constants.js';
 import { OUTSIDE_LOCATIONS } from '../constants.js';
 import { pick } from '../rng.js';
-import { itemOf, focusSurvivor, energyMax } from '../selectors.js';
+import { itemOf, focusSurvivor, aliveSurvivors } from '../selectors.js';
 import {
   changeMorale, changeFood, recruitSurvivor, drawItems, discardCard, addZombies,
   removeZombies, addBarricades, woundSurvivor, healSurvivor, log, gainEnergy,
@@ -52,8 +52,8 @@ const EFFECTS = {
   },
   wound: (s, ctx) => { const sv = focus(s, ctx); if (sv) woundSurvivor(s, sv.id, 'crossroads'); },
   heal: (s, ctx) => { const sv = focus(s, ctx); if (sv) healSurvivor(s, sv.id); },
-  // Team energy (crossroads): delta can be negative; capped by the pool.
-  energy: (s, _ctx, e) => gainEnergy(s, e.delta ?? ENERGY.CARD, energyMax(s)),
+  // AP for everyone (crossroads): delta can be negative; capped by each survivor's max.
+  energy: (s, _ctx, e) => { for (const sv of aliveSurvivors(s)) gainEnergy(s, e.delta ?? ENERGY.CARD, sv.id); },
   moveHome: (s, ctx) => {
     const sv = focus(s, ctx);
     if (!sv || sv.location === 'colony') return;

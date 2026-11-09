@@ -117,7 +117,7 @@ function survivorCard(ctx, id, { order = 0, color = '#888', dim = false, pop = f
   h('b', {}, d.name),
   h('small', {}, c('survivors', id, 'occupation')),
   h('span', { class: 'sv-stats' },
-    h('span', { class: 'need', tip: t('draft.energy', { n: d.energy, regen: d.regen + (d.ability.type === 'extraDie' ? 15 : 0) }) }, icon('exposure'), `${d.energy}`, h('small', {}, `+${d.regen + (d.ability.type === 'extraDie' ? 15 : 0)}`)),
+    h('span', { class: 'need', tip: t('draft.energy', { n: d.energy }) }, icon('exposure'), `${d.energy}`),
     h('span', { class: 'need', tip: t('draft.attackCost') }, icon('attack'), ENERGY.ATTACK_BASE + ENERGY.PER_SKILL * d.attack),
     h('span', { class: 'need', tip: t('draft.searchCost') }, icon('search'), ENERGY.SEARCH_BASE + ENERGY.PER_SKILL * d.search),
     h('span', { class: 'need', tip: t('draft.health') }, icon('heal'), hp)),
@@ -302,7 +302,7 @@ export function confirmEndModal(ctx) {
   const me = ctx.state.team;
   return dialog('confirm-end',
     h('h2', {}, t('confirm.end.title')),
-    h('p', {}, t('confirm.end.energy', { n: me.energy })),
+    h('p', {}, t('confirm.end.energy', { n: me.survivors.reduce((a, id) => a + (ctx.state.survivors[id]?.alive ? ctx.state.survivors[id].ap : 0), 0) })),
     // Step 18: what is still unsafe this round, before the colony phase.
     (() => { const bad = checklistView(ctx.state, { onlyBad: true }); return bad ? h('div', { class: 'warn-box' }, h('small', {}, t('check.warn')), bad) : null; })(),
     h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: ctx.ui.skipEndConfirm, onchange: (ev) => { ctx.ui.skipEndConfirm = ev.target.checked; } }), ` ${t('confirm.end.skip')}`),

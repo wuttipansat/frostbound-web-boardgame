@@ -1,15 +1,15 @@
 // Active-player actions. Everything that takes effort costs the survivor's energy (no dice anywhere);
 // cards, gear and abilities are free.
-import { PHASES, LOCATION_IDS, ENERGY } from '../constants.js';
+import { PHASES, LOCATION_IDS, ENERGY, REST } from '../constants.js';
 import { assert } from '../errors.js';
 import {
   survivorDef, freeSurvivorSlots, freeZombieSlots, itemOf, scenarioDef, booksHeld, holdsBlueprint,
-  actionCost, killsPerAttack, energyMax, teamHasAbility,
+  actionCost, killsPerAttack, apMax, teamHasAbility,
 } from '../selectors.js';
 import {
   log, drawItems, discardCard, removeFromHand, addZombies, removeZombies,
   addBarricades, creditKills, healSurvivor, changeFood, changeMorale, recruitSurvivor,
-  spendEnergy, gainEnergy,
+  spendEnergy, gainEnergy, healHp,
 } from './helpers.js';
 import { endTurn } from './flow.js';
 import { isPermanent, gearSlot } from '../../content/items.js';
@@ -30,9 +30,17 @@ function requireSurvivor(s, survivorId) {
   return sv;
 }
 
-/** Pay an action's energy. */
+/** A survivor who takes an AP action today (a napping survivor rests the whole day). */
+function requireActive(s, survivorId) {
+  const sv = requireSurvivor(s, survivorId);
+  assert(!sv.napped, 'napping');
+  return sv;
+}
+
+/** Pay an action's AP (the survivor has now acted today). */
 function pay(s, survivorId, kind, to = null) {
-  spendEnergy(s, actionCost(s, survivorId, kind, to));
+  s.survivors[survivorId].acted = true;
+  spendEnergy(s, actionCost(s, survivorId, kind, to), survivorId);
 }
 
 function requireCard(s, p, uid) {
@@ -48,7 +56,7 @@ function ability(survivorId) {
 
 export function attack(s, { survivorId }) {
   requireTurn(s);
-  const sv = requireSurvivor(s, survivorId);
+  const sv = requireActive(s, survivorId);
   assert(s.locations[sv.location].zombies > 0, 'noZombiesHere');
   pay(s, survivorId, 'attack');
   const killed = removeZombies(s, sv.location, killsPerAttack(s, survivorId));
@@ -58,7 +66,7 @@ export function attack(s, { survivorId }) {
 
 export function search(s, { survivorId }) {
   const p = requireTurn(s);
-  const sv = requireSurvivor(s, survivorId);
+  const sv = requireActive(s, survivorId);
   assert(sv.location !== 'colony', 'cannotSearchColony');
   assert(s.locations[sv.location].deck.length > 0, 'deckEmpty');
   pay(s, survivorId, 'search');
@@ -84,7 +92,7 @@ export function returnCard(s, { cardUid }) {
 
 export function barricade(s, { survivorId }) {
   requireTurn(s);
-  const sv = requireSurvivor(s, survivorId);
+  const sv = requireActive(s, survivorId);
   assert(freeZombieSlots(s, sv.location) > 0, 'noBarricadeSpace');
   pay(s, survivorId, 'barricade');
   const n = (ability(survivorId).type === 'barricadeTwo' ? 2 : 1) + Math.min(1, booksHeld(s, 'barricadePlus'));
@@ -93,7 +101,7 @@ export function barricade(s, { survivorId }) {
 
 export function lure(s, { survivorId, toLocation }) {
   requireTurn(s);
-  const sv = requireSurvivor(s, survivorId);
+  const sv = requireActive(s, survivorId);
   assert(LOCATION_IDS.includes(toLocation), 'noSuchLocation', toLocation);
   assert(toLocation !== sv.location, 'sameLocation');
   assert(s.locations[sv.location].zombies > 0, 'noZombiesHere');
@@ -108,7 +116,7 @@ export function lure(s, { survivorId, toLocation }) {
  */
 export function move(s, { survivorId, toLocation, fuelCardUid }) {
   const p = requireTurn(s);
-  const sv = requireSurvivor(s, survivorId);
+  const sv = requireActive(s, survivorId);
   assert(LOCATION_IDS.includes(toLocation), 'noSuchLocation', toLocation);
   assert(toLocation !== sv.location, 'sameLocation');
   assert(freeSurvivorSlots(s, toLocation) > 0, 'locationFull');
@@ -173,11 +181,13 @@ export function playCard(s, { cardUid, targetSurvivorId }) {
       addBarricades(s, sv.location, item.value);
       break;
     }
-    case 'junk':
-      assert(p.energy < energyMax(s), 'energyFull');
+    case 'junk': {
+      const sv = requireSurvivor(s, targetSurvivorId ?? p.survivors.find((id) => s.survivors[id]?.alive));
+      assert(sv.ap < apMax(s, sv.id), 'energyFull');
       spend();
-      gainEnergy(s, ENERGY.JUNK * item.value * (teamHasAbility(s, 'haggler') ? 2 : 1), energyMax(s));
+      gainEnergy(s, ENERGY.JUNK * item.value * (teamHasAbility(s, 'haggler') ? 2 : 1), sv.id);
       break;
+    }
     case 'survivor':
       removeFromHand(s, cardUid); // they join the colony
       changeMorale(s, recruitSurvivor(s) ? 1 : 2, 'newcomer');
@@ -226,6 +236,29 @@ export function useAbility(s, { survivorId, targetSurvivorId }) {
   assert(target.wounds > 0 || target.frostbite, 'notWounded');
   p.abilityUsed[survivorId] = true;
   healSurvivor(s, targetSurvivorId);
+}
+
+// ---------------------------------------------------------------- rest
+
+/** Nap at the colony: +25 AP +5 HP; that survivor takes no other AP action today. Only before acting. */
+export function nap(s, { survivorId }) {
+  requireTurn(s);
+  const sv = requireActive(s, survivorId);
+  assert(sv.location === 'colony', 'mustBeInColony');
+  assert(!sv.moved && !sv.acted, 'alreadyActed');
+  sv.napped = true;
+  gainEnergy(s, REST.NAP_AP, survivorId);
+  healHp(s, survivorId, REST.NAP_HP);
+  log(s, 'nap', { survivorId });
+}
+
+/** Tonight's plan: 'sleep' or 'guard' (guards must be at the colony; each one stops one zombie at the colony tonight). */
+export function setRest(s, { survivorId, mode }) {
+  requireTurn(s);
+  const sv = requireSurvivor(s, survivorId);
+  assert(mode === 'sleep' || mode === 'guard', 'badRest');
+  if (mode === 'guard') assert(sv.location === 'colony', 'mustBeInColony');
+  sv.rest = mode;
 }
 
 export function finishTurn(s) {

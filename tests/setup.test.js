@@ -67,7 +67,7 @@ test('drafting validates picks and starts round 1', () => {
 
   const t = s.team;
   assert.equal(t.survivors.length, RULES.TEAM_START);
-  assert.equal(t.energy, SURVIVORS_BY_ID[t.survivors[0]].energy, 'starts full');
+  for (const id of t.survivors) assert.equal(s.survivors[id].ap, SURVIVORS_BY_ID[id].energy, 'starts full');
   assert.equal(t.hand.length, RULES.STARTING_HAND, 'starting hand');
   for (const id of t.survivors) assert.equal(s.survivors[id].location, 'colony');
 });

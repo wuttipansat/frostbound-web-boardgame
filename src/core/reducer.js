@@ -20,6 +20,8 @@ const HANDLERS = {
   [A.END_TURN]: turn.finishTurn,
   [A.RETURN_CARD]: turn.returnCard,
   [A.EQUIP]: turn.equip,
+  [A.NAP]: turn.nap,
+  [A.SET_REST]: turn.setRest,
 };
 
 export function reduce(state, action) {

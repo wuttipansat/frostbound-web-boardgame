@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { reduce, tryReduce } from '../src/core/reducer.js';
 import * as a from '../src/core/actions.js';
-import { actionCost, energyMax } from '../src/core/selectors.js';
+import { actionCost, apMax } from '../src/core/selectors.js';
 import { ENERGY } from '../src/core/constants.js';
 import { startedGame, setSurvivors, setEnergy, giveCard, patch } from './_helpers.js';
 
@@ -12,7 +12,8 @@ function setup(placements, energy = 100, opts = {}) {
   s = setEnergy(s, energy);
   return { s };
 }
-const energy = (s) => s.team.energy;
+// The lowest AP on the team (only the acting survivor spends).
+const energy = (s) => Math.min(...s.team.survivors.filter((id) => s.survivors[id].alive).map((id) => s.survivors[id].ap));
 
 test('actions only work in the turn phase; there are no player ids (solo)', () => {
   const { s } = setup({ 'corwin-daly': 'police' });
@@ -144,9 +145,9 @@ test('playing cards: food, medicine, tools, junk (energy); gear must be equipped
   assert.equal(boarded.locations.police.barricades, 1);
 
   assert.equal(tryReduce(s, a.playCard(gun, { targetSurvivorId: 'corwin-daly' })).error, 'equipInstead');
-  const charged = reduce(s, a.playCard(junk));
+  const charged = reduce(s, a.playCard(junk, { targetSurvivorId: 'corwin-daly' }));
   assert.ok(!charged.team.hand.includes(junk));
-  assert.equal(energy(charged), Math.min(energyMax(s), 30 + ENERGY.JUNK));
+  assert.equal(charged.survivors['corwin-daly'].ap, Math.min(apMax(s, 'corwin-daly'), 30 + ENERGY.JUNK));
 });
 
 test('contribute adds the card to the crisis and removes it from the hand', () => {
