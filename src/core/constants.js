@@ -78,5 +78,7 @@ export const RING = Object.freeze({ colony: 0, grocery: 1, school: 1, gas: 2, li
 export const SEARCH_SPAWN = Object.freeze({ grocery: 0.1, school: 0.15, library: 0.1, gas: 0.15, police: 0.25, hospital: 0.2, EXTRA: 0.1 });
 // ---------------------------------------------------------------- food (every day)
 export const FOOD = Object.freeze({ HUNGRY_HP: 15, HUNGRY_MORALE: 1 });
+// Seasons get harsher: cold nights (sleeping outside −10 HP), brutes (FIGHT.BRUTE_DAY), daily storms.
+export const SEASON = Object.freeze({ COLD: 11, COLD_HP: 10, STORMS: 31 });
 export const DANGEROUS_LOCATIONS = Object.freeze(['hospital', 'police']);
 

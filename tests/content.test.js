@@ -14,7 +14,7 @@ const unique = (arr) => new Set(arr).size === arr.length;
 
 test('content counts match the design brief', () => {
   assert.equal(SURVIVORS.length, 20);
-  assert.equal(SCENARIOS.length, 3);
+  assert.equal(SCENARIOS.length, 4);
   assert.equal(CRISES.length, 10);
   assert.equal(CROSSROADS.length, 30);
 });

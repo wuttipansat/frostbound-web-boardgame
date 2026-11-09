@@ -3,6 +3,14 @@
 
 export const SCENARIOS = [
   {
+    id: 'crawler', difficulty: 'medium', length: 'long',
+    name: 'Build the Snow Crawler',
+    text: 'An old snow crawler sits in the colony yard. Rebuild it in four stages and drive everyone south before day 40.',
+    days: 40, morale: 8, startFood: 3,
+    goal: { type: 'crawler', target: 4 },
+    goalText: 'Finish all 4 stages of the snow crawler: frame, engine, heater, fuel.',
+  },
+  {
     id: 'beacon', difficulty: 'easy', length: 'short',
     name: 'Light the Ridge Beacon',
     text: 'A rescue convoy will pass the ridge only if it sees fire. Bring fuel to the colony and stack the beacon before time runs out.',

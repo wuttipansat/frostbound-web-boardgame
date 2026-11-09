@@ -340,7 +340,7 @@ if (params.has('lineup')) {
 
 if (params.get('play')) {
   app.quickStart({
-    scenarioId: params.get('scenario') ?? 'beacon',
+    scenarioId: params.get('scenario') ?? 'crawler',
     seed: Number(params.get('seed') ?? 1), lang: params.get('lang') ?? undefined,
   });
 }

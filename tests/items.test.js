@@ -7,8 +7,8 @@ import { LOCATIONS } from '../src/content/locations.js';
 import { foodNeeded, killsPerAttack, actionCost, holderOf, packSize } from '../src/core/selectors.js';
 import { startedGame, setSurvivors, setEnergy, giveCard, patch } from './_helpers.js';
 
-const turn = (placements, energy = 100) => {
-  let s = startedGame();
+const turn = (placements, energy = 100, opts = {}) => {
+  let s = startedGame(opts);
   s = setSurvivors(s, placements);
   s = setEnergy(s, energy);
   return { s };
@@ -167,4 +167,20 @@ test('base upgrades: materials start a level, AP carries over, effects apply', a
   const green = patch(s, (x) => { x.base.greenhouse = 2; x.food = 10; });
   const next = reduce(green, a.endTurn());
   assert.ok(next.log.some((e) => e.k === 'food' && e.reason === 'greenhouse' && e.delta === 2));
+});
+
+test('snow crawler: 4 stages built like upgrades; finishing it wins; seasons get harsher', async () => {
+  const { build } = await import('../src/core/actions.js');
+  const { scenarioProgress, isStorm, season } = await import('../src/core/selectors.js');
+  const { checkScenarioGoal } = await import('../src/core/rules/flow.js');
+  let { s } = turn({ 'corwin-daly': 'colony' }, 100, { scenarioId: 'crawler' });
+  let u;
+  for (const id of ['scrap', 'scrap', 'scrap', 'wood', 'wood']) [s, u] = giveCard(s, id, 'stockpile');
+  s = reduce(s, build('crawler', 'corwin-daly'));
+  assert.equal(scenarioProgress(s), 1, 'frame done');
+  assert.equal(tryReduce(s, build('crawler', 'corwin-daly')).error, 'missingMaterials', 'the engine needs 2 engine parts');
+  assert.equal(checkScenarioGoal(patch(s, (x) => { x.base.crawler = 3; })), false);
+  assert.equal(checkScenarioGoal(patch(s, (x) => { x.base.crawler = 4; })), true);
+  assert.deepEqual([1, 11, 21, 31].map((d) => season(patch(s, (x) => { x.day = d; }))), ['early', 'cold', 'brutes', 'storms']);
+  assert.equal(isStorm(patch(s, (x) => { x.day = 32; })), true, 'every day is a storm from day 31');
 });

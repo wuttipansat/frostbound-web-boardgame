@@ -27,7 +27,7 @@ Numbers are starting values; Step 18 tunes them.
 | 10 | Food every day: everyone at the base eats 1. Missing food: −15 HP each, −1 morale, 50% AP next day. "Food for N days" on the HUD. | **done** |
 | 11 | A crisis every day: revealed at dawn, items handed in during the day (face up), scored at dusk. +1 needed every 10 days. | **done** |
 | 12 | Base upgrades (3 levels each, materials + AP, AP carries over): dorm, wall, greenhouse, workshop, infirmary, radio tower. | **done** |
-| 13 | Main goal: the snow crawler in 4 stages (frame, engine, heater, fuel). Rare parts in certain places. Seasons get harsher (cold day 11+, brutes day 21+, storms day 31+). | |
+| 13 | Main goal: the snow crawler in 4 stages (frame, engine, heater, fuel). Rare parts in certain places. Seasons get harsher (cold day 11+, brutes day 21+, storms day 31+). | **done** |
 | 14 | Night attacks on the base: dawn forecast; at night walls and guards stop zombies first; the rest hurt people at the base. Fully predictable ("5 attack, 4 stopped"). | |
 | 15 | Solo fun: a daily event card with 2 choices, traits and bonds, weekly missions, experience (skills improve with use), difficulty levels, an end-of-game summary. | |
 | 16 | New scene and camera: isometric ~55°, rotate in 90° steps, 3 zoom levels; less fog, brighter day, readable night; limited palette, bigger survivors with outlines; roads with AP costs; bigger buttons and a bottom sheet on phones. | |
@@ -172,3 +172,13 @@ Numbers are starting values; Step 18 tunes them.
   colony; **radio tower** 10% per level each dawn that a newcomer joins.
 - UI: an "Base upgrades" row in the colony panel (level, cost or progress, effect in the tooltip).
 - The bot tries to build, but it rarely brings materials home yet (0 levels in 10 test games); Step 18.
+
+## Step 13 notes
+
+- New main scenario **crawler** (the default in the UI): build the snow crawler in 4 stages with `build('crawler', id)`
+  at the colony, like an upgrade: frame (3 scrap + 2 wood, 40 AP), engine (2 engine parts + scrap, 50),
+  heater (2 heater parts + 2 cloth, 40), fuel (3 jerry cans, 20). Stage 4 done = win. The old scenarios stay as modes.
+- Rare parts: engine parts at the gas station (2) and the police station (1); heater parts at the school, hospital and library (1 each).
+- Seasons (shown on the HUD calendar): cold from day 11 (sleeping outside −10 HP more), brutes from day 21
+  (ferocity 150), storms every day from day 31.
+- Balance (bot, 30 games): crawler 0% won — the bot does not gather parts yet; Step 18 teaches it.

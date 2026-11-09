@@ -1,11 +1,11 @@
-import { BUILDINGS } from '../content/buildings.js';
+import { BUILDINGS, CRAWLER } from '../content/buildings.js';
 // Read-only derived queries over GameState. Safe to use from UI/renderer.
 import { SURVIVORS_BY_ID } from '../content/survivors.js';
 import { LOCATIONS } from '../content/locations.js';
 import { ITEMS } from '../content/items.js';
 import { SCENARIOS_BY_ID } from '../content/scenarios.js';
 import { CRISES_BY_ID } from '../content/crises.js';
-import { RULES, ENERGY, REST, FIGHT, RING, SEARCH_SPAWN, DANGEROUS_LOCATIONS, OUTSIDE_LOCATIONS } from './constants.js';
+import { RULES, ENERGY, REST, FIGHT, SEASON, RING, SEARCH_SPAWN, DANGEROUS_LOCATIONS, OUTSIDE_LOCATIONS } from './constants.js';
 
 export const survivorDef = (id) => SURVIVORS_BY_ID[id];
 export const itemOf = (s, uid) => ITEMS[s.cards[uid]];
@@ -116,6 +116,7 @@ export function scenarioProgress(s) {
     case 'deposit': return s.scenario.deposited;
     case 'stockpile': return s.food;
     case 'kills': return s.totalKills;
+    case 'crawler': return baseLevel(s, 'crawler');
     default: return 0;
   }
 }
@@ -130,7 +131,9 @@ export function roundsRemaining(s) {
 export const foodDays = (s) => { const n = foodNeeded(s); return n ? Math.floor(s.food / n) : Infinity; };
 
 /** Every third day a storm blows: outside actions cost more. */
-export const isStorm = (s) => s.day % 3 === 0;
+export const isStorm = (s) => s.day % 3 === 0 || s.day >= SEASON.STORMS;
+/** The season: cold from day 11 (sleeping outside hurts), brutes from 21, storms every day from 31. */
+export const season = (s) => (s.day >= SEASON.STORMS ? 'storms' : s.day >= FIGHT.BRUTE_DAY ? 'brutes' : s.day >= SEASON.COLD ? 'cold' : 'early');
 
 /**
  * Energy cost of an action for a survivor (move: `to` is the destination). Odd numbers on purpose.
@@ -266,7 +269,7 @@ export const bedCount = (s) => RULES.BEDS + 2 * baseLevel(s, 'dorm');
 
 /** The next level of a building: { level, needs, ap, spent, started } or null when maxed. */
 export function nextLevel(s, id) {
-  const def = BUILDINGS[id];
+  const def = id === 'crawler' ? CRAWLER : BUILDINGS[id];
   const lv = baseLevel(s, id);
   if (!def || lv >= def.levels.length) return null;
   const spent = s.building?.[id];

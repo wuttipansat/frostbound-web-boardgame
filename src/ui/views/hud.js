@@ -5,7 +5,7 @@ import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
 import { formatLog, describeEffects } from '../../i18n/format.js';
 import {
-  foodNeeded, foodDays, isStorm, crisisDef, crisisRequirement, crisisScore, scenarioProgress, scenarioTarget,
+  foodNeeded, foodDays, isStorm, season, crisisDef, crisisRequirement, crisisScore, scenarioProgress, scenarioTarget,
 } from '../../core/selectors.js';
 import { counter } from '../ticker.js';
 import { RULES } from '../../core/constants.js';
@@ -30,7 +30,7 @@ export function renderTopbar(el, ctx) {
   // Calendar: day n / 40, the time of day, and how much of the winter has passed.
   const round = block(`round calendar${lastRound ? ' critical' : ''}`, t('tip.day'), 'round', t('hud.day'),
     counter('round', s.day, { text: (v) => `${v}/${s.scenario.days}` }),
-    h('small', { class: `time t-${s.time ?? 'day'}` }, t(`time.${s.time ?? 'day'}`), isStorm(s) ? ` · ${t('hud.storm')}` : ''),
+    h('small', { class: `time t-${s.time ?? 'day'}` }, t(`time.${s.time ?? 'day'}`), isStorm(s) ? ` · ${t('hud.storm')}` : '', ` · ${t(`hud.season.${season(s)}`)}`),
     h('div', { class: 'mini-bar' }, h('i', { style: { width: `${Math.round((s.day / s.scenario.days) * 100)}%` } })));
   const food = block(`food${s.food < need ? ' critical' : ''}`, t('tip.food'), 'food', t('hud.food'), counter('food', s.food),
     h('small', {}, t('hud.foodNeed', { n: need })),

@@ -17,3 +17,15 @@ export const BUILDINGS = Object.freeze({
     levels: [L({ scrap: 2 }, 25), L({ scrap: 2, wood: 1, cloth: 1 }, 35), L({ scrap: 3, cloth: 1 }, 45)] },
 });
 export const BUILDING_IDS = Object.freeze(Object.keys(BUILDINGS));
+
+/** The main goal: the snow crawler, built like an upgrade in 4 stages (rare parts: engine / heater). */
+export const CRAWLER = Object.freeze({
+  id: 'crawler', name: 'Snow Crawler',
+  stages: ['frame', 'engine', 'heater', 'fuel'],
+  levels: [
+    L({ scrap: 3, wood: 2 }, 40),
+    L({ 'engine-part': 2, scrap: 1 }, 50),
+    L({ 'heater-part': 2, cloth: 2 }, 40),
+    L({ 'jerry-can': 3 }, 20),
+  ],
+});

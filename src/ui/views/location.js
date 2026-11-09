@@ -93,13 +93,13 @@ export function renderLocationPanel(el, ctx) {
       if (id === 'colony') {
         // Base upgrades: level, next level's cost and progress; buttons for the selected survivor at home.
         actions.push(h('div', { class: 'act-box build' }, h('h4', {}, t('act.build')),
-          h('div', { class: 'picker-row' }, BUILDING_IDS.map((bid) => {
+          h('div', { class: 'picker-row' }, (s.scenario.id === 'crawler' ? ['crawler', ...BUILDING_IDS] : BUILDING_IDS).map((bid) => {
             const nx = nextLevel(s, bid);
             const r = sel?.location === 'colony' ? check(s, act.build(bid, sel.id)) : { ok: false, error: 'mustBeInColony' };
             const cost = nx ? (nx.started ? `${nx.spent}/${nx.ap} AP` : `${Object.entries(nx.needs).map(([i, n]) => `${n}× ${c('items', i, 'name')}`).join(' + ')} + ${nx.ap} AP`) : t('build.max');
             return h('button', {
               class: `btn small-act${r.ok ? '' : ' off'}`,
-              tip: `${t(`bld.${bid}`)} ${s.base[bid]}/3 — ${t(`bld.${bid}.fx`)} · ${cost}${r.ok ? '' : ` · ${t(`err.${r.error}`)}`}`,
+              tip: `${t(`bld.${bid}`)} ${s.base[bid]}/${bid === 'crawler' ? 4 : 3} — ${t(`bld.${bid}.fx`)} · ${cost}${r.ok ? '' : ` · ${t(`err.${r.error}`)}`}`,
               onclick: (ev) => (r.ok ? ctx.dispatch(r.action) : flashTip(ev.currentTarget)),
             }, `${t(`bld.${bid}`)} ${s.base[bid]}${nx?.started ? ' …' : ''}`);
           }))));

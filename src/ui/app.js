@@ -50,7 +50,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
   let modalKey = null;
   let toasts = [];
   const ui = {
-    setup: { scenarioId: 'beacon' },
+    setup: { scenarioId: 'crawler' },
     modal: null, selSurvivor: null, selCard: null, selLoc: null, lureTo: null,
     queue: [], // public reveal modals waiting to be shown: { type: 'colony' | 'vote', report }
     useFuel: false, logOpen: false, logTab: 'log', crisisOpen: false, draftPicks: [], // logOpen pins the log history open (the feed itself always shows)
@@ -347,7 +347,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
   }
 
   /** Quick start for testing/screenshots. */
-  function quickStart({ scenarioId = 'beacon', seed = 1, lang } = {}) {
+  function quickStart({ scenarioId = 'crawler', seed = 1, lang } = {}) {
     if (lang) setLang(lang);
     ui.setup = { scenarioId, seed };
     startGame();

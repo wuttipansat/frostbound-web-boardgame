@@ -2,7 +2,7 @@
 import { simulate } from '../src/ai/simulate.js';
 
 const N = Number(process.argv[2] ?? 200);
-for (const scenarioId of ['beacon', 'stores', 'purge']) {
+for (const scenarioId of ['crawler', 'beacon', 'stores', 'purge']) {
   const reasons = {};
   let rounds = 0;
   let errors = 0;

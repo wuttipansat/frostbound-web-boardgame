@@ -81,7 +81,7 @@ export function createGame(config = {}) {
     usedCards: [],
     pick: null,      // blueprint search: { locationId, uids } until one card is put back
   };
-  s.base = { dorm: 0, wall: 0, greenhouse: 0, workshop: 0, infirmary: 0, radio: 0 };
+  s.base = { crawler: 0, dorm: 0, wall: 0, greenhouse: 0, workshop: 0, infirmary: 0, radio: 0 };
   s.building = {}; // AP already put into the next level: { [buildingId]: n } (materials paid)
   s.stockpile = []; // items at the colony (they count only once carried home)
   s.searches = {};  // searches per location today (each extra one raises the zombie chance)

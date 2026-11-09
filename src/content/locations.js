@@ -18,7 +18,7 @@ export const LOCATIONS = {
     survivorSlots: 3,
     zombieSlots: 3,
     deck: {
-      ammo: 2, crowbar: 1, scrap: 1,
+      ammo: 2, crowbar: 1, scrap: 1, 'engine-part': 1,
       'glock-19': 2, 'riot-baton': 2, 'remington-870': 1, 'mosin-nagant': 1, 'first-aid-pouch': 2,
       'zip-ties': 2, 'canned-beans': 3, 'jerry-can': 1, bedpan: 1, 'blueprint-police': 1, 'riot-vest': 1,
     },
@@ -54,7 +54,7 @@ export const LOCATIONS = {
     survivorSlots: 3,
     zombieSlots: 3,
     deck: {
-      bandage: 2, 'first-aid-kit': 1, painkillers: 1,
+      bandage: 2, 'first-aid-kit': 1, painkillers: 1, 'heater-part': 1,
       'first-aid-pouch': 4, antibiotics: 2, 'canned-beans': 1, 'rice-sack': 1, 'jerry-can': 1,
       'zip-ties': 1, 'duct-tape': 1, bedpan: 1, 'stranger-with-child': 1, 'blueprint-hospital': 1, 'fire-axe': 1,
     },
@@ -66,7 +66,7 @@ export const LOCATIONS = {
     survivorSlots: 3,
     zombieSlots: 3,
     deck: {
-      'city-map': 1, 'hunting-bow': 1, wood: 1, 'snow-suit': 1, flashlight: 1,
+      'city-map': 1, 'hunting-bow': 1, wood: 1, 'snow-suit': 1, 'heater-part': 1, flashlight: 1,
       'duct-tape': 2, 'zip-ties': 2, 'socket-set': 1, 'field-manual': 1, 'blueprint-library': 1, 'jerry-can': 2,
       'canned-beans': 1, 'rice-sack': 1, 'first-aid-pouch': 1, bedpan: 1, 'stranger-with-child': 1, 'survival-guide': 1,
     },
@@ -78,7 +78,7 @@ export const LOCATIONS = {
     survivorSlots: 3,
     zombieSlots: 3,
     deck: {
-      'tool-kit': 1, sled: 1, scrap: 1, 'engine-part': 1, 'scrap-plate': 1,
+      'tool-kit': 1, sled: 1, scrap: 1, 'engine-part': 2, 'scrap-plate': 1,
       'jerry-can': 6, 'beef-jerky': 1, 'socket-set': 1, 'riot-baton': 1, 'motor-junk': 2,
       'duct-tape': 1, 'zip-ties': 1, 'blueprint-gas': 1, 'canned-beans': 1, 'winter-boots': 1, 'fire-axe': 1,
     },

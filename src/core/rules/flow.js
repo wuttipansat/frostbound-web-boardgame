@@ -1,5 +1,5 @@
 // Game flow (solo): pick survivors -> rounds (crisis, one turn w/ crossroads, energy) -> colony phase -> end checks.
-import { PHASES, OUTSIDE_LOCATIONS, RULES, FIGHT, FOOD } from '../constants.js';
+import { PHASES, OUTSIDE_LOCATIONS, RULES, FIGHT, FOOD, SEASON } from '../constants.js';
 import { shuffle, pick, random } from '../rng.js';
 import { assert } from '../errors.js';
 import { CROSSROADS_BY_ID } from '../../content/crossroads.js';
@@ -159,7 +159,7 @@ export function colonyPhase(s) {
   log(s, 'sleep', { plan: report.sleep });
   // Sleeping outside: the zombies there bite.
   for (const [id, r] of Object.entries(report.sleep)) {
-    if (r.kind === 'outside') damageSurvivor(s, id, FIGHT.NIGHT_BITE * (s.locations[s.survivors[id].location]?.zombies ?? 0), 'night');
+    if (r.kind === 'outside') damageSurvivor(s, id, FIGHT.NIGHT_BITE * (s.locations[s.survivors[id].location]?.zombies ?? 0) + (s.day >= SEASON.COLD ? SEASON.COLD_HP : 0), 'night');
   }
 
   s.reports.colony = report;
@@ -212,6 +212,7 @@ export function checkScenarioGoal(s) {
     case 'deposit': return s.scenario.deposited >= target;
     case 'stockpile': return s.food >= target && s.locations.colony.zombies <= goal.maxColonyZombies;
     case 'kills': return s.totalKills >= target;
+    case 'crawler': return (s.base?.crawler ?? 0) >= target;
     default: return false;
   }
 }
