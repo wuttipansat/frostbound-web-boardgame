@@ -202,7 +202,7 @@ function energyActions(s, p, survivors, candidates, cardsOf, opts) {
       const def = survivorDef(sv.id);
       const preferred = def.ability.type === 'doubleSearch' && options.includes(def.ability.location) ? def.ability.location : options[0];
       // Leave enough energy to search when we get there.
-      if (preferred && !sv.napped && sv.ap >= actionCost(s, sv.id, 'move', preferred) + ENERGY.SEARCH_BASE + ENERGY.PER_SKILL * def.search) candidates.push(act.move(sv.id, preferred));
+      if (preferred && !sv.napped && sv.ap >= actionCost(s, sv.id, 'move', preferred) + ENERGY.SEARCH) candidates.push(act.move(sv.id, preferred));
     }
   }
   // 6. Junk is energy now.

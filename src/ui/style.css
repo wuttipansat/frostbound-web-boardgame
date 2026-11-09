@@ -1679,3 +1679,16 @@ img.art-item.blank { image-rendering: auto; background: none; }
 .over-stats .ov-stat { display: flex; flex-direction: column; align-items: center; padding: 6px 4px; border-radius: 8px; background: rgba(255,255,255,.06); }
 .over-stats .ov-stat b { font-size: 1.2em; }
 @media (max-width: 480px) { .over-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Step 16: view controls, road prices, bigger touch targets, phone bottom sheet */
+#view-ctl { position: fixed; left: 12px; top: 38%; display: flex; flex-direction: column; gap: 6px; z-index: 30; }
+#view-ctl .view-btn { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; }
+.loc-label .walk-ap, [data-loc] .walk-ap { margin-left: 4px; padding: 0 5px; border-radius: 6px; background: #f2b33d; color: #1b1d1e; font-size: 11px; }
+@media (pointer: coarse) {
+  .btn, .small-act, .act { min-height: 44px; min-width: 44px; }
+  #view-ctl .view-btn { width: 46px; height: 46px; }
+}
+@media (max-width: 760px) {
+  #view-ctl { left: 8px; top: 150px; flex-direction: row; }
+}
+#view-ctl.hidden { display: none; }

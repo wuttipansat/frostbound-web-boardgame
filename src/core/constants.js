@@ -40,7 +40,6 @@ export const ENERGY = Object.freeze({
   COST: Object.freeze({ move: 12, barricade: 19, lure: 11 }),
   WALK: Object.freeze([12, 17, 23]), // walking: near / mid / far
   SEARCH: 17,
-  SEARCH_BASE: 15,        // search cost = 15 + 2 × search skill (2..6 → 19..27)
   PER_SKILL: 2,
   CROWDED: 7,             // 2+ zombies here: search / barricade cost more
   DANGEROUS: 7,           // hospital, police: search costs more (better loot)

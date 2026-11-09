@@ -12,6 +12,9 @@ import { SURVIVORS_BY_ID } from '../content/survivors.js';
 import { LOCATIONS } from '../content/locations.js';
 import { LOCATION_IDS } from '../core/constants.js';
 
+const SURVIVOR_SCALE = 1.3;
+const OUTLINE_MAT = new THREE.MeshBasicMaterial({ color: 0x0c0f14, side: THREE.BackSide });
+
 export const CHAR_VOXEL = 0.15; // world size of a character voxel (8 voxels = 1.2 units wide, ~2.4 tall)
 export const PLAYER_COLORS = [0xf2b33d, 0x4fa3e0, 0xe0605a, 0x7fcf6a, 0xc58ae8];
 
@@ -236,10 +239,16 @@ export function createPieces(board, tweens) {
     const group = new THREE.Group();
     const body = new THREE.Group();
     const { lit, glow } = survivorGeometry(id);
+    // Step 16: survivors are bigger than zombies and wear a dark outline (inverted hull) so they read at a glance.
+    const big = new THREE.Group();
+    big.scale.setScalar(SURVIVOR_SCALE);
     const mesh = new THREE.Mesh(lit, MATERIALS.lit);
     mesh.castShadow = true;
-    body.add(mesh);
-    if (glow) body.add(new THREE.Mesh(glow, MATERIALS.glow));
+    const outline = new THREE.Mesh(lit, OUTLINE_MAT);
+    outline.scale.setScalar(1.07);
+    big.add(outline, mesh);
+    if (glow) big.add(new THREE.Mesh(glow, MATERIALS.glow));
+    body.add(big);
     const disc = new THREE.Mesh(discGeo, discMats[ownerIdx % discMats.length]);
     disc.position.y = 0.04;
     group.add(disc, body);

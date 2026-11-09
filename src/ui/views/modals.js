@@ -6,7 +6,7 @@ import { describeEffects, describeTrigger } from '../../i18n/format.js';
 import { SCENARIOS } from '../../content/scenarios.js';
 import { CRISES_BY_ID } from '../../content/crises.js';
 import { CROSSROADS_BY_ID } from '../../content/crossroads.js';
-import { RULES, ENERGY } from '../../core/constants.js';
+import { RULES, ENERGY, FIGHT } from '../../core/constants.js';
 import { survivorDef, itemOf, woundLimit, aliveSurvivors } from '../../core/selectors.js';
 import * as act from '../../core/actions.js';
 import { checklistView } from './help.js';
@@ -123,8 +123,7 @@ function survivorCard(ctx, id, { order = 0, color = '#888', dim = false, pop = f
   h('small', {}, c('survivors', id, 'occupation')),
   h('span', { class: 'sv-stats' },
     h('span', { class: 'need', tip: t('draft.energy', { n: d.energy }) }, icon('exposure'), `${d.energy}`),
-    h('span', { class: 'need', tip: t('draft.attackCost') }, icon('attack'), ENERGY.ATTACK_BASE + ENERGY.PER_SKILL * d.attack),
-    h('span', { class: 'need', tip: t('draft.searchCost') }, icon('search'), ENERGY.SEARCH_BASE + ENERGY.PER_SKILL * d.search),
+    h('span', { class: 'need', tip: t('draft.atk') }, icon('attack'), `ATK ${(7 - d.attack) * FIGHT.ATK_PER_SKILL}`),
     h('span', { class: 'need', tip: t('draft.health') }, icon('heal'), hp)),
   h('p', { class: 'svp-ability' }, c('survivors', id, 'abilityText')));
 }

@@ -22,13 +22,14 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
 
   const scene = new THREE.Scene();
   scene.background = q.sky ? skyTexture() : new THREE.Color(P.night);
-  scene.fog = new THREE.FogExp2(P.fog, 0.0042);
+  scene.fog = new THREE.FogExp2(P.fog, 0.002); // less fog: the whole town stays readable
 
   // Isometric-ish orthographic camera.
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 400);
   const dist = 110;
-  const polar = THREE.MathUtils.degToRad(54);
-  const azimuth = THREE.MathUtils.degToRad(35);
+  // Step 16: a fixed isometric tilt (~55°); the view turns in 90° steps and zooms in 3 levels.
+  const polar = THREE.MathUtils.degToRad(55);
+  const azimuth = THREE.MathUtils.degToRad(45);
   camera.position.set(
     dist * Math.sin(polar) * Math.sin(azimuth),
     dist * Math.cos(polar),
@@ -41,8 +42,10 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   controls.dampingFactor = 0.08;
   controls.minZoom = 0.75;
   controls.maxZoom = 3.5;
-  controls.minPolarAngle = THREE.MathUtils.degToRad(25);
-  controls.maxPolarAngle = THREE.MathUtils.degToRad(68);
+  controls.minPolarAngle = polar;
+  controls.maxPolarAngle = polar;
+  controls.enableRotate = false; // rotate with the buttons / Q E (90° steps)
+  controls.enableZoom = false;   // zoom with the buttons / wheel / + − (3 levels)
   controls.screenSpacePanning = false;
   controls.zoomToCursor = true;
   controls.target.set(0, 0, 0);
@@ -130,6 +133,7 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   const clock = new THREE.Clock();
   let running = true;
   function frame(dt, t) {
+    view.tick(dt);
     controls.update();
     snowfall?.update(dt, t);
     mist?.update(dt);
@@ -161,7 +165,42 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   }
   requestAnimationFrame(loop);
 
+  // ---- view steps: rotate 90°, 3 zoom levels (eased in the frame loop)
+  const ZOOMS = [0.95, 1.55, 2.5];
+  let zoomIdx = 0;
+  let turnLeft = 0; // radians still to turn
+  const view = {
+    ZOOMS,
+    get zoomLevel() { return zoomIdx; },
+    zoomTo(i) { zoomIdx = Math.max(0, Math.min(ZOOMS.length - 1, i)); view.goalZoom = ZOOMS[zoomIdx]; },
+    zoomStep(d) { view.zoomTo(zoomIdx + d); },
+    rotate(dir) { turnLeft += dir * Math.PI / 2; },
+    goalZoom: null,
+    tick(dt) {
+      if (turnLeft) {
+        const step = Math.sign(turnLeft) * Math.min(Math.abs(turnLeft), dt * 4);
+        turnLeft -= step;
+        const off = camera.position.clone().sub(controls.target);
+        off.applyAxisAngle(new THREE.Vector3(0, 1, 0), step);
+        camera.position.copy(controls.target).add(off);
+        camera.lookAt(controls.target);
+        controls.update();
+      }
+      if (view.goalZoom != null) {
+        camera.zoom += (view.goalZoom - camera.zoom) * Math.min(1, dt * 8);
+        if (Math.abs(view.goalZoom - camera.zoom) < 0.003) { camera.zoom = view.goalZoom; view.goalZoom = null; }
+        camera.updateProjectionMatrix();
+      }
+    },
+  };
+  canvas.addEventListener('wheel', (ev) => {
+    ev.preventDefault();
+    if (view.goalZoom != null) return; // one step per gesture
+    view.zoomStep(ev.deltaY < 0 ? 1 : -1);
+  }, { passive: false });
+
   return {
+    view,
     renderer, scene, camera, controls, quality: q, hemi, moon,
     /** Step 22: apply a graphics tier (see render/perf.js TIERS). */
     setTier(tier) {

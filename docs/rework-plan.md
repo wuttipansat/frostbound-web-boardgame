@@ -30,7 +30,7 @@ Numbers are starting values; Step 18 tunes them.
 | 13 | Main goal: the snow crawler in 4 stages (frame, engine, heater, fuel). Rare parts in certain places. Seasons get harsher (cold day 11+, brutes day 21+, storms day 31+). | **done** |
 | 14 | Night attacks on the base: dawn forecast; at night walls and guards stop zombies first; the rest hurt people at the base. Fully predictable ("5 attack, 4 stopped"). | **done** |
 | 15 | Solo fun: a daily event card with 2 choices, traits and bonds, weekly missions, experience (skills improve with use), difficulty levels, an end-of-game summary. | **done** |
-| 16 | New scene and camera: isometric ~55°, rotate in 90° steps, 3 zoom levels; less fog, brighter day, readable night; limited palette, bigger survivors with outlines; roads with AP costs; bigger buttons and a bottom sheet on phones. | |
+| 16 | New scene and camera: isometric ~55°, rotate in 90° steps, 3 zoom levels; less fog, brighter day, readable night; limited palette, bigger survivors with outlines; roads with AP costs; bigger buttons and a bottom sheet on phones. | **done** (palette unchanged) |
 | 17 | Show every action: previews (path + AP, HP to lose, spawn %), animations (walk, loot flying into the backpack, hits with damage numbers, scaffolding, night attack), HP bars, toasts, a daily report, a tutorial over days 1–3. | |
 | 18 | Balance, tests, deploy: a balance bot (100 games per difficulty; normal wins 35–50%, wins end on day 30–36), e2e on desktop and phone, perf, publish. | |
 
@@ -207,3 +207,14 @@ Numbers are starting values; Step 18 tunes them.
 - **Difficulty** (setup screen): easy +3 food +2 morale −1 attacker a night; hard −1 food −2 morale +1 attacker.
 - **End-of-game summary:** days, kills, searches, levels built, items crafted, missions, survivors lost, difficulty.
 - Balance (bot, normal, 30 games): crawler 0%, beacon 0%, stores 7%, purge 23%; Step 18.
+
+## Step 16 notes
+
+- Camera: fixed isometric tilt 55°, no free orbit. Turn the view in 90° steps (buttons on the left, Q / E) and
+  zoom in 3 levels (buttons, mouse wheel one step per gesture, + / −). Panning still works.
+- Light: half the fog, brighter day light, the night keeps more light so the board stays readable.
+- Survivors are 30% bigger than before and wear a dark outline (inverted hull), so they stand out from zombies.
+- Roads with prices: with a survivor selected, every place's label shows what walking there costs in AP.
+- Touch: buttons are at least 44 px on touch screens; the location panel was already a bottom sheet on phones.
+- Fixed: the draft cards showed "NaN" for the attack cost since Step 6; they now show the survivor's ATK.
+- The palette was not changed in this step.

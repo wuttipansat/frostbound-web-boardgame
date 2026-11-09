@@ -44,9 +44,9 @@ export function createAtmosphere(stage, board) {
       for (const key of ['storm', 'dusk', 'fire']) cur[key] += (goal[key] - cur[key]) * k;
       stage.setWeather?.(cur.storm);
       const { hemi, moon, scene } = stage;
-      if (hemi) { hemi.color.copy(c.copy(DAY.hemi).lerp(NIGHT.hemi, cur.dusk)); hemi.intensity = 1.25 - cur.dusk * 0.35 - cur.storm * 0.3; }
-      if (moon) { moon.color.copy(c.copy(DAY.moon).lerp(NIGHT.moon, cur.dusk)); moon.intensity = 1.85 - cur.dusk * 0.5 - cur.storm * 0.6; }
-      if (scene?.fog) { scene.fog.color.copy(c.copy(DAY.fog).lerp(NIGHT.fog, cur.dusk)); scene.fog.density = 0.0025 + cur.storm * 0.009; }
+      if (hemi) { hemi.color.copy(c.copy(DAY.hemi).lerp(NIGHT.hemi, cur.dusk)); hemi.intensity = 1.4 - cur.dusk * 0.3 - cur.storm * 0.25; /* brighter day, readable night */ }
+      if (moon) { moon.color.copy(c.copy(DAY.moon).lerp(NIGHT.moon, cur.dusk)); moon.intensity = 2.05 - cur.dusk * 0.45 - cur.storm * 0.5; }
+      if (scene?.fog) { scene.fog.color.copy(c.copy(DAY.fog).lerp(NIGHT.fog, cur.dusk)); scene.fog.density = 0.0015 + cur.storm * 0.006; }
       board.setFire?.(cur.fire);
     },
   };

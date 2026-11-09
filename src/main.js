@@ -19,6 +19,7 @@ import { c, t as tr } from './i18n/index.js';
 import { LOCATION_IDS } from './core/constants.js';
 import { ITEMS } from './content/items.js';
 import { tryReduce } from './core/reducer.js';
+import { actionCost } from './core/selectors.js';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -97,12 +98,16 @@ $('labels').appendChild(nameTag);
 let hoveredLoc = null;
 
 function refreshLabels(state) {
+  // Step 16: with a survivor selected, every place shows the AP that walk costs (the road's price).
+  const sel = state && app?.ui.selSurvivor && state.survivors[app.ui.selSurvivor]?.alive ? app.ui.selSurvivor : null;
   for (const id of LOCATION_IDS) {
     const z = state?.locations[id].zombies ?? 0;
+    const walk = sel && state.survivors[sel].location !== id ? actionCost(state, sel, 'move', id) : null;
     labels[id].replaceChildren();
-    labels[id].classList.toggle('empty', !z);
+    labels[id].classList.toggle('empty', !z && walk == null);
     labels[id].dataset.loc = id;
     if (z) labels[id].append(icon('skull'), String(z));
+    if (walk != null) { const b = document.createElement('b'); b.className = 'walk-ap'; b.textContent = `${walk} AP`; labels[id].append(b); }
     labels[id].setAttribute('aria-label', `${c('locations', id, 'name')}: ${z}`);
   }
 }
@@ -188,12 +193,32 @@ const app = createApp({
       // While the night report is on screen, the board shows night.
       updateWinter(state && app?.ui.queue[0]?.type === 'colony' ? { ...state, time: 'night' } : state);
       refreshLabels(state);
+      document.getElementById('view-ctl')?.classList.toggle('hidden', !state || state.phase === 'draft' || state.phase === 'gameOver');
       for (const [id, el] of Object.entries(labels)) el.classList.toggle('active', app?.ui.selLoc === id);
     },
   },
 });
 refreshLabels(null);
 updateWinter(null);
+
+// Step 16: view buttons (turn 90°, 3 zoom levels) and keys Q / E / + / −.
+{
+  const bar = document.createElement('div');
+  bar.id = 'view-ctl';
+  const btn = (ico, label, fn) => { const b = document.createElement('button'); b.className = 'btn round view-btn'; b.setAttribute('aria-label', label); b.setAttribute('tip', label); b.append(icon(ico)); b.onclick = fn; bar.append(b); };
+  btn('left', tr('view.left'), () => stage.view.rotate(-1));
+  btn('right', tr('view.right'), () => stage.view.rotate(1));
+  btn('up', tr('view.in'), () => stage.view.zoomStep(1));
+  btn('down', tr('view.out'), () => stage.view.zoomStep(-1));
+  document.body.append(bar);
+  window.addEventListener('keydown', (ev) => {
+    if (ev.target.closest?.('input, textarea')) return;
+    if (ev.key === 'q' || ev.key === 'Q') stage.view.rotate(-1);
+    else if (ev.key === 'e' || ev.key === 'E') stage.view.rotate(1);
+    else if (ev.key === '+' || ev.key === '=') stage.view.zoomStep(1);
+    else if (ev.key === '-') stage.view.zoomStep(-1);
+  });
+}
 
 // Step 22: behind an opaque full-screen panel (the draft) draw 1 frame in 4.
 let coverCheck = 0;
