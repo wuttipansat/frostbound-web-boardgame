@@ -77,7 +77,7 @@ export function killSurvivor(s, survivorId, cause) {
   // Gear and backpack: home if they die at the colony, lost out there.
   if (sv.location === 'colony') for (const uid of [...Object.values(sv.gear ?? {}), ...(sv.pack ?? [])]) if (uid) s.stockpile.push(uid);
   sv.pack = [];
-  sv.gear = { weapon: null, armor: null, book: null };
+  sv.gear = { weapon: null, armor: null, book: null, tool: null };
   t.survivors = t.survivors.filter((id) => id !== survivorId);
   t.fallen.push(survivorId);
   log(s, 'death', { survivorId, cause, location: sv.location });
@@ -97,7 +97,7 @@ export function recruitSurvivor(s) {
 }
 
 export function newSurvivor(id, location) {
-  return { id, location, wounds: 0, frostbite: false, alive: true, moved: false, acted: false, ap: 0, hp: RULES.HP_MAX, ammo: 0, pack: [], rest: 'sleep', napped: false, gear: { weapon: null, armor: null, book: null } };
+  return { id, location, wounds: 0, frostbite: false, alive: true, moved: false, acted: false, ap: 0, hp: RULES.HP_MAX, ammo: 0, pack: [], rest: 'sleep', napped: false, gear: { weapon: null, armor: null, book: null, tool: null } };
 }
 
 export function woundSurvivor(s, survivorId, cause = 'wound') {

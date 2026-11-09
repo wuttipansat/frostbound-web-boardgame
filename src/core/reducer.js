@@ -22,6 +22,7 @@ const HANDLERS = {
   [A.EQUIP]: turn.equip,
   [A.NAP]: turn.nap,
   [A.GIVE]: turn.give,
+  [A.CRAFT]: turn.craft,
   [A.SET_REST]: turn.setRest,
 };
 

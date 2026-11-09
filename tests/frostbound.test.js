@@ -55,7 +55,7 @@ test('gear: equip is free, swaps back to hand, changes personal stats, and is wo
   assert.ok(holderOf(s, baton), 'the baton goes back where the shotgun was');
   assert.equal(killsPerAttack(s, 'corwin-daly'), 2);
   const r = reduce(s, act.attack('corwin-daly'));
-  assert.equal(r.locations.police.zombies, 1);
+  assert.equal(r.locations.police.zombies, 1 + r.log.findLast((e) => e.k === 'attack').drawn, 'kills 2 (the noise may draw one)');
   s = reduce(s, act.equip(boots));
   assert.equal(actionCost(s, 'corwin-daly', 'move', 'colony'), ENERGY.WALK[2] - 5);
   const wake = sleepPlan(s)['corwin-daly'].ap;

@@ -171,7 +171,7 @@ export function resolveCrisis(s) {
   const cards = revealed.map((uid) => {
     const item = itemOf(s, uid);
     let delta = -1;
-    if (item.type === crisis.item || item.wild) delta = 1;
+    if (item.type === crisis.item || item.counts === crisis.item || item.wild) delta = 1;
     else if (item.type === 'junk' && teamHasAbility(s, 'tinkerer')) delta = 1;
     score += delta;
     return { card: s.cards[uid], type: item.type, delta };

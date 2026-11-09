@@ -32,7 +32,7 @@ export function gearOf(s, survivorId = null) {
   const sv = survivorId ? s.survivors[survivorId] : heroOf(s);
   const g = sv?.gear ?? {};
   const def = (uid) => (uid ? ITEMS[s.cards[uid]] ?? null : null);
-  return { weapon: def(g.weapon), armor: def(g.armor), book: def(g.book) };
+  return { weapon: def(g.weapon), armor: def(g.armor), book: def(g.book), tool: def(g.tool) };
 }
 
 /** How many living survivors have a book with this passive equipped (books help the whole team). */
@@ -128,7 +128,9 @@ export function actionCost(s, survivorId, kind, to = null) {
   let cost = ENERGY.COST[kind] ?? 0;
   if (kind === 'attack') cost = gear.weapon?.gun ? FIGHT.GUN_AP : FIGHT.MELEE_AP;
   if (kind === 'search') cost = ENERGY.SEARCH;
-  if (kind === 'move') cost = walkCost(sv?.location ?? 'colony', to ?? 'colony') + (gear.armor?.moveMod ?? 0);
+  if (kind === 'move') cost = walkCost(sv?.location ?? 'colony', to ?? 'colony') + (gear.armor?.moveMod ?? 0) + (gear.tool?.walkMod ?? 0);
+  if (kind === 'search') cost += gear.tool?.searchMod ?? 0;
+  if (kind === 'barricade') cost += gear.tool?.barricadeMod ?? 0;
   if (!sv) return cost;
   const here = sv.location;
   const zombies = s.locations[here]?.zombies ?? 0;
@@ -138,7 +140,7 @@ export function actionCost(s, survivorId, kind, to = null) {
   const cheaper = { move: 'roadRunner', attack: 'sharpshooter', barricade: 'handy' }[kind];
   if (cheaper && def?.ability.type === cheaper) cost -= ENERGY.SKILLED;
   const outside = kind === 'move' ? to && to !== 'colony' : here !== 'colony';
-  if (isStorm(s) && outside && def?.ability.type !== 'coldProof') cost += ENERGY.STORM;
+  if (isStorm(s) && outside && def?.ability.type !== 'coldProof' && !gear.armor?.coldProof) cost += ENERGY.STORM;
   return Math.max(1, cost);
 }
 
@@ -168,7 +170,9 @@ export function placeOfItem(s, uid) {
   return h === 'stockpile' ? 'colony' : h ? s.survivors[h].location : null;
 }
 
-export const packFree = (s, survivorId) => RULES.PACK - (s.survivors[survivorId]?.pack?.length ?? 0);
+/** Backpack slots: 3, more with a big backpack or a sled. */
+export const packSize = (s, survivorId) => RULES.PACK + (s.survivors[survivorId] ? gearOf(s, survivorId).tool?.pack ?? 0 : 0);
+export const packFree = (s, survivorId) => packSize(s, survivorId) - (s.survivors[survivorId]?.pack?.length ?? 0);
 
 /** Zombies one attack kills: a gun's value (shotgun 2); melee 1, +1 for Teodor. */
 export function killsPerAttack(s, survivorId) {

@@ -33,7 +33,8 @@ test('move and card options', () => {
   assert.ok(moveOption(s, 'corwin-daly', 'school').ok);
   assert.equal(moveOption(s, 'corwin-daly', 'colony').error, 'sameLocation');
   let fuel; [s, fuel] = giveCard(s, 'jerry-can');
-  assert.equal(moveOption(s, 'corwin-daly', 'school', true).fuel, fuel);
+  assert.equal(s.cards[moveOption(s, 'corwin-daly', 'school', true).fuel], 'jerry-can');
+  assert.ok(fuel);
   const fuelOpts = cardOptions(s, fuel);
   assert.deepEqual(fuelOpts.map((o) => o.id), ['contribute', 'deposit'], 'fuel is used when moving, not played');
   assert.ok(fuelOpts.find((o) => o.id === 'deposit').ok);

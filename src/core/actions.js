@@ -17,6 +17,7 @@ export const A = Object.freeze({
   EQUIP: 'EQUIP',
   NAP: 'NAP',
   GIVE: 'GIVE',
+  CRAFT: 'CRAFT',
   SET_REST: 'SET_REST',
 });
 
@@ -42,3 +43,5 @@ export const nap = (survivorId) => ({ type: A.NAP, survivorId });
 export const setRest = (survivorId, mode) => ({ type: A.SET_REST, survivorId, mode });
 /** Hand an item to a survivor at the same place (free); no survivor = into the stockpile at the colony. */
 export const give = (cardUid, toSurvivorId = null) => ({ type: A.GIVE, cardUid, toSurvivorId });
+/** Craft a recipe (content/items.js RECIPES) at the colony with stockpile materials and the survivor's AP. */
+export const craft = (recipeId, survivorId) => ({ type: A.CRAFT, recipeId, survivorId });

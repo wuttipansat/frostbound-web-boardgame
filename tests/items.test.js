@@ -4,7 +4,7 @@ import { reduce, tryReduce } from '../src/core/reducer.js';
 import * as a from '../src/core/actions.js';
 import { ITEMS } from '../src/content/items.js';
 import { LOCATIONS } from '../src/content/locations.js';
-import { foodNeeded, killsPerAttack, actionCost, holderOf } from '../src/core/selectors.js';
+import { foodNeeded, killsPerAttack, actionCost, holderOf, packSize } from '../src/core/selectors.js';
 import { startedGame, setSurvivors, setEnergy, giveCard, patch } from './_helpers.js';
 
 const turn = (placements, energy = 100) => {
@@ -36,7 +36,7 @@ test('weapons are worn: each attack kills the weapon\'s value, at the weapon\'s 
   assert.equal(killsPerAttack(r, 'corwin-daly'), 2);
   assert.equal(actionCost(r, 'corwin-daly', 'attack'), 10, 'a shot costs 10');
   const shot = reduce(r, a.attack('corwin-daly'));
-  assert.equal(shot.locations.police.zombies, 1, 'shotgun kills 2');
+  assert.equal(shot.locations.police.zombies, 1 + shot.log.findLast((e) => e.k === 'attack').drawn, 'shotgun kills 2');
   r = reduce(r, a.equip(rifle));
   assert.equal(killsPerAttack(r, 'corwin-daly'), 1);
   assert.ok(bare > 10);
@@ -115,4 +115,30 @@ test('books work while equipped (one book slot per survivor): cookbook saves foo
   assert.equal(foodNeeded(s), need, 'the cookbook went back to the hand');
   assert.equal(reduce(s, a.barricade('corwin-daly')).locations.police.barricades, 2);
   assert.ok(holderOf(s, book));
+});
+
+test('step 8 items: consumables, gadgets, crafting', async () => {
+  const { craft } = await import('../src/core/actions.js');
+  let { s } = turn({ 'corwin-daly': 'police', 'agnes-pell': 'colony' });
+  s = patch(s, (x) => { x.survivors['corwin-daly'].hp = 50; x.survivors['corwin-daly'].ap = 30; x.locations.police.zombies = 4; });
+  let bandage, coffee, bomb, ammo, pack;
+  [s, bandage] = giveCard(s, 'bandage');
+  [s, coffee] = giveCard(s, 'coffee');
+  [s, bomb] = giveCard(s, 'firebomb');
+  assert.equal(reduce(s, a.playCard(bandage, { targetSurvivorId: 'corwin-daly' })).survivors['corwin-daly'].hp, 65);
+  assert.equal(reduce(s, a.playCard(coffee, { targetSurvivorId: 'corwin-daly' })).survivors['corwin-daly'].ap, 50);
+  const burnt = reduce(s, a.playCard(bomb, { targetSurvivorId: 'corwin-daly' }));
+  assert.equal(burnt.locations.police.zombies, 1);
+  [s, ammo] = giveCard(s, 'ammo', 'corwin-daly');
+  assert.equal(tryReduce(s, a.playCard(ammo, { targetSurvivorId: 'corwin-daly' })).error, 'needGun');
+  [s, pack] = giveCard(s, 'big-backpack', 'corwin-daly');
+  s = reduce(s, a.equip(pack, 'corwin-daly'));
+  assert.equal(packSize(s, 'corwin-daly'), 5);
+  // Crafting: materials from the stockpile + AP, at the colony.
+  let w; [s, w] = giveCard(s, 'wood', 'stockpile'); [s, w] = giveCard(s, 'wood', 'stockpile');
+  assert.equal(tryReduce(s, craft('baseball-bat', 'corwin-daly')).error, 'mustBeInColony');
+  assert.equal(tryReduce(s, craft('sled', 'agnes-pell')).error, 'missingMaterials');
+  const made = reduce(s, craft('baseball-bat', 'agnes-pell'));
+  assert.ok(made.stockpile.some((u) => made.cards[u] === 'baseball-bat'));
+  assert.ok(!made.stockpile.some((u) => made.cards[u] === 'wood'));
 });

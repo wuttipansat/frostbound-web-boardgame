@@ -6,7 +6,7 @@ the game checks each file once and swaps the frame for the picture.
 
 - Size: **128 × 128 px** (64 × 64 also works; it is shown pixelated), transparent background.
 - Name: exactly the id below, e.g. `public/items/canned-beans.png`.
-- New items added in later steps (Step 8) will be added to this list.
+- Step 8 items (gadgets, consumables, materials, new weapons and armor) are listed at the end of the table.
 
 | File | Type | Item |
 |------|------|------|
@@ -40,3 +40,26 @@ the game checks each file once and swaps the frame for the picture.
 | `mosin-nagant.png` | weapon | Mosin-Nagant |
 | `remington-870.png` | weapon | Remington 870 |
 | `riot-baton.png` | weapon | Riot Baton |
+| `kitchen-knife.png` | weapon | Kitchen Knife |
+| `crowbar.png` | weapon | Crowbar |
+| `baseball-bat.png` | weapon | Baseball Bat |
+| `hunting-bow.png` | weapon | Hunting Bow |
+| `scrap-plate.png` | armor | Scrap Plate Armor |
+| `snow-suit.png` | armor | Snow Suit |
+| `flashlight.png` | gadget | Flashlight |
+| `city-map.png` | gadget | City Map |
+| `big-backpack.png` | gadget | Big Backpack |
+| `sled.png` | gadget | Sled |
+| `tool-kit.png` | gadget | Tool Kit |
+| `bandage.png` | consumable | Bandage |
+| `first-aid-kit.png` | consumable | First-Aid Kit |
+| `painkillers.png` | consumable | Painkillers |
+| `coffee.png` | consumable | Instant Coffee |
+| `chocolate.png` | consumable | Chocolate Bar |
+| `ammo.png` | consumable | Box of Ammo |
+| `firebomb.png` | consumable | Firebomb |
+| `wood.png` | material | Planks |
+| `scrap.png` | material | Scrap Metal |
+| `cloth.png` | material | Cloth |
+| `engine-part.png` | material | Engine Part |
+| `heater-part.png` | material | Heater Part |

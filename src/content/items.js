@@ -1,5 +1,6 @@
 // Item card definitions. Every location deck is built from these.
-// type: food | medicine | fuel | tools | weapon | armor | junk | survivor | book
+// type: food | medicine | fuel | tools | weapon | armor | junk | survivor | book | gadget | consumable | material
+// counts: a crisis also accepts this item as that type (bandage → medicine, coffee → food, wood → tools).
 // tier: 1 common (white), 2 uncommon (blue), 3 rare (gold). Higher tiers are stronger and scarcer.
 // value: food tokens / wounds healed / barricades / zombies killed per attack / energy (junk: × 12).
 // Gear (weapon, armor, book) is EQUIPPED to a slot (free action) and changes its wearer's personal stats:
@@ -7,8 +8,8 @@
 //   armor:  value = HP saved per fight; boots: moveMod (move cost);
 //   book:   blueprint (search a place: draw 1 more, put 1 back) | foodSaver | barricadePlus | regenPlus.
 
-export const GEAR_SLOTS = Object.freeze({ weapon: 'weapon', armor: 'armor', book: 'book' });
-export const PERMANENT_TYPES = Object.freeze(['weapon', 'armor', 'book']);
+export const GEAR_SLOTS = Object.freeze({ weapon: 'weapon', armor: 'armor', book: 'book', gadget: 'tool' });
+export const PERMANENT_TYPES = Object.freeze(['weapon', 'armor', 'book', 'gadget']);
 export const isPermanent = (item) => PERMANENT_TYPES.includes(item.type);
 export const gearSlot = (item) => GEAR_SLOTS[item?.type] ?? null;
 
@@ -53,5 +54,43 @@ export const ITEMS = {
   'blueprint-gas':      bp('gas', 'Gas Station Blueprint'),
   'winter-cookbook': { id: 'winter-cookbook', type: 'book', tier: 2, value: 1, passive: 'foodSaver', name: 'Winter Pantry Cookbook', text: 'Forty ways to stretch a can.' },
   'field-manual':    { id: 'field-manual', type: 'book', tier: 2, value: 1, passive: 'barricadePlus', name: 'Barricade Field Manual', text: 'Chapter 3: brace, then nail.' },
+  // MELEE WEAPONS (atk adds to ATK; the bow is silent)
+  'kitchen-knife':   { id: 'kitchen-knife', type: 'weapon', tier: 1, value: 1, atk: 6, name: 'Kitchen Knife', text: 'Short reach, sure grip.' },
+  crowbar:           { id: 'crowbar', type: 'weapon', tier: 1, value: 1, atk: 8, name: 'Crowbar', text: 'Opens doors and arguments.' },
+  'baseball-bat':    { id: 'baseball-bat', type: 'weapon', tier: 1, value: 1, atk: 10, name: 'Baseball Bat', text: 'Signed by nobody famous.' },
+  'hunting-bow':     { id: 'hunting-bow', type: 'weapon', tier: 2, value: 1, atk: 12, name: 'Hunting Bow', text: 'Silent. Arrows come back, mostly.' },
+  // ARMOR (value = HP saved per fight)
+  'scrap-plate':     { id: 'scrap-plate', type: 'armor', tier: 3, value: 5, name: 'Scrap Plate Armor', text: 'Car doors and leather straps.' },
+  'snow-suit':       { id: 'snow-suit', type: 'armor', tier: 2, value: 1, coldProof: true, name: 'Snow Suit', text: 'Storms cost nothing extra.' },
+  // GADGETS (tool slot)
+  flashlight:        { id: 'flashlight', type: 'gadget', tier: 1, value: 0, searchMod: -5, name: 'Flashlight', text: 'Searching costs 5 less AP.' },
+  'city-map':        { id: 'city-map', type: 'gadget', tier: 1, value: 0, walkMod: -3, name: 'City Map', text: 'Walking costs 3 less AP.' },
+  'big-backpack':    { id: 'big-backpack', type: 'gadget', tier: 2, value: 0, pack: 2, name: 'Big Backpack', text: '+2 backpack slots.' },
+  sled:              { id: 'sled', type: 'gadget', tier: 2, value: 0, pack: 3, walkMod: 2, name: 'Sled', text: '+3 slots, walking costs 2 more.' },
+  'tool-kit':        { id: 'tool-kit', type: 'gadget', tier: 2, value: 0, barricadeMod: -5, name: 'Tool Kit', text: 'Barricades cost 5 less AP.' },
+  // CONSUMABLES (used on a survivor at the same place)
+  bandage:           { id: 'bandage', type: 'consumable', counts: 'medicine', tier: 1, value: 0, use: { hp: 15 }, name: 'Bandage', text: '+15 HP.' },
+  'first-aid-kit':   { id: 'first-aid-kit', type: 'consumable', counts: 'medicine', tier: 2, value: 0, use: { hp: 35 }, name: 'First-Aid Kit', text: '+35 HP.' },
+  painkillers:       { id: 'painkillers', type: 'consumable', counts: 'medicine', tier: 1, value: 0, use: { hp: 10, ap: 10 }, name: 'Painkillers', text: '+10 HP, +10 AP.' },
+  coffee:            { id: 'coffee', type: 'consumable', counts: 'food', tier: 1, value: 0, use: { ap: 20 }, name: 'Instant Coffee', text: '+20 AP.' },
+  chocolate:         { id: 'chocolate', type: 'consumable', counts: 'food', tier: 1, value: 0, use: { ap: 10, hp: 5 }, name: 'Chocolate Bar', text: '+10 AP, +5 HP.' },
+  ammo:              { id: 'ammo', type: 'consumable', counts: 'weapon', tier: 1, value: 0, use: { ammo: 6 }, name: 'Box of Ammo', text: '+6 rounds for a gun.' },
+  firebomb:          { id: 'firebomb', type: 'consumable', counts: 'weapon', tier: 2, value: 0, use: { burn: 3 }, name: 'Firebomb', text: 'Kills up to 3 zombies here.' },
+  // MATERIALS (crafting now; base upgrades and the snow crawler later)
+  wood:              { id: 'wood', type: 'material', counts: 'tools', tier: 1, value: 1, name: 'Planks', text: 'Pulled off a fence.' },
+  scrap:             { id: 'scrap', type: 'material', counts: 'tools', tier: 1, value: 1, name: 'Scrap Metal', text: 'Sharp edges, good weight.' },
+  cloth:             { id: 'cloth', type: 'material', counts: 'medicine', tier: 1, value: 1, name: 'Cloth', text: 'Curtains, sheets, flags.' },
+  'engine-part':     { id: 'engine-part', type: 'material', tier: 3, value: 1, name: 'Engine Part', text: 'For the snow crawler.' },
+  'heater-part':     { id: 'heater-part', type: 'material', tier: 3, value: 1, name: 'Heater Part', text: 'For the snow crawler.' },
   'survival-guide':  { id: 'survival-guide', type: 'book', tier: 2, value: 10, passive: 'regenPlus', name: 'Winter Survival Guide', text: 'Rest smart, eat warm, move at dawn.' },
+};
+
+/** Crafting at the colony: materials (item ids, from the stockpile) + AP → an item into the stockpile. */
+export const RECIPES = {
+  bandage:       { needs: { cloth: 1 }, ap: 5, makes: 'bandage' },
+  firebomb:      { needs: { 'jerry-can': 1, cloth: 1 }, ap: 5, makes: 'firebomb' },
+  'baseball-bat': { needs: { wood: 2 }, ap: 10, makes: 'baseball-bat' },
+  'scrap-plate': { needs: { scrap: 2, cloth: 1 }, ap: 15, makes: 'scrap-plate' },
+  sled:          { needs: { wood: 2, scrap: 1 }, ap: 15, makes: 'sled' },
+  barricade:     { needs: { wood: 1, scrap: 1 }, ap: 5, makes: 'socket-set' },
 };

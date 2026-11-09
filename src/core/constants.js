@@ -8,7 +8,7 @@ export const PHASES = Object.freeze({
   GAME_OVER: 'gameOver',
 });
 
-export const ITEM_TYPES = Object.freeze(['food', 'medicine', 'fuel', 'tools', 'weapon', 'armor', 'junk', 'survivor', 'book']);
+export const ITEM_TYPES = Object.freeze(['food', 'medicine', 'fuel', 'tools', 'weapon', 'armor', 'junk', 'survivor', 'book', 'gadget', 'consumable', 'material']);
 
 /** Parts of a day: dawn (crisis, crossroads) → day (your actions) → dusk (food, crisis) → night (zombies). */
 export const TIMES = Object.freeze(['dawn', 'day', 'dusk', 'night']);

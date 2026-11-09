@@ -1,6 +1,6 @@
 // Active-player actions. Everything that takes effort costs the survivor's energy (no dice anywhere);
 // cards, gear and abilities are free.
-import { PHASES, LOCATION_IDS, ENERGY, REST } from '../constants.js';
+import { PHASES, LOCATION_IDS, ENERGY, REST, RULES } from '../constants.js';
 import { random } from '../rng.js';
 import { assert } from '../errors.js';
 import {
@@ -13,7 +13,7 @@ import {
   spendEnergy, gainEnergy, healHp, damageSurvivor, unpack,
 } from './helpers.js';
 import { endTurn } from './flow.js';
-import { isPermanent, gearSlot } from '../../content/items.js';
+import { isPermanent, gearSlot, RECIPES } from '../../content/items.js';
 
 // ---------------------------------------------------------------- guards
 
@@ -174,7 +174,7 @@ export function equip(s, { cardUid, survivorId = null }) {
   const holder = holderOf(s, cardUid);
   const sv = requireSurvivor(s, survivorId ?? (holder !== 'stockpile' ? holder : p.survivors.find((id) => s.survivors[id]?.alive && s.survivors[id].location === 'colony')) ?? '');
   requireSamePlace(s, cardUid, sv.id);
-  sv.gear = sv.gear ?? { weapon: null, armor: null, book: null };
+  sv.gear = sv.gear ?? { weapon: null, armor: null, book: null, tool: null };
   const old = sv.gear[slot];
   removeFromHand(s, cardUid);
   // The old item goes where the new one came from.
@@ -227,6 +227,24 @@ export function playCard(s, { cardUid, targetSurvivorId }) {
       gainEnergy(s, ENERGY.JUNK * item.value * (teamHasAbility(s, 'haggler') ? 2 : 1), sv.id);
       break;
     }
+    case 'consumable': {
+      const h = holderOf(s, cardUid);
+      const sv = requireSurvivor(s, targetSurvivorId ?? (h !== 'stockpile' ? h : p.survivors.find((id) => s.survivors[id]?.alive && s.survivors[id].location === 'colony')) ?? '');
+      requireSamePlace(s, cardUid, sv.id);
+      const u = item.use;
+      if (u.ammo) assert(gearOf(s, sv.id).weapon?.gun, 'needGun');
+      if (u.burn) assert(s.locations[sv.location].zombies > 0, 'noZombiesHere');
+      if (!u.ammo && !u.burn) assert((u.hp && sv.hp < RULES.HP_MAX) || (u.ap && sv.ap < apMax(s, sv.id)), 'energyFull');
+      spend();
+      if (u.hp) healHp(s, sv.id, u.hp);
+      if (u.ap) gainEnergy(s, u.ap, sv.id);
+      if (u.ammo) sv.ammo = (sv.ammo ?? 0) + u.ammo;
+      if (u.burn) creditKills(s, removeZombies(s, sv.location, u.burn));
+      break;
+    }
+    case 'material':
+      assert(false, 'craftInstead');
+      break;
     case 'survivor':
       removeFromHand(s, cardUid); // they join the colony
       changeMorale(s, recruitSurvivor(s) ? 1 : 2, 'newcomer');
@@ -234,7 +252,7 @@ export function playCard(s, { cardUid, targetSurvivorId }) {
     case 'fuel':
       assert(false, 'fuelIsPlayedWhenMoving');
       break;
-    case 'weapon': case 'armor': case 'book':
+    case 'weapon': case 'armor': case 'book': case 'gadget':
       assert(false, 'equipInstead');
       break;
     default:
@@ -299,6 +317,29 @@ export function give(s, { cardUid, toSurvivorId = null }) {
   removeFromHand(s, cardUid);
   to.pack.push(cardUid);
   log(s, 'give', { survivorId: from === 'stockpile' ? toSurvivorId : from, card: s.cards[cardUid], to: toSurvivorId });
+}
+
+/** Craft at the colony: the survivor spends AP, the materials leave the stockpile, the item joins it. */
+export function craft(s, { recipeId, survivorId }) {
+  requireTurn(s);
+  const r = RECIPES[recipeId];
+  assert(r, 'noSuchRecipe', recipeId);
+  const sv = requireActive(s, survivorId);
+  assert(sv.location === 'colony', 'mustBeInColony');
+  const used = [];
+  for (const [itemId, n] of Object.entries(r.needs)) {
+    const have = s.stockpile.filter((u) => s.cards[u] === itemId && !used.includes(u)).slice(0, n);
+    assert(have.length === n, 'missingMaterials', itemId);
+    used.push(...have);
+  }
+  assert(sv.ap >= r.ap, 'notEnoughEnergy');
+  sv.ap -= r.ap;
+  sv.acted = true;
+  for (const u of used) discardCard(s, u);
+  const uid = `k${Object.keys(s.cards).length}`;
+  s.cards[uid] = r.makes;
+  s.stockpile.push(uid);
+  log(s, 'craft', { survivorId, card: r.makes });
 }
 
 // ---------------------------------------------------------------- rest

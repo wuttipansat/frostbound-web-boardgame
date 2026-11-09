@@ -1,3 +1,7 @@
+import { RECIPES } from '../../content/items.js';
+import * as act from '../../core/actions.js';
+import { tryReduce } from '../../core/reducer.js';
+const check = (s, action) => { const r = tryReduce(s, action); return { action, ok: r.ok, error: r.error }; };
 // Right-hand location panel: details, who is here (portraits), zombies (art), and illustrated actions
 // for the selected survivor. Lure picks its destination on the board.
 import { h, mount } from '../dom.js';
@@ -84,6 +88,15 @@ export function renderLocationPanel(el, ctx) {
             o.cost ? h('span', { class: 'need-badge cost', 'aria-hidden': 'true' }, String(o.cost)) : null,
             null);
           }))));
+      }
+      if (id === 'colony' && sel?.location === 'colony') {
+        const crafts = Object.entries(RECIPES).map(([rid, r]) => ({ rid, r, ...check(s, act.craft(rid, sel.id)) }));
+        actions.push(h('div', { class: 'act-box craft' }, h('h4', {}, t('act.craft')),
+          h('div', { class: 'picker-row' }, crafts.map((x) => h('button', {
+            class: `btn small-act${x.ok ? '' : ' off'}`,
+            tip: `${Object.entries(x.r.needs).map(([i, n]) => `${n}× ${c('items', i, 'name')}`).join(' + ')} + ${x.r.ap} AP${x.ok ? '' : ` · ${t(`err.${x.error}`)}`}`,
+            onclick: (ev) => (x.ok ? ctx.dispatch(x.action) : flashTip(ev.currentTarget)),
+          }, c('items', x.r.makes, 'name'))))));
       }
       if (!sel && !mine.length) actions.push(h('p', { class: 'muted small' }, t('panel.selectHint')));
     }

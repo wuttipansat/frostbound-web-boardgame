@@ -119,7 +119,7 @@ export function renderPlayerPanel(refs, ctx) {
       h('b', { class: 'en-num' }, `${e}`), h('small', {}, `/${max}`)));
   // The survivor's round face, with the worn gear (weapon / armor / book) beside it.
   mount(refs.survivors, aliveSurvivors(s).map((sv) => survivorToken(ctx, sv, { canAct: acting.has(sv.id), color: '#f2b33d' })),
-    h('div', { class: 'gear', role: 'group', 'aria-label': t('panel.gear') }, ['weapon', 'armor', 'book'].map((slot) => {
+    h('div', { class: 'gear', role: 'group', 'aria-label': t('panel.gear') }, ['weapon', 'armor', 'book', 'tool'].map((slot) => {
       const it = gear[slot];
       const label = it ? `${t(`item.${slot}`)}: ${c('items', it.id, 'name')} — ${t(...itemShort(it))}` : t('panel.gearEmpty', { slot: t(`item.${slot}`) });
       return h('span', { class: `gear-slot${it ? ' on' : ''}`, dataset: { slot }, tip: label, 'aria-label': label, tabindex: '0' },
@@ -351,7 +351,7 @@ function survivorToken(ctx, sv, { canAct = false, color = '#888' } = {}) {
     // Worn gear (phones hide the gear slots in the HUD, so it is listed here too).
     (() => {
       const g = gearOf(ctx.state, sv.id);
-      const worn = ['weapon', 'armor', 'book'].map((k) => g[k]).filter(Boolean);
+      const worn = ['weapon', 'armor', 'book', 'tool'].map((k) => g[k]).filter(Boolean);
       return worn.length ? h('span', { class: 'tok-gear' }, icon('hand'), worn.map((it) => c('items', it.id, 'name')).join(' · ')) : null;
     })()));
 }

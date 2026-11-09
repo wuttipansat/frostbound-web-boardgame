@@ -8,7 +8,7 @@ import { PHASES, OUTSIDE_LOCATIONS, ENERGY, RULES } from '../core/constants.js';
 import { gearSlot } from '../content/items.js';
 import {
   aliveSurvivors, survivorDef, itemOf, crisisDef, scenarioDef,
-  freeSurvivorSlots, freeZombieSlots, foodNeeded, actionCost, fightPreview, placeOfItem, packFree, spawnForecast, crisisRequirement, gearOf,
+  freeSurvivorSlots, freeZombieSlots, foodNeeded, actionCost, fightPreview, placeOfItem, packFree, leaveDamage, spawnForecast, crisisRequirement, gearOf,
 } from '../core/selectors.js';
 import { CROSSROADS_BY_ID } from '../content/crossroads.js';
 
@@ -74,7 +74,7 @@ function turnAction(s, p, opts) {
   // Crisis contribution.
   if (crisis) {
     const added = s.crisis.contributions.length;
-    const match = cardsOf(crisis.item)[0];
+    const match = cardsOf(crisis.item)[0] ?? items.find((u) => itemOf(s, u).counts === crisis.item);
     if (match && added < crisisRequirement(s) + 1) candidates.push(act.contribute(match));
   }
 
@@ -113,6 +113,20 @@ function turnAction(s, p, opts) {
     if (who) { candidates.unshift(act.equip(uid, who.id)); break; }
   }
 
+  // Consumables: heal, wake up, reload, burn crowds (illegal ones are filtered out).
+  for (const uid of cardsOf('consumable')) {
+    const u = itemOf(s, uid).use;
+    const at = placeOfItem(s, uid);
+    for (const sv of survivors.filter((x) => x.location === at)) {
+      const want = (u.hp && sv.hp <= 100 - u.hp) || (u.ap && !u.hp && sv.ap < 25) || u.ammo
+        || (u.burn && s.locations[sv.location].zombies >= 2);
+      if (want) candidates.push(act.playCard(uid, { targetSurvivorId: sv.id }));
+    }
+  }
+  // Craft at home when the materials are there.
+  const crafter = survivors.find((sv) => sv.location === 'colony' && sv.ap >= 20);
+  if (crafter && s.food >= foodNeeded(s)) for (const rid of ['scrap-plate', 'sled', 'baseball-bat', 'bandage']) candidates.push(act.craft(rid, crafter.id));
+
   // Newcomers lift morale (but eat): take them in while the larder holds.
   const recruit = cardsOf('survivor')[0];
   if (recruit && s.food >= foodNeeded(s)) candidates.push(act.playCard(recruit));
@@ -128,6 +142,7 @@ function turnAction(s, p, opts) {
 function energyActions(s, p, survivors, candidates, cardsOf, opts) {
   const can = (sv, kind, to) => {
     if (sv.napped || sv.ap < actionCost(s, sv.id, kind, to)) return false;
+    if (kind === 'move' && leaveDamage(s, sv.id) >= sv.hp - 10) return false; // walking out would kill them
     if (kind !== 'attack') return true;
     // Fight only when it is safe enough: a loaded gun, or a melee hit that leaves plenty of HP.
     const f = fightPreview(s, sv.id);

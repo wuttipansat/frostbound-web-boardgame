@@ -10,6 +10,7 @@ function effect(item) {
     if (item.moveMod) return ['armorMove', { mod: signed(item.moveMod) }];
     return ['armor', { n: item.value }];
   }
+  if (['gadget', 'consumable', 'material'].includes(item.type)) return [item.type, { text: c('items', item.id, 'text') }];
   if (item.type === 'survivor') return ['recruit', { n: 1 }];
   if (item.type === 'junk') return [item.wild ? 'junkWild' : 'junk', { n: item.value * 12 }];
   return [item.type, { n: item.value }];

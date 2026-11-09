@@ -22,7 +22,7 @@ Numbers are starting values; Step 18 tunes them.
 | 5 | AP per survivor (max 60–95, odd numbers) and sleep. Night: bed 100% AP +15 HP, no bed 70% +5 HP, outside 40% +0 HP (and the zombies there attack). Guard duty (helps defend, 50% AP next day). Nap: +25 AP +5 HP, skips the day. | **done** (HP is tracked; zombie bites outside come in Step 6) |
 | 6 | HP 100 and fights. One attack = one zombie dead, costs 15 AP. HP lost = `max(0, zombie ferocity − (AP left + ATK)) ÷ 3` rounded up, minus armor. Walker ferocity 110, brute 150 (day 21+). Leaving a place with zombies: 5 HP per zombie. Guns: kill without losing HP, 10 AP + 1 ammo, a chance a new zombie appears (pistol 40%, shotgun 50% and kills 2, silenced rifle 15%). | **done** |
 | 7 | Expeditions: walking costs AP by distance (12 / 17 / 23), search 17 AP into the survivor's backpack (3 slots). Items count only once carried home (`s.stockpile`). A search may make a zombie appear (10–25% by place, +10% per extra search there that day; it appears, it does not bite at once). Hand items over for free at the same place. No player hand. | **done** |
-| 8 | Items: weapons (knife +6, crowbar +8, bat +10, bow +12 silent, fire axe +18, guns), armor (−2 / −3 / −5 HP per fight, snow suit), tools (flashlight, map, big backpack, sled, survival guide, tool kit), consumables (bandage +15 HP, first-aid kit +35 HP, painkillers, coffee +20 AP, chocolate, canned food, ammo, firebomb), materials (wood, scrap, cloth, tools, fuel, engine and heater parts). Loot tables per place. Crafting (needs the workshop). | |
+| 8 | Items: weapons (knife +6, crowbar +8, bat +10, bow +12 silent, fire axe +18, guns), armor (−2 / −3 / −5 HP per fight, snow suit), tools (flashlight, map, big backpack, sled, survival guide, tool kit), consumables (bandage +15 HP, first-aid kit +35 HP, painkillers, coffee +20 AP, chocolate, canned food, ammo, firebomb), materials (wood, scrap, cloth, tools, fuel, engine and heater parts). Loot tables per place. Crafting (needs the workshop). | **done** (crafting at the colony; the workshop gate comes in Step 12) |
 | 9 | New location capacity: remove the slot pedestals. One floating sign per place: name, 👤 2/4, 🧟 3/6 bar, search %, cards left. 6 zombies = the place is overrun (no searching, extra zombies walk to the base). | |
 | 10 | Food every day: everyone at the base eats 1. Missing food: −15 HP each, −1 morale, 50% AP next day. "Food for N days" on the HUD. | |
 | 11 | A crisis every day: revealed at dawn, items handed in during the day (face up), scored at dusk. +1 needed every 10 days. | |
@@ -124,3 +124,23 @@ Numbers are starting values; Step 18 tunes them.
   police 25%, +10% for every earlier search there today (`searchSpawnChance`, shown on the search button).
 - A survivor who dies at the colony leaves gear and backpack in the stockpile; out there they are lost.
 - Balance (bot, 30 games): beacon 23% won, stores 27%, purge 43%.
+
+## Step 8 notes
+
+- New item types: **gadget** (a 4th gear slot, `tool`), **consumable** (used on a survivor at the same place),
+  **material** (crafting now; base upgrades and the snow crawler later). Old items stay.
+- Melee: kitchen knife +6, crowbar +8 (riot baton +8), baseball bat +10, hunting bow +12, fire axe +18.
+  Armor: parka 2, riot vest 3, scrap plate 5, snow suit 1 + no storm cost.
+- Gadgets: flashlight (search −5), city map (walk −3), big backpack (+2 slots), sled (+3 slots, walk +2),
+  tool kit (barricade −5). The survival guide stays a book.
+- Consumables: bandage +15 HP, first-aid kit +35, painkillers +10 HP +10 AP, coffee +20 AP, chocolate +10 AP +5 HP,
+  ammo +6 rounds (needs a gun), firebomb kills up to 3 zombies here.
+- Materials: wood, scrap, cloth, engine part (gas station), heater part (school).
+- Some new items also count for crises (`counts`): bandages / painkillers / first-aid kits / cloth as medicine,
+  coffee / chocolate as food, wood / scrap as tools, ammo / firebomb as weapons.
+- Crafting (`craft(recipeId, survivorId)`, at the colony, stockpile materials + AP): bandage (cloth, 5 AP),
+  firebomb (fuel + cloth, 5), baseball bat (2 wood, 10), scrap plate (2 scrap + cloth, 15),
+  sled (2 wood + scrap, 15), socket set for barricades (wood + scrap, 5). Craft buttons are in the colony panel.
+- Loot: every place got a few new items (about +6 cards each); `docs/item-art.md` lists all 53 picture files.
+- Balance (bot, 30 games): beacon 3% won, stores 10%, purge 3%. Bigger decks mean fewer crisis items, and
+  the bot does not plan expeditions well. Step 10 (food), 11 (crises) and 18 retune this.
