@@ -78,6 +78,10 @@ export function setupScreen(ctx) {
           h('button', { class: seat.isAI ? 'on' : '', onclick: () => setSeat(i, { isAI: true }) }, t('setup.ai'))))))),
     h('details', { class: 'setup-more' },
       h('summary', {}, t('setup.more')),
+      // Step 23: Frostbound rules (energy + danger deck) or the classic dice.
+      h('div', { class: 'row' },
+        h('span', { class: 'lbl', tip: t('setup.rulesTip') }, t('setup.rules')),
+        h('div', { class: 'seg small' }, ['frostbound', 'classic'].map((m) => h('button', { class: (cfg.rules ?? 'frostbound') === m ? 'on' : '', 'data-rules': m, onclick: () => update({ rules: m }) }, t(`setup.rules.${m}`))))),
       h('div', { class: 'row' },
         h('span', { class: 'lbl' }, t('setup.betrayer')),
         h('div', { class: 'seg small' }, ['maybe', 'always', 'never'].map((m) => h('button', { class: cfg.betrayer === m ? 'on' : '', onclick: () => update({ betrayer: m }) }, t(`setup.betrayer.${m}`))))),
@@ -575,8 +579,8 @@ export function confirmEndModal(ctx) {
   const n = me.dice.filter((d) => !d.used).length;
   return dialog('confirm-end',
     h('h2', {}, t('confirm.end.title')),
-    h('div', { class: 'dice-row' }, me.dice.map((d) => dieFace(d.v, d.used ? 'spent' : ''))),
-    h('p', {}, t('confirm.end.text', { n })),
+    me.energy != null && ctx.state.danger ? h('p', {}, t('confirm.end.energy', { n: me.energy })) : h('div', { class: 'dice-row' }, me.dice.map((d) => dieFace(d.v, d.used ? 'spent' : ''))),
+    me.energy != null && ctx.state.danger ? null : h('p', {}, t('confirm.end.text', { n })),
     // Step 18: what is still unsafe this round, before you hand over.
     (() => { const bad = checklistView(ctx.state, { onlyBad: true }); return bad ? h('div', { class: 'warn-box' }, h('small', {}, t('check.warn')), bad) : null; })(),
     h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: ctx.ui.skipEndConfirm, onchange: (ev) => { ctx.ui.skipEndConfirm = ev.target.checked; } }), ` ${t('confirm.end.skip')}`),

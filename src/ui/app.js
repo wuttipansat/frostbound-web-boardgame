@@ -58,7 +58,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
   let toasts = [];
   let lastActive = null;
   const ui = {
-    setup: { count: 3, seats: defaultSeats(), scenarioId: 'beacon', betrayer: 'maybe' },
+    setup: { count: 3, seats: defaultSeats(), scenarioId: 'beacon', betrayer: 'maybe', rules: 'frostbound' },
     modal: null, selSurvivor: null, selDie: null, selCard: null, selLoc: null, lureTo: null,
     queue: [], // public reveal modals waiting to be shown: { type: 'colony' | 'vote', report }
     useFuel: false, logOpen: false, logTab: 'log', crisisOpen: false, peek: false, draftPicks: [], req: null, // logOpen pins the log history open (the feed itself always shows)
@@ -297,7 +297,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     const cfg = ui.setup;
     state = createGame({
       players: cfg.seats.slice(0, cfg.count).map((s, i) => ({ name: s.name.trim() || t('setup.defaultName', { n: i + 1 }), isAI: s.isAI })),
-      scenarioId: cfg.scenarioId, betrayer: cfg.betrayer, seed: cfg.seed ?? Date.now(),
+      scenarioId: cfg.scenarioId, betrayer: cfg.betrayer, seed: cfg.seed ?? Date.now(), rules: cfg.rules ?? 'frostbound',
     });
     aiRandom = mulberry((cfg.seed ?? Date.now()) >>> 0);
     seat = null;
@@ -425,7 +425,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     const cfg = ui.setup;
     const o = goOnline();
     o.client.create(cfg.seats[0].name, {
-      count: cfg.count, ai: cfg.seats.slice(0, cfg.count).map((x, i) => i > 0 && x.isAI), scenarioId: cfg.scenarioId, betrayer: cfg.betrayer,
+      count: cfg.count, ai: cfg.seats.slice(0, cfg.count).map((x, i) => i > 0 && x.isAI), scenarioId: cfg.scenarioId, betrayer: cfg.betrayer, rules: cfg.rules ?? 'frostbound',
     });
     render();
   }
@@ -605,12 +605,12 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
   }
 
   /** Quick start for testing/screenshots, e.g. seats "HHA". */
-  function quickStart({ seats = 'HA', scenarioId = 'beacon', seed = 1, lang }) {
+  function quickStart({ seats = 'HA', scenarioId = 'beacon', seed = 1, lang, rules = 'frostbound' }) {
     if (lang) setLang(lang);
     ui.setup = {
       count: seats.length,
       seats: [...seats].map((ch, i) => ({ name: ['Ana', 'Ben', 'Chai', 'Dara', 'Eve'][i], isAI: ch.toUpperCase() === 'A' })),
-      scenarioId, betrayer: 'maybe', seed,
+      scenarioId, betrayer: 'maybe', seed, rules,
     };
     startGame();
   }

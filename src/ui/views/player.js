@@ -4,7 +4,7 @@ import { h, mount, hex } from '../dom.js';
 import { icon, dieFace, heart } from '../icons.js';
 import { t, c, getLang } from '../../i18n/index.js';
 import { flashTip } from '../tooltip.js';
-import { getPlayer, aliveSurvivorsOf, survivorDef, itemOf, woundLimit, objectiveDef } from '../../core/selectors.js';
+import { getPlayer, aliveSurvivorsOf, survivorDef, itemOf, woundLimit, objectiveDef, isFrostbound, energyMax, energyRegen } from '../../core/selectors.js';
 import { PLAYER_COLORS } from '../../render/pieces.js';
 import {
   cardOptions, endTurnOption, voteTargets, cardNeeds, cardTargets, cardDice, shouldConfirmEndTurn, cardLocations, junkAction, cardUsable, actingSurvivors, unusedDice,
@@ -131,6 +131,16 @@ export function renderPlayerPanel(refs, ctx) {
   const acting = new Set(isActor ? actingSurvivors(s, shown.id) : []);
   mount(refs.survivors, aliveSurvivorsOf(s, shown.id).map((sv) => survivorToken(ctx, sv, { canAct: acting.has(sv.id), color: hex(PLAYER_COLORS[idx]) })));
 
+  // ---- Frostbound: an energy meter instead of dice
+  if (isFrostbound(s)) {
+    const max = energyMax(s, shown.id);
+    const e = shown.energy ?? 0;
+    const tip = t('panel.energyTip', { n: e, max, regen: energyRegen(s, shown.id) });
+    mount(refs.chips, h('div', { class: 'energy', role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': String(max), 'aria-valuenow': String(e), 'aria-label': tip, tip },
+      icon('exposure', 'en-ico'),
+      h('span', { class: 'en-bar' }, h('i', { style: { width: `${Math.round((Math.min(e, max) / max) * 100)}%` } })),
+      h('b', { class: 'en-num' }, `${e}`), h('small', {}, `/${max}`)));
+  } else {
   // ---- dice: 2D chips only (the 3D tray shows the roll, then hides)
   const left = unusedDice(s, shown.id);
   mount(refs.chips,
@@ -143,6 +153,7 @@ export function renderPlayerPanel(refs, ctx) {
       onclick: () => ctx.set({ selDie: ui.selDie === i ? null : i }),
     }, dieFace(d.v))),
     isActor && shown.dice.length ? h('span', { class: 'dice-badge', tip: t('tip.diceLeft'), 'aria-label': t('panel.diceLeft', { n: left }) }, String(left)) : null);
+  }
 
   // ---- hand (only ever the viewer's own): a floating pile or a fan
   const hand = viewer ? shown.hand : [];

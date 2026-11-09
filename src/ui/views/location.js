@@ -4,12 +4,12 @@ import { h, mount, hex } from '../dom.js';
 import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
 import { LOCATIONS } from '../../content/locations.js';
-import { survivorsAt, survivorDef, getPlayer, aliveSurvivorsOf } from '../../core/selectors.js';
+import { survivorsAt, survivorDef, getPlayer, aliveSurvivorsOf, isFrostbound, spawnForecast } from '../../core/selectors.js';
 import { PLAYER_COLORS } from '../../render/pieces.js';
 import { flashTip } from '../tooltip.js';
 import { survivorOptions, lureTargets } from '../options.js';
 
-const ACTION_ICON = { attack: 'attack', search: 'search', barricade: 'barricade', clean: 'clean', lure: 'lure', ability: 'heal' };
+const ACTION_ICON = { attack: 'attack', search: 'search', barricade: 'barricade', clean: 'clean', lure: 'lure', ability: 'heal', deeper: 'down' };
 
 /** Light up the die chip an action would use while the pointer/focus is on it (no re-render). */
 function hintDie(index, on) {
@@ -35,7 +35,9 @@ export function renderLocationPanel(el, ctx) {
     h('span', { class: 'stat warm', tip: t('loc.survivors'), tabindex: '0' }, icon('person'), h('b', {}, `${here.length}/${def.survivorSlots ?? '∞'}`)),
     h('span', { class: 'stat danger', tip: `${t('loc.zombies')} — ${t('tip.zombies', { n: loc.zombies })}`, tabindex: '0' }, icon('skull'), h('b', {}, `${loc.zombies}/${def.zombieSlots}`)),
     h('span', { class: 'stat', tip: t('loc.barricades'), tabindex: '0' }, icon('barricade'), h('b', {}, loc.barricades)),
-    loc.deck ? h('span', { class: 'stat', tip: t('loc.cards'), tabindex: '0' }, icon('search'), h('b', {}, loc.deck.length)) : null);
+    loc.deck ? h('span', { class: 'stat', tip: t('loc.cards'), tabindex: '0' }, icon('search'), h('b', {}, loc.deck.deckCount ?? loc.deckCount ?? loc.deck.length)) : null,
+    // Step 23: threat forecast — zombies this place gets if the round ended now.
+    isFrostbound(s) && spawnForecast(s)[id] ? h('span', { class: 'stat danger forecast', tip: t('loc.forecast', { n: spawnForecast(s)[id] }), tabindex: '0' }, icon('crisis'), h('b', {}, `+${spawnForecast(s)[id]}`)) : null);
 
   const people = h('div', { class: 'here' },
     here.length ? h('div', { class: 'chips' }, here.map((sv) => h('button', {
@@ -78,7 +80,9 @@ export function renderLocationPanel(el, ctx) {
             const die = o.die != null ? getPlayer(s, me).dice[o.die] : null;
             // Icon only; the name, the die it uses and why it can't be done now are in the tooltip.
             const tip = [t(`act.${o.id}`),
+              o.cost != null ? t('act.cost', { n: o.cost, have: getPlayer(s, me).energy }) : null,
               !o.ok ? t(`err.${o.error}`) : o.min > 1 ? t('act.needDie', { n: o.min }) : null,
+              o.id === 'deeper' && o.ok ? t('act.deeperTip') : null,
               o.ok && die ? t('tip.die', { v: die.v }) : null,
               risky(o) && o.ok ? t('tip.exposure') : null,
               isLure && o.ok ? t('act.pickOnBoard') : null].filter(Boolean).join(' · ');
@@ -96,6 +100,7 @@ export function renderLocationPanel(el, ctx) {
             },
             icon(ACTION_ICON[o.id] ?? 'ability', 'act-ico'),
             o.min > 1 ? h('span', { class: 'need-badge', 'aria-hidden': 'true' }, `${o.min}+`) : null,
+            o.cost ? h('span', { class: 'need-badge cost', 'aria-hidden': 'true' }, String(o.cost)) : null,
             risky(o) && o.ok ? h('span', { class: 'risk-dot', 'aria-hidden': 'true' }) : null);
           }))));
       }

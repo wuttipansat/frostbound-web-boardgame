@@ -2,7 +2,7 @@
 // rules engine itself (tryReduce), so the UI can never offer an illegal move or hide a legal one.
 import * as act from '../core/actions.js';
 import { tryReduce } from '../core/reducer.js';
-import { getPlayer, survivorDef, itemOf, scenarioDef } from '../core/selectors.js';
+import { getPlayer, survivorDef, itemOf, scenarioDef, isFrostbound, actionCost } from '../core/selectors.js';
 import { LOCATION_IDS } from '../core/constants.js';
 
 const check = (state, action) => {
@@ -36,7 +36,14 @@ export function survivorOptions(state, playerId, survivorId, { dieIndex = null, 
   if (!sv?.alive) return [];
   const def = survivorDef(survivorId);
   const out = [];
+  const fb = isFrostbound(state);
   const dieAction = (id, min, make) => {
+    if (fb) {
+      // Frostbound: no dice, an energy cost (the engine checks it; the error says why).
+      const action = make(0);
+      out.push({ id, min: 0, die: null, cost: actionCost(state, survivorId, id), ...check(state, action) });
+      return;
+    }
     const die = pickDie(state, playerId, min, dieIndex);
     const action = make(die ?? 0);
     const res = die == null ? { action, ok: false, error: min > 1 ? 'dieTooLow' : 'noSuchDie' } : check(state, action);
@@ -54,6 +61,11 @@ export function survivorOptions(state, playerId, survivorId, { dieIndex = null, 
     const target = patients[0];
     const action = act.useAbility(playerId, survivorId, target?.id ?? survivorId);
     out.push({ id: 'ability', min: 0, die: null, ...(target ? check(state, action) : { action, ok: false, error: 'notWounded' }) });
+  }
+  // Frostbound: right after a search, "search deeper" (free: one more card, then a danger card).
+  const ls = fb ? getPlayer(state, playerId).lastSearch : null;
+  if (ls && ls.survivorId === survivorId && ls.locationId === sv.location) {
+    out.push({ id: 'deeper', min: 0, die: null, cost: 0, ...check(state, act.searchDeeper(playerId, survivorId)) });
   }
   return out;
 }
@@ -165,7 +177,7 @@ export function actingSurvivors(state, playerId) {
   return getPlayer(state, playerId).survivors.filter((id) => {
     const sv = state.survivors[id];
     if (!sv?.alive) return false;
-    if (!sv.moved && Object.values(moveTargets(state, playerId, id)).includes('ok')) return true;
+    if ((!sv.moved || isFrostbound(state)) && Object.values(moveTargets(state, playerId, id)).includes('ok')) return true;
     return survivorOptions(state, playerId, id).some((o) => o.ok);
   });
 }
@@ -174,9 +186,16 @@ export function unusedDice(state, playerId) {
   return getPlayer(state, playerId).dice.filter((d) => !d.used).length;
 }
 
+/** Frostbound: can any of the player's survivors still afford an action (or move)? */
+export function hasEnergyLeft(state, playerId) {
+  if (!isFrostbound(state)) return false;
+  return actingSurvivors(state, playerId).length > 0;
+}
+
 /** Ask before ending a turn while dice are still unused (unless the player opted out this game). */
 export function shouldConfirmEndTurn(state, playerId, { skip = false } = {}) {
-  return !skip && unusedDice(state, playerId) > 0;
+  if (skip) return false;
+  return isFrostbound(state) ? hasEnergyLeft(state, playerId) : unusedDice(state, playerId) > 0;
 }
 
 // ---------------------------------------------------------------- step 11: card availability

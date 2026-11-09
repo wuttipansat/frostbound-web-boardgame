@@ -160,12 +160,14 @@ function playScene(ev, state) {
 
 // ---------------------------------------------------------------- exposure popups
 
-const FX_ICON = { blank: 'check', wound: 'heal', frostbite: 'snowflake', bite: 'skull' };
+const FX_ICON = { blank: 'check', wound: 'heal', frostbite: 'snowflake', bite: 'skull', startle: 'exposure', surrounded: 'attack' };
 const FX_BURST = {
   blank: [0xf2f6fc],
   wound: [0xb3202a, 0xe0605a],
   frostbite: [0x9fd4ff, 0xe8f6ff],
   bite: [0x5a0f12, 0x8e1b1b, 0x6f8a4e],
+  startle: [0xffd27a, 0xf2f6fc],
+  surrounded: [0x6f8a4e, 0x3d4a2a],
 };
 const popups = [];
 // The dice stage floats over the board while dice roll, holds the result, then fades away.
@@ -189,11 +191,13 @@ function showDice() {
 diceStage.addEventListener('click', () => { clearTimeout(diceTimer); diceStage.classList.remove('on'); });
 
 function exposureFx(survivorId, face) {
-  showDice();
   const obj = pieces.survivorObject(survivorId);
   const fallback = obj ? obj.position.clone() : new THREE.Vector3();
+  // Frostbound: a danger card, no die to tumble (23b gives it a card flip).
+  const danger = !!app?.state?.danger;
+  if (!danger) showDice();
   // The die tumbles in the tray first; the verdict then floats up over the survivor.
-  diceTray.rollExposure(face).then(() => {
+  (danger ? Promise.resolve() : diceTray.rollExposure(face)).then(() => {
     pieces.burstAt(survivorId, FX_BURST[face], face === 'bite' ? 30 : 18, face === 'bite' ? 1.5 : 1.1);
     const el = document.createElement('div');
     el.className = `fx-pop f-${face}`;
@@ -372,6 +376,7 @@ if (params.get('play')) {
   app.quickStart({
     seats: params.get('play'), scenarioId: params.get('scenario') ?? 'beacon',
     seed: Number(params.get('seed') ?? 1), lang: params.get('lang') ?? undefined,
+    rules: params.get('rules') ?? undefined, // step 23: ?rules=classic
   });
 }
 // Browsers only allow audio after a user gesture; UI buttons give a soft click.

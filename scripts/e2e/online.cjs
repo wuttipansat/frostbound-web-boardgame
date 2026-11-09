@@ -55,6 +55,9 @@ const URL = `http://localhost:${PORT}/?snow=0`;
     const shown = [...document.querySelectorAll('#pp-hand .item-card[data-uid]')].map((e) => e.dataset.uid);
     if (shown.some((u) => !me?.hand.includes(u))) out.push('a card on screen is not in this player hand');
     if (s.rng) { /* the hydrated stand-in is fine */ }
+    // Step 23: the danger deck's order never reaches a client (only the counts).
+    if (s.config?.rules === 'frostbound' && !s.danger?.left) out.push('no public danger counts in a frostbound view');
+    if (s.danger?.deck?.length) out.push('danger deck order leaked');
     return out;
   });
 

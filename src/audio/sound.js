@@ -131,7 +131,8 @@ const SOUNDS = {
 /** Which sound each engine log entry makes (null = silent). */
 export function soundForLog(e) {
   switch (e.k) {
-    case 'exposure': return `exposure:${e.face}`;
+    case 'exposure': return SOUNDS[`exposure:${e.face}`] ? `exposure:${e.face}` : 'exposure:wound';
+    case 'searchDeeper': return 'search';
     case 'crisisResolved': return null; // played by the colony-phase reveal, in time with the verdict
     case 'roll': return 'roll';
     case 'move': case 'attack': case 'search': case 'barricade': case 'clean': case 'lure': case 'play':

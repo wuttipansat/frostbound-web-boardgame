@@ -1628,3 +1628,19 @@ body:has(.backdrop.over.peek) :is(#player, #hint, #move-pick, #tutorial, #dice-s
 body.in-game:not(.passing) #log.feed.pinned { display: block; }
 @media (max-width: 720px) { #log.feed.pinned .feed-history { max-height: 46vh; overflow-y: auto; } }
 body:has(.more-menu) #dice-stage { visibility: hidden; } /* the rolled dice never cover the open ⋯ menu */
+
+/* ---------------------------------------------------------------- step 23: energy + danger (plain UI; 23b polishes) */
+.energy { display: flex; align-items: center; gap: 6px; padding: 2px 8px; min-width: 150px; }
+.energy .en-ico { width: 18px; height: 18px; color: #9fd4ff; }
+.energy .en-bar { flex: 1; height: 8px; border-radius: 6px; background: rgba(255,255,255,0.1); overflow: hidden; min-width: 60px; }
+.energy .en-bar i { display: block; height: 100%; background: linear-gradient(90deg, #5aa8ff, #bfe4ff); box-shadow: 0 0 8px rgba(140,200,255,0.6); }
+.energy .en-num { font-variant-numeric: tabular-nums; font-size: 16px; }
+.energy small { color: var(--muted); }
+.need-badge.cost { background: #1d3b5c; color: #cfe8ff; border-color: #5aa8ff; }
+.stat.forecast b { color: #ff9b8a; }
+.fx-pop.f-startle, .fx-pop.f-surrounded { border-color: #ffb36b; }
+@media (max-width: 520px) {
+  .energy { min-width: 0; padding: 2px 6px; gap: 4px; }
+  .energy .en-bar { min-width: 34px; }
+  .energy small { display: none; }
+}
