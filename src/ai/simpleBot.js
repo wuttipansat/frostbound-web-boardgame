@@ -12,7 +12,7 @@ import {
 import { CROSSROADS_BY_ID } from '../content/crossroads.js';
 
 const EFFECT_SCORE = {
-  morale: (e) => 3 * e.delta, food: (e) => e.delta, helpless: (e) => 1.5 * e.delta,
+  morale: (e) => 3 * e.delta, food: (e) => e.delta, recruit: () => 2,
   spawn: (e) => -1.2 * e.n, removeZombies: (e) => e.n,
   barricade: (e) => 0.8 * e.n, drawItem: (e) => e.n, discard: (e) => -0.8 * e.n,
   wound: () => -2, heal: () => 1.5, energy: (e) => e.delta / 20,
@@ -106,8 +106,8 @@ function turnAction(s, p, opts) {
     const item = itemOf(s, uid);
     const slot = gearSlot(item);
     if (!slot) continue;
-    const worn = gearOf(s)[slot];
-    if (!worn || item.tier > worn.tier) { candidates.unshift(act.equip(uid)); break; }
+    const who = survivors.find((sv) => { const w = gearOf(s, sv.id)[slot]; return !w || item.tier > w.tier; });
+    if (who) { candidates.unshift(act.equip(uid, who.id)); break; }
   }
 
   // Newcomers lift morale (but eat): take them in while the larder holds.

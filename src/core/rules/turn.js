@@ -8,7 +8,7 @@ import {
 } from '../selectors.js';
 import {
   log, drawItems, discardCard, removeFromHand, addZombies, removeZombies,
-  addBarricades, creditKills, healSurvivor, changeFood, changeHelpless, changeMorale,
+  addBarricades, creditKills, healSurvivor, changeFood, changeMorale, recruitSurvivor,
   spendEnergy, gainEnergy,
 } from './helpers.js';
 import { endTurn } from './flow.js';
@@ -65,7 +65,7 @@ export function search(s, { survivorId }) {
   const a = ability(survivorId);
   const n = a.type === 'doubleSearch' && a.location === sv.location ? 2 : 1;
   // A blueprint for this place: draw one extra, then put one back (returnCard).
-  const blueprint = holdsBlueprint(s, sv.location);
+  const blueprint = holdsBlueprint(s, survivorId, sv.location);
   const drawn = drawItems(s, sv.location, blueprint ? n + 1 : n);
   log(s, 'search', { survivorId, locationId: sv.location, count: drawn.length });
   if (blueprint && drawn.length > n) p.pick = { locationId: sv.location, uids: drawn };
@@ -127,18 +127,19 @@ export function move(s, { survivorId, toLocation, fuelCardUid }) {
 
 // ---------------------------------------------------------------- gear
 
-/** Equip a weapon, armor or book from your hand (free). Whatever was in that slot goes back to your hand. */
-export function equip(s, { cardUid }) {
+/** Equip a weapon, armor or book from the hand on a survivor (free). Whatever was in that slot goes back to the hand. */
+export function equip(s, { cardUid, survivorId = null }) {
   const p = requireTurn(s);
   const item = requireCard(s, p, cardUid);
   const slot = gearSlot(item);
   assert(slot, 'notGear');
-  p.gear = p.gear ?? { weapon: null, armor: null, book: null };
-  const old = p.gear[slot];
+  const sv = requireSurvivor(s, survivorId ?? p.survivors.find((id) => s.survivors[id]?.alive));
+  sv.gear = sv.gear ?? { weapon: null, armor: null, book: null };
+  const old = sv.gear[slot];
   removeFromHand(s, cardUid);
   if (old) p.hand.push(old);
-  p.gear[slot] = cardUid;
-  log(s, 'equip', { card: s.cards[cardUid], slot });
+  sv.gear[slot] = cardUid;
+  log(s, 'equip', { survivorId: sv.id, card: s.cards[cardUid], slot });
 }
 
 // ---------------------------------------------------------------- cards
@@ -146,7 +147,7 @@ export function equip(s, { cardUid }) {
 /**
  * Play an item card for its effect (strength = item.value).
  * food -> colony supply; medicine -> heal targetSurvivorId; tools -> barricades at targetSurvivorId;
- * junk -> energy; survivor -> a newcomer joins the colony (helpless, but hope: +1 morale).
+ * junk -> energy; survivor -> a newcomer joins the team (+1 morale; a full team: +2 morale).
  * Gear is equipped (equip), fuel is burnt when moving.
  */
 export function playCard(s, { cardUid, targetSurvivorId }) {
@@ -179,8 +180,7 @@ export function playCard(s, { cardUid, targetSurvivorId }) {
       break;
     case 'survivor':
       removeFromHand(s, cardUid); // they join the colony
-      changeHelpless(s, 1 + (item.helpless ?? 0), 'newcomer');
-      changeMorale(s, 1, 'newcomer');
+      changeMorale(s, recruitSurvivor(s) ? 1 : 2, 'newcomer');
       break;
     case 'fuel':
       assert(false, 'fuelIsPlayedWhenMoving');

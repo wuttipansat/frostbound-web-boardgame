@@ -18,7 +18,7 @@ test('the team starts full of energy; no danger deck, no waste, no dice', () => 
   const s = fb();
   assert.equal(s.danger, undefined);
   assert.equal(s.waste, undefined);
-  assert.equal(s.team.survivors.length, 1);
+  assert.equal(s.team.survivors.length, 2, 'two survivors at the start');
   assert.equal(s.team.energy, energyMax(s));
   assert.equal(s.team.dice, undefined);
   assert.ok(!JSON.stringify(s).includes('"roll"'));

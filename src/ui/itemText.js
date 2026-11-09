@@ -9,7 +9,7 @@ function effect(item) {
   if (item.type === 'armor') {
     if (item.moveMod) return ['armorMove', { mod: signed(item.moveMod) }];
   }
-  if (item.type === 'survivor') return [item.helpless ? 'recruitHelpless' : 'recruit', { n: 1 + (item.helpless ?? 0) }];
+  if (item.type === 'survivor') return ['recruit', { n: 1 }];
   if (item.type === 'junk') return [item.wild ? 'junkWild' : 'junk', { n: item.value * 12 }];
   return [item.type, { n: item.value }];
 }

@@ -1,4 +1,4 @@
-// Top bar (morale, round, food, helpless, crisis, goal) and the log panel — drawn icons, no emoji.
+// Top bar (morale, day, food, team, crisis, goal) and the log panel — drawn icons, no emoji.
 import { journalEntries, daySummary } from '../journal.js';
 import { h, mount, TYPE_REP } from '../dom.js';
 import { icon } from '../icons.js';
@@ -8,6 +8,7 @@ import {
   foodNeeded, isStorm, crisisDef, crisisRequirement, scenarioProgress, scenarioTarget,
 } from '../../core/selectors.js';
 import { counter } from '../ticker.js';
+import { RULES } from '../../core/constants.js';
 import { checklistView } from './help.js';
 import { PHASES } from '../../core/constants.js';
 
@@ -34,7 +35,7 @@ export function renderTopbar(el, ctx) {
   const food = block(`food${s.food < need ? ' critical' : ''}`, t('tip.food'), 'food', t('hud.food'), counter('food', s.food),
     h('small', {}, t('hud.foodNeed', { n: need })),
     s.starvation ? h('small', { class: 'bad' }, t('hud.starvation', { n: s.starvation })) : null);
-  const helpless = block('helpless', t('tip.helpless'), 'person', t('hud.helplessShort'), counter('helpless', s.helpless));
+  const team = block('helpless team', t('tip.team', { max: RULES.TEAM_MAX }), 'person', t('hud.team'), counter('team', s.team.survivors.length, { text: (v) => `${v}/${RULES.TEAM_MAX}` }));
 
   const crisisChip = crisis ? h('button', {
     class: `stat-block crisis${ui.crisisOpen ? ' open' : ''}`, tip: t('tip.crisis'),
@@ -51,7 +52,7 @@ export function renderTopbar(el, ctx) {
 
   mount(el,
     h('div', { class: 'brand-mini' }, 'FROSTBOUND'),
-    morale, food, helpless, round, goal, crisisChip,
+    morale, food, team, round, goal, crisisChip,
     h('div', { class: 'spacer' }),
     h('button', { class: 'icon-btn rules-btn', tip: t('hud.rules'), 'aria-label': t('hud.rules'), onclick: () => ctx.set({ modal: 'rules' }) }, '?'),
     h('button', { class: `icon-btn${ui.logOpen ? ' on' : ''}`, tip: t('hud.log'), 'aria-label': t('hud.log'), onclick: () => ctx.set({ logOpen: !ui.logOpen }) }, icon('log')),
@@ -64,7 +65,6 @@ export function renderTopbar(el, ctx) {
         h('div', {}, h('h3', {}, c('crises', crisis.id, 'name')), h('p', {}, c('crises', crisis.id, 'text')))),
       h('p', { class: 'need' }, t('hud.crisisNeed', { n: crisisRequirement(s), item: t(`item.${crisis.item}`) })),
       h('p', { class: 'fail' }, icon('crisis'), ` ${describeEffects(crisis.fail)}`),
-      h('p', { class: 'muted' }, icon('person'), ` ${t('hud.helpless', { n: s.helpless })}`),
       h('h4', {}, t('check.title')),
       checklistView(s)));
   }

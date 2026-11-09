@@ -15,7 +15,7 @@ async function setup(p) {
   await p.waitForTimeout(800);
   await p.evaluate(() => {
     const a = window.__frostbound.app;
-    a.dispatch({ type: 'DRAFT_PICK', survivorIds: a.state.team.draftOptions.slice(0, 1) });
+    a.dispatch({ type: 'DRAFT_PICK', survivorIds: a.state.team.draftOptions.slice(0, 2) });
     a.tutorialEvent?.('skip');
     const s = structuredClone(a.state);
     s.phase = 'turn'; s.pendingCrossroads = null; s.day = 2;

@@ -26,15 +26,6 @@ export function changeFood(s, delta, reason) {
   log(s, 'food', { delta, reason, value: s.food });
 }
 
-export function changeHelpless(s, delta, reason) {
-  if (!delta) return;
-  const before = s.helpless;
-  s.helpless = Math.max(0, s.helpless + delta);
-  const lost = before - s.helpless;
-  log(s, 'helpless', { delta: s.helpless - before, reason, value: s.helpless });
-  // Every helpless survivor who dies hurts morale.
-  if (lost > 0) changeMorale(s, -lost, 'helplessDied');
-}
 
 // ---------------------------------------------------------------- cards
 
@@ -70,6 +61,9 @@ export function killSurvivor(s, survivorId, cause) {
   sv.alive = false;
   sv.deathCause = cause;
   const t = s.team;
+  // Their gear goes back to the team's hand.
+  for (const uid of Object.values(sv.gear ?? {})) if (uid) t.hand.push(uid);
+  sv.gear = { weapon: null, armor: null, book: null };
   t.survivors = t.survivors.filter((id) => id !== survivorId);
   t.fallen.push(survivorId);
   log(s, 'death', { survivorId, cause, location: sv.location });
@@ -77,17 +71,18 @@ export function killSurvivor(s, survivorId, cause) {
   if (t.survivors.length === 0) recruitSurvivor(s);
 }
 
-/** Add the top survivor of the deck to the team, in the colony. */
+/** Add the top survivor of the deck to the team, in the colony (at most RULES.TEAM_MAX). */
 export function recruitSurvivor(s) {
-  if (!s.survivorDeck.length) return;
+  if (!s.survivorDeck.length || s.team.survivors.length >= RULES.TEAM_MAX) return false;
   const id = s.survivorDeck.pop();
   s.survivors[id] = newSurvivor(id, 'colony');
   s.team.survivors.push(id);
   log(s, 'recruit', { survivorId: id, location: 'colony' });
+  return true;
 }
 
 export function newSurvivor(id, location) {
-  return { id, location, wounds: 0, frostbite: false, alive: true, moved: false };
+  return { id, location, wounds: 0, frostbite: false, alive: true, moved: false, gear: { weapon: null, armor: null, book: null } };
 }
 
 export function woundSurvivor(s, survivorId, cause = 'wound') {
@@ -126,10 +121,6 @@ export function addZombies(s, locationId, n, reason) {
 
 function overrun(s, locationId) {
   log(s, 'overrun', { locationId });
-  if (locationId === 'colony' && s.helpless > 0) {
-    changeHelpless(s, -1, 'overrun');
-    return;
-  }
   const victims = survivorsAt(s, locationId);
   if (!victims.length) return;
   victims.sort((a, b) => survivorDef(a.id).influence - survivorDef(b.id).influence);

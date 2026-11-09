@@ -5,7 +5,7 @@ const { chromium } = require('playwright');
 
 const setupTurn = (opts = {}) => `(() => {
   const a = window.__frostbound.app;
-  if (a.state.phase === 'draft') a.dispatch({ type: 'DRAFT_PICK', survivorIds: a.state.team.draftOptions.slice(0, 1) });
+  if (a.state.phase === 'draft') a.dispatch({ type: 'DRAFT_PICK', survivorIds: a.state.team.draftOptions.slice(0, 2) });
   a.tutorialEvent?.('skip');
   const s = structuredClone(a.state);
   s.phase = 'turn'; s.pendingCrossroads = null;

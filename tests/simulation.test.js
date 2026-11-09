@@ -8,7 +8,7 @@ import { LOCATION_IDS } from '../src/core/constants.js';
 
 function checkInvariants(s) {
   assert.ok(s.morale >= 0 && s.morale <= s.maxMorale, 'morale in range');
-  assert.ok(s.food >= 0 && s.helpless >= 0, 'non-negative counters');
+  assert.ok(s.food >= 0, 'non-negative counters');
   for (const id of LOCATION_IDS) {
     const loc = s.locations[id];
     assert.ok(loc.zombies >= 0 && loc.barricades >= 0);
@@ -18,7 +18,7 @@ function checkInvariants(s) {
   const seen = new Set();
   const zones = [
     ...s.team.hand,
-    ...Object.values(s.team.gear).filter(Boolean),
+    ...Object.values(s.survivors).flatMap((sv) => Object.values(sv.gear ?? {}).filter(Boolean)),
     ...Object.values(s.locations).flatMap((l) => l.deck ?? []),
     ...(s.crisis?.contributions ?? []),
   ];

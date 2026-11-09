@@ -7,7 +7,7 @@ export const CRISES = [
     fail: [{ type: 'morale', delta: -1 }, { type: 'spawn', where: 'colony', n: 2 }] },
   { id: 'fever-ward', name: 'Fever Ward', item: 'medicine', need: 1,
     text: 'A cough moves through the bunks, one sleeper at a time.',
-    fail: [{ type: 'morale', delta: -1 }, { type: 'helpless', delta: -2 }] },
+    fail: [{ type: 'morale', delta: -1 }, { type: 'wound' }, { type: 'wound' }] },
   { id: 'empty-pantry', name: 'Empty Pantry', item: 'food', need: 1,
     text: 'Someone counted the cans twice. The number did not change.',
     fail: [{ type: 'morale', delta: -2 }] },
@@ -31,7 +31,7 @@ export const CRISES = [
     fail: [{ type: 'morale', delta: -2 }] },
   { id: 'ration-riot', name: 'Ration Riot', item: 'food', need: 1,
     text: 'A shoving match at the food line turns into something worse.',
-    fail: [{ type: 'morale', delta: -1 }, { type: 'food', delta: -1 }, { type: 'helpless', delta: -1 }] },
+    fail: [{ type: 'morale', delta: -1 }, { type: 'food', delta: -1 }, { type: 'wound' }] },
 ];
 
 export const CRISES_BY_ID = Object.fromEntries(CRISES.map((c) => [c.id, c]));

@@ -18,8 +18,9 @@ export const LOCATION_IDS = Object.freeze(['colony', 'police', 'grocery', 'schoo
 export const OUTSIDE_LOCATIONS = Object.freeze(LOCATION_IDS.filter((l) => l !== 'colony'));
 
 export const RULES = Object.freeze({
-  TEAM_START: 1,          // survivors picked at the start (solo game)
-  DRAFT_OPTIONS: 3,
+  TEAM_START: 2,          // survivors picked at the start (solo game)
+  TEAM_MAX: 6,            // the most survivors the team can have
+  DRAFT_OPTIONS: 6,
   STARTING_HAND: 3,
   WOUNDS_TO_DIE: 3,
   MAX_LOG: 300,

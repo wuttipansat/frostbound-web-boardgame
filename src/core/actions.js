@@ -31,5 +31,5 @@ export const contribute = (cardUid) => ({ type: A.CONTRIBUTE, cardUid });
 export const deposit = (cardUid) => ({ type: A.DEPOSIT, cardUid });
 export const useAbility = (survivorId, targetSurvivorId) => ({ type: A.USE_ABILITY, survivorId, targetSurvivorId });
 export const endTurn = () => ({ type: A.END_TURN });
-/** Equip a weapon / armor / book from the hand (free; the slot's old item returns to the hand). */
-export const equip = (cardUid) => ({ type: A.EQUIP, cardUid });
+/** Equip a weapon / armor / book from the hand on a survivor (free; the slot's old item returns to the hand). */
+export const equip = (cardUid, survivorId = null) => ({ type: A.EQUIP, cardUid, survivorId });

@@ -14,7 +14,7 @@ const { chromium } = require('playwright');
       f.app.quickStart({ seed });
       const me = f.app.state.team;
       const draftBoard = f.pieces.counts().survivors;
-      f.app.dispatch({ type: 'DRAFT_PICK', survivorIds: me.draftOptions.slice(0, 1) });
+      f.app.dispatch({ type: 'DRAFT_PICK', survivorIds: me.draftOptions.slice(0, 2) });
       await new Promise((r) => setTimeout(r, 1500));
       const alive = Object.values(f.app.state.survivors).filter((s) => s.alive).length;
       const info = f.stage.renderer?.info?.memory ?? {};

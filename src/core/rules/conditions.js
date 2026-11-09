@@ -16,7 +16,6 @@ const PREDICATES = {
   foodAtMost: (s, c) => s.food <= c.n,
   foodAtLeast: (s, c) => s.food >= c.n,
   dayAtLeast: (s, c) => s.day >= c.n,
-  helplessAtLeast: (s, c) => s.helpless >= c.n,
   colonyZombiesAtLeast: (s, c) => s.locations.colony.zombies >= c.n,
 
   // the team

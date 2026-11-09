@@ -59,17 +59,20 @@ test('tier scales medicine, tools and junk; motor junk is wild in a crisis', () 
   assert.equal(ITEMS['motor-junk'].wild, true);
 });
 
-test('survivor cards: a newcomer joins the colony (+1 morale, more mouths); you still play one survivor', () => {
+test('survivor cards: a newcomer joins the team (+1 morale); a full team gives +2 morale instead', () => {
   let { s } = turn({ 'corwin-daly': 'colony' });
   s = patch(s, (x) => { x.morale = 5; });
   let card; [s, card] = giveCard(s, 'stranger-with-child');
   const r = reduce(s, a.playCard(card));
-  assert.equal(r.team.survivors.length, 1);
-  assert.equal(r.helpless, s.helpless + 2, 'the stranger and the child');
+  assert.equal(r.team.survivors.length, 2);
+  assert.equal(r.survivors[r.team.survivors[1]].location, 'colony');
   assert.equal(r.morale, 6);
   assert.ok(!r.team.hand.includes(card));
-  let lone; [s, lone] = giveCard(s, 'lone-wanderer');
-  assert.equal(reduce(s, a.playCard(lone)).helpless, s.helpless + 1);
+  let full = setSurvivors(s, { 'corwin-daly': 'colony', 'agnes-pell': 'colony', 'greta-vos': 'colony', 'bo-lindqvist': 'colony', 'nia-calloway': 'colony', 'osei-vance': 'colony' });
+  let lone; [full, lone] = giveCard(full, 'lone-wanderer');
+  const f = reduce(full, a.playCard(lone));
+  assert.equal(f.team.survivors.length, 6, 'at most 6');
+  assert.equal(f.morale, 7);
 });
 
 test('a blueprint draws one extra card when searching its location, then one goes back', () => {
@@ -87,7 +90,7 @@ test('a blueprint draws one extra card when searching its location, then one goe
   assert.equal(r.locations.police.deck.length, n - 1);
   assert.equal(r.locations.police.deck[0], pick.uids[0], 'returned to the bottom');
   assert.ok(r.team.hand.includes(pick.uids[1]));
-  assert.equal(r.team.gear.book, bp);
+  assert.equal(r.survivors['maren-holt'].gear.book, bp);
   // Elsewhere the blueprint does nothing.
   let { s: s2 } = turn({ 'maren-holt': 'school' });
   let bp2; [s2, bp2] = giveCard(s2, 'blueprint-police');
@@ -99,9 +102,8 @@ test('a blueprint draws one extra card when searching its location, then one goe
   assert.equal(reduce(s3, a.search('maren-holt')).team.pick, null);
 });
 
-test('books work while equipped (one book slot): cookbook saves food, field manual adds a barricade', () => {
-  let { s } = turn({ 'corwin-daly': 'police' });
-  s = patch(s, (x) => { x.helpless = 6; });
+test('books work while equipped (one book slot per survivor): cookbook saves food, field manual adds a barricade', () => {
+  let { s } = turn({ 'corwin-daly': 'police', 'agnes-pell': 'colony', 'greta-vos': 'colony', 'bo-lindqvist': 'colony', 'nia-calloway': 'colony', 'osei-vance': 'colony' });
   const need = foodNeeded(s);
   let book; [s, book] = giveCard(s, 'winter-cookbook');
   assert.equal(foodNeeded(s), need, 'not while only in hand');

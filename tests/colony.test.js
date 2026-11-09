@@ -12,17 +12,16 @@ function team(placements, opts = {}) {
   return setSurvivors(startedGame(opts), placements);
 }
 
-test('food need: 1 per 2 colony residents incl. helpless; the cook saves 1', () => {
-  let s = team({ 'corwin-daly': 'colony', 'agnes-pell': 'colony', 'greta-vos': 'colony', 'bo-lindqvist': 'school' });
-  s = patch(s, (x) => { x.helpless = 2; });
-  assert.equal(foodNeeded(s), 3); // 3 residents + 2 helpless = 5 -> 3
-  s = setSurvivors(s, { 'corwin-daly': 'colony', 'agnes-pell': 'colony', 'pim-arunrat': 'colony', 'bo-lindqvist': 'school' });
+test('food need: 1 per 2 survivors at the colony; the cook saves 1', () => {
+  let s = team({ 'corwin-daly': 'colony', 'agnes-pell': 'colony', 'greta-vos': 'colony', 'nia-calloway': 'colony', 'osei-vance': 'colony', 'bo-lindqvist': 'school' });
+  assert.equal(foodNeeded(s), 3); // 5 at the colony -> 3
+  s = setSurvivors(s, { 'corwin-daly': 'colony', 'agnes-pell': 'colony', 'pim-arunrat': 'colony', 'nia-calloway': 'colony', 'osei-vance': 'colony', 'bo-lindqvist': 'school' });
   assert.equal(foodNeeded(s), 2);
 });
 
 test('colony phase pays food or adds escalating starvation', () => {
-  let s = team({ 'corwin-daly': 'colony', 'greta-vos': 'colony' });
-  s = patch(s, (x) => { x.helpless = 2; x.food = 5; x.morale = 8; x.crisis.contributions = []; });
+  let s = team({ 'corwin-daly': 'colony', 'greta-vos': 'colony', 'agnes-pell': 'colony', 'nia-calloway': 'colony' });
+  s = patch(s, (x) => { x.food = 5; x.morale = 8; x.crisis.contributions = []; });
   const fed = patch(s, (x) => { x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
   assert.equal(fed.reports.colony.fed, true);
   assert.equal(fed.food, 3);
@@ -69,19 +68,18 @@ test('inspire adds morale when a crisis is averted', () => {
 });
 
 test('spawning: ceil(n/2) outside, ceil(n/3) at colony; quiet guide reduces', () => {
-  let s = team({ 'corwin-daly': 'school', 'agnes-pell': 'school', 'silas-thorn': 'library', 'greta-vos': 'library' });
-  s = patch(s, (x) => { x.helpless = 2; x.spawns = spawnZombies(x); });
+  let s = team({ 'corwin-daly': 'school', 'agnes-pell': 'school', 'silas-thorn': 'library', 'greta-vos': 'library', 'nia-calloway': 'colony' });
+  s = patch(s, (x) => { x.spawns = spawnZombies(x); });
   assert.deepEqual(s.spawns, { school: 1, colony: 1 });
 });
 
-test('overrun: a full entrance kills the lowest-influence survivor; colony loses helpless first', () => {
+test('overrun: a full entrance kills the lowest-influence survivor', () => {
   let s = team({ 'corwin-daly': 'school', 'dot-ferreira': 'school', 'greta-vos': 'colony' });
   s = patch(s, (x) => { x.locations.school.zombies = 3; x.morale = 8; addZombies(x, 'school', 1); });
   assert.equal(s.survivors['dot-ferreira'].alive, false);
   assert.equal(s.survivors['corwin-daly'].alive, true);
 
-  s = patch(s, (x) => { x.locations.colony.zombies = 12; x.helpless = 1; addZombies(x, 'colony', 2); });
-  assert.equal(s.helpless, 0);
+  s = patch(s, (x) => { x.locations.colony.zombies = 12; addZombies(x, 'colony', 1); });
   assert.equal(s.survivors['greta-vos'].alive, false);
 });
 
@@ -125,7 +123,7 @@ test('stockpile goal requires food AND a clear gate', () => {
     return patch(f, (x) => {
       const uid = Object.keys(x.cards)[0];
       x.cards[uid] = 'jerry-can';
-      x.helpless = 0; x.food = food; x.locations.colony.zombies = zombies;
+      x.food = food; x.locations.colony.zombies = zombies;
       x.crisis = { id: 'whiteout', contributions: [uid] };
       colonyPhase(x);
     });

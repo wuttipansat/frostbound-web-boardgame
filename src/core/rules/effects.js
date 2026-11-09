@@ -5,7 +5,7 @@ import { OUTSIDE_LOCATIONS } from '../constants.js';
 import { pick } from '../rng.js';
 import { itemOf, focusSurvivor, energyMax } from '../selectors.js';
 import {
-  changeMorale, changeFood, changeHelpless, drawItems, discardCard, addZombies,
+  changeMorale, changeFood, recruitSurvivor, drawItems, discardCard, addZombies,
   removeZombies, addBarricades, woundSurvivor, healSurvivor, log, gainEnergy,
 } from './helpers.js';
 
@@ -23,7 +23,8 @@ function resolveWhere(s, ctx, where) {
 const EFFECTS = {
   morale: (s, ctx, e) => changeMorale(s, e.delta, ctx.reason),
   food: (s, ctx, e) => changeFood(s, e.delta, ctx.reason),
-  helpless: (s, ctx, e) => changeHelpless(s, e.delta, ctx.reason),
+  // A newcomer joins the team (a full team: they find shelter elsewhere, hope still helps).
+  recruit: (s, ctx) => { if (!recruitSurvivor(s)) changeMorale(s, 1, ctx.reason); },
   starvation: (s, _ctx, e) => { s.starvation += e.delta; },
   spawn: (s, ctx, e) => addZombies(s, resolveWhere(s, ctx, e.where), e.n, ctx.reason),
   removeZombies: (s, ctx, e) => {

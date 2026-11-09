@@ -27,21 +27,22 @@ export function hasAbility(s, survivorId, type) {
   return !!sv && sv.alive && survivorDef(survivorId).ability.type === type;
 }
 
-/** Equipped gear: { weapon, armor, book } item defs (or null). */
-export function gearOf(s) {
-  const g = s.team?.gear ?? {};
+/** A survivor's equipped gear: { weapon, armor, book } item defs (or null). No id: the lead survivor. */
+export function gearOf(s, survivorId = null) {
+  const sv = survivorId ? s.survivors[survivorId] : heroOf(s);
+  const g = sv?.gear ?? {};
   const def = (uid) => (uid ? ITEMS[s.cards[uid]] ?? null : null);
   return { weapon: def(g.weapon), armor: def(g.armor), book: def(g.book) };
 }
 
-/** 1 if the equipped book has this passive, else 0. */
+/** How many living survivors have a book with this passive equipped (books help the whole team). */
 export function booksHeld(s, passive) {
-  return gearOf(s).book?.passive === passive ? 1 : 0;
+  return aliveSurvivors(s).filter((sv) => gearOf(s, sv.id).book?.passive === passive).length;
 }
 
-/** An equipped blueprint for this location. */
-export function holdsBlueprint(s, locationId) {
-  return gearOf(s).book?.blueprint === locationId;
+/** This survivor has the blueprint for this location equipped. */
+export function holdsBlueprint(s, survivorId, locationId) {
+  return gearOf(s, survivorId).book?.blueprint === locationId;
 }
 
 /** Does a living survivor of the team have this ability? */
@@ -65,9 +66,9 @@ export function freeZombieSlots(s, locationId) {
   return LOCATIONS[locationId].zombieSlots - loc.zombies - loc.barricades;
 }
 
-/** People the colony must feed: survivors standing in the colony + helpless survivors. */
+/** People the colony must feed: survivors standing in the colony. */
 export function colonyPopulation(s) {
-  return survivorsAt(s, 'colony').length + s.helpless;
+  return survivorsAt(s, 'colony').length;
 }
 
 export function foodNeeded(s) {
@@ -123,7 +124,7 @@ export const isStorm = (s) => s.day % 3 === 0;
 export function actionCost(s, survivorId, kind, to = null) {
   const sv = s.survivors[survivorId];
   const def = survivorDef(survivorId);
-  const gear = sv ? gearOf(s) : {};
+  const gear = sv ? gearOf(s, survivorId) : {};
   let cost = ENERGY.COST[kind] ?? 0;
   if (kind === 'attack') cost = ENERGY.ATTACK_BASE + ENERGY.PER_SKILL * (def?.attack ?? 4) + (gear.weapon?.attackMod ?? 0);
   if (kind === 'search') cost = ENERGY.SEARCH_BASE + ENERGY.PER_SKILL * (def?.search ?? 4);
@@ -145,7 +146,7 @@ export function actionCost(s, survivorId, kind, to = null) {
 /** Zombies one attack kills: the weapon's value (bare hands 1), +1 for Teodor. */
 export function killsPerAttack(s, survivorId) {
   const sv = s.survivors[survivorId];
-  const weapon = sv ? gearOf(s).weapon : null;
+  const weapon = sv ? gearOf(s, survivorId).weapon : null;
   return Math.max(1, weapon?.value ?? 1) + (survivorDef(survivorId)?.ability.type === 'killTwo' ? 1 : 0);
 }
 
@@ -167,7 +168,7 @@ export function energyRegen(s) {
   const def = survivorDef(sv.id);
   let n = def.regen ?? 65;
   if (def.ability.type === 'extraDie') n += 15;
-  if (gearOf(s).book?.passive === 'regenPlus') n += gearOf(s).book.value;
+  for (const o of aliveSurvivors(s)) { const b = gearOf(s, o.id).book; if (b?.passive === 'regenPlus') n += b.value; }
   if (s.starvation > 0) n -= ENERGY.STARVING;
   return Math.max(0, n);
 }
@@ -182,7 +183,7 @@ export function spawnForecast(s) {
     const n = Math.max(0, Math.ceil(here.length / 2) - quiet);
     if (n) out[loc] = n;
   }
-  const n = Math.ceil((survivorsAt(s, 'colony').length + s.helpless) / 3);
+  const n = Math.ceil(survivorsAt(s, 'colony').length / 3);
   if (n) out.colony = n;
   return out;
 }

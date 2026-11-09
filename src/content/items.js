@@ -42,7 +42,7 @@ export const ITEMS = {
   bedpan:            { id: 'bedpan', type: 'junk', tier: 1, value: 1, name: 'Steel Bedpan', text: 'Unused. Probably.' },
   'motor-junk':      { id: 'motor-junk', type: 'junk', tier: 2, value: 2, wild: true, name: 'Motor Odds & Ends', text: 'Springs, gaskets, mystery bolts.' },
   // SURVIVORS (recruit someone to your group)
-  'stranger-with-child': { id: 'stranger-with-child', type: 'survivor', tier: 1, value: 1, helpless: 1, name: 'Stranger with a Child', text: 'She can fight. He cannot.' },
+  'stranger-with-child': { id: 'stranger-with-child', type: 'survivor', tier: 1, value: 1, name: 'Stranger with a Child', text: 'She can fight. He cannot.' },
   'lone-wanderer':   { id: 'lone-wanderer', type: 'survivor', tier: 2, value: 1, name: 'Lone Wanderer', text: 'Travels light, asks nothing.' },
   // BOOKS (equip; passive while equipped)
   'blueprint-police':   bp('police', 'Police Station Blueprint'),

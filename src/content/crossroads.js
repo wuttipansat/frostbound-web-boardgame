@@ -8,7 +8,7 @@ export const CROSSROADS = [
     trigger: { type: 'survivorAt', location: 'grocery' },
     text: 'Behind the meat freezer, a boy in a snowsuit clutches a can opener and will not let go.',
     choices: [
-      { label: 'Bring him home.', effects: [{ type: 'helpless', delta: 1 }, { type: 'morale', delta: 1 }] },
+      { label: 'Bring him home.', effects: [{ type: 'recruit' }, { type: 'morale', delta: 1 }] },
       { label: 'Take the can opener. Leave him the beans.', effects: [{ type: 'drawItem', from: 'grocery', n: 1 }, { type: 'morale', delta: -1 }] },
     ] },
   { id: 'xr-evidence-locker', title: 'The Evidence Locker',
@@ -29,7 +29,7 @@ export const CROSSROADS = [
     trigger: { type: 'survivorAt', location: 'library' },
     text: 'Twelve survivors huddle in the reading pit. They ask if you know any stories that end well.',
     choices: [
-      { label: 'Invite them to the colony.', effects: [{ type: 'helpless', delta: 2 }, { type: 'food', delta: -1 }] },
+      { label: 'Invite them to the colony.', effects: [{ type: 'recruit' }, { type: 'food', delta: -1 }] },
       { label: 'Trade them a story for supplies.', effects: [{ type: 'drawItem', from: 'library', n: 1 }] },
     ] },
   { id: 'xr-school-bell', title: 'The School Bell',
@@ -64,7 +64,7 @@ export const CROSSROADS = [
     trigger: { type: 'hasItem', item: 'medicine' },
     text: 'A woman sits in a snowbank, holding her side. She says it was a fall. She is lying, or she is not.',
     choices: [
-      { label: 'Patch her up and bring her in.', effects: [{ type: 'discard', item: 'medicine', n: 1 }, { type: 'helpless', delta: 1 }] },
+      { label: 'Patch her up and bring her in.', effects: [{ type: 'discard', item: 'medicine', n: 1 }, { type: 'recruit' }] },
       { label: 'Leave her. You can\'t risk it.', effects: [{ type: 'morale', delta: -1 }] },
     ] },
   { id: 'xr-low-spirits', title: 'Long Faces',
@@ -85,7 +85,7 @@ export const CROSSROADS = [
     trigger: { type: 'foodAtMost', n: 1 },
     text: 'The children are hungry. A volunteer offers to go hunting alone in the dark.',
     choices: [
-      { label: 'Let them go.', effects: [{ type: 'food', delta: 2 }, { type: 'helpless', delta: -1 }] },
+      { label: 'Let them go.', effects: [{ type: 'food', delta: 2 }, { type: 'morale', delta: -1 }] },
       { label: 'Go yourself.', effects: [{ type: 'food', delta: 1 }, { type: 'wound' }] },
     ] },
   { id: 'xr-rotting-pile', title: 'The Midden',
@@ -99,7 +99,7 @@ export const CROSSROADS = [
     trigger: { type: 'dayAtLeast', n: 2 },
     text: 'A familiar face at the fence. They\'re pale. They swear they weren\'t bitten.',
     choices: [
-      { label: 'Let them in.', effects: [{ type: 'helpless', delta: 1 }, { type: 'spawn', where: 'colony', n: 1 }] },
+      { label: 'Let them in.', effects: [{ type: 'recruit' }, { type: 'spawn', where: 'colony', n: 1 }] },
       { label: 'Keep the gate shut.', effects: [{ type: 'morale', delta: -1 }] },
     ] },
   { id: 'xr-limp', title: 'The Limp',
@@ -110,11 +110,11 @@ export const CROSSROADS = [
       { label: 'Push through it.', effects: [{ type: 'energy', delta: 20 }, { type: 'wound' }] },
     ] },
   { id: 'xr-crowded-bunks', title: 'Crowded Bunks',
-    trigger: { type: 'helplessAtLeast', n: 4 },
+    trigger: { type: 'survivorCountAtLeast', n: 4 },
     text: 'There are more mouths than beds. A few of the newcomers offer to stand watch for their keep.',
     choices: [
       { label: 'Put them on the wall.', effects: [{ type: 'barricade', where: 'colony', n: 1 }] },
-      { label: 'Ask them to find shelter elsewhere.', effects: [{ type: 'helpless', delta: -1 }, { type: 'food', delta: 1 }] },
+      { label: 'Ask them to find shelter elsewhere.', effects: [{ type: 'morale', delta: -1 }, { type: 'food', delta: 1 }] },
     ] },
   { id: 'xr-crowd', title: 'Big Family',
     trigger: { type: 'survivorCountAtLeast', n: 2 },
@@ -194,7 +194,7 @@ export const CROSSROADS = [
       { label: 'Keep the tools for the fence.', effects: [] },
     ] },
   { id: 'xr-sleepwalker', title: 'The Sleepwalker',
-    trigger: { type: 'helplessAtLeast', n: 1 },
+    trigger: { type: 'survivorCountAtLeast', n: 3 },
     text: 'One of the colonists is found at the gate at 3 a.m., barefoot, humming.',
     choices: [
       { label: 'Assign someone to watch them.', effects: [{ type: 'energy', delta: -20 }] },

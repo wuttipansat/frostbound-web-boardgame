@@ -19,13 +19,13 @@ test('card play needs an explicit target: one entry per survivor, legal only whe
   let food; [s, food] = giveCard(s, 'canned-beans');
   assert.equal(cardNeeds(s, med), 'survivor');
   assert.equal(cardNeeds(s, junk), null, 'junk is scrapped for energy, no target');
-  assert.equal(cardNeeds(s, gun), null, 'gear is equipped, no target');
+  assert.equal(cardNeeds(s, gun), 'survivor', 'gear is equipped on a chosen survivor');
   assert.equal(cardNeeds(s, food), null);
   const medT = Object.fromEntries(cardTargets(s, med).map((x) => [x.survivorId, x]));
   assert.equal(medT['agnes-pell'].ok, true, 'only the wounded survivor can be healed');
   assert.equal(medT['corwin-daly'].error, 'notWounded');
-  assert.deepEqual(cardOptions(s, gun).map((o) => o.id), ['equip', 'contribute', 'deposit']);
-  assert.ok(cardOptions(s, gun)[0].ok);
+  assert.deepEqual(cardOptions(s, gun).map((o) => o.id), ['contribute', 'deposit']);
+  assert.ok(cardTargets(s, gun).every((x) => x.ok && x.action.type === 'EQUIP'));
 });
 
 test('lure and move targets for the board highlights', () => {

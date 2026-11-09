@@ -51,8 +51,7 @@ export function hasFuel(state) {
 export function cardOptions(state, uid, { survivorId = null } = {}) {
   const item = itemOf(state, uid);
   const out = [];
-  if (gearSlot(item)) out.push({ id: 'equip', ...check(state, act.equip(uid)) });
-  else if (item.type !== 'fuel') {
+  if (gearSlot(item)) { /* equipped on a chosen survivor: cardTargets */ } else if (item.type !== 'fuel') {
     const opts = {};
     if (['medicine', 'tools'].includes(item.type)) opts.targetSurvivorId = survivorId;
     out.push({ id: 'play', ...check(state, act.playCard(uid, opts)) });
@@ -72,15 +71,17 @@ const TARGETED = ['medicine', 'tools'];
 
 /** Does playing this card need the player to choose a survivor? */
 export function cardNeeds(state, uid) {
-  return TARGETED.includes(itemOf(state, uid).type) ? 'survivor' : null;
+  const item = itemOf(state, uid);
+  return TARGETED.includes(item.type) || gearSlot(item) ? 'survivor' : null;
 }
 
 /** Every survivor the card could be played on, with legality and the action to dispatch. */
 export function cardTargets(state, uid) {
   if (cardNeeds(state, uid) !== 'survivor') return [];
+  const gear = !!gearSlot(itemOf(state, uid));
   return state.team.survivors
     .filter((id) => state.survivors[id]?.alive)
-    .map((survivorId) => ({ survivorId, ...check(state, act.playCard(uid, { targetSurvivorId: survivorId })) }));
+    .map((survivorId) => ({ survivorId, ...check(state, gear ? act.equip(uid, survivorId) : act.playCard(uid, { targetSurvivorId: survivorId })) }));
 }
 
 /** Where a survivor could lure zombies to. */

@@ -18,7 +18,7 @@ Numbers are starting values; Step 18 tunes them.
 | 1 | Solo only: remove multiplayer, online, hot seat, AI seats, secret objectives, betrayer, requests, votes, `perPlayer` values. State has `s.team`, actions carry no player id. | **done** |
 | 2 | Remove waste and the danger deck. Item art becomes empty frames (name + type colour); `public/items/<item-id>.png` is used when it exists (`docs/item-art.md` lists the files, 128×128, transparent). | **done** |
 | 3 | Rounds → days (`s.day` 1–40), parts of the day, calendar on the HUD, light follows the time of day. | **done** |
-| 4 | Several survivors: pick 2 of 6 at the start; recruit up to 6. Each survivor has location, HP, AP, ATK, gear, backpack. Remove "helpless". | |
+| 4 | Several survivors: pick 2 of 6 at the start; recruit up to 6. Each survivor has location, HP, AP, ATK, gear, backpack. Remove "helpless". | **done** (AP, HP, ATK, backpack come in Steps 5–7) |
 | 5 | AP per survivor (max 60–95, odd numbers) and sleep. Night: bed 100% AP +15 HP, no bed 70% +5 HP, outside 40% +0 HP (and the zombies there attack). Guard duty (helps defend, 50% AP next day). Nap: +25 AP +5 HP, skips the day. | |
 | 6 | HP 100 and fights. One attack = one zombie dead, costs 15 AP. HP lost = `max(0, zombie ferocity − (AP left + ATK)) ÷ 3` rounded up, minus armor. Walker ferocity 110, brute 150 (day 21+). Leaving a place with zombies: 5 HP per zombie. Guns: kill without losing HP, 10 AP + 1 ammo, a chance a new zombie appears (pistol 40%, shotgun 50% and kills 2, silenced rifle 15%). | |
 | 7 | Expeditions: walking costs AP by distance (12 / 17 / 23), search 17 AP into the survivor's backpack (3 slots). Items count only once carried home (`s.stockpile`). A search may make a zombie appear (10–25% by place, +10% per extra search there that day; it appears, it does not bite at once). Hand items over for free at the same place. No player hand. | |
@@ -71,3 +71,16 @@ Numbers are starting values; Step 18 tunes them.
 - Scenario targets for 40 days: beacon 8 fuel, stores 12 food, purge 25 kills (placeholders until Step 13).
 - Balance: with one survivor the bot now loses almost every 40-day game (morale runs out by day 6–10).
   Expected; Steps 4–14 add the team, sleep, food and base systems that make 40 days survivable.
+
+## Step 4 notes
+
+- Start: pick **2 of 6** survivors. The team holds at most **6** (`RULES.TEAM_MAX`).
+- Newcomers join the team at the colony: survivor cards (+1 morale; a full team gives +2 morale instead)
+  and the crossroads effect `recruit` (a full team: +1 morale).
+- "Helpless" is gone: no counter, no food or spawns for them. Crossroads that added or lost helpless now
+  recruit or cost morale; crises that killed helpless now wound the team.
+- Gear is per survivor (`survivor.gear`): equipping asks who wears it; a blueprint works for its wearer;
+  books with a team passive (cookbook, field manual, survival guide) count for everyone. A survivor who dies
+  drops their gear back into the hand.
+- The energy pool is still shared by the team (the lead survivor's pool) until Step 5 gives each survivor AP.
+- HUD: a Team counter (n/6) replaces Helpless; the draft screen shows 6 cards and asks for 2.

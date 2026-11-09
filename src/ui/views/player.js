@@ -100,7 +100,9 @@ export function renderPlayerPanel(refs, ctx) {
     move: actionCost(s, hero.id, 'move', 'school'), search: actionCost(s, hero.id, 'search'), attack: actionCost(s, hero.id, 'attack'), kills: killsPerAttack(s, hero.id),
   }) : '';
   const tip = `${t('panel.energyTip', { n: e, max, regen: energyRegen(s) })}\n${costs}`;
-  const gear = gearOf(s);
+  // Gear of the selected survivor (or the first one).
+  const gearSv = (ui.selSurvivor && s.survivors[ui.selSurvivor]?.alive) ? ui.selSurvivor : aliveSurvivors(s)[0]?.id;
+  const gear = gearOf(s, gearSv);
   mount(refs.chips,
     h('div', { class: 'energy', role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': String(max), 'aria-valuenow': String(e), 'aria-label': tip, tip },
       icon('exposure', 'en-ico'),
@@ -335,7 +337,7 @@ function survivorToken(ctx, sv, { canAct = false, color = '#888' } = {}) {
     h('span', { class: 'tok-ability' }, icon('ability'), c('survivors', sv.id, 'abilityText')),
     // Worn gear (phones hide the gear slots in the HUD, so it is listed here too).
     (() => {
-      const g = gearOf(ctx.state);
+      const g = gearOf(ctx.state, sv.id);
       const worn = ['weapon', 'armor', 'book'].map((k) => g[k]).filter(Boolean);
       return worn.length ? h('span', { class: 'tok-gear' }, icon('hand'), worn.map((it) => c('items', it.id, 'name')).join(' · ')) : null;
     })()));

@@ -36,7 +36,7 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
     }
     if (await page.locator('.draft-screen .sv-pick').count()) {
       const cards = page.locator('.draft-screen .sv-pick');
-      if (VP.hasTouch) await cards.nth(0).tap(); else await cards.nth(0).click();
+      for (const i of [0, 1]) { if (VP.hasTouch) await cards.nth(i).tap(); else await cards.nth(i).click(); }
       await click('.draft-actions .btn.primary'); counts.draft++; continue;
     }
     if (await page.locator('.dialog.confirm-end').count()) { await click('.dialog.confirm-end .btn.primary'); counts.confirm++; continue; }

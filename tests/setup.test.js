@@ -54,7 +54,7 @@ test('drafting validates picks and starts round 1', () => {
   assert.equal(tryReduce(s, draftPick([])).error, 'badDraft');
   assert.equal(tryReduce(s, draftPick(opts.slice(0, RULES.TEAM_START + 1))).error, 'badDraft');
   assert.equal(tryReduce(s, draftPick([opts[0], opts[0]])).error, 'badDraft');
-  assert.equal(tryReduce(s, draftPick([s.survivorDeck[0]])).error, 'notInDraftOptions');
+  assert.equal(tryReduce(s, draftPick([opts[0], s.survivorDeck[0]])).error, 'notInDraftOptions');
 
   const before = structuredClone(s);
   s = reduce(s, draftPick(opts.slice(0, RULES.TEAM_START)));

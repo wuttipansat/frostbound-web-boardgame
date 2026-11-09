@@ -38,8 +38,7 @@ test('move and card options', () => {
   assert.deepEqual(fuelOpts.map((o) => o.id), ['contribute', 'deposit'], 'fuel is used when moving, not played');
   assert.ok(fuelOpts.find((o) => o.id === 'deposit').ok);
   let gun; [s, gun] = giveCard(s, 'glock-19');
-  assert.equal(cardOptions(s, gun)[0].id, 'equip');
-  assert.ok(cardOptions(s, gun)[0].ok);
+  assert.equal(cardOptions(s, gun).some((o) => o.id === 'equip'), false, 'gear: pick who wears it (cardTargets)');
 });
 
 test('every English UI key has a Thai translation', () => {

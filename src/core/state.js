@@ -32,7 +32,6 @@ export function createGame(config = {}) {
     maxMorale: 10,
     food: scenario.startFood,
     starvation: 0,
-    helpless: scenario.helpless,
     totalKills: 0,
     team: null,
     survivors: {},
@@ -80,7 +79,6 @@ export function createGame(config = {}) {
     hand: [],
     energy: 0,       // the survivor's energy (set when the draft ends)
     fresh: true,     // the first turn starts full
-    gear: { weapon: null, armor: null, book: null }, // equipped item uids
     kills: 0,
     abilityUsed: {},
     usedCards: [],
