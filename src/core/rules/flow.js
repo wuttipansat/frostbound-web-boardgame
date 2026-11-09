@@ -1,12 +1,12 @@
 // Game flow (solo): pick survivors -> rounds (crisis, one turn w/ crossroads, energy) -> colony phase -> end checks.
-import { PHASES, OUTSIDE_LOCATIONS, RULES, FIGHT, FOOD, SEASON } from '../constants.js';
+import { PHASES, OUTSIDE_LOCATIONS, RULES, FIGHT, FOOD, SEASON, SIEGE } from '../constants.js';
 import { shuffle, pick, random } from '../rng.js';
 import { assert } from '../errors.js';
 import { CROSSROADS_BY_ID } from '../../content/crossroads.js';
 import { CRISES_BY_ID } from '../../content/crises.js';
 import {
   aliveSurvivors, foodNeeded, colonyPopulation, crisisRequirement, itemOf, scenarioDef, scenarioTarget,
-  focusSurvivor, teamHasAbility, crisisMatches, baseLevel, apMax, sleepPlan, spawnForecast,
+  focusSurvivor, teamHasAbility, crisisMatches, baseLevel, siegeForecast, apMax, sleepPlan, spawnForecast,
 } from '../selectors.js';
 import {
   log, changeMorale, changeFood, recruitSurvivor, healHp, damageSurvivor, unpack, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems,
@@ -142,6 +142,7 @@ export function colonyPhase(s) {
   // 4. Zombie spawns
   s.time = 'night';
   report.spawns = spawnZombies(s);
+  report.siege = nightSiege(s);
 
   // 5. Frostbite: the campfire cures it; out in the cold it bites deeper.
   for (const sv of Object.values(s.survivors)) {
@@ -196,6 +197,18 @@ export function resolveCrisis(s) {
   s.crisisDiscard.push(s.crisis.id);
   s.crisis = null;
   return result;
+}
+
+/** The night attack on the base: walls, guards and barricades stop zombies first, the rest bite (see siegeForecast). */
+export function nightSiege(s) {
+  const f = siegeForecast(s);
+  const col = s.locations.colony;
+  // Barricades are used up; zombies at the gate join the attack and stay there until killed.
+  col.barricades -= Math.max(0, Math.min(col.barricades, f.stopped - f.wall - f.guards));
+  log(s, 'siege', { attackers: f.attackers, stopped: f.stopped, hits: f.hits });
+  for (const id of f.targets) damageSurvivor(s, id, SIEGE.HIT_HP, 'siege');
+  if (!f.targets.length && f.hits) changeFood(s, -Math.min(s.food, f.hits * SIEGE.NO_ONE_FOOD), 'siege');
+  return f;
 }
 
 export function spawnZombies(s) {

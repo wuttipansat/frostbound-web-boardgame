@@ -92,10 +92,10 @@ test('inspire adds morale when a crisis is averted', () => {
   assert.equal(s.morale, 6);
 });
 
-test('spawning: ceil(n/2) outside, ceil(n/3) at colony; quiet guide reduces', () => {
+test('spawning: ceil(n/2) outside; the colony gets a night attack instead', () => {
   let s = team({ 'corwin-daly': 'school', 'agnes-pell': 'school', 'silas-thorn': 'library', 'greta-vos': 'library', 'nia-calloway': 'colony' });
   s = patch(s, (x) => { x.spawns = spawnZombies(x); });
-  assert.deepEqual(s.spawns, { school: 1, colony: 1 });
+  assert.deepEqual(s.spawns, { school: 1 });
 });
 
 test('overrun: a full entrance kills the lowest-influence survivor', () => {
@@ -148,7 +148,7 @@ test('stockpile goal requires food AND a clear gate', () => {
     return patch(f, (x) => {
       const uid = Object.keys(x.cards)[0];
       x.cards[uid] = 'jerry-can';
-      x.food = food; x.locations.colony.zombies = zombies;
+      x.food = food; x.locations.colony.zombies = zombies; x.base.wall = 3; x.locations.colony.barricades = 3;
       x.crisis = { id: 'whiteout', contributions: [uid] };
       colonyPhase(x);
     });

@@ -5,7 +5,7 @@ import { newGame, startedGame, setSurvivors, patch } from './_helpers.js';
 import { reduce, tryReduce } from '../src/core/reducer.js';
 import * as act from '../src/core/actions.js';
 import { ENERGY, FIGHT } from '../src/core/constants.js';
-import { actionCost, spawnForecast, holderOf, apMax, sleepPlan, atkOf, fightPreview, killsPerAttack, gearOf } from '../src/core/selectors.js';
+import { actionCost, spawnForecast, siegeForecast, holderOf, apMax, sleepPlan, atkOf, fightPreview, killsPerAttack, gearOf } from '../src/core/selectors.js';
 import { SURVIVORS } from '../src/content/survivors.js';
 import { giveCard, setEnergy } from './_helpers.js';
 import { spawnZombies } from '../src/core/rules/flow.js';
@@ -126,7 +126,7 @@ test('sleep: bed 100% +15 HP, floor 70% +5, outside 40%; carry-over, cap, lower 
   assert.equal(plan['agnes-pell'].ap, Math.min(apMax(s, 'agnes-pell'), 30 + Math.round(apMax(s, 'agnes-pell') * 0.7)));
   assert.equal(plan['corwin-daly'].kind, 'outside');
   assert.equal(plan['corwin-daly'].ap, Math.round(apMax(s, 'corwin-daly') * 0.4));
-  s.food = 20;
+  s.food = 20; s.base.wall = 3; // no night attack in this test
   const next = reduce(s, act.endTurn());
   if (next.phase !== 'gameOver') {
     assert.equal(next.survivors['osei-vance'].hp, 65);
@@ -151,16 +151,31 @@ test('nap: +25 AP +5 HP at the colony, only before acting, then no more actions 
   assert.equal(tryReduce(napped, act.move('osei-vance', 'school')).error, 'napping');
 });
 
-test('guard duty: at the colony only, stops one colony zombie tonight, wakes at 50%', () => {
+test('guard duty: at the colony only, stops one attacker tonight, wakes at 50%', () => {
   let s = fb({ seed: 12 });
   s = setSurvivors(s, { 'osei-vance': 'colony', 'greta-vos': 'school' });
   assert.equal(tryReduce(s, act.setRest('greta-vos', 'guard')).error, 'mustBeInColony');
-  assert.equal(spawnForecast(s).colony, 1);
+  s.locations.colony.barricades = 0;
+  assert.equal(siegeForecast(s).hits, 1);
   setAp(s, 'osei-vance', 0);
   s = reduce(s, act.setRest('osei-vance', 'guard'));
-  assert.equal(spawnForecast(s).colony, undefined);
+  assert.equal(siegeForecast(s).hits, 0);
   assert.equal(sleepPlan(s)['osei-vance'].kind, 'guard');
   assert.equal(sleepPlan(s)['osei-vance'].ap, Math.round(apMax(s, 'osei-vance') * 0.5));
+});
+
+test('night attack: predictable; walls, guards and barricades stop first; the rest bite people at the base', () => {
+  let s = fb({ seed: 12 });
+  s = setSurvivors(s, { 'osei-vance': 'colony', 'greta-vos': 'colony' });
+  s.day = 17; s.food = 20; s.base.wall = 1; s.locations.colony.barricades = 1; s.locations.colony.zombies = 1;
+  const f = siegeForecast(s);
+  assert.deepEqual([f.attackers, f.stopped, f.hits], [1 + 4 + 1, 2, 4], 'day 17: 5 come + 1 at the gate; wall + barricade stop 2');
+  assert.deepEqual(f.targets, ['greta-vos', 'osei-vance', 'greta-vos', 'osei-vance'], 'shared, healthiest first');
+  const r = reduce(s, act.endTurn());
+  const siege = r.reports.colony.siege;
+  assert.equal(siege.hits, 4);
+  assert.equal(r.locations.colony.barricades, 0, 'the barricade is used up');
+  assert.ok(r.log.some((e) => e.k === 'hurt' && e.cause === 'siege' && e.n === 10));
 });
 
 test('threat forecast equals what the colony phase spawns', () => {

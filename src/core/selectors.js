@@ -5,7 +5,7 @@ import { LOCATIONS } from '../content/locations.js';
 import { ITEMS } from '../content/items.js';
 import { SCENARIOS_BY_ID } from '../content/scenarios.js';
 import { CRISES_BY_ID } from '../content/crises.js';
-import { RULES, ENERGY, REST, FIGHT, SEASON, RING, SEARCH_SPAWN, DANGEROUS_LOCATIONS, OUTSIDE_LOCATIONS } from './constants.js';
+import { RULES, ENERGY, REST, FIGHT, SEASON, SIEGE, RING, SEARCH_SPAWN, DANGEROUS_LOCATIONS, OUTSIDE_LOCATIONS } from './constants.js';
 
 export const survivorDef = (id) => SURVIVORS_BY_ID[id];
 export const itemOf = (s, uid) => ITEMS[s.cards[uid]];
@@ -289,7 +289,22 @@ export function spawnForecast(s) {
     const n = Math.max(0, Math.ceil(here.length / 2) - quiet);
     if (n) out[loc] = n;
   }
-  const n = Math.max(0, Math.ceil(survivorsAt(s, 'colony').length / 3) - guardsOnDuty(s) - baseLevel(s, 'wall'));
-  if (n) out.colony = n;
   return out;
+}
+
+/**
+ * Tonight's attack on the base, fully predictable:
+ * { attackers, wall, guards, barricades, stopped, hits, targets: [survivorId per hit] }.
+ * Hits go round-robin to the survivors at the colony, healthiest first; with nobody home each hit eats 1 food.
+ */
+export function siegeForecast(s) {
+  const attackers = SIEGE.BASE + Math.floor((s.day - 1) / SIEGE.EVERY) + (s.locations.colony?.zombies ?? 0);
+  const wall = baseLevel(s, 'wall');
+  const guards = guardsOnDuty(s) * SIEGE.GUARD;
+  const barricades = s.locations.colony?.barricades ?? 0;
+  const stopped = Math.min(attackers, wall + guards + barricades);
+  const hits = attackers - stopped;
+  const home = aliveSurvivors(s).filter((sv) => sv.location === 'colony').sort((a, b) => b.hp - a.hp || a.id.localeCompare(b.id));
+  const targets = home.length ? Array.from({ length: hits }, (_, i) => home[i % home.length].id) : [];
+  return { attackers, wall, guards, barricades, stopped, hits, targets };
 }

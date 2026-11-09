@@ -28,7 +28,7 @@ Numbers are starting values; Step 18 tunes them.
 | 11 | A crisis every day: revealed at dawn, items handed in during the day (face up), scored at dusk. +1 needed every 10 days. | **done** |
 | 12 | Base upgrades (3 levels each, materials + AP, AP carries over): dorm, wall, greenhouse, workshop, infirmary, radio tower. | **done** |
 | 13 | Main goal: the snow crawler in 4 stages (frame, engine, heater, fuel). Rare parts in certain places. Seasons get harsher (cold day 11+, brutes day 21+, storms day 31+). | **done** |
-| 14 | Night attacks on the base: dawn forecast; at night walls and guards stop zombies first; the rest hurt people at the base. Fully predictable ("5 attack, 4 stopped"). | |
+| 14 | Night attacks on the base: dawn forecast; at night walls and guards stop zombies first; the rest hurt people at the base. Fully predictable ("5 attack, 4 stopped"). | **done** |
 | 15 | Solo fun: a daily event card with 2 choices, traits and bonds, weekly missions, experience (skills improve with use), difficulty levels, an end-of-game summary. | |
 | 16 | New scene and camera: isometric ~55°, rotate in 90° steps, 3 zoom levels; less fog, brighter day, readable night; limited palette, bigger survivors with outlines; roads with AP costs; bigger buttons and a bottom sheet on phones. | |
 | 17 | Show every action: previews (path + AP, HP to lose, spawn %), animations (walk, loot flying into the backpack, hits with damage numbers, scaffolding, night attack), HP bars, toasts, a daily report, a tutorial over days 1–3. | |
@@ -182,3 +182,13 @@ Numbers are starting values; Step 18 tunes them.
 - Seasons (shown on the HUD calendar): cold from day 11 (sleeping outside −10 HP more), brutes from day 21
   (ferocity 150), storms every day from day 31.
 - Balance (bot, 30 games): crawler 0% won — the bot does not gather parts yet; Step 18 teaches it.
+
+## Step 14 notes
+
+- The colony no longer gets night spawns; it gets a **night attack** (`siegeForecast`, `nightSiege`):
+  attackers = 1 + 1 per 4 days (day 1: 1, day 17: 5, day 37: 10) + zombies already at the colony gate.
+- Stopped first: wall (1 per level), guards (1 each), colony barricades (1 each, used up). Every attacker left bites
+  someone at the colony for 10 HP (round-robin, healthiest first). Nobody home: each one eats 1 food.
+  Zombies at the gate stay there until killed.
+- HUD block "Tonight: 5 attack, 4 stopped · 1 bite (−10 HP)", with the wall / guard / barricade numbers in the tooltip.
+- Balance (bot, 30 games): crawler 0%, beacon 3%, stores 0%, purge 7%; Step 18.

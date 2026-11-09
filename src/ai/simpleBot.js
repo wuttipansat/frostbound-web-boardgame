@@ -8,7 +8,7 @@ import { PHASES, OUTSIDE_LOCATIONS, ENERGY, RULES } from '../core/constants.js';
 import { gearSlot } from '../content/items.js';
 import {
   aliveSurvivors, survivorDef, itemOf, crisisDef, scenarioDef,
-  freeSurvivorSlots, freeZombieSlots, foodNeeded, actionCost, fightPreview, placeOfItem, packFree, leaveDamage, spawnForecast, crisisRequirement, crisisScore, gearOf,
+  freeSurvivorSlots, freeZombieSlots, foodNeeded, actionCost, fightPreview, siegeForecast, placeOfItem, packFree, leaveDamage, spawnForecast, crisisRequirement, crisisScore, gearOf,
 } from '../core/selectors.js';
 import { CROSSROADS_BY_ID } from '../content/crossroads.js';
 
@@ -167,7 +167,7 @@ function energyActions(s, p, survivors, candidates, cardsOf, opts) {
     const loc = s.locations[sv.location];
     // 4. Hold the colony against tonight's zombies.
     if (freeZombieSlots(s, sv.location) > 0 && can(sv, 'barricade')
-      && ((sv.location === 'colony' && (forecast.colony ?? 0) > s.locations.colony.barricades) || loc.zombies > 0)) {
+      && ((sv.location === 'colony' && siegeForecast(s).hits > 0) || loc.zombies > 0)) {
       candidates.push(act.barricade(sv.id));
     }
   }
@@ -214,5 +214,5 @@ function energyActions(s, p, survivors, candidates, cardsOf, opts) {
     if (sv.location === 'colony' && !sv.acted && !sv.moved && !sv.napped && sv.ap < 30) candidates.push(act.nap(sv.id));
   }
   const guard = survivors.find((sv) => sv.location === 'colony' && sv.ap < 15 && sv.rest !== 'guard');
-  if (guard && (forecast.colony ?? 0) > 0 && !survivors.some((sv) => sv.rest === 'guard')) candidates.push(act.setRest(guard.id, 'guard'));
+  if (guard && siegeForecast(s).hits > 0 && !survivors.some((sv) => sv.rest === 'guard')) candidates.push(act.setRest(guard.id, 'guard'));
 }

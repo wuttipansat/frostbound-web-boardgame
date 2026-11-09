@@ -80,5 +80,8 @@ export const SEARCH_SPAWN = Object.freeze({ grocery: 0.1, school: 0.15, library:
 export const FOOD = Object.freeze({ HUNGRY_HP: 15, HUNGRY_MORALE: 1 });
 // Seasons get harsher: cold nights (sleeping outside −10 HP), brutes (FIGHT.BRUTE_DAY), daily storms.
 export const SEASON = Object.freeze({ COLD: 11, COLD_HP: 10, STORMS: 31 });
+// Night attack on the base: attackers = BASE + 1 per EVERY days (+ zombies already at the colony gate).
+// Walls (per level), guards and colony barricades each stop 1; every attacker left bites someone at the base.
+export const SIEGE = Object.freeze({ BASE: 1, EVERY: 4, GUARD: 1, HIT_HP: 10, NO_ONE_FOOD: 1 });
 export const DANGEROUS_LOCATIONS = Object.freeze(['hospital', 'police']);
 
