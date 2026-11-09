@@ -260,7 +260,7 @@ Normal is just under the 35–50% target and wins come about a day earlier than 
 careful player, so this is a reasonable place to stop. Old scenarios, normal, 30 games: beacon 30%, stores 57%, purge 57%.
 
 Tests and checks: `npm test` 139 passing; e2e smoke on desktop and phone, HUD layout (no overlaps), UI audit,
-and perf (initial download 251 kB gzip-ish, 3 ms frames) all pass.
+and perf (initial download 251 kB as the perf script measures it, 3 ms frames) all pass.
 
 Publish: `.github/workflows/pages.yml` builds, tests and deploys `dist/` to GitHub Pages on pushes to `main` (or by
 hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHub Actions.
