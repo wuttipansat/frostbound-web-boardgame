@@ -1,13 +1,13 @@
 // Floating player HUD (step 14): name tag, survivor tokens, dice chips, a floating hand (pile ↔ fan),
 // the card sheet with round targets, and the round "more" button next to End turn.
 import { h, mount, hex } from '../dom.js';
-import { icon, dieFace, heart } from '../icons.js';
+import { icon, heart } from '../icons.js';
 import { t, c, getLang } from '../../i18n/index.js';
 import { flashTip } from '../tooltip.js';
-import { getPlayer, aliveSurvivorsOf, survivorDef, itemOf, woundLimit, objectiveDef, isFrostbound, energyMax, energyRegen } from '../../core/selectors.js';
+import { getPlayer, aliveSurvivorsOf, survivorDef, itemOf, woundLimit, objectiveDef, energyMax, energyRegen, gearOf, actionCost, killsPerAttack, heroOf } from '../../core/selectors.js';
 import { PLAYER_COLORS } from '../../render/pieces.js';
 import {
-  cardOptions, endTurnOption, voteTargets, cardNeeds, cardTargets, cardDice, shouldConfirmEndTurn, cardLocations, junkAction, cardUsable, actingSurvivors, unusedDice,
+  cardOptions, endTurnOption, voteTargets, cardNeeds, cardTargets, shouldConfirmEndTurn, cardUsable, actingSurvivors,
 } from '../options.js';
 import * as act from '../../core/actions.js';
 import { itemPlay, itemShort } from '../itemText.js';
@@ -23,7 +23,7 @@ function roundTarget(art, survivorId, ok, tipText, onPick) {
   }, art.portrait(survivorId, 's', { alt: '' }), ok ? null : h('span', { class: 'off-mark', 'aria-hidden': 'true' }, icon('close')));
 }
 
-const CARD_ACTION_ICON = { play: 'check', contribute: 'crisis', deposit: 'goal' };
+const CARD_ACTION_ICON = { play: 'check', equip: 'hand', contribute: 'crisis', deposit: 'goal' };
 
 /** The card sheet: small art, name, tier, one rule line; explicit target / die choice; the card's actions. */
 function cardDetail(ctx, shown, uid) {
@@ -40,35 +40,6 @@ function cardDetail(ctx, shown, uid) {
       h('h4', {}, t('act.pickTarget')),
       h('div', { class: 'picker-row round-row' }, cardTargets(s, shown.id, uid).map((tg) => roundTarget(art, tg.survivorId, tg.ok,
         `${survivorDef(tg.survivorId).name} — ${tg.ok ? t(...itemShort(item)) : t(`err.${tg.error}`)}`, () => go(tg.action)))));
-  } else if (need === 'location') {
-    picker = h('div', { class: 'picker', 'data-target-picker': '' },
-      h('h4', {}, t('act.pickPlace')),
-      h('div', { class: 'picker-row' }, cardLocations(s, shown.id, uid).map((tg) => h('button', {
-        class: `pick place${tg.ok ? '' : ' off'}`, 'aria-disabled': tg.ok ? null : 'true',
-        tip: tg.ok ? t('itemShort.zombiesHere', { n: tg.zombies }) : t(`err.${tg.error}`),
-        onclick: (ev) => (tg.ok ? go(tg.action) : flashTip(ev.currentTarget)),
-      }, c('locations', tg.to, 'name')))));
-  } else if (need === 'die' && item.value > 1) {
-    // Stronger junk: tick up to two dice, then reroll.
-    const picked = (ctx.ui.junkDice ?? []).filter((i) => shown.dice[i] && !shown.dice[i].used);
-    const toggle = (i) => ctx.set({ junkDice: picked.includes(i) ? picked.filter((x) => x !== i) : [...picked, i].slice(-item.value) });
-    picker = h('div', { class: 'picker', 'data-target-picker': '' },
-      h('h4', {}, t('act.pickDice', { n: item.value })),
-      h('div', { class: 'picker-row' }, cardDice(s, shown.id, uid).map((d) => h('button', {
-        class: `pick die-pick${picked.includes(d.dieIndex) ? ' on' : ''}`, disabled: !d.ok, 'aria-pressed': picked.includes(d.dieIndex) ? 'true' : 'false',
-        'aria-label': t('tip.die', { v: d.value }), onclick: () => toggle(d.dieIndex),
-      }, dieFace(d.value))),
-      h('button', {
-        class: 'btn primary', disabled: !picked.length,
-        onclick: () => { flyCard(uid, 'play'); if (ctx.dispatch(junkAction(shown.id, uid, picked))) { ctx.set({ junkDice: [] }); close(); } },
-      }, t('act.reroll'))));
-  } else if (need === 'die') {
-    picker = h('div', { class: 'picker', 'data-target-picker': '' },
-      h('h4', {}, t('act.pickDie')),
-      h('div', { class: 'picker-row' }, cardDice(s, shown.id, uid).map((d) => h('button', {
-        class: 'pick die-pick', disabled: !d.ok, 'aria-label': t('tip.die', { v: d.value }),
-        onclick: () => go(d.action),
-      }, dieFace(d.value)))));
   }
   const flavour = [c('items', item.id, 'text'), isPermanent(item) ? t(`itemPlay.permanent.${item.type}`) : null].filter(Boolean).join(' — ');
   return h('div', { class: `card-detail panel t-${item.type} tier-${item.tier}`, role: 'dialog', 'aria-label': t('panel.cardDetail') },
@@ -83,7 +54,7 @@ function cardDetail(ctx, shown, uid) {
     h('p', { class: 'cd-rule' }, t(...itemPlay(item))),
     picker,
     h('div', { class: 'cd-actions' }, opts.map((o) => h('button', {
-      class: `btn small-act${o.id === 'play' ? ' primary' : ''}${o.ok ? '' : ' off'}`, 'aria-disabled': o.ok ? null : 'true',
+      class: `btn small-act${o.id === 'play' || o.id === 'equip' ? ' primary' : ''}${o.ok ? '' : ' off'}`, 'aria-disabled': o.ok ? null : 'true',
       tip: o.ok ? t(`act.${o.id}`) : `${t(`act.${o.id}`)} — ${t(`err.${o.error}`)}`,
       onclick: (ev) => (o.ok ? go(o.action, o.id) : flashTip(ev.currentTarget)),
     }, icon(CARD_ACTION_ICON[o.id] ?? 'check'), h('span', {}, t(`act.${o.id}Short`))))));
@@ -104,7 +75,7 @@ function placeSheet(container, uid) {
 
 /** refs: { head, survivors, chips, hand, actions } floating HUD pieces. */
 export function renderPlayerPanel(refs, ctx) {
-  const { state: s, ui, viewer, actor } = ctx;
+  const { state: s, ui, viewer, actor, art } = ctx;
   const shown = viewer ? getPlayer(s, viewer) : (s.activePlayerId ? getPlayer(s, s.activePlayerId) : null);
   if (!shown) {
     for (const el of Object.values(refs)) mount(el);
@@ -129,34 +100,32 @@ export function renderPlayerPanel(refs, ctx) {
 
   // ---- survivors: round tokens
   const acting = new Set(isActor ? actingSurvivors(s, shown.id) : []);
-  mount(refs.survivors, aliveSurvivorsOf(s, shown.id).map((sv) => survivorToken(ctx, sv, { canAct: acting.has(sv.id), color: hex(PLAYER_COLORS[idx]) })));
 
-  // ---- Frostbound: an energy meter instead of dice
-  if (isFrostbound(s)) {
-    const max = energyMax(s, shown.id);
-    const e = shown.energy ?? 0;
-    const tip = t('panel.energyTip', { n: e, max, regen: energyRegen(s, shown.id) });
-    mount(refs.chips, h('div', { class: 'energy', role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': String(max), 'aria-valuenow': String(e), 'aria-label': tip, tip },
-      icon('exposure', 'en-ico'),
-      h('span', { class: 'en-bar' }, h('i', { style: { width: `${Math.round((Math.min(e, max) / max) * 100)}%` } })),
-      h('b', { class: 'en-num' }, `${e}`), h('small', {}, `/${max}`)));
-  } else {
-  // ---- dice: 2D chips only (the 3D tray shows the roll, then hides)
-  const left = unusedDice(s, shown.id);
+  // ---- energy meter + worn gear (weapon / armor / book), with the survivor's personal costs in the tooltip
+  const max = energyMax(s, shown.id);
+  const e = shown.energy ?? 0;
+  const hero = heroOf(s, shown.id);
+  const costs = hero ? t('panel.costs', {
+    move: actionCost(s, hero.id, 'move', 'school'), search: actionCost(s, hero.id, 'search'), attack: actionCost(s, hero.id, 'attack'), kills: killsPerAttack(s, hero.id),
+  }) : '';
+  const tip = `${t('panel.energyTip', { n: e, max, regen: energyRegen(s, shown.id) })}\n${costs}`;
+  const gear = gearOf(s, shown.id);
   mount(refs.chips,
-    shown.dice.map((d, i) => h('button', {
-      class: `die-chip${d.used ? ' used' : ''}${ui.selDie === i ? ' selected' : ''}`,
-      dataset: { die: String(i) },
-      disabled: d.used || !isActor,
-      'aria-label': t('tip.die', { v: d.v }),
-      tip: isActor ? t('tip.dieChip') : null,
-      onclick: () => ctx.set({ selDie: ui.selDie === i ? null : i }),
-    }, dieFace(d.v))),
-    isActor && shown.dice.length ? h('span', { class: 'dice-badge', tip: t('tip.diceLeft'), 'aria-label': t('panel.diceLeft', { n: left }) }, String(left)) : null);
-  }
+    h('div', { class: 'energy', role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': String(max), 'aria-valuenow': String(e), 'aria-label': tip, tip },
+      icon('exposure', 'en-ico'),
+      h('span', { class: 'en-bar' }, h('i', { style: { width: `${Math.round((Math.min(e, max) / Math.max(1, max)) * 100)}%` } })),
+      h('b', { class: 'en-num' }, `${e}`), h('small', {}, `/${max}`)));
+  // The survivor's round face, with the worn gear (weapon / armor / book) beside it.
+  mount(refs.survivors, aliveSurvivorsOf(s, shown.id).map((sv) => survivorToken(ctx, sv, { canAct: acting.has(sv.id), color: hex(PLAYER_COLORS[idx]) })),
+    h('div', { class: 'gear', role: 'group', 'aria-label': t('panel.gear') }, ['weapon', 'armor', 'book'].map((slot) => {
+      const it = gear[slot];
+      const label = it ? `${t(`item.${slot}`)}: ${c('items', it.id, 'name')} — ${t(...itemShort(it))}` : t('panel.gearEmpty', { slot: t(`item.${slot}`) });
+      return h('span', { class: `gear-slot${it ? ' on' : ''}`, dataset: { slot }, tip: label, 'aria-label': label, tabindex: '0' },
+        it ? art.item(it.id, 's', { alt: '' }) : icon(slot === 'weapon' ? 'attack' : slot === 'armor' ? 'barricade' : 'log'));
+    })));
 
   // ---- hand (only ever the viewer's own): a floating pile or a fan
-  const hand = viewer ? shown.hand : [];
+  const hand = viewer && !ctx.passing ? shown.hand : [];
   // Phones: an open location sheet takes the room, so the hand folds into its pile.
   const phoneLoc = window.innerWidth <= 760 && !!ui.selLoc;
   // A card picked by other means (keyboard, tutorial, a test) opens the fan while its sheet is up.
@@ -386,9 +355,15 @@ function survivorToken(ctx, sv, { canAct = false, color = '#888' } = {}) {
     h('b', {}, d.name),
     h('small', {}, `${c('survivors', sv.id, 'occupation')} · ${where}`),
     h('span', { class: 'sv-stats' },
-      h('span', { class: 'need' }, icon('attack'), dieFace(d.attack, 'mini'), '+'),
-      h('span', { class: 'need' }, icon('search'), dieFace(d.search, 'mini'), '+'),
-      h('span', { class: 'need' }, icon('star'), d.influence)),
+      h('span', { class: 'need' }, icon('exposure'), `${energyMax(ctx.state, sv.owner)}`),
+      h('span', { class: 'need' }, icon('attack'), actionCost(ctx.state, sv.id, 'attack')),
+      h('span', { class: 'need' }, icon('search'), actionCost(ctx.state, sv.id, 'search'))),
     h('span', { class: 'sv-health' }, Array.from({ length: limit }, (_, i) => heart(i < left)), sv.moved ? h('small', {}, ` · ${t('panel.moved')}`) : null),
-    h('span', { class: 'tok-ability' }, icon('ability'), c('survivors', sv.id, 'abilityText'))));
+    h('span', { class: 'tok-ability' }, icon('ability'), c('survivors', sv.id, 'abilityText')),
+    // Worn gear (phones hide the gear slots in the HUD, so it is listed here too).
+    (() => {
+      const g = gearOf(ctx.state, sv.owner);
+      const worn = ['weapon', 'armor', 'book'].map((k) => g[k]).filter(Boolean);
+      return worn.length ? h('span', { class: 'tok-gear' }, icon('hand'), worn.map((it) => c('items', it.id, 'name')).join(' · ')) : null;
+    })()));
 }

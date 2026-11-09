@@ -23,7 +23,7 @@ export const CROSSROADS = [
     text: 'A nurse\'s clipboard lists every patient on the ward. The last entry is her own name.',
     choices: [
       { label: 'Read the notes for supply locations.', effects: [{ type: 'drawItem', from: 'hospital', n: 1 }] },
-      { label: 'Give her a proper burial in the snow.', effects: [{ type: 'morale', delta: 1 }, { type: 'loseDie', n: 1 }] },
+      { label: 'Give her a proper burial in the snow.', effects: [{ type: 'morale', delta: 1 }, { type: 'energy', delta: -20 }] },
     ] },
   { id: 'xr-story-time', title: 'Story Time',
     trigger: { type: 'survivorAt', location: 'library' },
@@ -44,7 +44,7 @@ export const CROSSROADS = [
     text: 'The emergency hand pump works. It also squeals like a wounded animal.',
     choices: [
       { label: 'Pump anyway.', effects: [{ type: 'drawItem', from: 'gas', n: 2 }, { type: 'spawn', where: 'here', n: 1 }] },
-      { label: 'Muffle it with your coat. Slowly.', effects: [{ type: 'loseDie', n: 1 }, { type: 'drawItem', from: 'gas', n: 1 }] },
+      { label: 'Muffle it with your coat. Slowly.', effects: [{ type: 'energy', delta: -20 }, { type: 'drawItem', from: 'gas', n: 1 }] },
     ] },
   { id: 'xr-hungry-dog', title: 'A Hungry Dog',
     trigger: { type: 'hasItem', item: 'food' },
@@ -78,7 +78,7 @@ export const CROSSROADS = [
     trigger: { type: 'colonyZombiesAtLeast', n: 3 },
     text: 'The south gate shudders all night. The chain is starting to stretch.',
     choices: [
-      { label: 'Reinforce it now.', effects: [{ type: 'loseDie', n: 1 }, { type: 'barricade', where: 'colony', n: 2 }] },
+      { label: 'Reinforce it now.', effects: [{ type: 'energy', delta: -20 }, { type: 'barricade', where: 'colony', n: 2 }] },
       { label: 'Pray the chain holds.', effects: [{ type: 'spawn', where: 'colony', n: 1 }] },
     ] },
   { id: 'xr-empty-plates', title: 'Empty Plates',
@@ -106,8 +106,8 @@ export const CROSSROADS = [
     trigger: { type: 'hasWounded' },
     text: 'Your wound has gone hot and tight. Someone mentions the hospital still has antiseptic.',
     choices: [
-      { label: 'Rest by the fire.', effects: [{ type: 'heal' }, { type: 'loseDie', n: 1 }] },
-      { label: 'Push through it.', effects: [{ type: 'gainDie', n: 1 }, { type: 'wound' }] },
+      { label: 'Rest by the fire.', effects: [{ type: 'heal' }, { type: 'energy', delta: -20 }] },
+      { label: 'Push through it.', effects: [{ type: 'energy', delta: 20 }, { type: 'wound' }] },
     ] },
   { id: 'xr-crowded-bunks', title: 'Crowded Bunks',
     trigger: { type: 'helplessAtLeast', n: 4 },
@@ -120,14 +120,14 @@ export const CROSSROADS = [
     trigger: { type: 'survivorCountAtLeast', n: 2 },
     text: 'Your people argue about who should take the night shift.',
     choices: [
-      { label: 'Take it yourself.', effects: [{ type: 'loseDie', n: 1 }, { type: 'morale', delta: 1 }] },
+      { label: 'Take it yourself.', effects: [{ type: 'energy', delta: -20 }, { type: 'morale', delta: 1 }] },
       { label: 'Draw straws.', effects: [{ type: 'exposure' }] },
     ] },
   { id: 'xr-snow-angel', title: 'Snow Angels',
     trigger: { type: 'always' },
     text: 'Fresh snow and a clear sky. The children want to play outside for the first time in weeks.',
     choices: [
-      { label: 'Let them. You\'ll stand guard.', effects: [{ type: 'morale', delta: 1 }, { type: 'loseDie', n: 1 }] },
+      { label: 'Let them. You\'ll stand guard.', effects: [{ type: 'morale', delta: 1 }, { type: 'energy', delta: -20 }] },
       { label: 'Too dangerous.', effects: [] },
     ] },
   { id: 'xr-radio-voice', title: 'A Voice on the Radio',
@@ -141,8 +141,8 @@ export const CROSSROADS = [
     trigger: { type: 'notInColony' },
     text: 'The road shines like glass. One wrong step and you go down hard.',
     choices: [
-      { label: 'Take the long way.', effects: [{ type: 'loseDie', n: 1 }] },
-      { label: 'Risk it.', effects: [{ type: 'exposure' }, { type: 'gainDie', n: 1 }] },
+      { label: 'Take the long way.', effects: [{ type: 'energy', delta: -20 }] },
+      { label: 'Risk it.', effects: [{ type: 'exposure' }, { type: 'energy', delta: 20 }] },
     ] },
   { id: 'xr-stashed-rations', title: 'Hidden Rations',
     trigger: { type: 'foodAtLeast', n: 4 },
@@ -162,7 +162,7 @@ export const CROSSROADS = [
     trigger: { type: 'roundAtLeast', n: 4 },
     text: 'Someone scratches another line in the doorframe. The lines are running out of room.',
     choices: [
-      { label: 'Work through the night.', effects: [{ type: 'gainDie', n: 1 }, { type: 'morale', delta: -1 }] },
+      { label: 'Work through the night.', effects: [{ type: 'energy', delta: 20 }, { type: 'morale', delta: -1 }] },
       { label: 'Sleep. You need it.', effects: [{ type: 'heal' }] },
     ] },
   { id: 'xr-weapons-cache', title: 'The Hunter\'s Cabin',
@@ -176,7 +176,7 @@ export const CROSSROADS = [
     trigger: { type: 'survivorAt', location: 'colony' },
     text: 'A drift has buried the west gate overnight. Digging it out will take all morning.',
     choices: [
-      { label: 'Dig it out.', effects: [{ type: 'loseDie', n: 1 }, { type: 'removeZombies', where: 'colony', n: 1 }] },
+      { label: 'Dig it out.', effects: [{ type: 'energy', delta: -20 }, { type: 'removeZombies', where: 'colony', n: 1 }] },
       { label: 'Leave it. A wall of snow is still a wall.', effects: [{ type: 'barricade', where: 'colony', n: 1 }, { type: 'waste', delta: 2 }] },
     ] },
   { id: 'xr-fuel-thief', title: 'Who Took the Fuel?',
@@ -197,7 +197,7 @@ export const CROSSROADS = [
     trigger: { type: 'helplessAtLeast', n: 1 },
     text: 'One of the colonists is found at the gate at 3 a.m., barefoot, humming.',
     choices: [
-      { label: 'Assign someone to watch them.', effects: [{ type: 'loseDie', n: 1 }] },
+      { label: 'Assign someone to watch them.', effects: [{ type: 'energy', delta: -20 }] },
       { label: 'Lock them in the storage shed at night.', effects: [{ type: 'morale', delta: -1 }, { type: 'waste', delta: 1 }] },
     ] },
   { id: 'xr-frost-fever', title: 'Frost Fever',
@@ -205,7 +205,7 @@ export const CROSSROADS = [
     text: 'Your fingers stopped hurting an hour ago. That is not a good sign.',
     choices: [
       { label: 'Head straight back to the fire.', effects: [{ type: 'moveHome' }] },
-      { label: 'Finish the job first.', effects: [{ type: 'wound' }, { type: 'gainDie', n: 1 }] },
+      { label: 'Finish the job first.', effects: [{ type: 'wound' }, { type: 'energy', delta: 20 }] },
     ] },
   { id: 'xr-noise-upstairs', title: 'Footsteps Upstairs',
     trigger: { type: 'notInColony' },

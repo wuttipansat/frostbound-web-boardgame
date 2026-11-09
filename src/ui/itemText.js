@@ -4,9 +4,15 @@ import { c } from '../i18n/index.js';
 function effect(item) {
   if (item.blueprint) return ['blueprint', { place: c('locations', item.blueprint, 'name') }];
   if (item.passive) return [item.passive, { n: item.value }];
-  if (item.type === 'weapon' && item.range === 'any') return ['sniper', { n: item.value }];
-  if (item.type === 'survivor') return [item.helpless ? 'recruitHelpless' : 'recruit', { n: item.helpless ?? 0 }];
-  if (item.type === 'junk' && item.wild) return ['junkWild', { n: item.value }];
+  const signed = (v) => (v > 0 ? `+${v}` : `${v}`);
+  if (item.type === 'weapon') return ['weapon', { n: item.value, mod: signed(item.attackMod ?? 0) }];
+  if (item.type === 'armor') {
+    if (item.frostProof) return ['armorFrost', {}];
+    if (item.soak) return ['armorSoak', { n: item.soak }];
+    if (item.moveMod) return ['armorMove', { mod: signed(item.moveMod) }];
+  }
+  if (item.type === 'survivor') return [item.helpless ? 'recruitHelpless' : 'recruit', { n: 1 + (item.helpless ?? 0) }];
+  if (item.type === 'junk') return [item.wild ? 'junkWild' : 'junk', { n: item.value * 12 }];
   return [item.type, { n: item.value }];
 }
 

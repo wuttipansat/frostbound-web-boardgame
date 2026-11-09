@@ -12,14 +12,14 @@ const URL = 'http://localhost:4173/?snow=0&play=HA&seed=4&ai=fast';
     await calm(p);
     await p.evaluate((tut) => {
       const f = window.__frostbound; const a = f.app; f.stage.stop();
-      a.dispatch({ type: 'DRAFT_PICK', playerId: 'p0', survivorIds: a.state.players[0].draftOptions.slice(0, 2) });
+      a.dispatch({ type: 'DRAFT_PICK', playerId: 'p0', survivorIds: a.state.players[0].draftOptions.slice(0, 1) });
       a.set({ queue: [] });
       const s = structuredClone(a.state);
       s.phase = 'turn'; s.pendingCrossroads = null; s.activePlayerId = 'p0';
       s.locations.grocery.zombies = 2;
       a.loadState(s, 'p0');
       if (tut) a.set({ tutStep: 0 }); else a.tutorialEvent('skip');
-      document.getElementById('dice-stage').style.display = 'none';
+      
       f.stage.step(0.05);
     }, tutorial);
     await p.waitForTimeout(200);

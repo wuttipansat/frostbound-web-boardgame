@@ -3,10 +3,10 @@
 import { ENERGY } from '../constants.js';
 import { OUTSIDE_LOCATIONS } from '../constants.js';
 import { pick } from '../rng.js';
-import { getPlayer, itemOf, focusSurvivor } from '../selectors.js';
+import { getPlayer, itemOf, focusSurvivor, energyMax } from '../selectors.js';
 import {
   changeMorale, changeFood, changeWaste, changeHelpless, drawItems, wasteCard, addZombies,
-  removeZombies, addBarricades, woundSurvivor, healSurvivor, rollExposure, addDie, loseDie, log, gainEnergy,
+  removeZombies, addBarricades, woundSurvivor, healSurvivor, rollExposure, log, gainEnergy,
 } from './helpers.js';
 
 function focus(s, ctx) {
@@ -56,9 +56,8 @@ const EFFECTS = {
   wound: (s, ctx) => { const sv = focus(s, ctx); if (sv) woundSurvivor(s, sv.id, 'crossroads'); },
   heal: (s, ctx) => { const sv = focus(s, ctx); if (sv) healSurvivor(s, sv.id); },
   exposure: (s, ctx) => { const sv = focus(s, ctx); if (sv) rollExposure(s, sv.id, 'crossroads'); },
-  // Frostbound: a die is worth ENERGY.CARD energy.
-  gainDie: (s, ctx, e) => { if (!ctx.playerId) return; if (s.danger) gainEnergy(s, ctx.playerId, ENERGY.CARD * e.n, ENERGY.MAX + 20); else for (let i = 0; i < e.n; i++) addDie(s, ctx.playerId); },
-  loseDie: (s, ctx, e) => { if (!ctx.playerId) return; if (s.danger) gainEnergy(s, ctx.playerId, -ENERGY.CARD * e.n); else for (let i = 0; i < e.n; i++) loseDie(s, ctx.playerId); },
+  // Energy for the acting player (crossroads): delta can be negative; capped by their pool.
+  energy: (s, ctx, e) => { if (ctx.playerId) gainEnergy(s, ctx.playerId, e.delta ?? ENERGY.CARD, energyMax(s, ctx.playerId)); },
   moveHome: (s, ctx) => {
     const sv = focus(s, ctx);
     if (!sv || getPlayer(s, sv.owner).exiled || sv.location === 'colony') return;

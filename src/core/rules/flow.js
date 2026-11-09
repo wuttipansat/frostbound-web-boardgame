@@ -1,4 +1,4 @@
-// Game flow: draft -> rounds (crisis, dice, turns w/ crossroads) -> colony phase -> end checks.
+// Game flow: draft -> rounds (crisis, turns w/ crossroads, energy) -> colony phase -> end checks.
 import { PHASES, OUTSIDE_LOCATIONS, RULES } from '../constants.js';
 import { shuffle, pick } from '../rng.js';
 import { CROSSROADS_BY_ID } from '../../content/crossroads.js';
@@ -6,12 +6,12 @@ import { CRISES_BY_ID } from '../../content/crises.js';
 import {
   getPlayer, nextPlayer, survivorDef, survivorsAt, aliveSurvivorsOf, foodNeeded,
   colonyPopulation, crisisRequirement, itemOf, scenarioDef, scenarioTarget, objectiveDef,
-  focusSurvivor, playerHasAbility, isFrostbound, energyMax, energyRegen, spawnForecast,
+  focusSurvivor, playerHasAbility, energyMax, energyRegen, spawnForecast,
 } from '../selectors.js';
 import {
-  log, changeMorale, rollDiceFor, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems, addDangerCard,
+  log, changeMorale, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems, addDangerCard,
 } from './helpers.js';
-import { ENERGY, DANGER_ESCALATION } from '../constants.js';
+import { DANGER_ESCALATION } from '../constants.js';
 import { applyEffects } from './effects.js';
 import { evaluate, focusFilterFor } from './conditions.js';
 
@@ -35,7 +35,7 @@ export function finishDraft(s) {
   }
   s.leaderId = best.pid;
   log(s, 'draftDone', { leaderId: s.leaderId });
-  if (isFrostbound(s)) for (const p of s.players) p.energy = ENERGY.START;
+  for (const p of s.players) p.energy = energyMax(s, p.id); // everyone starts full
   // Everyone starts with a few scavenged items from random locations.
   for (const p of s.players) {
     for (let i = 0; i < RULES.STARTING_HAND; i++) {
@@ -54,7 +54,6 @@ export function startRound(s) {
   const crisisId = drawFromDeck(s, 'crisisDeck', 'crisisDiscard');
   s.crisis = { id: crisisId, contributions: [] };
   log(s, 'roundStart', { round: s.round, crisisId, leaderId: s.leaderId });
-  if (!isFrostbound(s)) for (const p of s.players) rollDiceFor(s, p.id);
   s.activePlayerId = s.leaderId;
   beginTurn(s);
 }
@@ -65,17 +64,15 @@ export function beginTurn(s) {
   p.abilityUsed = {};
   p.usedCards = [];
   p.pick = null;
-  if (isFrostbound(s)) {
-    // Regain energy (carry-over stays, capped); a frost card's penalty applies to this one regen.
-    // The first turn of the game starts full, so it gets nothing extra.
-    const max = energyMax(s, p.id);
-    if (p.fresh !== false) p.fresh = false;
-    else p.energy = Math.min(max, p.energy + energyRegen(s, p.id));
-    p.energy = Math.min(p.energy, max);
-    p.regenPenalty = 0;
-    p.lastSearch = null;
-    log(s, 'energy', { playerId: p.id, value: p.energy, max });
-  }
+  // Regain energy (carry-over stays, capped by the survivor's pool); a frost card's penalty applies once.
+  // The first turn of the game starts full, so it gets nothing extra.
+  const max = energyMax(s, p.id);
+  if (p.fresh) p.fresh = false;
+  else p.energy = Math.min(max, p.energy + energyRegen(s, p.id));
+  p.energy = Math.min(p.energy, max);
+  p.regenPenalty = 0;
+  p.lastSearch = null;
+  log(s, 'energy', { playerId: p.id, value: p.energy, max });
   s.pendingCrossroads = null;
 
   const reader = nextPlayer(s, p.id);
@@ -151,7 +148,7 @@ export function colonyPhase(s) {
   }
 
   // 6. Frostbound: the danger deck gets meaner as the winter goes on.
-  if (DANGER_ESCALATION[s.round] && s.danger) addDangerCard(s, DANGER_ESCALATION[s.round], 'winter');
+  if (DANGER_ESCALATION[s.round]) addDangerCard(s, DANGER_ESCALATION[s.round], 'winter');
 
   s.reports.colony = report;
   if (s.morale <= 0) return endGame(s, 'moraleCollapse');
@@ -188,7 +185,7 @@ export function resolveCrisis(s) {
     if (bonus) changeMorale(s, bonus, 'crisisAverted');
   } else {
     applyEffects(s, crisis.fail, { reason: 'crisisFailed' });
-    if (s.danger) addDangerCard(s, 'scratch', 'crisisFailed');
+    addDangerCard(s, 'scratch', 'crisisFailed');
   }
   s.crisisDiscard.push(s.crisis.id);
   s.crisis = null;

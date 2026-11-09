@@ -5,7 +5,7 @@ const { chromium } = require('playwright');
 
 const setupTurn = (opts = {}) => `(() => {
   const a = window.__frostbound.app;
-  for (const p of a.state.players.filter((x) => !x.isAI && !x.drafted)) a.dispatch({ type: 'DRAFT_PICK', playerId: p.id, survivorIds: p.draftOptions.slice(0, 2) });
+  for (const p of a.state.players.filter((x) => !x.isAI && !x.drafted)) a.dispatch({ type: 'DRAFT_PICK', playerId: p.id, survivorIds: p.draftOptions.slice(0, 1) });
   a.tutorialEvent?.('skip');
   const s = structuredClone(a.state);
   s.phase = 'turn'; s.pendingCrossroads = null; s.activePlayerId = 'p0';
@@ -13,7 +13,7 @@ const setupTurn = (opts = {}) => `(() => {
   s.survivors[sv].location = ${JSON.stringify(opts.loc ?? 'grocery')};
   s.survivors[sv].wounds = 1;
   s.locations[${JSON.stringify(opts.loc ?? 'grocery')}].zombies = 2;
-  s.players[0].dice = [{ v: 5, used: false }, { v: 2, used: false }, { v: 6, used: false }];
+  s.players[0].energy = 80;
   for (const type of ['medicine', 'weapon', 'food', 'tools', 'junk', 'fuel', 'medicine', 'food']) for (const loc of Object.values(s.locations)) {
     const i = (loc.deck || []).findIndex((u) => window.__frostbound.itemType(s.cards[u]) === type);
     if (i >= 0) { s.players[0].hand.push(loc.deck.splice(i, 1)[0]); break; }
@@ -136,7 +136,7 @@ async function audit(browser, device, vp) {
     return cs.outlineStyle !== 'none' && cs.outlineWidth !== '0px';
   });
 
-  // End turn with unused dice: confirmation?
+  // End turn with energy left: confirmation?
   f.endTurnUnusedDiceConfirm = await page.evaluate(() => {
     const before = window.__frostbound.app.state.turnsTaken;
     const btn = [...document.querySelectorAll('#pp-actions .btn.primary')].pop();

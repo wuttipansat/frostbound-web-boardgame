@@ -43,7 +43,7 @@ const storage = {
 
 const defaultSeats = () => Array.from({ length: 5 }, (_, i) => ({ name: t('setup.defaultName', { n: i + 1 }), isAI: i >= 2 }));
 
-export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = {}, aiFast = false, sceneScale = 1, graphics = null }) {
+export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, aiFast = false, sceneScale = 1, graphics = null }) {
   const settings = storage.get(SETTINGS_KEY) ?? {};
   setLang(settings.lang ?? (navigator.language?.startsWith('th') ? 'th' : 'en'));
   sound.enabled = settings.sound ?? true;
@@ -58,14 +58,14 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
   let toasts = [];
   let lastActive = null;
   const ui = {
-    setup: { count: 3, seats: defaultSeats(), scenarioId: 'beacon', betrayer: 'maybe', rules: 'frostbound' },
-    modal: null, selSurvivor: null, selDie: null, selCard: null, selLoc: null, lureTo: null,
+    setup: { count: 3, seats: defaultSeats(), scenarioId: 'beacon', betrayer: 'maybe' },
+    modal: null, selSurvivor: null, selCard: null, selLoc: null, lureTo: null,
     queue: [], // public reveal modals waiting to be shown: { type: 'colony' | 'vote', report }
     useFuel: false, logOpen: false, logTab: 'log', crisisOpen: false, peek: false, draftPicks: [], req: null, // logOpen pins the log history open (the feed itself always shows)
     sound: sound.enabled,
     tutorial: settings.tutorial ?? !settings.tutorialDone,
     tutStep: DONE,
-    picking: null, // { type: 'lure', survivorId, dieIndex } while choosing a destination on the board
+    picking: null, // { type: 'lure', survivorId } while choosing a destination on the board
     skipEndConfirm: false,
     moreOpen: false, // the "more actions" menu next to End turn
     // Hand shown as compact faces (remembered per device); phones and short screens start compact.
@@ -139,6 +139,8 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     return {
       state, ui, actor, viewer, art,
       canAct: !!viewer && viewer === actor && state?.phase === PHASES.TURN && !needsPass() && !objectivePending(),
+      // The device is being handed over: nothing private (a hand) may be in the page, even hidden.
+      passing: !!state && (!!needsPass() || !!objectivePending()),
       markObjectiveSeen, objectivePending: objectivePending(),
       hasSave: !!storage.get(SAVE_KEY)?.state,
       online: online ? { code: online.code, lobby: online.lobby, playerId: online.playerId, status: online.status, host: online.playerId === 'p0' } : null,
@@ -238,7 +240,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     }
     if (state.activePlayerId !== lastActive) {
       lastActive = state.activePlayerId;
-      Object.assign(ui, { selSurvivor: null, selDie: null, selCard: null, useFuel: false, lureTo: null, picking: null, movePick: null });
+      Object.assign(ui, { selSurvivor: null, selCard: null, useFuel: false, lureTo: null, picking: null, movePick: null });
     }
     if (ui.picking && (!state.survivors[ui.picking.survivorId]?.alive || state.phase !== PHASES.TURN)) ui.picking = null;
     // Drop stale selections.
@@ -246,7 +248,6 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     const me = v ? getPlayer(state, v) : null;
     if (ui.selSurvivor && !state.survivors[ui.selSurvivor]?.alive) ui.selSurvivor = null;
     if (ui.selCard && !me?.hand.includes(ui.selCard)) ui.selCard = null;
-    if (ui.selDie != null && me?.dice[ui.selDie]?.used) ui.selDie = null;
     pieces.sync(state, { animate });
     pieces.setHighlight?.(ui.selSurvivor);
     if (!online) storage.set(SAVE_KEY, { state, seat });
@@ -288,7 +289,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
 
   function takeSeat(playerId) {
     seat = playerId;
-    Object.assign(ui, { selSurvivor: null, selDie: null, selCard: null, peek: false, draftPicks: [] });
+    Object.assign(ui, { selSurvivor: null, selCard: null, peek: false, draftPicks: [] });
     storage.set(SAVE_KEY, { state, seat });
     render();
   }
@@ -297,7 +298,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     const cfg = ui.setup;
     state = createGame({
       players: cfg.seats.slice(0, cfg.count).map((s, i) => ({ name: s.name.trim() || t('setup.defaultName', { n: i + 1 }), isAI: s.isAI })),
-      scenarioId: cfg.scenarioId, betrayer: cfg.betrayer, seed: cfg.seed ?? Date.now(), rules: cfg.rules ?? 'frostbound',
+      scenarioId: cfg.scenarioId, betrayer: cfg.betrayer, seed: cfg.seed ?? Date.now(),
     });
     aiRandom = mulberry((cfg.seed ?? Date.now()) >>> 0);
     seat = null;
@@ -425,7 +426,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     const cfg = ui.setup;
     const o = goOnline();
     o.client.create(cfg.seats[0].name, {
-      count: cfg.count, ai: cfg.seats.slice(0, cfg.count).map((x, i) => i > 0 && x.isAI), scenarioId: cfg.scenarioId, betrayer: cfg.betrayer, rules: cfg.rules ?? 'frostbound',
+      count: cfg.count, ai: cfg.seats.slice(0, cfg.count).map((x, i) => i > 0 && x.isAI), scenarioId: cfg.scenarioId, betrayer: cfg.betrayer,
     });
     render();
   }
@@ -471,7 +472,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
       // Wait for animations, but never forever: after 5 s the AI plays on regardless.
       // Someone else's move plays out first (the queue caps each scene, so this can't hang).
       if (director.busy) { aiTimer = 0; busyWait = 0; return; }
-      if ((pieces.busy || diceTray.busy || diceTray.exposureBusy) && (busyWait += dt) < 5) { aiTimer = 0; return; }
+      if (pieces.busy && (busyWait += dt) < 5) { aiTimer = 0; return; }
       busyWait = 0;
       aiTimer += dt;
       if (aiTimer < AI_DELAY) return;
@@ -510,12 +511,6 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     if (dom.movePick) renderMovePicker(dom.movePick, x);
     if (dom.hint) renderHint(dom.hint, { ...x, ui: { ...ui, hints: ui.hints && ui.tutStep >= DONE } });
     renderPlayerPanel(dom.playerRefs, x);
-    // The tray throws the active player's dice when their turn starts (dice are public); the panel
-    // then shows them as 2D chips. Everyone watches the roll, online too.
-    const roller = state.activePlayerId ? getPlayer(state, state.activePlayerId) : null;
-    if (roller && state.phase !== PHASES.DRAFT && state.phase !== PHASES.GAME_OVER) {
-      if (diceTray.sync(roller.dice, `${roller.id}:${state.round}`)) fx.diceRoll?.();
-    }
     // Animated reveal modals keep their DOM while they stay on screen, so the animation isn't restarted.
     const [key, build] = modalFor(x);
     if (!key || key !== modalKey) {
@@ -530,7 +525,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     const me = x.canAct ? x.viewer : null;
     let hints = {};
     if (me && ui.picking?.type === 'lure') {
-      for (const tg of lureTargets(state, me, ui.picking.survivorId, ui.picking.dieIndex)) hints[tg.to] = tg.ok ? 'lure' : 'blocked';
+      for (const tg of lureTargets(state, me, ui.picking.survivorId)) hints[tg.to] = tg.ok ? 'lure' : 'blocked';
     } else if (me && ui.selSurvivor && state.survivors[ui.selSurvivor]?.owner === me && !state.survivors[ui.selSurvivor].moved) {
       hints = moveTargets(state, me, ui.selSurvivor);
     }
@@ -592,7 +587,7 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
     // Lure: the clicked location is the destination.
     if (ui.picking?.type === 'lure' && locationId) {
       const me = viewerId();
-      const tg = lureTargets(state, me, ui.picking.survivorId, ui.picking.dieIndex).find((x) => x.to === locationId);
+      const tg = lureTargets(state, me, ui.picking.survivorId).find((x) => x.to === locationId);
       if (tg?.ok && dispatch(tg.action)) { ui.picking = null; render(); }
       return;
     }
@@ -605,12 +600,12 @@ export function createApp({ dom, pieces, diceTray, board, art, fx = {}, scene = 
   }
 
   /** Quick start for testing/screenshots, e.g. seats "HHA". */
-  function quickStart({ seats = 'HA', scenarioId = 'beacon', seed = 1, lang, rules = 'frostbound' }) {
+  function quickStart({ seats = 'HA', scenarioId = 'beacon', seed = 1, lang }) {
     if (lang) setLang(lang);
     ui.setup = {
       count: seats.length,
       seats: [...seats].map((ch, i) => ({ name: ['Ana', 'Ben', 'Chai', 'Dara', 'Eve'][i], isAI: ch.toUpperCase() === 'A' })),
-      scenarioId, betrayer: 'maybe', seed, rules,
+      scenarioId, betrayer: 'maybe', seed,
     };
     startGame();
   }

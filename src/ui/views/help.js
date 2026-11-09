@@ -28,9 +28,7 @@ function describe(s, me, a) {
   const sv = a.survivorId ? survivorDef(a.survivorId).name : '';
   const at = a.survivorId ? s.survivors[a.survivorId]?.location : null;
   const place = (id) => c('locations', id, 'name');
-  const die = a.dieIndex != null ? p.dice[a.dieIndex]?.v : null;
-  // Frostbound: no dice; the hint names the energy cost instead.
-  const fb = !!s.danger;
+  // The hint names the energy cost.
   const cost = (kind) => (a.survivorId ? actionCost(s, a.survivorId, kind, a.toLocation) : 0);
   const card = a.cardUid ? c('items', itemOf(s, a.cardUid).id, 'name') : '';
   const crisis = crisisDef(s);
@@ -38,16 +36,17 @@ function describe(s, me, a) {
   const loc = (id) => s.locations[id];
   switch (a.type) {
     case 'MOVE': return { text: t('hint.move', { sv, place: place(a.toLocation) }), why: loc(a.toLocation).zombies ? t('why.zombies', { n: loc(a.toLocation).zombies }) : '', point: { survivor: a.survivorId, location: a.toLocation, move: true } };
-    case 'ATTACK': return { text: fb ? t('hint.attackE', { sv, place: place(at), n: cost('attack') }) : t('hint.attack', { sv, place: place(at), v: die }), why: t('why.zombies', { n: loc(at).zombies }), point: { survivor: a.survivorId, die: a.dieIndex } };
+    case 'ATTACK': return { text: t('hint.attackE', { sv, place: place(at), n: cost('attack') }), why: t('why.zombies', { n: loc(at).zombies }), point: { survivor: a.survivorId } };
     case 'SEARCH_DEEPER': return { text: t('hint.deeper', { sv, place: place(at) }), why: t('why.deeper', { n: Math.round(biteOdds(s) * 100) }), point: { survivor: a.survivorId } };
-    case 'SEARCH': return { text: fb ? t('hint.searchE', { sv, place: place(at), n: cost('search') }) : t('hint.search', { sv, place: place(at), v: die }), why: s.food < foodNeeded(s) ? t('why.food', { have: s.food, need: foodNeeded(s) }) : t('why.cards', { n: loc(at).deckCount ?? loc(at).deck?.length ?? 0 }), point: { survivor: a.survivorId, die: a.dieIndex } };
-    case 'BARRICADE': return { text: t('hint.barricade', { sv, place: place(at) }), why: fb ? t('why.energy') : t('why.dice'), point: { survivor: a.survivorId, die: a.dieIndex } };
-    case 'CLEAN': return { text: t('hint.clean', { sv }), why: t('why.waste', { n: s.waste }), point: { survivor: a.survivorId, die: a.dieIndex } };
-    case 'LURE': return { text: t('hint.lure', { sv, place: place(a.toLocation) }), why: t('why.zombies', { n: loc(at).zombies }), point: { survivor: a.survivorId, die: a.dieIndex } };
+    case 'SEARCH': return { text: t('hint.searchE', { sv, place: place(at), n: cost('search') }), why: s.food < foodNeeded(s) ? t('why.food', { have: s.food, need: foodNeeded(s) }) : t('why.cards', { n: loc(at).deckCount ?? loc(at).deck?.length ?? 0 }), point: { survivor: a.survivorId } };
+    case 'BARRICADE': return { text: t('hint.barricade', { sv, place: place(at) }), why: t('why.energy'), point: { survivor: a.survivorId } };
+    case 'CLEAN': return { text: t('hint.clean', { sv }), why: t('why.waste', { n: s.waste }), point: { survivor: a.survivorId } };
+    case 'LURE': return { text: t('hint.lure', { sv, place: place(a.toLocation) }), why: t('why.zombies', { n: loc(at).zombies }), point: { survivor: a.survivorId } };
     case 'USE_ABILITY': return { text: t('hint.ability', { sv }), why: '', point: { survivor: a.survivorId } };
     case 'PLAY_CARD': return { text: t('hint.play', { card }), why: itemOf(s, a.cardUid).type === 'food' && s.food < foodNeeded(s) ? t('why.food', { have: s.food, need: foodNeeded(s) }) : '', point: { card: a.cardUid } };
     case 'CONTRIBUTE': return { text: t('hint.contribute', { card }), why: crisisWhy, point: { card: a.cardUid } };
     case 'DEPOSIT': return { text: t('hint.deposit', { card }), why: '', point: { card: a.cardUid } };
+    case 'EQUIP': return { text: t('hint.equip', { card }), why: t('why.equip'), point: { card: a.cardUid } };
     case 'END_TURN': return { text: t('hint.end'), why: '', point: { end: true } };
     default: return null;
   }
@@ -67,7 +66,7 @@ export function renderHint(el, ctx) {
     if (pt.end) { const b = document.querySelector('#pp-actions .btn.end-turn'); b?.classList.remove('nudge'); void b?.offsetWidth; b?.classList.add('nudge'); b?.focus(); return; }
     if (pt.card) { ctx.set({ selCard: pt.card }); return; }
     if (pt.move) { ctx.selectSurvivor(pt.survivor); ctx.selectLocation(pt.location); ctx.set({ movePick: pt.location }); return; }
-    if (pt.survivor) { ctx.selectSurvivor(pt.survivor); if (pt.die != null) ctx.set({ selDie: pt.die }); }
+    if (pt.survivor) ctx.selectSurvivor(pt.survivor);
   };
   mount(el,
     h('span', { class: 'hint-ico', 'aria-hidden': 'true' }, icon('star')),

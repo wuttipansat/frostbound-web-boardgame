@@ -29,6 +29,8 @@ export function viewFor(state, playerId) {
   if (!over) {
     const visible = new Set(v.players.find((p) => p.id === playerId)?.hand ?? []);
     for (const c of v.crisis?.contributions ?? []) if (c.uid) visible.add(c.uid);
+    // Equipped gear is worn in plain sight.
+    for (const p of v.players) for (const uid of Object.values(p.gear ?? {})) if (uid) visible.add(uid);
     v.cards = Object.fromEntries(Object.entries(v.cards).filter(([uid]) => visible.has(uid)));
   }
   for (const loc of Object.values(v.locations)) {
@@ -38,7 +40,7 @@ export function viewFor(state, playerId) {
     v[`${key}Count`] = v[key].length;
     v[key] = [];
   }
-  // Step 23: the danger deck's order is secret; how many of each kind are left is public.
+  // The danger deck's order is secret; how many of each kind are left is public.
   if (v.danger) {
     const left = {};
     for (const k of v.danger.deck) left[k] = (left[k] ?? 0) + 1;

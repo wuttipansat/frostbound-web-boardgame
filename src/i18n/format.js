@@ -69,7 +69,7 @@ export function formatLog(e, state) {
 export function describeEffect(e) {
   const where = e.where === 'here' ? t('where.here') : e.where ? c('locations', e.where, 'name') : '';
   switch (e.type) {
-    case 'morale': case 'food': case 'waste': case 'helpless': case 'starvation':
+    case 'morale': case 'food': case 'waste': case 'helpless': case 'starvation': case 'energy':
       return t(`eff.${e.type}`, { d: signed(e.delta) });
     case 'discard': return t('eff.discard', { n: e.n, item: e.item ? t(`item.${e.item}`) : '' });
     default: return t(`eff.${e.type}`, { n: e.n, where });

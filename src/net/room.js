@@ -30,7 +30,7 @@ export class Room {
     const count = Math.max(RULES.MIN_PLAYERS, Math.min(RULES.MAX_PLAYERS, Number(config.count) || 2));
     this.code = code;
     this.random = random;
-    this.config = { scenarioId: config.scenarioId ?? 'beacon', betrayer: config.betrayer ?? 'maybe', rules: config.rules === 'classic' ? 'classic' : 'frostbound', seed: config.seed ?? Math.floor(random() * 2 ** 31) };
+    this.config = { scenarioId: config.scenarioId ?? 'beacon', betrayer: config.betrayer ?? 'maybe', seed: config.seed ?? Math.floor(random() * 2 ** 31) };
     this.seats = Array.from({ length: count }, (_, i) => ({
       isAI: i > 0 && !!config.ai?.[i], name: null, token: null, connected: false,
     }));
@@ -99,7 +99,7 @@ export class Room {
     if (!this.canStart()) return { error: 'seatsOpen' };
     this.state = createGame({
       players: this.seats.map((s, i) => ({ name: s.isAI ? `Bot ${i + 1}` : s.name, isAI: s.isAI })),
-      scenarioId: this.config.scenarioId, betrayer: this.config.betrayer, seed: this.config.seed, rules: this.config.rules,
+      scenarioId: this.config.scenarioId, betrayer: this.config.betrayer, seed: this.config.seed,
     });
     return { ok: true };
   }

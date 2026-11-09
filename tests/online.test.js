@@ -43,15 +43,15 @@ test('players can only act for their own seat, and illegal moves are refused', (
   const r = room(2);
   r.join('Ana'); r.join('Ben'); r.start(0);
   const p1 = r.state.players[1];
-  assert.equal(r.act(0, A.draftPick('p1', p1.draftOptions.slice(0, 2))).error, 'notYourSeat');
-  assert.equal(r.act(0, A.draftPick('p0', ['nope', 'nada'])).error, 'notInDraftOptions');
-  assert.ok(r.act(0, A.draftPick('p0', r.state.players[0].draftOptions.slice(0, 2))).ok);
+  assert.equal(r.act(0, A.draftPick('p1', p1.draftOptions.slice(0, 1))).error, 'notYourSeat');
+  assert.equal(r.act(0, A.draftPick('p0', ['nope'])).error, 'notInDraftOptions');
+  assert.ok(r.act(0, A.draftPick('p0', r.state.players[0].draftOptions.slice(0, 1))).ok);
 });
 
 test('each seat only sees its own hand, objective and contributions', () => {
   const r = room(2);
   r.join('Ana'); r.join('Ben'); r.start(0);
-  for (const seat of [0, 1]) r.act(seat, A.draftPick(`p${seat}`, r.state.players[seat].draftOptions.slice(0, 2)));
+  for (const seat of [0, 1]) r.act(seat, A.draftPick(`p${seat}`, r.state.players[seat].draftOptions.slice(0, 1)));
   const v = r.view(0);
   assert.equal(v.rng, undefined);
   assert.deepEqual(v.players[1].hand, []);
@@ -94,7 +94,7 @@ test('log diffing finds the new entries, even when the log is capped', () => {
 test('draft: both players pick at once, in any order, and nobody sees the other picks until everyone is done', () => {
   const r = room(2);
   r.join('Ana'); r.join('Ben'); r.start(0);
-  const opts = (seat) => r.state.players[seat].draftOptions.slice(0, 2);
+  const opts = (seat) => r.state.players[seat].draftOptions.slice(0, 1);
   const benPicks = opts(1);
   // Ben (seat 1) picks first: no waiting for Ana's turn.
   assert.ok(r.act(1, A.draftPick('p1', benPicks)).ok);
@@ -112,7 +112,7 @@ test('draft: both players pick at once, in any order, and nobody sees the other 
 test('after the draft, nothing moves until every human has read their secret objective', () => {
   const r = room(3, [false, false, true]);
   r.join('Ana'); r.join('Ben'); r.start(0);
-  for (const seat of [0, 1]) r.act(seat, A.draftPick(`p${seat}`, r.state.players[seat].draftOptions.slice(0, 2)));
+  for (const seat of [0, 1]) r.act(seat, A.draftPick(`p${seat}`, r.state.players[seat].draftOptions.slice(0, 1)));
   while (r.state.phase === 'draft' && r.botStep()); // the bot drafts
   assert.notEqual(r.state.phase, 'draft');
   assert.equal(r.ready, false);

@@ -13,7 +13,7 @@ const F = { force: true, timeout: 15000 };
     await p.waitForTimeout(1000);
     await p.evaluate(() => {
       const a = window.__frostbound.app; const me = a.state.players[0];
-      a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 2) });
+      a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 1) });
       a.tutorialEvent?.('skip');
       const s = structuredClone(a.state);
       s.phase = 'turn'; s.pendingCrossroads = null; s.activePlayerId = 'p0'; s.round = 2;
@@ -26,14 +26,14 @@ const F = { force: true, timeout: 15000 };
       a.loadState(s, 'p0');
       // Software WebGL in headless Chrome is slow: freeze the board so the dice tray gets the CPU.
       window.__frostbound.stage.stop();
-      document.getElementById('dice-stage').style.transition = 'none'; // transitions crawl in headless software GL
+      
     });
     // The tray steps at most 50 ms per frame and headless frames are slow: wait for the throw to land.
     await p.waitForFunction(() => !window.__frostbound.diceTray.busy, null, { timeout: 90000 }).catch(() => {});
-    await p.evaluate(() => document.getElementById('dice-stage').classList.add('on'));
+    
     await p.waitForTimeout(300);
     await shot('dice-roll');
-    await p.evaluate(() => document.getElementById('dice-stage').classList.remove('on'));
+    
     await p.evaluate(() => { const a = window.__frostbound.app; a.set({ handCompact: true }); });
     await p.waitForTimeout(300);
     await shot('hand-compact');

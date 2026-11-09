@@ -13,7 +13,7 @@ const F = { force: true, timeout: 15000 };
     const shot = (n) => p.screenshot({ path: `${out}/after-${device}-${n}.jpg`, type: 'jpeg', quality: 84 });
     await p.goto('http://localhost:4173/?snow=0&play=HA&seed=4', { waitUntil: 'networkidle' });
     await calm(p);
-    await p.evaluate(() => { const f = window.__frostbound; f.stage.stop(); const a = f.app; a.tutorialEvent('skip'); a.dispatch({ type: 'DRAFT_PICK', playerId: 'p0', survivorIds: a.state.players[0].draftOptions.slice(0, 2) }); a.set({ queue: [] }); });
+    await p.evaluate(() => { const f = window.__frostbound; f.stage.stop(); const a = f.app; a.tutorialEvent('skip'); a.dispatch({ type: 'DRAFT_PICK', playerId: 'p0', survivorIds: a.state.players[0].draftOptions.slice(0, 1) }); a.set({ queue: [] }); });
     await p.waitForTimeout(200);
     if (device === 'desktop') await shot('objective-face-down');
     await p.locator('.obj-reveal .obj-card').click(F);

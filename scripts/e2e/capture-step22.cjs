@@ -27,7 +27,7 @@ const out = process.argv[2] || 'docs/screenshots/step22';
       await p.addStyleTag({ content: '*, *::before, *::after { transition: none !important; animation-duration: 0s !important; animation-delay: 0s !important; }' });
       await p.evaluate(() => {
         const f = window.__frostbound; const a = f.app; a.tutorialEvent('skip');
-        a.dispatch({ type: 'DRAFT_PICK', playerId: 'p0', survivorIds: a.state.players[0].draftOptions.slice(0, 2) });
+        a.dispatch({ type: 'DRAFT_PICK', playerId: 'p0', survivorIds: a.state.players[0].draftOptions.slice(0, 1) });
         a.markObjectiveSeen(); a.set({ queue: [] });
       });
       await p.waitForTimeout(1500);

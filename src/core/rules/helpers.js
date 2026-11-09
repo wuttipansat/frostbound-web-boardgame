@@ -1,9 +1,13 @@
 // Low-level state mutations shared by all rule modules.
 // Every function here mutates the draft `s` (a private clone made by the reducer).
-import { EXPOSURE_FACES, OUTSIDE_LOCATIONS, RULES, ENERGY } from '../constants.js';
-import { random, rollD6, shuffle } from '../rng.js';
+import { OUTSIDE_LOCATIONS, RULES } from '../constants.js';
+import { shuffle } from '../rng.js';
 import { assert } from '../errors.js';
 import { LOCATIONS } from '../../content/locations.js';
+import { ITEMS } from '../../content/items.js';
+import { ENERGY } from '../constants.js';
+
+const ENERGY_REGEN_FROST = ENERGY.REGEN_FROST;
 import {
   getPlayer, survivorDef, survivorsAt, woundLimit, freeSurvivorSlots, aliveSurvivorsOf,
 } from '../selectors.js';
@@ -134,54 +138,11 @@ export function healSurvivor(s, survivorId) {
   return true;
 }
 
-const FACE_RANK = { blank: 0, wound: 1, frostbite: 2, bite: 3 };
-
-function rollFace(s) {
-  return EXPOSURE_FACES[Math.floor(random(s) * EXPOSURE_FACES.length)];
-}
-
-/**
- * Roll the exposure die for a survivor and apply the result.
- * Returns the final face. A bite kills and spreads to the lowest-influence survivor at the same location.
- */
+/** Exposure is a danger card now (kept as the name every caller uses: moves, fights, crossroads, infection). */
 export function rollExposure(s, survivorId, cause) {
-  const sv = s.survivors[survivorId];
-  if (!sv?.alive) return null;
-  if (s.danger) return drawDanger(s, survivorId, cause); // Frostbound rules: the danger deck instead
-  const ability = survivorDef(survivorId).ability.type;
-  let face = rollFace(s);
-  if (ability === 'luckyExposure') {
-    const second = rollFace(s);
-    if (FACE_RANK[second] < FACE_RANK[face]) face = second;
-  }
-  if (face === 'frostbite' && ability === 'ignoreFrostbite') face = 'blank';
-  s.lastExposure = { survivorId, face, cause, seq: (s.lastExposure?.seq ?? 0) + 1 };
-  log(s, 'exposure', { survivorId, face, cause });
-
-  if (face === 'wound') woundSurvivor(s, survivorId, 'exposure');
-  else if (face === 'frostbite') {
-    sv.frostbite = true;
-    woundSurvivor(s, survivorId, 'frostbite');
-  } else if (face === 'bite') {
-    const location = sv.location;
-    killSurvivor(s, survivorId, 'bite');
-    const others = survivorsAt(s, location);
-    if (others.length) {
-      others.sort((a, b) => survivorDef(a.id).influence - survivorDef(b.id).influence);
-      log(s, 'infectionSpreads', { from: survivorId, to: others[0].id, location });
-      rollExposure(s, others[0].id, 'infection');
-    }
-  }
-  return face;
+  return drawDanger(s, survivorId, cause);
 }
 
-// ---------------------------------------------------------------- zombies
-
-/**
- * Add zombies one at a time. Each zombie first smashes a barricade if one exists;
- * if the entrance is full it overruns: the lowest-influence survivor there dies
- * (at the colony, helpless survivors die first).
- */
 export function addZombies(s, locationId, n, reason) {
   const loc = s.locations[locationId];
   const slots = LOCATIONS[locationId].zombieSlots;
@@ -234,29 +195,6 @@ export function creditKills(s, playerId, n) {
 
 // ---------------------------------------------------------------- dice & decks
 
-export function rollDiceFor(s, playerId) {
-  const p = getPlayer(s, playerId);
-  const survivors = aliveSurvivorsOf(s, playerId);
-  let count = 1 + survivors.length;
-  count += survivors.filter((sv) => survivorDef(sv.id).ability.type === 'extraDie').length;
-  p.dice = Array.from({ length: count }, () => ({ v: rollD6(s), used: false }));
-  log(s, 'roll', { playerId, dice: p.dice.map((d) => d.v) });
-}
-
-export function addDie(s, playerId) {
-  getPlayer(s, playerId).dice.push({ v: rollD6(s), used: false });
-}
-
-export function loseDie(s, playerId) {
-  const dice = getPlayer(s, playerId).dice;
-  // Lose the lowest unused die.
-  let idx = -1;
-  dice.forEach((d, i) => { if (!d.used && (idx === -1 || d.v < dice[idx].v)) idx = i; });
-  if (idx !== -1) dice[idx].used = true;
-  return idx !== -1;
-}
-
-/** Draw from a deck stored at s[deckKey], reshuffling s[discardKey] when empty. */
 export function drawFromDeck(s, deckKey, discardKey) {
   if (!s[deckKey].length) {
     s[deckKey] = shuffle(s, s[discardKey]);
@@ -293,16 +231,19 @@ export function drawDanger(s, survivorId, cause) {
     s.danger.discard.push(second);
   }
   s.danger.discard.push(kind);
-  if (kind === 'frost' && ability === 'ignoreFrostbite') kind = 'safe';
+  const owner = getPlayer(s, sv.owner);
+  // Personal protection: Bo or a padded parka shrug off frost; a riot vest stops the first scratch each round.
+  const armor = owner.gear?.armor ? ITEMS[s.cards[owner.gear.armor]] : null;
+  if (kind === 'frost' && (ability === 'ignoreFrostbite' || armor?.frostProof)) kind = 'safe';
+  if (kind === 'scratch' && armor?.soak && owner.soakRound !== s.round) { owner.soakRound = s.round; kind = 'safe'; }
   const face = DANGER_FACE[kind];
   s.lastExposure = { survivorId, face, danger: kind, cause, seq: (s.lastExposure?.seq ?? 0) + 1 };
   log(s, 'exposure', { survivorId, face, danger: kind, cause });
-  const owner = getPlayer(s, sv.owner);
   switch (kind) {
     case 'scratch': woundSurvivor(s, survivorId, 'exposure'); break;
     case 'frost':
       sv.frostbite = true;
-      owner.regenPenalty = (owner.regenPenalty ?? 0) - ENERGY.REGEN_FROST;
+      owner.regenPenalty = (owner.regenPenalty ?? 0) - ENERGY_REGEN_FROST;
       woundSurvivor(s, survivorId, 'frostbite');
       break;
     case 'startle': owner.energy = Math.max(0, (owner.energy ?? 0) - 10); break;

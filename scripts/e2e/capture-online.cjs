@@ -32,7 +32,7 @@ const F = { force: true, timeout: 15000 };
   await p.waitForTimeout(1000);
   await p.evaluate(() => {
     const a = window.__frostbound.app; const me = a.state.players[0];
-    a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 2) }); a.tutorialEvent?.('skip');
+    a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 1) }); a.tutorialEvent?.('skip');
     const s = structuredClone(a.state);
     s.phase = 'crossroads'; s.activePlayerId = 'p0';
     s.pendingCrossroads = { cardId: s.crossroadsDeck[0] ?? s.crossroadsDiscard[0], activePlayerId: 'p0', readerId: 'p1', focusSurvivorId: s.players[0].survivors[0] };

@@ -10,7 +10,7 @@ const SCENES = {
   draft: `(() => { window.__frostbound.app.tutorialEvent?.('skip'); })()`,
   crisis: `(() => {
     const a = window.__frostbound.app; const me = a.state.players[0];
-    a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 2) });
+    a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 1) });
     a.tutorialEvent?.('skip');
     const s = structuredClone(a.state);
     s.phase = 'turn'; s.pendingCrossroads = null; s.activePlayerId = 'p0';
@@ -18,7 +18,7 @@ const SCENES = {
   })()`,
   turn: `(() => {
     const a = window.__frostbound.app; const me = a.state.players[0];
-    a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 2) });
+    a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 1) });
     a.tutorialEvent?.('skip');
     const s = structuredClone(a.state);
     s.phase = 'turn'; s.pendingCrossroads = null; s.activePlayerId = 'p0';
@@ -29,7 +29,7 @@ const SCENES = {
   })()`,
   hand: `(() => {
     const a = window.__frostbound.app; const me = a.state.players[0];
-    a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 2) });
+    a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 1) });
     a.tutorialEvent?.('skip');
     const s = structuredClone(a.state);
     s.phase = 'turn'; s.pendingCrossroads = null; s.activePlayerId = 'p0';
@@ -47,7 +47,7 @@ const SCENES = {
   })()`,
   colony: `(() => {
     const a = window.__frostbound.app; const me = a.state.players[0];
-    a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 2) });
+    a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 1) });
     a.tutorialEvent?.('skip');
     const s = structuredClone(a.state);
     s.phase = 'turn'; s.pendingCrossroads = null; s.activePlayerId = 'p0'; s.turnsTaken = s.players.length - 1;
@@ -60,7 +60,7 @@ const SCENES = {
   })()`,
   over: `(() => {
     const a = window.__frostbound.app; const me = a.state.players[0];
-    a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 2) });
+    a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 1) });
     a.tutorialEvent?.('skip');
     const s = structuredClone(a.state);
     s.phase = 'gameOver';

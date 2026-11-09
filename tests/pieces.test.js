@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { Tweens, ease } from '../src/render/tween.js';
 import { assignSlots, zombieSlotIndex, barricadeSlotIndex } from '../src/render/pieces.js';
-import { survivorModel, zombieModel, dieModel, SURVIVOR_STYLES, DIE_FACES, DIE_VOXELS } from '../src/render/characters.js';
-import { faceUpQuaternion, valueFacingUp, diceLayout } from '../src/render/dice.js';
+import { survivorModel, zombieModel, SURVIVOR_STYLES } from '../src/render/characters.js';
 import { SURVIVORS } from '../src/content/survivors.js';
 import { LOCATIONS } from '../src/content/locations.js';
 
@@ -82,32 +81,6 @@ test('zombies are hunched: the head is pushed forward of the feet and has glowin
     assert.ok(avg(head) > avg(feet) + 2);
     assert.ok([...m.voxels.values()].some((x) => x.glow));
   }
-});
-
-test('die faces: opposite faces sum to 7, pips are correct, and face-up rotations land on the value', () => {
-  for (const [a, na] of Object.entries(DIE_FACES)) {
-    const opp = Object.entries(DIE_FACES).find(([, n]) => n.every((c, i) => c === -na[i]));
-    assert.equal(Number(a) + Number(opp[0]), 7);
-  }
-  const m = dieModel(0xffffff, 0x000000, 0xff0000);
-  const count = (pred) => [...m.voxels.values()].filter((v) => v.color !== 0xffffff && pred(v)).length;
-  const N = DIE_VOXELS - 1;
-  assert.equal(count((v) => v.y === N), 1);
-  assert.equal(count((v) => v.y === 0), 6);
-  assert.equal(count((v) => v.z === N), 2);
-  assert.equal(count((v) => v.z === 0), 5);
-  assert.equal(count((v) => v.x === N), 3);
-  assert.equal(count((v) => v.x === 0), 4);
-  // Pips never touch each other (one-voxel gaps keep them readable).
-  const pips = [...m.voxels.values()].filter((v) => v.color !== 0xffffff);
-  for (const a of pips) for (const b of pips) {
-    if (a !== b) assert.ok(Math.abs(a.x - b.x) + Math.abs(a.y - b.y) + Math.abs(a.z - b.z) > 1, 'adjacent pips');
-  }
-  for (let v = 1; v <= 6; v++) {
-    const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.4);
-    assert.equal(valueFacingUp(yaw.multiply(faceUpQuaternion(v))), v);
-  }
-  assert.deepEqual(diceLayout(3, 1), [-1, 0, 1]);
 });
 
 test('a new game drops survivor figures that are not in the new state', async () => {

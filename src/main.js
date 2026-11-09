@@ -1,9 +1,8 @@
-// Entry point: 3D stage + board + pieces + dice tray, wired to the UI controller.
+// Entry point: 3D stage + board + pieces, wired to the UI controller.
 import * as THREE from 'three';
 import { createStage } from './render/stage.js';
 import { createBoard } from './render/board.js';
 import { createPieces } from './render/pieces.js';
-import { createDiceTray } from './render/dice.js';
 import { Tweens } from './render/tween.js';
 import { createAmbientParticles } from './render/particles.js';
 import { loadQuality } from './render/quality.js';
@@ -49,7 +48,6 @@ const tweens = new Tweens();
 boot(0.7);
 const pieces = createPieces(board, tweens);
 stage.scene.add(pieces.root);
-const diceTray = createDiceTray($('dice'));
 const rig = createCameraRig(stage, { board, pieces });
 // Step 20: living winter — weather/day-night/bonfire follow the game; footprints follow walkers.
 const atmosphere = createAtmosphere(stage, board);
@@ -170,34 +168,11 @@ const FX_BURST = {
   surrounded: [0x6f8a4e, 0x3d4a2a],
 };
 const popups = [];
-// The dice stage floats over the board while dice roll, holds the result, then fades away.
-const diceStage = $('dice-stage');
-let diceTimer = null;
-let diceStarted = 0;
-// Timers, not frames: the stage must also go away if rendering is paused. Never longer than 6 s.
-function watchDice() {
-  clearTimeout(diceTimer);
-  diceTimer = setTimeout(() => {
-    // Still rolling: keep watching. Settled: hold the result ~1.6 s so it can be read, then fade.
-    if ((diceTray.busy || diceTray.exposureBusy) && performance.now() - diceStarted < 6000) watchDice();
-    else diceTimer = setTimeout(() => diceStage.classList.remove('on'), 1600);
-  }, 200);
-}
-function showDice() {
-  diceStage.classList.add('on');
-  diceStarted = performance.now();
-  watchDice();
-}
-diceStage.addEventListener('click', () => { clearTimeout(diceTimer); diceStage.classList.remove('on'); });
-
 function exposureFx(survivorId, face) {
   const obj = pieces.survivorObject(survivorId);
   const fallback = obj ? obj.position.clone() : new THREE.Vector3();
-  // Frostbound: a danger card, no die to tumble (23b gives it a card flip).
-  const danger = !!app?.state?.danger;
-  if (!danger) showDice();
-  // The die tumbles in the tray first; the verdict then floats up over the survivor.
-  (danger ? Promise.resolve() : diceTray.rollExposure(face)).then(() => {
+  // A danger card: the verdict floats up over the survivor (23b gives it a card flip).
+  Promise.resolve().then(() => {
     pieces.burstAt(survivorId, FX_BURST[face], face === 'bite' ? 30 : 18, face === 'bite' ? 1.5 : 1.1);
     const el = document.createElement('div');
     el.className = `fx-pop f-${face}`;
@@ -208,14 +183,14 @@ function exposureFx(survivorId, face) {
 }
 
 const app = createApp({
-  board, pieces, diceTray, art,
+  board, pieces, art,
   graphics: governor,
   aiFast: params.get('ai') === 'fast', // debug/testing: AI doesn't wait for animations
   sceneScale: Math.max(0.1, Math.min(20, Number(params.get('scenes') ?? 1) || 1)), // testing: slower scenes
-  fx: { exposure: exposureFx, diceRoll: showDice },
+  fx: { exposure: exposureFx },
   scene: { camera: rig, play: playScene },
   dom: {
-    topbar: $('topbar'), phase: $('phase'), log: $('log'), diceStage: $('dice-stage'), loc: $('locpanel'), player: $('player'), modal: $('modal'), toasts: $('toasts'), tutorial: $('tutorial'),
+    topbar: $('topbar'), phase: $('phase'), log: $('log'), loc: $('locpanel'), player: $('player'), modal: $('modal'), toasts: $('toasts'), tutorial: $('tutorial'),
     movePick: $('move-pick'),
     hint: $('hint'),
     playerRefs: { head: $('pp-head'), survivors: $('pp-survivors'), chips: $('pp-chips'), hand: $('pp-hand'), actions: $('pp-actions') },
@@ -376,14 +351,13 @@ if (params.get('play')) {
   app.quickStart({
     seats: params.get('play'), scenarioId: params.get('scenario') ?? 'beacon',
     seed: Number(params.get('seed') ?? 1), lang: params.get('lang') ?? undefined,
-    rules: params.get('rules') ?? undefined, // step 23: ?rules=classic
   });
 }
 // Browsers only allow audio after a user gesture; UI buttons give a soft click.
 window.addEventListener('pointerdown', () => sound.unlock());
 document.addEventListener('click', (ev) => { if (ev.target.closest?.('button')) sound.play('ui'); });
 
-window.__frostbound = { OBJECTIVES: SECRET_OBJECTIVES, rig, stage, atmosphere, footprints, groundAt, ray, board, pieces, diceTray, tweens, app, art, tryReduce, itemType: (defId) => ITEMS[defId]?.type };
+window.__frostbound = { OBJECTIVES: SECRET_OBJECTIVES, rig, stage, atmosphere, footprints, groundAt, ray, board, pieces, tweens, app, art, tryReduce, itemType: (defId) => ITEMS[defId]?.type };
 
 // Step 22: the first frame is on screen — drop the loading screen. A hidden tab draws nothing and
 // pauses the ambience.

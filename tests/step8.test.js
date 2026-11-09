@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import {
-  cardNeeds, cardTargets, cardDice, lureTargets, moveTargets, actingSurvivors, unusedDice, shouldConfirmEndTurn,
+  cardNeeds, cardTargets, lureTargets, moveTargets, actingSurvivors, shouldConfirmEndTurn, cardOptions,
 } from '../src/ui/options.js';
 import { whoMustHold, currentActor } from '../src/ui/seat.js';
 import { ArtCache, artKey } from '../src/render/art.js';
@@ -10,7 +10,7 @@ import { ITEMS } from '../src/content/items.js';
 import { SURVIVORS_BY_ID } from '../src/content/survivors.js';
 import { reduce } from '../src/core/reducer.js';
 import * as A from '../src/core/actions.js';
-import { startedGame, setSurvivors, setDice, giveCard, patch } from './_helpers.js';
+import { startedGame, setSurvivors, setEnergy, giveCard, patch } from './_helpers.js';
 
 test('card play needs an explicit target: one entry per survivor, legal only where it applies', () => {
   let s = startedGame();
@@ -22,24 +22,20 @@ test('card play needs an explicit target: one entry per survivor, legal only whe
   let junk; [s, junk] = giveCard(s, pid, 'bedpan');
   let food; [s, food] = giveCard(s, pid, 'canned-beans');
   assert.equal(cardNeeds(s, med), 'survivor');
-  assert.equal(cardNeeds(s, junk), 'die');
+  assert.equal(cardNeeds(s, junk), null, 'junk is scrapped for energy, no target');
+  assert.equal(cardNeeds(s, gun), null, 'gear is equipped, no target');
   assert.equal(cardNeeds(s, food), null);
   const medT = Object.fromEntries(cardTargets(s, pid, med).map((x) => [x.survivorId, x]));
   assert.equal(medT['agnes-pell'].ok, true, 'only the wounded survivor can be healed');
   assert.equal(medT['corwin-daly'].error, 'notWounded');
-  const gunT = Object.fromEntries(cardTargets(s, pid, gun).map((x) => [x.survivorId, x]));
-  assert.equal(gunT['corwin-daly'].ok, true);
-  assert.equal(gunT['agnes-pell'].error, 'noZombiesHere');
-  s = setDice(s, pid, [1, 4]);
-  assert.deepEqual(cardDice(s, pid, junk).map((d) => d.value), [1, 4]);
-  assert.ok(cardDice(s, pid, junk).every((d) => d.ok));
+  assert.deepEqual(cardOptions(s, pid, gun).map((o) => o.id), ['equip', 'contribute', 'deposit']);
+  assert.ok(cardOptions(s, pid, gun)[0].ok);
 });
 
 test('lure and move targets for the board highlights', () => {
   let s = startedGame();
   const pid = s.activePlayerId;
   s = setSurvivors(s, pid, { 'lio-fontaine': 'school' });
-  s = setDice(s, pid, [3]);
   s = patch(s, (x) => { x.locations.school.zombies = 2; });
   const lure = lureTargets(s, pid, 'lio-fontaine');
   assert.equal(lure.length, 6);
@@ -54,17 +50,16 @@ test('lure and move targets for the board highlights', () => {
   assert.equal(mt.school, undefined, 'no entry for where it already stands');
 });
 
-test('acting survivors, unused dice and the end-turn confirmation', () => {
+test('acting survivors and the end-turn confirmation follow the energy left', () => {
   let s = startedGame();
   const pid = s.activePlayerId;
   s = setSurvivors(s, pid, { 'corwin-daly': 'colony' });
-  s = setDice(s, pid, [2, 5]);
+  s = setEnergy(s, pid, 60);
   assert.deepEqual(actingSurvivors(s, pid), ['corwin-daly']);
-  assert.equal(unusedDice(s, pid), 2);
   assert.equal(shouldConfirmEndTurn(s, pid), true);
   assert.equal(shouldConfirmEndTurn(s, pid, { skip: true }), false);
-  s = patch(s, (x) => { x.players.find((p) => p.id === pid).dice.forEach((d) => { d.used = true; }); x.survivors['corwin-daly'].moved = true; });
-  assert.equal(shouldConfirmEndTurn(s, pid), false);
+  s = setEnergy(s, pid, 2);
+  assert.equal(shouldConfirmEndTurn(s, pid), false, 'nothing affordable: just end');
   assert.deepEqual(actingSurvivors(s, pid), []);
 });
 

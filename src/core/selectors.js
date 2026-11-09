@@ -46,18 +46,27 @@ export function hasAbility(s, survivorId, type) {
 
 /** Does this player control a living survivor with the given ability type? */
 /** How many copies of a passive book (by passive key) the colony's players hold. Exiles don't share. */
+/** Equipped gear of a player: { weapon, armor, book } item defs (or null). Hidden from no one: gear is worn. */
+export function gearOf(s, playerId) {
+  const g = getPlayer(s, playerId)?.gear ?? {};
+  const def = (uid) => (uid ? ITEMS[s.cards[uid]] ?? null : null);
+  return { weapon: def(g.weapon), armor: def(g.armor), book: def(g.book) };
+}
+
+/** How many equipped books with this passive (one player, or every non-exiled player). */
 export function booksHeld(s, passive, playerId = null) {
   let n = 0;
   for (const p of s.players) {
     if (playerId ? p.id !== playerId : p.exiled) continue;
-    for (const uid of p.hand) if (ITEMS[s.cards[uid]]?.passive === passive) n += 1;
+    if (gearOf(s, p.id).book?.passive === passive) n += 1;
   }
   return n;
 }
 
-/** Does the player hold the blueprint for this location? */
-export const holdsBlueprint = (s, playerId, locationId) =>
-  s.players.find((p) => p.id === playerId)?.hand.some((uid) => ITEMS[s.cards[uid]]?.blueprint === locationId) ?? false;
+/** An equipped blueprint for this location. */
+export function holdsBlueprint(s, playerId, locationId) {
+  return gearOf(s, playerId).book?.blueprint === locationId;
+}
 
 export function playerHasAbility(s, playerId, type) {
   return aliveSurvivorsOf(s, playerId).some((sv) => survivorDef(sv.id).ability.type === type);
@@ -144,39 +153,62 @@ export function pendingActors(s) {
   }
 }
 
-// ---------------------------------------------------------------- step 23: energy, danger, forecast
+// ---------------------------------------------------------------- energy (personal), danger, forecast
 
-export const isFrostbound = (s) => s.config?.rules === 'frostbound';
 export const isNight = (s) => s.round % 2 === 0;
 
 /**
  * Energy cost of an action for a survivor (move: `to` is the destination). Odd numbers on purpose.
- * Modifiers: crowded (2+ zombies) search/barricade, dangerous-location search, heavy attack, night outside.
+ * Personal: attack / search come from the survivor's skills; equipped weapon / boots change them.
+ * Modifiers: crowded (2+ zombies) search/barricade, dangerous-location search, heavy hitter, night outside.
  */
 export function actionCost(s, survivorId, kind, to = null) {
   const sv = s.survivors[survivorId];
+  const def = survivorDef(survivorId);
+  const gear = sv ? gearOf(s, sv.owner) : {};
   let cost = ENERGY.COST[kind] ?? 0;
+  if (kind === 'attack') cost = ENERGY.ATTACK_BASE + ENERGY.PER_SKILL * (def?.attack ?? 4) + (gear.weapon?.attackMod ?? 0);
+  if (kind === 'search') cost = ENERGY.SEARCH_BASE + ENERGY.PER_SKILL * (def?.search ?? 4);
+  if (kind === 'move') cost += gear.armor?.moveMod ?? 0;
   if (!sv) return cost;
   const here = sv.location;
   const zombies = s.locations[here]?.zombies ?? 0;
   if ((kind === 'search' || kind === 'barricade') && zombies >= 2) cost += ENERGY.CROWDED;
   if (kind === 'search' && DANGEROUS_LOCATIONS.includes(here)) cost += ENERGY.DANGEROUS;
-  if (kind === 'attack' && survivorDef(survivorId)?.ability.type === 'killTwo') cost += ENERGY.HEAVY;
+  if (kind === 'attack' && def?.ability.type === 'killTwo') cost += ENERGY.HEAVY;
   const outside = kind === 'move' ? to && to !== 'colony' : here !== 'colony';
   if (isNight(s) && outside) cost += ENERGY.NIGHT;
-  return cost;
+  return Math.max(1, cost);
 }
 
-/** Energy cap for a player: lower while one of their survivors has 2+ wounds. */
+/** Zombies one attack kills: the weapon's value (bare hands 1), +1 for Teodor. */
+export function killsPerAttack(s, survivorId) {
+  const sv = s.survivors[survivorId];
+  const weapon = sv ? gearOf(s, sv.owner).weapon : null;
+  return Math.max(1, weapon?.value ?? 1) + (survivorDef(survivorId)?.ability.type === 'killTwo' ? 1 : 0);
+}
+
+/** The player's survivor (one per player). */
+export const heroOf = (s, playerId) => aliveSurvivorsOf(s, playerId)[0] ?? null;
+
+/** Energy cap: the survivor's own pool, lower while badly hurt (2+ wounds). */
 export function energyMax(s, playerId) {
-  return aliveSurvivorsOf(s, playerId).some((sv) => sv.wounds >= 2) ? ENERGY.MAX_HURT : ENERGY.MAX;
+  const sv = heroOf(s, playerId);
+  if (!sv) return 0;
+  const base = survivorDef(sv.id).energy ?? ENERGY.MAX;
+  return Math.max(10, Math.min(ENERGY.MAX, base - (sv.wounds >= 2 ? ENERGY.HURT : 0)));
 }
 
-/** Energy regained at the start of a turn. */
+/** Energy regained at the start of a turn: the survivor's regen, Dot +15, a survival guide, starvation, frost. */
 export function energyRegen(s, playerId) {
   const p = getPlayer(s, playerId);
-  let n = s.starvation > 0 ? ENERGY.REGEN_STARVING : ENERGY.REGEN;
-  n += aliveSurvivorsOf(s, playerId).filter((sv) => survivorDef(sv.id).ability.type === 'extraDie').length * ENERGY.ABILITY_REGEN;
+  const sv = heroOf(s, playerId);
+  if (!sv) return 0;
+  const def = survivorDef(sv.id);
+  let n = def.regen ?? 65;
+  if (def.ability.type === 'extraDie') n += 15;
+  if (gearOf(s, playerId).book?.passive === 'regenPlus') n += gearOf(s, playerId).book.value;
+  if (s.starvation > 0) n -= ENERGY.STARVING;
   return Math.max(0, n - (p.regenPenalty ?? 0));
 }
 

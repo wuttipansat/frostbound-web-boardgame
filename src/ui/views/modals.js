@@ -1,13 +1,13 @@
 // Full-screen screens and dialogs: setup, settings, pass-the-device, draft, crossroads, requests, vote, game over.
 import { h, mount, hex, TYPE_REP } from '../dom.js';
-import { icon, dieFace } from '../icons.js';
+import { icon } from '../icons.js';
 import { t, c, LANGUAGES, getLang, crossChoice, signed } from '../../i18n/index.js';
 import { describeEffects, describeTrigger } from '../../i18n/format.js';
 import { SCENARIOS } from '../../content/scenarios.js';
 import { CRISES_BY_ID } from '../../content/crises.js';
 import { voteTargets } from '../options.js';
 import { CROSSROADS_BY_ID } from '../../content/crossroads.js';
-import { ITEM_TYPES, RULES } from '../../core/constants.js';
+import { ITEM_TYPES, RULES, ENERGY } from '../../core/constants.js';
 import { getPlayer, survivorDef, itemOf, objectiveDef, woundLimit } from '../../core/selectors.js';
 import { PLAYER_COLORS } from '../../render/pieces.js';
 import * as act from '../../core/actions.js';
@@ -78,10 +78,6 @@ export function setupScreen(ctx) {
           h('button', { class: seat.isAI ? 'on' : '', onclick: () => setSeat(i, { isAI: true }) }, t('setup.ai'))))))),
     h('details', { class: 'setup-more' },
       h('summary', {}, t('setup.more')),
-      // Step 23: Frostbound rules (energy + danger deck) or the classic dice.
-      h('div', { class: 'row' },
-        h('span', { class: 'lbl', tip: t('setup.rulesTip') }, t('setup.rules')),
-        h('div', { class: 'seg small' }, ['frostbound', 'classic'].map((m) => h('button', { class: (cfg.rules ?? 'frostbound') === m ? 'on' : '', 'data-rules': m, onclick: () => update({ rules: m }) }, t(`setup.rules.${m}`))))),
       h('div', { class: 'row' },
         h('span', { class: 'lbl' }, t('setup.betrayer')),
         h('div', { class: 'seg small' }, ['maybe', 'always', 'never'].map((m) => h('button', { class: cfg.betrayer === m ? 'on' : '', onclick: () => update({ betrayer: m }) }, t(`setup.betrayer.${m}`))))),
@@ -213,9 +209,9 @@ function survivorCard(ctx, id, { order = 0, color = '#888', dim = false, pop = f
   h('b', {}, d.name),
   h('small', {}, c('survivors', id, 'occupation')),
   h('span', { class: 'sv-stats' },
-    h('span', { class: 'need', tip: t('act.attack') }, icon('attack'), dieFace(d.attack, 'mini'), '+'),
-    h('span', { class: 'need', tip: t('act.search') }, icon('search'), dieFace(d.search, 'mini'), '+'),
-    h('span', { class: 'need', tip: t('draft.influence') }, icon('star'), d.influence),
+    h('span', { class: 'need', tip: t('draft.energy', { n: d.energy, regen: d.regen + (d.ability.type === 'extraDie' ? 15 : 0) }) }, icon('exposure'), `${d.energy}`, h('small', {}, `+${d.regen + (d.ability.type === 'extraDie' ? 15 : 0)}`)),
+    h('span', { class: 'need', tip: t('draft.attackCost') }, icon('attack'), ENERGY.ATTACK_BASE + ENERGY.PER_SKILL * d.attack),
+    h('span', { class: 'need', tip: t('draft.searchCost') }, icon('search'), ENERGY.SEARCH_BASE + ENERGY.PER_SKILL * d.search),
     h('span', { class: 'need', tip: t('draft.health') }, icon('heal'), hp)),
   h('p', { class: 'svp-ability' }, c('survivors', id, 'abilityText')));
 }
@@ -576,11 +572,9 @@ export function toastLayer(el, toasts) {
 
 export function confirmEndModal(ctx) {
   const me = getPlayer(ctx.state, ctx.viewer);
-  const n = me.dice.filter((d) => !d.used).length;
   return dialog('confirm-end',
     h('h2', {}, t('confirm.end.title')),
-    me.energy != null && ctx.state.danger ? h('p', {}, t('confirm.end.energy', { n: me.energy })) : h('div', { class: 'dice-row' }, me.dice.map((d) => dieFace(d.v, d.used ? 'spent' : ''))),
-    me.energy != null && ctx.state.danger ? null : h('p', {}, t('confirm.end.text', { n })),
+    h('p', {}, t('confirm.end.energy', { n: me.energy })),
     // Step 18: what is still unsafe this round, before you hand over.
     (() => { const bad = checklistView(ctx.state, { onlyBad: true }); return bad ? h('div', { class: 'warn-box' }, h('small', {}, t('check.warn')), bad) : null; })(),
     h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: ctx.ui.skipEndConfirm, onchange: (ev) => { ctx.ui.skipEndConfirm = ev.target.checked; } }), ` ${t('confirm.end.skip')}`),

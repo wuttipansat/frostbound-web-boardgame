@@ -16,7 +16,7 @@ const F = { force: true, timeout: 15000 };
     await p.addStyleTag({ content: '*, *::before, *::after { transition: none !important; animation-duration: 0s !important; animation-delay: 0s !important; }' });
     await p.evaluate(() => {
       const f = window.__frostbound; f.stage.stop(); const a = f.app; a.tutorialEvent('skip');
-      a.dispatch({ type: 'DRAFT_PICK', playerId: 'p0', survivorIds: a.state.players[0].draftOptions.slice(0, 2) });
+      a.dispatch({ type: 'DRAFT_PICK', playerId: 'p0', survivorIds: a.state.players[0].draftOptions.slice(0, 1) });
       a.markObjectiveSeen(); a.set({ queue: [] });
       // A few scripted days on top of the real state (journal reads the public log only).
       const s = structuredClone(a.state);

@@ -18,7 +18,7 @@ const out = process.argv[2] || 'docs/screenshots/step15';
       const f = window.__frostbound; const a = f.app;
       f.stage.stop();
       const me = a.state.players[0];
-      a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 2) });
+      a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 1) });
       a.tutorialEvent('skip');
       const s = structuredClone(a.state);
       s.phase = 'turn'; s.pendingCrossroads = null; s.activePlayerId = 'p0'; s.round = 2;
@@ -27,7 +27,7 @@ const out = process.argv[2] || 'docs/screenshots/step15';
       s.survivors[bot].location = 'grocery';
       a.loadState(s, 'p0');
       a.set({ handCompact: true });
-      document.getElementById('dice-stage').style.display = 'none';
+      
     });
     await step(2, 0.05);
     await shot('board-no-names');

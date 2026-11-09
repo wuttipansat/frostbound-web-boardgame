@@ -3,19 +3,20 @@ import { createGame } from '../src/core/state.js';
 import { reduce } from '../src/core/reducer.js';
 import { draftPick } from '../src/core/actions.js';
 import { newSurvivor } from '../src/core/rules/helpers.js';
+import { RULES } from '../src/core/constants.js';
 
 export function newGame(opts = {}) {
-  const { players = 3, scenarioId = 'beacon', seed = 42, betrayer = 'never', rules } = opts;
+  const { players = 3, scenarioId = 'beacon', seed = 42, betrayer = 'never' } = opts;
   return createGame({
     players: Array.from({ length: players }, (_, i) => ({ name: `P${i + 1}` })),
-    scenarioId, seed, betrayer, rules,
+    scenarioId, seed, betrayer,
   });
 }
 
 /** A game past the draft, forced into a clean TURN phase for the active player. */
 export function startedGame(opts = {}) {
   let s = newGame(opts);
-  for (const p of s.players) s = reduce(s, draftPick(p.id, p.draftOptions.slice(0, 2)));
+  for (const p of s.players) s = reduce(s, draftPick(p.id, p.draftOptions.slice(0, RULES.SURVIVORS_PER_PLAYER)));
   return forceTurn(s);
 }
 
@@ -52,9 +53,16 @@ export function giveCard(s, playerId, itemId) {
   return [c, uid];
 }
 
-export function setDice(s, playerId, values) {
+export function setEnergy(s, playerId, n) {
   const c = structuredClone(s);
-  c.players.find((x) => x.id === playerId).dice = values.map((v) => ({ v, used: false }));
+  c.players.find((x) => x.id === playerId).energy = n;
+  return c;
+}
+
+/** Put danger cards on top of the danger deck (the last one listed is drawn first). */
+export function topDanger(s, ...kinds) {
+  const c = structuredClone(s);
+  c.danger.deck.push(...kinds);
   return c;
 }
 
@@ -66,7 +74,7 @@ export function patch(s, fn) {
 
 export const player = (s, id) => s.players.find((p) => p.id === id);
 
-/** Find an rng seed value for which `predicate(stateAfter)` holds when running fn. */
+/** Find an rng seed value for which `predicate(stateAfter)` holds when running fn (shuffles, draws). */
 export function findSeed(s, fn, predicate, tries = 2000) {
   for (let seed = 1; seed < tries; seed++) {
     const c = patch(s, (x) => { x.rng = seed; });

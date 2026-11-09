@@ -17,14 +17,14 @@ const out = process.argv[2] || null;
     await p.evaluate(() => {
       const f = window.__frostbound; const a = f.app; const me = a.state.players[0];
       f.stage.stop();
-      a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 2) });
+      a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 1) });
       a.tutorialEvent('skip');
     });
     // Play p0's turn away (End turn), then let the bot go, stepping frames until its scenes play.
     const step = (n = 1, dt = 0.25) => p.evaluate(([k, d]) => { for (let i = 0; i < k; i++) window.__frostbound.stage.step(d); }, [n, dt]);
     let watched = null;
     let ended = false;
-    for (let i = 0; i < 150 && !watched; i++) {
+    for (let i = 0; i < 320 && !watched; i++) {
       watched = await p.evaluate((endedTurn) => {
         const f = window.__frostbound; const a = f.app; const s = a.state;
         const cur = a.director.current;

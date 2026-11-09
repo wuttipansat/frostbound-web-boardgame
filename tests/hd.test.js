@@ -6,7 +6,7 @@ import {
   LOCATION_BUILDERS, LOCATION_BUILDERS_HD, colonyHD, treeModelHD, rockModelHD,
 } from '../src/render/buildings.js';
 import {
-  survivorModel, survivorModelHD, zombieModelHD, dieModelHD, exposureDieModelHD, barricadeModelHD, DIE_VOXELS, HD,
+  survivorModel, survivorModelHD, zombieModelHD, barricadeModelHD, HD,
 } from '../src/render/characters.js';
 import { frameWindows, addIcicles, patternColor, materialOf, DETAIL_COLORS } from '../src/render/detail.js';
 import { heightmapGeometry, buildTerrainHD } from '../src/render/terrain.js';
@@ -69,16 +69,6 @@ test('HD zombies: five variants, glowing eyes, teeth', () => {
     shapes.add([...m.voxels.keys()].sort().join('|'));
   }
   assert.equal(shapes.size, 5);
-});
-
-test('HD dice: pips are carved in (no pip colour left on the outer surface) and faces are unchanged', () => {
-  const m = dieModelHD();
-  const N = DIE_VOXELS * HD - 1;
-  const outer = (v) => v.x === 0 || v.x === N || v.y === 0 || v.y === N || v.z === 0 || v.z === N;
-  assert.equal(count(m, (v) => v.color !== 0xf4f1ea && outer(v)), 0);
-  assert.ok(count(m, (v) => v.color !== 0xf4f1ea) > 0, 'recessed pips are still there one layer in');
-  assert.ok(count(exposureDieModelHD(), (v) => v.color !== 0x2b3442) > 0);
-  assert.ok(tris(barricadeModelHD().buildGeometries({ jitter: 0 }).lit) > 0);
 });
 
 test('detail passes: materials, brick mortar, window sills and icicles', () => {

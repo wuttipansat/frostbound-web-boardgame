@@ -15,21 +15,19 @@ async function setup(p) {
   await p.waitForTimeout(800);
   await p.evaluate(() => {
     const a = window.__frostbound.app; const me = a.state.players[0];
-    a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 2) });
+    a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 1) });
     a.tutorialEvent?.('skip');
     const s = structuredClone(a.state);
     s.phase = 'turn'; s.pendingCrossroads = null; s.activePlayerId = 'p0'; s.round = 2;
     const [sv, sv2] = s.players[0].survivors;
     s.survivors[sv].location = 'grocery'; s.survivors[sv].wounds = 1; s.locations.grocery.zombies = 2;
-    s.survivors[sv2].location = 'grocery';
+    // one survivor each now
     for (const type of ['weapon', 'medicine', 'book', 'food', 'junk', 'tools']) for (const loc of Object.values(s.locations)) {
       const i = (loc.deck || []).findIndex((u) => window.__frostbound.itemType(s.cards[u]) === type);
       if (i >= 0) { s.players[0].hand.push(loc.deck.splice(i, 1)[0]); break; }
     }
     a.loadState(s, 'p0');
     window.__frostbound.stage.stop();
-    document.getElementById('dice-stage').classList.remove('on');
-    document.getElementById('dice-stage').style.display = 'none';
   });
 }
 
@@ -45,7 +43,7 @@ function boxes() {
   return {
     topbar: union(q('#topbar')),
     name: union(q('#pp-head')),
-    dice: union(q('#pp-chips')),
+    energy: union(q('#pp-chips')),
     actions: union(q('#pp-actions > .icon-btn, #pp-actions > .btn')),
     hand: union([...vis('#pp-hand .item-card'), ...q('#pp-hand .hand-ctl button')]),
     tokens: union(q('.sv-token')),

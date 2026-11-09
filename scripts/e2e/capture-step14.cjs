@@ -11,7 +11,7 @@ const out = process.argv[2] || 'docs/screenshots/step14';
     await p.waitForTimeout(800);
     await p.evaluate(() => {
       const a = window.__frostbound.app; const me = a.state.players[0];
-      a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 2) });
+      a.dispatch({ type: 'DRAFT_PICK', playerId: me.id, survivorIds: me.draftOptions.slice(0, 1) });
       a.tutorialEvent?.('skip');
       const s = structuredClone(a.state);
       s.phase = 'turn'; s.pendingCrossroads = null; s.activePlayerId = 'p0'; s.round = 2;
@@ -25,7 +25,7 @@ const out = process.argv[2] || 'docs/screenshots/step14';
       }
       a.loadState(s, 'p0');
       window.__frostbound.stage.stop();
-      document.getElementById('dice-stage').style.display = 'none';
+      
       a.set({ handCompact: false });
     });
     await p.waitForTimeout(900);

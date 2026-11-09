@@ -32,7 +32,7 @@ function checkInvariants(s) {
   for (const sv of Object.values(s.survivors)) {
     assert.equal(owned.includes(sv.id), sv.alive, `${sv.id} ownership matches alive`);
   }
-  for (const p of s.players) for (const d of p.dice) assert.ok(d.v >= 1 && d.v <= 6);
+  for (const p of s.players) { assert.ok(p.energy >= 0 && p.energy <= 100, 'energy in range'); assert.ok(p.survivors.length <= 1, 'one survivor each'); }
   if (s.phase === 'crossroads') assert.ok(s.pendingCrossroads);
   if (s.phase === 'vote') assert.ok(s.vote);
   assert.notEqual(s.phase, 'colony', 'colony phase never leaks between actions');

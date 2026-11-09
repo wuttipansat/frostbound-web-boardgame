@@ -70,6 +70,8 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
       await page.locator('.obj-reveal .hold-btn').dispatchEvent('pointerup').catch(() => {});
       continue;
     }
+    // The first-game tutorial bubble can sit over the board: play on without it (the tutorial has its own e2e).
+    if (await page.locator('#tutorial .tut-bubble').count()) { await page.evaluate(() => window.__frostbound.app.tutorialEvent('skip')); continue; }
     // Moving (step 15): tap a location, then one of your survivors' round faces by it.
     if (!counts.move && await page.locator('#pp-actions .btn.end-turn').count()) {
       const target = await page.evaluate(() => {

@@ -46,7 +46,7 @@ const URL = `http://localhost:${PORT}/?snow=0`;
   const counts = { draft: 0, choice: 0, reveal: 0, end: 0, confirm: 0, colony: 0, incoming: 0, leakChecks: 0 };
   const leak = (page) => page.evaluate(() => {
     const a = window.__frostbound.app; const s = a.state;
-    if (!s) return [];
+    if (!s || s.phase === 'gameOver') return []; // at the end every hand is shown on purpose
     // A view only ever holds one hand: this player's own.
     const others = s.players.filter((p) => p.hand.length);
     const me = others[0] ?? null;
@@ -56,7 +56,7 @@ const URL = `http://localhost:${PORT}/?snow=0`;
     if (shown.some((u) => !me?.hand.includes(u))) out.push('a card on screen is not in this player hand');
     if (s.rng) { /* the hydrated stand-in is fine */ }
     // Step 23: the danger deck's order never reaches a client (only the counts).
-    if (s.config?.rules === 'frostbound' && !s.danger?.left) out.push('no public danger counts in a frostbound view');
+    if (!s.danger?.left) out.push('no public danger counts in the view');
     if (s.danger?.deck?.length) out.push('danger deck order leaked');
     return out;
   });

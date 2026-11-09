@@ -4,14 +4,14 @@ import { reduce, tryReduce } from '../src/core/reducer.js';
 import * as a from '../src/core/actions.js';
 import { ITEMS } from '../src/content/items.js';
 import { LOCATIONS } from '../src/content/locations.js';
-import { foodNeeded, getPlayer } from '../src/core/selectors.js';
-import { startedGame, setSurvivors, setDice, giveCard, patch } from './_helpers.js';
+import { foodNeeded, getPlayer, killsPerAttack, actionCost } from '../src/core/selectors.js';
+import { startedGame, setSurvivors, setEnergy, giveCard, patch } from './_helpers.js';
 
-const turn = (placements, dice = [6, 6, 6]) => {
+const turn = (placements, energy = 100) => {
   let s = startedGame();
   const pid = s.activePlayerId;
   s = setSurvivors(s, pid, placements);
-  s = setDice(s, pid, dice);
+  s = setEnergy(s, pid, energy);
   return { s, pid };
 };
 const hand = (s, pid) => getPlayer(s, pid).hand;
@@ -25,33 +25,28 @@ test('items have tiers 1-3 and higher tiers are scarcer in the decks', () => {
   assert.ok(copies[1] > copies[2] && copies[2] > copies[3] && copies[3] >= 1, JSON.stringify(copies));
 });
 
-test('weapons are permanent: they stay in hand and work once per turn; stronger guns kill more', () => {
+test('weapons are worn: each attack kills the weapon\'s value, at the weapon\'s cost, with no danger card', () => {
   let { s, pid } = turn({ 'corwin-daly': 'police' });
   s = patch(s, (x) => { x.locations.police.zombies = 3; });
-  let glock, shotgun;
+  let glock, shotgun, rifle;
   [s, glock] = giveCard(s, pid, 'glock-19');
   [s, shotgun] = giveCard(s, pid, 'remington-870');
-  let r = reduce(s, a.playCard(pid, shotgun, { targetSurvivorId: 'corwin-daly' }));
-  assert.equal(r.locations.police.zombies, 1, 'shotgun kills 2');
-  assert.ok(hand(r, pid).includes(shotgun), 'weapon stays in hand');
-  assert.equal(r.waste, s.waste, 'no waste');
-  assert.equal(tryReduce(r, a.playCard(pid, shotgun, { targetSurvivorId: 'corwin-daly' })).error, 'cardUsedThisTurn');
-  r = reduce(r, a.playCard(pid, glock, { targetSurvivorId: 'corwin-daly' }));
-  assert.equal(r.locations.police.zombies, 0);
-});
-
-test('the Mosin-Nagant shoots into any location', () => {
-  let { s, pid } = turn({ 'corwin-daly': 'colony' });
-  s = patch(s, (x) => { x.locations.hospital.zombies = 2; });
-  let rifle; [s, rifle] = giveCard(s, pid, 'mosin-nagant');
-  assert.equal(tryReduce(s, a.playCard(pid, rifle, { targetLocation: 'school' })).error, 'noZombiesHere');
-  const r = reduce(s, a.playCard(pid, rifle, { targetLocation: 'hospital' }));
-  assert.equal(r.locations.hospital.zombies, 1);
-  assert.equal(r.lastExposure, s.lastExposure);
+  [s, rifle] = giveCard(s, pid, 'mosin-nagant');
+  const bare = actionCost(s, 'corwin-daly', 'attack');
+  let r = reduce(s, a.equip(pid, shotgun));
+  assert.equal(killsPerAttack(r, 'corwin-daly'), 2);
+  assert.equal(actionCost(r, 'corwin-daly', 'attack'), bare + 2);
+  const shot = reduce(r, a.attack(pid, 'corwin-daly'));
+  assert.equal(shot.locations.police.zombies, 1, 'shotgun kills 2');
+  assert.deepEqual(shot.lastExposure, r.lastExposure, 'armed: no danger card');
+  assert.equal(shot.waste, s.waste, 'gear is never spent');
+  r = reduce(r, a.equip(pid, rifle));
+  assert.equal(actionCost(r, 'corwin-daly', 'attack'), bare - 6, 'the rifle is the cheapest shot');
+  assert.ok(hand(r, pid).includes(shotgun) && hand(r, pid).includes(glock));
 });
 
 test('tier scales medicine, tools and junk; motor junk is wild in a crisis', () => {
-  let { s, pid } = turn({ 'corwin-daly': 'police' }, [1, 1, 6]);
+  let { s, pid } = turn({ 'corwin-daly': 'police' }, 20);
   s = patch(s, (x) => { x.survivors['corwin-daly'].wounds = 1; x.survivors['corwin-daly'].frostbite = true; });
   let med, set, junk;
   [s, med] = giveCard(s, pid, 'antibiotics');
@@ -61,29 +56,32 @@ test('tier scales medicine, tools and junk; motor junk is wild in a crisis', () 
   assert.equal(healed.survivors['corwin-daly'].wounds, 0);
   assert.equal(healed.survivors['corwin-daly'].frostbite, false);
   assert.equal(reduce(s, a.playCard(pid, set, { targetSurvivorId: 'corwin-daly' })).locations.police.barricades, 2);
-  const re = reduce(s, a.playCard(pid, junk, { dieIndex: 0, dieIndex2: 1 }));
+  const re = reduce(s, a.playCard(pid, junk));
   assert.ok(!hand(re, pid).includes(junk));
+  assert.equal(getPlayer(re, pid).energy, 20 + 24, 'motor junk = 2 × 12 energy');
   assert.equal(ITEMS['motor-junk'].wild, true);
 });
 
-test('survivor cards recruit a new survivor (and the stranger brings a helpless child)', () => {
+test('survivor cards: a newcomer joins the colony (+1 morale, more mouths); you still play one survivor', () => {
   let { s, pid } = turn({ 'corwin-daly': 'colony' });
+  s = patch(s, (x) => { x.morale = 5; });
   let card; [s, card] = giveCard(s, pid, 'stranger-with-child');
-  const before = getPlayer(s, pid).survivors.length;
   const r = reduce(s, a.playCard(pid, card));
-  assert.equal(getPlayer(r, pid).survivors.length, before + 1);
-  assert.equal(r.helpless, s.helpless + 1);
+  assert.equal(getPlayer(r, pid).survivors.length, 1);
+  assert.equal(r.helpless, s.helpless + 2, 'the stranger and the child');
+  assert.equal(r.morale, 6);
   assert.ok(!hand(r, pid).includes(card));
-  const empty = patch(s, (x) => { x.survivorDeck = []; });
-  assert.equal(tryReduce(empty, a.playCard(pid, card)).error, 'noSurvivorsLeft');
+  let lone; [s, lone] = giveCard(s, pid, 'lone-wanderer');
+  assert.equal(reduce(s, a.playCard(pid, lone)).helpless, s.helpless + 1);
 });
 
 test('a blueprint draws one extra card when searching its location, then one goes back', () => {
   let { s, pid } = turn({ 'maren-holt': 'police' });
   let bp; [s, bp] = giveCard(s, pid, 'blueprint-police');
-  assert.equal(tryReduce(s, a.playCard(pid, bp)).error, 'passiveItem');
+  assert.equal(tryReduce(s, a.playCard(pid, bp)).error, 'equipInstead');
+  s = reduce(s, a.equip(pid, bp));
   const n = s.locations.police.deck.length;
-  let r = reduce(s, a.search(pid, 'maren-holt', 0));
+  let r = reduce(s, a.search(pid, 'maren-holt'));
   const pick = getPlayer(r, pid).pick;
   assert.equal(pick.uids.length, 2);
   assert.equal(tryReduce(r, a.endTurn(pid)).error, 'pickPending');
@@ -91,29 +89,40 @@ test('a blueprint draws one extra card when searching its location, then one goe
   assert.equal(getPlayer(r, pid).pick, null);
   assert.equal(r.locations.police.deck.length, n - 1);
   assert.equal(r.locations.police.deck[0], pick.uids[0], 'returned to the bottom');
-  assert.ok(hand(r, pid).includes(pick.uids[1]) && hand(r, pid).includes(bp));
+  assert.ok(hand(r, pid).includes(pick.uids[1]));
+  assert.equal(getPlayer(r, pid).gear.book, bp);
   // Elsewhere the blueprint does nothing.
   let { s: s2, pid: p2 } = turn({ 'maren-holt': 'school' });
-  [s2] = giveCard(s2, p2, 'blueprint-police');
-  assert.equal(reduce(s2, a.search(p2, 'maren-holt', 0)).players.find((p) => p.id === p2).pick, null);
+  let bp2; [s2, bp2] = giveCard(s2, p2, 'blueprint-police');
+  s2 = reduce(s2, a.equip(p2, bp2));
+  assert.equal(reduce(s2, a.search(p2, 'maren-holt')).players.find((p) => p.id === p2).pick, null);
+  // Only while equipped.
+  let { s: s3, pid: p3 } = turn({ 'maren-holt': 'police' });
+  [s3] = giveCard(s3, p3, 'blueprint-police');
+  assert.equal(reduce(s3, a.search(p3, 'maren-holt')).players.find((p) => p.id === p3).pick, null);
 });
 
-test('books work while held: cookbook saves food, field manual adds a barricade', () => {
+test('books work while equipped (one book slot): cookbook saves food, field manual adds a barricade', () => {
   let { s, pid } = turn({ 'corwin-daly': 'police' });
   s = patch(s, (x) => { x.helpless = 6; });
   const need = foodNeeded(s);
   let book; [s, book] = giveCard(s, pid, 'winter-cookbook');
+  assert.equal(foodNeeded(s), need, 'not while only in hand');
+  s = reduce(s, a.equip(pid, book));
   assert.equal(foodNeeded(s), need - 1);
-  [s] = giveCard(s, pid, 'field-manual');
-  assert.equal(reduce(s, a.barricade(pid, 'corwin-daly', 0)).locations.police.barricades, 2);
+  let manual; [s, manual] = giveCard(s, pid, 'field-manual');
+  s = reduce(s, a.equip(pid, manual));
+  assert.equal(foodNeeded(s), need, 'the cookbook went back to the hand');
+  assert.equal(reduce(s, a.barricade(pid, 'corwin-daly')).locations.police.barricades, 2);
   assert.ok(hand(s, pid).includes(book));
 });
 
 test('the hidden blueprint pick is not shown to other seats', async () => {
   const { viewFor } = await import('../src/core/view.js');
   let { s, pid } = turn({ 'corwin-daly': 'police' });
-  [s] = giveCard(s, pid, 'blueprint-police');
-  const r = reduce(s, a.search(pid, 'corwin-daly', 0));
+  let bp; [s, bp] = giveCard(s, pid, 'blueprint-police');
+  s = reduce(s, a.equip(pid, bp));
+  const r = reduce(s, a.search(pid, 'corwin-daly'));
   const other = r.players.find((p) => p.id !== pid).id;
   assert.equal(viewFor(r, other).players.find((p) => p.id === pid).pick, null);
   assert.ok(viewFor(r, pid).players.find((p) => p.id === pid).pick);

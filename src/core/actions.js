@@ -19,15 +19,16 @@ export const A = Object.freeze({
   CAST_VOTE: 'CAST_VOTE',
   RETURN_CARD: 'RETURN_CARD',
   SEARCH_DEEPER: 'SEARCH_DEEPER',
+  EQUIP: 'EQUIP',
 });
 
 export const draftPick = (playerId, survivorIds) => ({ type: A.DRAFT_PICK, playerId, survivorIds });
 export const resolveCrossroads = (playerId, choice) => ({ type: A.RESOLVE_CROSSROADS, playerId, choice });
-export const attack = (playerId, survivorId, dieIndex) => ({ type: A.ATTACK, playerId, survivorId, dieIndex });
-export const search = (playerId, survivorId, dieIndex) => ({ type: A.SEARCH, playerId, survivorId, dieIndex });
-export const barricade = (playerId, survivorId, dieIndex) => ({ type: A.BARRICADE, playerId, survivorId, dieIndex });
-export const clean = (playerId, survivorId, dieIndex) => ({ type: A.CLEAN, playerId, survivorId, dieIndex });
-export const lure = (playerId, survivorId, dieIndex, toLocation) => ({ type: A.LURE, playerId, survivorId, dieIndex, toLocation });
+export const attack = (playerId, survivorId) => ({ type: A.ATTACK, playerId, survivorId });
+export const search = (playerId, survivorId) => ({ type: A.SEARCH, playerId, survivorId });
+export const barricade = (playerId, survivorId) => ({ type: A.BARRICADE, playerId, survivorId });
+export const clean = (playerId, survivorId) => ({ type: A.CLEAN, playerId, survivorId });
+export const lure = (playerId, survivorId, toLocation) => ({ type: A.LURE, playerId, survivorId, toLocation });
 export const move = (playerId, survivorId, toLocation, fuelCardUid) => ({ type: A.MOVE, playerId, survivorId, toLocation, fuelCardUid });
 /** Blueprint search: put one of the drawn cards back under the deck. */
 export const returnCard = (playerId, cardUid) => ({ type: A.RETURN_CARD, playerId, cardUid });
@@ -40,5 +41,7 @@ export const requestItem = (playerId, targetId, itemType = null) => ({ type: A.R
 export const respondRequest = (playerId, requestId, cardUid = null) => ({ type: A.RESPOND_REQUEST, playerId, requestId, cardUid });
 export const callVote = (playerId, targetId) => ({ type: A.CALL_VOTE, playerId, targetId });
 export const castVote = (playerId, yes) => ({ type: A.CAST_VOTE, playerId, yes });
-/** Frostbound rules: one more card right after a search, then a danger card. */
+/** One more card right after a search, then a danger card. */
 export const searchDeeper = (playerId, survivorId) => ({ type: A.SEARCH_DEEPER, playerId, survivorId });
+/** Equip a weapon / armor / book from your hand (free; the slot's old item returns to your hand). */
+export const equip = (playerId, cardUid) => ({ type: A.EQUIP, playerId, cardUid });

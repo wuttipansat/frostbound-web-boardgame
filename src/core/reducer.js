@@ -40,6 +40,7 @@ const HANDLERS = {
   [A.CAST_VOTE]: social.castVote,
   [A.RETURN_CARD]: turn.returnCard,
   [A.SEARCH_DEEPER]: turn.searchDeeper,
+  [A.EQUIP]: turn.equip,
 };
 
 export function reduce(state, action) {

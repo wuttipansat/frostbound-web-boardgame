@@ -4,18 +4,12 @@ import { h, mount, hex } from '../dom.js';
 import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
 import { LOCATIONS } from '../../content/locations.js';
-import { survivorsAt, survivorDef, getPlayer, aliveSurvivorsOf, isFrostbound, spawnForecast } from '../../core/selectors.js';
+import { survivorsAt, survivorDef, getPlayer, aliveSurvivorsOf, spawnForecast } from '../../core/selectors.js';
 import { PLAYER_COLORS } from '../../render/pieces.js';
 import { flashTip } from '../tooltip.js';
 import { survivorOptions, lureTargets } from '../options.js';
 
 const ACTION_ICON = { attack: 'attack', search: 'search', barricade: 'barricade', clean: 'clean', lure: 'lure', ability: 'heal', deeper: 'down' };
-
-/** Light up the die chip an action would use while the pointer/focus is on it (no re-render). */
-function hintDie(index, on) {
-  const chip = document.querySelector(`#pp-chips [data-die="${index}"]`);
-  chip?.classList.toggle('hint', on);
-}
 
 export function renderLocationPanel(el, ctx) {
   const { state: s, ui, art } = ctx;
@@ -37,7 +31,7 @@ export function renderLocationPanel(el, ctx) {
     h('span', { class: 'stat', tip: t('loc.barricades'), tabindex: '0' }, icon('barricade'), h('b', {}, loc.barricades)),
     loc.deck ? h('span', { class: 'stat', tip: t('loc.cards'), tabindex: '0' }, icon('search'), h('b', {}, loc.deck.deckCount ?? loc.deckCount ?? loc.deck.length)) : null,
     // Step 23: threat forecast — zombies this place gets if the round ended now.
-    isFrostbound(s) && spawnForecast(s)[id] ? h('span', { class: 'stat danger forecast', tip: t('loc.forecast', { n: spawnForecast(s)[id] }), tabindex: '0' }, icon('crisis'), h('b', {}, `+${spawnForecast(s)[id]}`)) : null);
+    spawnForecast(s)[id] ? h('span', { class: 'stat danger forecast', tip: t('loc.forecast', { n: spawnForecast(s)[id] }), tabindex: '0' }, icon('crisis'), h('b', {}, `+${spawnForecast(s)[id]}`)) : null);
 
   const people = h('div', { class: 'here' },
     here.length ? h('div', { class: 'chips' }, here.map((sv) => h('button', {
@@ -57,7 +51,7 @@ export function renderLocationPanel(el, ctx) {
 
     // Lure picking mode: choose the destination on the board (or from these buttons).
     if (ui.picking?.type === 'lure' && sel) {
-      const targets = lureTargets(s, me, ui.picking.survivorId, ui.picking.dieIndex);
+      const targets = lureTargets(s, me, ui.picking.survivorId);
       actions.push(h('div', { class: 'pick-box' },
         h('h4', {}, icon('lure'), ` ${t('loc.lurePick')}`),
         h('p', { class: 'small muted' }, t('loc.pickDestination')),
@@ -71,19 +65,17 @@ export function renderLocationPanel(el, ctx) {
       const mine = aliveSurvivorsOf(s, me).filter((sv) => sv.location === id);
       const focus = sel && sel.location === id ? [sel] : mine;
       for (const sv of focus) {
-        const opts = survivorOptions(s, me, sv.id, { dieIndex: ui.selDie });
+        const opts = survivorOptions(s, me, sv.id);
         const risky = (o) => o.id === 'attack' && survivorDef(sv.id).ability.type !== 'noAttackExposure';
         actions.push(h('div', { class: 'act-box' },
           h('h4', { tip: t('loc.actionsFor', { name: survivorDef(sv.id).name }) }, art.portrait(sv.id, 's', { cls: 'h4-face', alt: survivorDef(sv.id).name })),
           h('div', { class: 'act-grid icons' }, opts.map((o) => {
             const isLure = o.id === 'lure';
-            const die = o.die != null ? getPlayer(s, me).dice[o.die] : null;
-            // Icon only; the name, the die it uses and why it can't be done now are in the tooltip.
+            // Icon only; the name, the energy it costs and why it can't be done now are in the tooltip.
             const tip = [t(`act.${o.id}`),
               o.cost != null ? t('act.cost', { n: o.cost, have: getPlayer(s, me).energy }) : null,
-              !o.ok ? t(`err.${o.error}`) : o.min > 1 ? t('act.needDie', { n: o.min }) : null,
+              !o.ok ? t(`err.${o.error}`) : null,
               o.id === 'deeper' && o.ok ? t('act.deeperTip') : null,
-              o.ok && die ? t('tip.die', { v: die.v }) : null,
               risky(o) && o.ok ? t('tip.exposure') : null,
               isLure && o.ok ? t('act.pickOnBoard') : null].filter(Boolean).join(' · ');
             return h('button', {
@@ -91,15 +83,10 @@ export function renderLocationPanel(el, ctx) {
               dataset: { act: o.id },
               onclick: (ev) => {
                 if (!o.ok) return flashTip(ev.currentTarget);
-                return isLure ? ctx.set({ picking: { type: 'lure', survivorId: sv.id, dieIndex: o.die } }) : ctx.dispatch(o.action);
+                return isLure ? ctx.set({ picking: { type: 'lure', survivorId: sv.id } }) : ctx.dispatch(o.action);
               },
-              onpointerenter: () => o.die != null && hintDie(o.die, true),
-              onpointerleave: () => o.die != null && hintDie(o.die, false),
-              onfocus: () => o.die != null && hintDie(o.die, true),
-              onblur: () => o.die != null && hintDie(o.die, false),
             },
             icon(ACTION_ICON[o.id] ?? 'ability', 'act-ico'),
-            o.min > 1 ? h('span', { class: 'need-badge', 'aria-hidden': 'true' }, `${o.min}+`) : null,
             o.cost ? h('span', { class: 'need-badge cost', 'aria-hidden': 'true' }, String(o.cost)) : null,
             risky(o) && o.ok ? h('span', { class: 'risk-dot', 'aria-hidden': 'true' }) : null);
           }))));

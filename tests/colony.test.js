@@ -127,9 +127,9 @@ test('scenario goal is checked in the colony phase; time running out ends the ga
 
 test('kills scenario goal', () => {
   let k = twoPlayer({ 'corwin-daly': 'colony' }, { 'greta-vos': 'colony' }, { scenarioId: 'purge' });
-  k = patch(k, (x) => { x.totalKills = 11; x.food = 10; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
-  assert.notEqual(k.result?.reason, 'objectiveComplete', 'needs 6 + 3*2 = 12');
-  k = patch(k, (x) => { x.totalKills = 12; x.phase = 'turn'; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
+  k = patch(k, (x) => { x.totalKills = 7; x.food = 10; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
+  assert.notEqual(k.result?.reason, 'objectiveComplete', 'needs 4 + 2*2 = 8');
+  k = patch(k, (x) => { x.totalKills = 8; x.phase = 'turn'; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
   assert.equal(k.result?.reason, 'objectiveComplete');
 });
 
@@ -138,10 +138,10 @@ test('stockpile goal requires food AND a clear gate', () => {
     let f = twoPlayer({ 'corwin-daly': 'school' }, { 'greta-vos': 'school' }, { scenarioId: 'stores' });
     return patch(f, (x) => { x.helpless = 0; x.food = food; x.locations.colony.zombies = zombies; x.crisis = { id: 'whiteout', contributions: [{ uid: Object.keys(x.cards)[0], playerId: 'p0' }] }; x.cards[Object.keys(x.cards)[0]] = 'jerry-can'; colonyPhase(x); });
   };
-  assert.equal(base(8, 0).result?.reason, 'objectiveComplete');
-  assert.equal(base(8, 3).result?.reason, 'objectiveComplete', 'exactly 3 zombies is allowed');
-  assert.notEqual(base(8, 4).result?.reason, 'objectiveComplete', 'too many zombies at the gate');
-  assert.notEqual(base(7, 0).result?.reason, 'objectiveComplete');
+  assert.equal(base(7, 0).result?.reason, 'objectiveComplete');
+  assert.equal(base(7, 3).result?.reason, 'objectiveComplete', 'exactly 3 zombies is allowed');
+  assert.notEqual(base(7, 4).result?.reason, 'objectiveComplete', 'too many zombies at the gate');
+  assert.notEqual(base(6, 0).result?.reason, 'objectiveComplete');
 });
 
 test('morale hitting 0 mid-turn ends the game immediately', () => {

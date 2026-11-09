@@ -56,29 +56,6 @@ export const ICON_NAMES = Object.keys(PATHS);
 
 // ---------------------------------------------------------------- dice and hearts
 
-const PIP_POS = {
-  1: [[50, 50]],
-  2: [[28, 28], [72, 72]],
-  3: [[28, 28], [50, 50], [72, 72]],
-  4: [[28, 28], [72, 28], [28, 72], [72, 72]],
-  5: [[28, 28], [72, 28], [50, 50], [28, 72], [72, 72]],
-  6: [[28, 26], [72, 26], [28, 50], [72, 50], [28, 74], [72, 74]],
-};
-
-/** SVG markup for a die face with value v (1–6). */
-export function dieFaceSVG(v) {
-  const pips = (PIP_POS[v] ?? []).map(([x, y]) => `<circle cx="${x}" cy="${y}" r="9" class="${v === 1 ? 'pip one' : 'pip'}"/>`).join('');
-  return `<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><rect x="5" y="5" width="90" height="90" rx="20" class="die-body"/>${pips}</svg>`;
-}
-
-/** <span class="die-face"> for value v; `need` renders a "3+" badge style die. */
-export function dieFace(v, cls = '') {
-  const span = document.createElement('span');
-  span.className = `die-face ${cls}`.trim();
-  span.innerHTML = dieFaceSVG(v);
-  return span;
-}
-
 export function heart(full = true) {
   const span = document.createElement('span');
   span.className = `heart${full ? '' : ' lost'}`;

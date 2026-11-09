@@ -19,7 +19,7 @@ const URL = 'http://localhost:4173/?snow=0';
     await calm(p);
     await p.evaluate(() => {
       const f = window.__frostbound; const a = f.app; f.stage.stop();
-      a.dispatch({ type: 'DRAFT_PICK', playerId: 'p0', survivorIds: a.state.players[0].draftOptions.slice(0, 2) });
+      a.dispatch({ type: 'DRAFT_PICK', playerId: 'p0', survivorIds: a.state.players[0].draftOptions.slice(0, 1) });
       a.tutorialEvent('skip'); a.set({ queue: [] });
       const s = structuredClone(a.state);
       s.phase = 'turn'; s.pendingCrossroads = null; s.activePlayerId = 'p0'; s.round = 2;
@@ -27,7 +27,7 @@ const URL = 'http://localhost:4173/?snow=0';
       const sv = s.players[0].survivors[0]; s.survivors[sv].location = 'grocery';
       a.loadState(s, 'p0');
       a.selectSurvivor(sv);
-      document.getElementById('dice-stage').style.display = 'none';
+      
       f.stage.step(0.05);
     });
     await shot('in-game');

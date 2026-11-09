@@ -25,10 +25,6 @@ export function randInt(s, min, max) {
   return min + Math.floor(random(s) * (max - min + 1));
 }
 
-export function rollD6(s) {
-  return randInt(s, 1, 6);
-}
-
 export function pick(s, arr) {
   return arr[Math.floor(random(s) * arr.length)];
 }

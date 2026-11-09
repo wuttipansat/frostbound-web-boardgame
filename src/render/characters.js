@@ -219,77 +219,6 @@ const PIPS = {
 };
 
 /** Which face shows each value: outward normal in model space. Opposite faces sum to 7. */
-export const DIE_FACES = {
-  1: [0, 1, 0], 6: [0, -1, 0],
-  2: [0, 0, 1], 5: [0, 0, -1],
-  3: [1, 0, 0], 4: [-1, 0, 0],
-};
-
-/** 7x7x7 voxel d6 with rounded corners; pips sit on a 3x3 grid with one-voxel gaps. */
-export const DIE_VOXELS = 7;
-export function dieModel(body = 0xf4f1ea, pip = 0x1d2433, one = 0xc0392b) {
-  const N = DIE_VOXELS - 1;
-  const m = new VoxelModel();
-  m.box(0, 0, 0, DIE_VOXELS, DIE_VOXELS, DIE_VOXELS, (x, y, z) => {
-    const edges = [x, y, z].filter((v) => v === 0 || v === N).length;
-    return edges >= 2 ? null : body; // bevel every edge for a rounded look
-  });
-  m.box(1, 1, 1, N - 1, N - 1, N - 1, body); // solid core
-  for (const [value, n] of Object.entries(DIE_FACES)) {
-    for (const [pu, pv] of PIPS[value]) {
-      const u = 2 * pu - 1; const v = 2 * pv - 1; // 1..3 -> 1, 3, 5
-      let p;
-      if (n[1] !== 0) p = [u, n[1] > 0 ? N : 0, v];
-      else if (n[2] !== 0) p = [u, v, n[2] > 0 ? N : 0];
-      else p = [n[0] > 0 ? N : 0, u, v];
-      m.set(p[0], p[1], p[2], Number(value) === 1 ? one : pip);
-    }
-  }
-  return m;
-}
-
-// ---------------------------------------------------------------- exposure die
-
-/** Which exposure face points where on the cube (blank and wound appear twice, like a weighted die). */
-export const EXPOSURE_DIE_FACES = {
-  blank: [0, 1, 0],
-  wound: [0, 0, 1],
-  frostbite: [1, 0, 0],
-  bite: [0, -1, 0],
-  blank2: [0, 0, -1],
-  wound2: [-1, 0, 0],
-};
-
-const SYMBOLS = {
-  wound: { color: 0xd4352b, rows: ['..X..', '.XXX.', 'XXXXX', 'XXXXX', '.XXX.'] },
-  frostbite: { color: 0x8fd3ff, rows: ['X.X.X', '.XXX.', 'XXXXX', '.XXX.', 'X.X.X'] },
-  bite: { color: 0xf2efe6, bg: 0x8e1b1b, rows: ['X.X.X', 'XXXXX', '.....', 'XXXXX', 'X.X.X'] },
-  blank: { color: 0x55657c, rows: ['.....', '.....', '..X..', '.....', '.....'] },
-};
-
-/** 7^3 slate cube carrying the exposure symbols on its faces. */
-export function exposureDieModel() {
-  const N = 6;
-  const body = 0x2b3442;
-  const m = new VoxelModel();
-  m.box(0, 0, 0, 7, 7, 7, (x, y, z) => ([x, y, z].filter((v) => v === 0 || v === N).length >= 2 ? null : body));
-  for (const [name, n] of Object.entries(EXPOSURE_DIE_FACES)) {
-    const sym = SYMBOLS[name.replace('2', '')];
-    for (let a = 1; a <= 5; a++) {
-      for (let b = 1; b <= 5; b++) {
-        const on = sym.rows[b - 1][a - 1] === 'X';
-        const color = on ? sym.color : sym.bg;
-        if (color == null) continue;
-        let p;
-        if (n[1] !== 0) p = [a, n[1] > 0 ? N : 0, b];
-        else if (n[2] !== 0) p = [a, 6 - b, n[2] > 0 ? N : 0];
-        else p = [n[0] > 0 ? N : 0, 6 - b, a];
-        m.set(p[0], p[1], p[2], color, on && name.startsWith('bite') === false && name.startsWith('blank') === false);
-      }
-    }
-  }
-  return m;
-}
 
 /** Two posts and crossed planks. */
 export function barricadeModel() {
@@ -381,21 +310,6 @@ export function zombieModelHD(variant = 0) {
   return m.bevel(0.3, { topOnly: true, keep: (v) => v.glow || v.z >= 20 });
 }
 
-/** Die at 2×: same faces as dieModel(), but bevelled with recessed pips. */
-export function dieModelHD() {
-  const m = dieModel().upscale(HD);
-  const N = DIE_VOXELS * HD - 1;
-  const onSurface = (v) => v.x === 0 || v.x === N || v.y === 0 || v.y === N || v.z === 0 || v.z === N;
-  // Carve the pips one voxel deep so they read as recesses.
-  for (const v of [...m.voxels.values()]) {
-    if (v.color !== 0xf4f1ea && onSurface(v)) m.remove(v.x, v.y, v.z);
-  }
-  return m.bevel(0.5, { keep: (v) => v.color !== 0xf4f1ea });
-}
-
-export function exposureDieModelHD() {
-  return exposureDieModel().upscale(HD).bevel(0.5, { keep: (v) => v.color !== 0x2b3442 });
-}
 
 export function barricadeModelHD() {
   const m = barricadeModel().upscale(HD);

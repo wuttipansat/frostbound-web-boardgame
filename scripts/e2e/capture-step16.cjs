@@ -31,7 +31,7 @@ const URL = `http://localhost:${PORT}/?snow=0`;
     await p.locator('.draft-screen .sv-pick').nth(0).click(F);
     await p.locator('.draft-actions .btn.primary').click(F);
     await p.waitForTimeout(500);
-    await p.evaluate(() => { window.__frostbound.app.tutorialEvent('skip'); window.__frostbound.app.set({ queue: [] }); window.__frostbound.app.markObjectiveSeen(); document.getElementById('dice-stage').style.display = 'none'; });
+    await p.evaluate(() => { window.__frostbound.app.tutorialEvent('skip'); window.__frostbound.app.set({ queue: [] }); window.__frostbound.app.markObjectiveSeen(); });
     await p.waitForTimeout(300);
     const box = await p.locator('#pp-chips').boundingBox();
     if (box) await p.screenshot({ path: `${out}/after-${device}-dice.png`, clip: { x: box.x - 6, y: box.y - 6, width: box.width + 12, height: box.height + 12 } });

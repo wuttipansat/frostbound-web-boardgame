@@ -1644,3 +1644,28 @@ body:has(.more-menu) #dice-stage { visibility: hidden; } /* the rolled dice neve
   .energy .en-bar { min-width: 34px; }
   .energy small { display: none; }
 }
+/* gear slots next to the energy meter */
+#pp-chips { display: flex; align-items: center; gap: 6px; }
+.gear { display: flex; gap: 4px; }
+.gear-slot { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.18); color: var(--muted); }
+.gear-slot svg { width: 16px; height: 16px; opacity: 0.6; }
+.gear-slot.on { border: 1px solid rgba(255,196,107,0.6); background: rgba(255,196,107,0.08); }
+.gear-slot img { width: 26px; height: 26px; image-rendering: pixelated; }
+@media (max-width: 520px) { .gear-slot { width: 26px; height: 26px; } .gear-slot img { width: 22px; height: 22px; } }
+/* short landscape phones: the number only, small gear */
+@media (max-height: 520px) {
+  .energy { min-width: 0; padding: 2px 6px; gap: 4px; }
+  .energy .en-bar, .energy small { display: none; }
+  .gear { gap: 2px; }
+  .gear-slot { width: 22px; height: 22px; border-radius: 6px; }
+  .gear-slot img { width: 18px; height: 18px; }
+  .gear-slot svg { width: 12px; height: 12px; }
+}
+@media (max-width: 520px) { .energy .en-bar { display: none; } }
+.sv-tokens { position: fixed; } .sv-tokens .gear { position: absolute; left: 70px; bottom: 4px; flex-direction: row; pointer-events: auto; }
+.tok-gear { display: flex; gap: 4px; align-items: center; font-size: 11.5px; color: #ffd9a3; }
+.tok-gear svg { width: 12px; height: 12px; }
+@media (max-height: 520px) { .sv-tokens .gear { display: none; } } /* short landscape phones: gear is listed on the survivor card */
+@media (max-width: 760px) { body:has(#locpanel:not(.hidden)) .sv-tokens .gear { display: none; } } /* the location sheet needs that room */
+@media (max-width: 760px) { .sv-tokens .gear { display: none; } } /* phones and tablets: gear is listed on the survivor card (tap the face) */
+body:has(#locpanel:not(.hidden)) .sv-tokens .gear { display: none; } /* an open location sheet takes that room */

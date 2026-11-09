@@ -2,7 +2,8 @@
 // rules engine itself (tryReduce), so the UI can never offer an illegal move or hide a legal one.
 import * as act from '../core/actions.js';
 import { tryReduce } from '../core/reducer.js';
-import { getPlayer, survivorDef, itemOf, scenarioDef, isFrostbound, actionCost } from '../core/selectors.js';
+import { getPlayer, survivorDef, itemOf, scenarioDef, actionCost } from '../core/selectors.js';
+import { gearSlot } from '../content/items.js';
 import { LOCATION_IDS } from '../core/constants.js';
 
 const check = (state, action) => {
@@ -16,56 +17,32 @@ const check = (state, action) => {
   }
 };
 
-/** Lowest unused die with value >= min (keeps high dice for harder actions). Respects a preferred index. */
-export function pickDie(state, playerId, min = 1, preferred = null) {
-  const dice = getPlayer(state, playerId).dice;
-  if (preferred != null && dice[preferred] && !dice[preferred].used) return preferred;
-  let best = null;
-  dice.forEach((d, i) => {
-    if (!d.used && d.v >= min && (best == null || d.v < dice[best].v)) best = i;
-  });
-  return best;
-}
-
 /**
- * Die actions + ability for one survivor. Each option: { id, action, ok, error, min, die }.
- * `dieIndex` forces a specific die; otherwise the cheapest sufficient die is used.
+ * Energy actions + ability for one survivor. Each option: { id, action, ok, error, cost }.
+ * Legality (including "not enough energy") comes from the engine.
  */
-export function survivorOptions(state, playerId, survivorId, { dieIndex = null, lureTo = null } = {}) {
+export function survivorOptions(state, playerId, survivorId, { lureTo = null } = {}) {
   const sv = state.survivors[survivorId];
   if (!sv?.alive) return [];
   const def = survivorDef(survivorId);
   const out = [];
-  const fb = isFrostbound(state);
-  const dieAction = (id, min, make) => {
-    if (fb) {
-      // Frostbound: no dice, an energy cost (the engine checks it; the error says why).
-      const action = make(0);
-      out.push({ id, min: 0, die: null, cost: actionCost(state, survivorId, id), ...check(state, action) });
-      return;
-    }
-    const die = pickDie(state, playerId, min, dieIndex);
-    const action = make(die ?? 0);
-    const res = die == null ? { action, ok: false, error: min > 1 ? 'dieTooLow' : 'noSuchDie' } : check(state, action);
-    out.push({ id, min, die, ...res });
-  };
-  dieAction('attack', def.attack, (d) => act.attack(playerId, survivorId, d));
-  dieAction('search', def.search, (d) => act.search(playerId, survivorId, d));
-  dieAction('barricade', 1, (d) => act.barricade(playerId, survivorId, d));
-  dieAction('clean', 1, (d) => act.clean(playerId, survivorId, d));
-  const lureTarget = lureTo ?? LOCATION_IDS.find((l) => l !== sv.location);
-  dieAction('lure', 1, (d) => act.lure(playerId, survivorId, d, lureTarget));
+  const add = (id, action) => out.push({ id, cost: actionCost(state, survivorId, id), ...check(state, action) });
+  add('attack', act.attack(playerId, survivorId));
+  add('search', act.search(playerId, survivorId));
+  add('barricade', act.barricade(playerId, survivorId));
+  add('clean', act.clean(playerId, survivorId));
+  add('lure', act.lure(playerId, survivorId, lureTo ?? LOCATION_IDS.find((l) => l !== sv.location)));
   if (def.ability.type === 'healer') {
     const patients = Object.values(state.survivors)
       .filter((o) => o.alive && o.location === sv.location && (o.wounds > 0 || o.frostbite));
     const target = patients[0];
     const action = act.useAbility(playerId, survivorId, target?.id ?? survivorId);
-    out.push({ id: 'ability', min: 0, die: null, ...(target ? check(state, action) : { action, ok: false, error: 'notWounded' }) });
+    out.push({ id: 'ability', cost: 0, ...(target ? check(state, action) : { action, ok: false, error: 'notWounded' }) });
   }
-  // Frostbound: right after a search, "search deeper" (free: one more card, then a danger card).
-  const ls = fb ? getPlayer(state, playerId).lastSearch : null;
+  // Right after a search: "search deeper" (free: one more card, then a danger card).
+  const ls = getPlayer(state, playerId).lastSearch;
   if (ls && ls.survivorId === survivorId && ls.locationId === sv.location) {
-    out.push({ id: 'deeper', min: 0, die: null, cost: 0, ...check(state, act.searchDeeper(playerId, survivorId)) });
+    out.push({ id: 'deeper', cost: 0, ...check(state, act.searchDeeper(playerId, survivorId)) });
   }
   return out;
 }
@@ -81,15 +58,15 @@ export function hasFuel(state, playerId) {
 }
 
 /**
- * What can be done with a card: play (needs a target survivor or die for some types), contribute, deposit.
+ * What can be done with a card: equip (gear), play (some need a target survivor), contribute, deposit.
  */
-export function cardOptions(state, playerId, uid, { survivorId = null, dieIndex = null } = {}) {
+export function cardOptions(state, playerId, uid, { survivorId = null } = {}) {
   const item = itemOf(state, uid);
   const out = [];
-  if (item.type !== 'fuel' && item.type !== 'book') {
+  if (gearSlot(item)) out.push({ id: 'equip', ...check(state, act.equip(playerId, uid)) });
+  else if (item.type !== 'fuel') {
     const opts = {};
-    if (['medicine', 'tools', 'weapon'].includes(item.type)) opts.targetSurvivorId = survivorId;
-    if (item.type === 'junk') opts.dieIndex = pickDie(state, playerId, 1, dieIndex) ?? 0;
+    if (['medicine', 'tools'].includes(item.type)) opts.targetSurvivorId = survivorId;
     out.push({ id: 'play', ...check(state, act.playCard(playerId, uid, opts)) });
   }
   out.push({ id: 'contribute', ...check(state, act.contribute(playerId, uid)) });
@@ -111,16 +88,11 @@ export function voteTargets(state, playerId) {
 
 // ---------------------------------------------------------------- step 8: explicit targets & board hints
 
-const TARGETED = ['medicine', 'tools', 'weapon'];
+const TARGETED = ['medicine', 'tools'];
 
-/** Does playing this card need the player to choose something (a survivor, or a die for junk)? */
+/** Does playing this card need the player to choose a survivor? */
 export function cardNeeds(state, uid) {
-  const item = itemOf(state, uid);
-  const type = item.type;
-  if (type === 'weapon' && item.range === 'any') return 'location';
-  if (TARGETED.includes(type)) return 'survivor';
-  if (type === 'junk') return 'die';
-  return null;
+  return TARGETED.includes(itemOf(state, uid).type) ? 'survivor' : null;
 }
 
 /** Every survivor the card could be played on, with legality and the action to dispatch. */
@@ -131,31 +103,11 @@ export function cardTargets(state, playerId, uid) {
     .map((survivorId) => ({ survivorId, ...check(state, act.playCard(playerId, uid, { targetSurvivorId: survivorId })) }));
 }
 
-/** Locations a long gun can shoot into (any location, legal where there are zombies). */
-export function cardLocations(state, playerId, uid) {
-  if (cardNeeds(state, uid) !== 'location') return [];
-  return LOCATION_IDS.map((to) => ({ to, zombies: state.locations[to].zombies, ...check(state, act.playCard(playerId, uid, { targetLocation: to })) }));
-}
-
-/** The reroll action for a junk card and the chosen dice (one, or two for stronger junk). */
-export function junkAction(playerId, uid, picked) {
-  return act.playCard(playerId, uid, { dieIndex: picked[0], ...(picked.length > 1 ? { dieIndex2: picked[1] } : {}) });
-}
-
-/** Dice a junk card can reroll. */
-export function cardDice(state, playerId, uid) {
-  if (cardNeeds(state, uid) !== 'die') return [];
-  return getPlayer(state, playerId).dice.map((d, dieIndex) => ({ dieIndex, value: d.v, ...check(state, act.playCard(playerId, uid, { dieIndex })) }));
-}
-
-/** Where a survivor could lure zombies to (with the die that would be used). */
-export function lureTargets(state, playerId, survivorId, dieIndex = null) {
+/** Where a survivor could lure zombies to. */
+export function lureTargets(state, playerId, survivorId) {
   const sv = state.survivors[survivorId];
   if (!sv?.alive) return [];
-  const die = pickDie(state, playerId, 1, dieIndex);
-  return LOCATION_IDS.filter((l) => l !== sv.location).map((to) => ({
-    to, die, ...(die == null ? { ok: false, error: 'noSuchDie', action: null } : check(state, act.lure(playerId, survivorId, die, to))),
-  }));
+  return LOCATION_IDS.filter((l) => l !== sv.location).map((to) => ({ to, ...check(state, act.lure(playerId, survivorId, to)) }));
 }
 
 /** Board hint for a selected survivor: each location -> 'ok' | 'full' | 'blocked' (no entry for its own location). */
@@ -177,25 +129,19 @@ export function actingSurvivors(state, playerId) {
   return getPlayer(state, playerId).survivors.filter((id) => {
     const sv = state.survivors[id];
     if (!sv?.alive) return false;
-    if ((!sv.moved || isFrostbound(state)) && Object.values(moveTargets(state, playerId, id)).includes('ok')) return true;
+    if (Object.values(moveTargets(state, playerId, id)).includes('ok')) return true;
     return survivorOptions(state, playerId, id).some((o) => o.ok);
   });
 }
 
-export function unusedDice(state, playerId) {
-  return getPlayer(state, playerId).dice.filter((d) => !d.used).length;
-}
-
-/** Frostbound: can any of the player's survivors still afford an action (or move)? */
+/** Can the player's survivor still afford an action or a move? */
 export function hasEnergyLeft(state, playerId) {
-  if (!isFrostbound(state)) return false;
   return actingSurvivors(state, playerId).length > 0;
 }
 
-/** Ask before ending a turn while dice are still unused (unless the player opted out this game). */
+/** Ask before ending a turn while something can still be done (unless the player opted out this game). */
 export function shouldConfirmEndTurn(state, playerId, { skip = false } = {}) {
-  if (skip) return false;
-  return isFrostbound(state) ? hasEnergyLeft(state, playerId) : unusedDice(state, playerId) > 0;
+  return !skip && hasEnergyLeft(state, playerId);
 }
 
 // ---------------------------------------------------------------- step 11: card availability
@@ -207,10 +153,7 @@ export function shouldConfirmEndTurn(state, playerId, { skip = false } = {}) {
  */
 export function cardUsable(state, playerId, uid) {
   const need = cardNeeds(state, uid);
-  const plays = need === 'survivor' ? cardTargets(state, playerId, uid)
-    : need === 'location' ? cardLocations(state, playerId, uid)
-      : need === 'die' ? cardDice(state, playerId, uid)
-        : [];
+  const plays = need === 'survivor' ? cardTargets(state, playerId, uid) : [];
   const opts = cardOptions(state, playerId, uid);
   const all = [...plays, ...opts];
   if (all.some((o) => o.ok)) return { ok: true, reason: null };

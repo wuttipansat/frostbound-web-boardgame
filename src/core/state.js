@@ -1,7 +1,7 @@
 // createGame(config) -> a fresh, fully JSON-serializable GameState.
 import { PHASES, LOCATION_IDS, RULES } from './constants.js';
 import { normalizeSeed, shuffle } from './rng.js';
-import { RULESETS, DANGER_DECK } from './constants.js';
+import { DANGER_DECK } from './constants.js';
 import { assert } from './errors.js';
 import { LOCATIONS } from '../content/locations.js';
 import { SURVIVORS } from '../content/survivors.js';
@@ -10,7 +10,7 @@ import { SCENARIOS_BY_ID } from '../content/scenarios.js';
 import { CRISES } from '../content/crises.js';
 import { CROSSROADS } from '../content/crossroads.js';
 
-export const STATE_VERSION = 1;
+export const STATE_VERSION = 2; // 2: one survivor, energy + gear, danger deck (no dice)
 
 /**
  * @param {object} config
@@ -29,7 +29,7 @@ export function createGame(config) {
   const s = {
     version: STATE_VERSION,
     rng: normalizeSeed(config.seed),
-    config: { playerCount: players.length, scenarioId: scenario.id, betrayer: betrayerMode, rules: RULESETS.includes(config.rules) ? config.rules : 'classic' },
+    config: { playerCount: players.length, scenarioId: scenario.id, betrayer: betrayerMode },
     phase: PHASES.DRAFT,
     round: 1,
     scenario: { id: scenario.id, rounds: scenario.rounds, deposited: 0 },
@@ -107,7 +107,11 @@ export function createGame(config) {
       draftOptions: survivorPool.splice(0, RULES.DRAFT_OPTIONS),
       drafted: false,
       hand: [],
-      dice: [],
+      energy: 0,       // the survivor's energy (set when the draft ends)
+      regenPenalty: 0, // a frost card: lower regen next turn
+      fresh: true,     // the first turn starts full
+      lastSearch: null, // { survivorId, locationId } while "search deeper" is possible
+      gear: { weapon: null, armor: null, book: null }, // equipped item uids
       objectiveId: pool[i],
       exiled: false,
       kills: 0,
@@ -118,11 +122,8 @@ export function createGame(config) {
     });
   });
   s.survivorDeck = survivorPool;
-  // Step 23: the danger deck (shuffled last, so classic games keep their exact seeds).
-  if (s.config.rules === 'frostbound') {
-    const deck = Object.entries(DANGER_DECK).flatMap(([kind, n]) => Array(n).fill(kind));
-    s.danger = { deck: shuffle(s, deck), discard: [] };
-    for (const p of s.players) { p.energy = 0; p.regenPenalty = 0; p.lastSearch = null; }
-  }
+  // The shared danger deck.
+  const deck = Object.entries(DANGER_DECK).flatMap(([kind, n]) => Array(n).fill(kind));
+  s.danger = { deck: shuffle(s, deck), discard: [] };
   return s;
 }

@@ -36,6 +36,6 @@ export function mount(container, ...children) {
 /** A representative item per type, used for type badges (crisis needs, request types, goals). */
 export const TYPE_REP = {
   food: 'canned-beans', medicine: 'first-aid-pouch', fuel: 'jerry-can', tools: 'socket-set', weapon: 'glock-19', junk: 'motor-junk',
-  survivor: 'lone-wanderer', book: 'field-manual',
+  survivor: 'lone-wanderer', book: 'field-manual', armor: 'riot-vest',
 };
 export const hex = (n) => `#${n.toString(16).padStart(6, '0')}`;

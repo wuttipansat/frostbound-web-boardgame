@@ -17,11 +17,11 @@ export function mulberry(seed) {
 }
 
 export function simulate({
-  players = 3, scenarioId = 'beacon', seed = 1, chaos = 0, betrayer = 'maybe', maxSteps = 5000, onStep = null, rules = 'classic',
+  players = 3, scenarioId = 'beacon', seed = 1, chaos = 0, betrayer = 'maybe', maxSteps = 5000, onStep = null,
 } = {}) {
   let state = createGame({
     players: Array.from({ length: players }, (_, i) => ({ name: `Bot ${i + 1}`, isAI: true })),
-    scenarioId, seed, betrayer, rules,
+    scenarioId, seed, betrayer,
   });
   const random = mulberry(seed * 7919 + 13);
   const errors = [];
