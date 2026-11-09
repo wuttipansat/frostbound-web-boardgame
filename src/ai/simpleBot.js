@@ -123,6 +123,9 @@ function turnAction(s, p, opts) {
       if (want) candidates.push(act.playCard(uid, { targetSurvivorId: sv.id }));
     }
   }
+  // Build: one survivor at home with spare AP works on the most useful upgrade it can.
+  const builder = survivors.find((sv) => sv.location === 'colony' && sv.ap >= 15 && !sv.napped);
+  if (builder) for (const b of ['workshop', 'dorm', 'greenhouse', 'wall', 'infirmary', 'radio']) candidates.push(act.build(b, builder.id));
   // Craft at home when the materials are there.
   const crafter = survivors.find((sv) => sv.location === 'colony' && sv.ap >= 20);
   if (crafter && s.food >= foodNeeded(s)) for (const rid of ['scrap-plate', 'sled', 'baseball-bat', 'bandage']) candidates.push(act.craft(rid, crafter.id));

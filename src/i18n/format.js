@@ -41,6 +41,8 @@ export function formatLog(e, state) {
     case 'infectionSpreads': return t('log.infectionSpreads', p);
     case 'lure': return t('log.lure', p);
     case 'unpack': return t('log.unpack', { ...p, count: e.count });
+    case 'built': return t('log.built', { building: t(`bld.${e.buildingId}`), level: e.level });
+    case 'building': return t('log.building', { ...p, building: t(`bld.${e.buildingId}`), n: e.n });
     case 'hurt': return t('log.hurt', { ...p, n: e.n, hp: e.hp });
     case 'crossroadsChoice': return t('log.crossroadsChoice', { ...p, choice: crossChoice(e.cardId, e.choice) });
     case 'starvation': return t('log.starvation', { n: e.tokens });

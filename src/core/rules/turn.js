@@ -5,7 +5,7 @@ import { random } from '../rng.js';
 import { assert } from '../errors.js';
 import {
   survivorDef, gearOf, freeSurvivorSlots, freeZombieSlots, itemOf, scenarioDef, booksHeld, holdsBlueprint,
-  actionCost, killsPerAttack, apMax, fightPreview, leaveDamage, holderOf, placeOfItem, packFree, searchSpawnChance, teamHasAbility,
+  actionCost, killsPerAttack, apMax, fightPreview, leaveDamage, holderOf, placeOfItem, packFree, searchSpawnChance, baseLevel, nextLevel, teamHasAbility,
 } from '../selectors.js';
 import {
   log, drawItems, discardCard, removeFromHand, addZombies, removeZombies,
@@ -326,20 +326,54 @@ export function craft(s, { recipeId, survivorId }) {
   assert(r, 'noSuchRecipe', recipeId);
   const sv = requireActive(s, survivorId);
   assert(sv.location === 'colony', 'mustBeInColony');
+  assert(baseLevel(s, 'workshop') >= 1, 'needWorkshop');
+  const cost = Math.max(1, r.ap - 3 * (baseLevel(s, 'workshop') - 1));
   const used = [];
   for (const [itemId, n] of Object.entries(r.needs)) {
     const have = s.stockpile.filter((u) => s.cards[u] === itemId && !used.includes(u)).slice(0, n);
     assert(have.length === n, 'missingMaterials', itemId);
     used.push(...have);
   }
-  assert(sv.ap >= r.ap, 'notEnoughEnergy');
-  sv.ap -= r.ap;
+  assert(sv.ap >= cost, 'notEnoughEnergy');
+  sv.ap -= cost;
   sv.acted = true;
   for (const u of used) discardCard(s, u);
   const uid = `k${Object.keys(s.cards).length}`;
   s.cards[uid] = r.makes;
   s.stockpile.push(uid);
   log(s, 'craft', { survivorId, card: r.makes });
+}
+
+/**
+ * Work on a base upgrade (at the colony). Starting a level takes its materials from the stockpile;
+ * then the survivor puts in AP (all they have, up to what is left). Unfinished work carries over.
+ */
+export function build(s, { buildingId, survivorId }) {
+  requireTurn(s);
+  const sv = requireActive(s, survivorId);
+  assert(sv.location === 'colony', 'mustBeInColony');
+  const next = nextLevel(s, buildingId);
+  assert(next, 'maxLevel', buildingId);
+  assert(sv.ap > 0, 'notEnoughEnergy');
+  if (!next.started) {
+    const used = [];
+    for (const [itemId, n] of Object.entries(next.needs)) {
+      const have = s.stockpile.filter((u) => s.cards[u] === itemId && !used.includes(u)).slice(0, n);
+      assert(have.length === n, 'missingMaterials', itemId);
+      used.push(...have);
+    }
+    for (const u of used) discardCard(s, u);
+    s.building[buildingId] = 0;
+  }
+  const put = Math.min(sv.ap, next.ap - s.building[buildingId]);
+  sv.ap -= put;
+  sv.acted = true;
+  s.building[buildingId] += put;
+  if (s.building[buildingId] >= next.ap) {
+    delete s.building[buildingId];
+    s.base[buildingId] = next.level;
+    log(s, 'built', { buildingId, level: next.level });
+  } else log(s, 'building', { survivorId, buildingId, n: put });
 }
 
 // ---------------------------------------------------------------- rest

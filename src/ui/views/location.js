@@ -1,4 +1,5 @@
 import { RECIPES } from '../../content/items.js';
+import { BUILDING_IDS } from '../../content/buildings.js';
 import * as act from '../../core/actions.js';
 import { tryReduce } from '../../core/reducer.js';
 const check = (s, action) => { const r = tryReduce(s, action); return { action, ok: r.ok, error: r.error }; };
@@ -8,7 +9,7 @@ import { h, mount } from '../dom.js';
 import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
 import { LOCATIONS } from '../../content/locations.js';
-import { survivorsAt, survivorDef, aliveSurvivors, spawnForecast, searchSpawnChance } from '../../core/selectors.js';
+import { survivorsAt, survivorDef, aliveSurvivors, spawnForecast, searchSpawnChance, nextLevel } from '../../core/selectors.js';
 import { flashTip } from '../tooltip.js';
 import { survivorOptions, lureTargets } from '../options.js';
 
@@ -87,6 +88,20 @@ export function renderLocationPanel(el, ctx) {
             icon(ACTION_ICON[o.id] ?? 'ability', 'act-ico'),
             o.cost ? h('span', { class: 'need-badge cost', 'aria-hidden': 'true' }, String(o.cost)) : null,
             null);
+          }))));
+      }
+      if (id === 'colony') {
+        // Base upgrades: level, next level's cost and progress; buttons for the selected survivor at home.
+        actions.push(h('div', { class: 'act-box build' }, h('h4', {}, t('act.build')),
+          h('div', { class: 'picker-row' }, BUILDING_IDS.map((bid) => {
+            const nx = nextLevel(s, bid);
+            const r = sel?.location === 'colony' ? check(s, act.build(bid, sel.id)) : { ok: false, error: 'mustBeInColony' };
+            const cost = nx ? (nx.started ? `${nx.spent}/${nx.ap} AP` : `${Object.entries(nx.needs).map(([i, n]) => `${n}× ${c('items', i, 'name')}`).join(' + ')} + ${nx.ap} AP`) : t('build.max');
+            return h('button', {
+              class: `btn small-act${r.ok ? '' : ' off'}`,
+              tip: `${t(`bld.${bid}`)} ${s.base[bid]}/3 — ${t(`bld.${bid}.fx`)} · ${cost}${r.ok ? '' : ` · ${t(`err.${r.error}`)}`}`,
+              onclick: (ev) => (r.ok ? ctx.dispatch(r.action) : flashTip(ev.currentTarget)),
+            }, `${t(`bld.${bid}`)} ${s.base[bid]}${nx?.started ? ' …' : ''}`);
           }))));
       }
       if (id === 'colony' && sel?.location === 'colony') {

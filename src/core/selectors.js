@@ -1,3 +1,4 @@
+import { BUILDINGS } from '../content/buildings.js';
 // Read-only derived queries over GameState. Safe to use from UI/renderer.
 import { SURVIVORS_BY_ID } from '../content/survivors.js';
 import { LOCATIONS } from '../content/locations.js';
@@ -244,7 +245,7 @@ export function sleepPlan(s) {
   const alive = aliveSurvivors(s);
   const home = alive.filter((sv) => sv.location === 'colony' && sv.rest !== 'guard')
     .sort((a, b) => apOf(s, a.id) / apMax(s, a.id) - apOf(s, b.id) / apMax(s, b.id) || a.id.localeCompare(b.id));
-  const beds = new Set(home.slice(0, RULES.BEDS).map((sv) => sv.id));
+  const beds = new Set(home.slice(0, bedCount(s)).map((sv) => sv.id));
   let bonus = 0;
   for (const o of alive) { const b = gearOf(s, o.id).book; if (b?.passive === 'regenPlus') bonus += b.value; }
   for (const sv of alive) {
@@ -253,9 +254,23 @@ export function sleepPlan(s) {
     const extra = bonus + (survivorDef(sv.id).ability.type === 'extraDie' ? 15 : 0);
     let ap = Math.max(0, Math.min(max, apOf(s, sv.id) + Math.round(max * REST[kind].ap) + extra));
     if (sv.hungry) ap = Math.round(ap * REST.HUNGRY); // went to bed hungry: half AP tomorrow
-    out[sv.id] = { kind, ap, hp: REST[kind].hp };
+    out[sv.id] = { kind, ap, hp: REST[kind].hp + (sv.location === 'colony' ? 5 * baseLevel(s, 'infirmary') : 0) };
   }
   return out;
+}
+
+/** Base upgrade level (0..3). */
+export const baseLevel = (s, id) => s.base?.[id] ?? 0;
+/** Beds at the colony: 2, +2 per dorm level. */
+export const bedCount = (s) => RULES.BEDS + 2 * baseLevel(s, 'dorm');
+
+/** The next level of a building: { level, needs, ap, spent, started } or null when maxed. */
+export function nextLevel(s, id) {
+  const def = BUILDINGS[id];
+  const lv = baseLevel(s, id);
+  if (!def || lv >= def.levels.length) return null;
+  const spent = s.building?.[id];
+  return { level: lv + 1, ...def.levels[lv], spent: spent ?? 0, started: spent != null };
 }
 
 /** Guards on duty at the colony tonight. */
@@ -271,7 +286,7 @@ export function spawnForecast(s) {
     const n = Math.max(0, Math.ceil(here.length / 2) - quiet);
     if (n) out[loc] = n;
   }
-  const n = Math.max(0, Math.ceil(survivorsAt(s, 'colony').length / 3) - guardsOnDuty(s));
+  const n = Math.max(0, Math.ceil(survivorsAt(s, 'colony').length / 3) - guardsOnDuty(s) - baseLevel(s, 'wall'));
   if (n) out.colony = n;
   return out;
 }

@@ -1,15 +1,15 @@
 // Game flow (solo): pick survivors -> rounds (crisis, one turn w/ crossroads, energy) -> colony phase -> end checks.
 import { PHASES, OUTSIDE_LOCATIONS, RULES, FIGHT, FOOD } from '../constants.js';
-import { shuffle, pick } from '../rng.js';
+import { shuffle, pick, random } from '../rng.js';
 import { assert } from '../errors.js';
 import { CROSSROADS_BY_ID } from '../../content/crossroads.js';
 import { CRISES_BY_ID } from '../../content/crises.js';
 import {
   aliveSurvivors, foodNeeded, colonyPopulation, crisisRequirement, itemOf, scenarioDef, scenarioTarget,
-  focusSurvivor, teamHasAbility, crisisMatches, apMax, sleepPlan, spawnForecast,
+  focusSurvivor, teamHasAbility, crisisMatches, baseLevel, apMax, sleepPlan, spawnForecast,
 } from '../selectors.js';
 import {
-  log, changeMorale, healHp, damageSurvivor, unpack, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems,
+  log, changeMorale, changeFood, recruitSurvivor, healHp, damageSurvivor, unpack, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems,
 } from './helpers.js';
 import { applyEffects } from './effects.js';
 import { evaluate, focusFilterFor } from './conditions.js';
@@ -52,6 +52,9 @@ export function startRound(s) {
   s.time = 'dawn';
   s.crisis = { id: crisisId, contributions: [] };
   log(s, 'roundStart', { day: s.day, crisisId });
+  const green = baseLevel(s, 'greenhouse');
+  if (green) changeFood(s, green, 'greenhouse');
+  if (baseLevel(s, 'radio') && random(s) < 0.1 * baseLevel(s, 'radio')) recruitSurvivor(s);
   beginTurn(s);
 }
 

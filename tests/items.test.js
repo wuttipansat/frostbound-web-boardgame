@@ -136,9 +136,35 @@ test('step 8 items: consumables, gadgets, crafting', async () => {
   assert.equal(packSize(s, 'corwin-daly'), 5);
   // Crafting: materials from the stockpile + AP, at the colony.
   let w; [s, w] = giveCard(s, 'wood', 'stockpile'); [s, w] = giveCard(s, 'wood', 'stockpile');
+  assert.equal(tryReduce(s, craft('baseball-bat', 'agnes-pell')).error, 'needWorkshop');
+  s = patch(s, (x) => { x.base.workshop = 1; });
   assert.equal(tryReduce(s, craft('baseball-bat', 'corwin-daly')).error, 'mustBeInColony');
   assert.equal(tryReduce(s, craft('sled', 'agnes-pell')).error, 'missingMaterials');
   const made = reduce(s, craft('baseball-bat', 'agnes-pell'));
   assert.ok(made.stockpile.some((u) => made.cards[u] === 'baseball-bat'));
   assert.ok(!made.stockpile.some((u) => made.cards[u] === 'wood'));
+});
+
+test('base upgrades: materials start a level, AP carries over, effects apply', async () => {
+  const { build } = await import('../src/core/actions.js');
+  const { nextLevel, bedCount, spawnForecast, sleepPlan } = await import('../src/core/selectors.js');
+  let { s } = turn({ 'corwin-daly': 'colony', 'agnes-pell': 'colony' });
+  assert.equal(tryReduce(s, build('dorm', 'corwin-daly')).error, 'missingMaterials');
+  let w; [s, w] = giveCard(s, 'wood', 'stockpile'); [s, w] = giveCard(s, 'wood', 'stockpile');
+  s = patch(s, (x) => { x.survivors['corwin-daly'].ap = 12; x.survivors['agnes-pell'].ap = 50; });
+  s = reduce(s, build('dorm', 'corwin-daly'));
+  assert.deepEqual([nextLevel(s, 'dorm').spent, s.survivors['corwin-daly'].ap], [12, 0], 'wood paid, 12 AP in');
+  assert.ok(!s.stockpile.some((u) => s.cards[u] === 'wood'));
+  s = reduce(s, build('dorm', 'agnes-pell'));
+  assert.equal(s.base.dorm, 1);
+  assert.equal(s.survivors['agnes-pell'].ap, 42, 'only the 8 AP that were left');
+  assert.equal(bedCount(s), 4);
+  // Wall and infirmary.
+  const walled = patch(s, (x) => { x.base.wall = 1; x.base.infirmary = 2; });
+  assert.equal(spawnForecast(walled).colony, undefined, 'the wall stops the 1 colony zombie');
+  assert.equal(sleepPlan(walled)['corwin-daly'].hp, 15 + 10);
+  // Greenhouse: +food at dawn.
+  const green = patch(s, (x) => { x.base.greenhouse = 2; x.food = 10; });
+  const next = reduce(green, a.endTurn());
+  assert.ok(next.log.some((e) => e.k === 'food' && e.reason === 'greenhouse' && e.delta === 2));
 });

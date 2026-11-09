@@ -26,7 +26,7 @@ Numbers are starting values; Step 18 tunes them.
 | 9 | (skipped for now, at the user's request) New location capacity: remove the slot pedestals. One floating sign per place: name, 👤 2/4, 🧟 3/6 bar, search %, cards left. 6 zombies = the place is overrun (no searching, extra zombies walk to the base). | |
 | 10 | Food every day: everyone at the base eats 1. Missing food: −15 HP each, −1 morale, 50% AP next day. "Food for N days" on the HUD. | **done** |
 | 11 | A crisis every day: revealed at dawn, items handed in during the day (face up), scored at dusk. +1 needed every 10 days. | **done** |
-| 12 | Base upgrades (3 levels each, materials + AP, AP carries over): dorm, wall, greenhouse, workshop, infirmary, radio tower. | |
+| 12 | Base upgrades (3 levels each, materials + AP, AP carries over): dorm, wall, greenhouse, workshop, infirmary, radio tower. | **done** |
 | 13 | Main goal: the snow crawler in 4 stages (frame, engine, heater, fuel). Rare parts in certain places. Seasons get harsher (cold day 11+, brutes day 21+, storms day 31+). | |
 | 14 | Night attacks on the base: dawn forecast; at night walls and guards stop zombies first; the rest hurt people at the base. Fully predictable ("5 attack, 4 stopped"). | |
 | 15 | Solo fun: a daily event card with 2 choices, traits and bonds, weekly missions, experience (skills improve with use), difficulty levels, an end-of-game summary. | |
@@ -161,3 +161,14 @@ Numbers are starting values; Step 18 tunes them.
 - Needed: the crisis's own need (1) **+1 every 10 days** (day 11: 2, day 21: 3, day 31: 4).
 - `crisisScore(s)` shows the running score on the HUD ("1/2 Fuel · scored at dusk").
 - Balance (bot, 30 games): beacon 0%, stores 3%, purge 3% — unchanged; Step 18.
+
+## Step 12 notes
+
+- `src/content/buildings.js`: 6 upgrades × 3 levels. `build(buildingId, survivorId)` at the colony: starting a level
+  takes its materials (wood / scrap / cloth) from the stockpile, then the survivor puts in all their AP up to what is
+  left; unfinished work (`s.building`) carries over to later days. Levels live in `s.base`.
+- Effects: **dorm** +2 beds per level; **wall** stops 1 colony zombie a night per level; **greenhouse** +1 food every
+  dawn per level; **workshop** is needed to craft (levels 2–3: −3 / −6 AP); **infirmary** +5 HP a night per level at the
+  colony; **radio tower** 10% per level each dawn that a newcomer joins.
+- UI: an "Base upgrades" row in the colony panel (level, cost or progress, effect in the tooltip).
+- The bot tries to build, but it rarely brings materials home yet (0 levels in 10 test games); Step 18.

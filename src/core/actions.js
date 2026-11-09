@@ -18,6 +18,7 @@ export const A = Object.freeze({
   NAP: 'NAP',
   GIVE: 'GIVE',
   CRAFT: 'CRAFT',
+  BUILD: 'BUILD',
   SET_REST: 'SET_REST',
 });
 
@@ -45,3 +46,5 @@ export const setRest = (survivorId, mode) => ({ type: A.SET_REST, survivorId, mo
 export const give = (cardUid, toSurvivorId = null) => ({ type: A.GIVE, cardUid, toSurvivorId });
 /** Craft a recipe (content/items.js RECIPES) at the colony with stockpile materials and the survivor's AP. */
 export const craft = (recipeId, survivorId) => ({ type: A.CRAFT, recipeId, survivorId });
+/** Work on a base upgrade at the colony (materials when a level starts, then AP; progress carries over). */
+export const build = (buildingId, survivorId) => ({ type: A.BUILD, buildingId, survivorId });
