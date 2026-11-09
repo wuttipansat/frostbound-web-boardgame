@@ -41,7 +41,7 @@ Any weapon means fights draw no danger card. Junk is scrapped for 12 energy per 
 
 ## Danger deck (unchanged from 23a)
 20 shared cards (safe 9, scratch 4, frost 3, startle 2, surrounded 1, bite 1); drawn when walking in among zombies,
-fighting bare-handed, searching deeper, crossroads, infection; +1 bite after rounds 3 and 6, +1 scratch per failed
+fighting bare-handed, crossroads, infection; +1 bite after rounds 3 and 6, +1 scratch per failed
 crisis; order secret, counts public.
 
 ## Scenario goals (scaled for one survivor each)

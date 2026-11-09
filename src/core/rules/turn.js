@@ -9,7 +9,7 @@ import {
 import {
   log, rollExposure, drawItems, wasteCard, removeFromHand, addZombies, removeZombies,
   addBarricades, creditKills, healSurvivor, changeFood, changeHelpless, changeMorale,
-  spendEnergy, gainEnergy, drawDanger,
+  spendEnergy, gainEnergy,
 } from './helpers.js';
 import { endTurn } from './flow.js';
 import { isPermanent, gearSlot } from '../../content/items.js';
@@ -31,10 +31,9 @@ function requireSurvivor(s, playerId, survivorId) {
   return sv;
 }
 
-/** Pay an action's energy. Any paid action ends a "search deeper" chance. */
+/** Pay an action's energy. */
 function pay(s, p, survivorId, kind, to = null) {
   spendEnergy(s, p.id, actionCost(s, survivorId, kind, to));
-  p.lastSearch = null;
 }
 
 function requireCard(s, p, uid) {
@@ -74,20 +73,7 @@ export function search(s, { playerId, survivorId }) {
   const drawn = drawItems(s, playerId, sv.location, blueprint ? n + 1 : n);
   log(s, 'search', { playerId, survivorId, locationId: sv.location, count: drawn.length });
   if (blueprint && drawn.length > n) p.pick = { locationId: sv.location, uids: drawn };
-  p.lastSearch = { survivorId, locationId: sv.location };
   return drawn;
-}
-
-/** Right after a search, dig deeper for free — one more card, then a danger card. Repeatable. */
-export function searchDeeper(s, { playerId, survivorId }) {
-  const p = requireTurn(s, playerId);
-  const sv = requireSurvivor(s, playerId, survivorId);
-  assert(p.lastSearch && p.lastSearch.survivorId === survivorId && p.lastSearch.locationId === sv.location, 'searchFirst');
-  assert(s.locations[sv.location].deck.length > 0, 'deckEmpty');
-  const drawn = drawItems(s, playerId, sv.location, 1);
-  log(s, 'searchDeeper', { playerId, survivorId, locationId: sv.location, count: drawn.length });
-  drawDanger(s, survivorId, 'deeper');
-  if (!s.survivors[survivorId].alive) p.lastSearch = null;
 }
 
 /** Resolve a blueprint search: the chosen card goes back to the bottom of that location's deck. */

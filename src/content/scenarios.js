@@ -7,8 +7,8 @@ export const SCENARIOS = [
     name: 'Light the Ridge Beacon',
     text: 'A rescue convoy will pass the ridge only if it sees fire. Bring fuel to the colony and stack the beacon before time runs out.',
     rounds: 6, morale: 8, helpless: 2, startFood: 3,
-    goal: { type: 'deposit', item: 'fuel', base: 1, perPlayer: 1 },
-    goalText: 'Deposit fuel cards in the colony beacon: 1 + 1 per player.',
+    goal: { type: 'deposit', item: 'fuel', base: 0, perPlayer: 1 },
+    goalText: 'Deposit fuel cards in the colony beacon: 1 per player.',
   },
   {
     id: 'stores', difficulty: 'medium', length: 'medium',

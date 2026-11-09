@@ -1,4 +1,4 @@
-// Energy (personal, per survivor), gear, the shared danger deck, search deeper, threat forecast.
+// Energy (personal, per survivor), gear, the shared danger deck, threat forecast.
 // There are no dice anywhere.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -154,25 +154,6 @@ test('the deck reshuffles its discards when empty; escalation adds bites; failed
   let grew = false;
   simulate({ players: 3, seed: 3, onStep: (st) => { if (st.log.some((e) => e.k === 'dangerAdded' && e.kind === 'bite')) grew = true; } });
   assert.ok(grew, 'a bite card was added as the winter went on');
-});
-
-test('search deeper: only right after a search, +1 card then a danger card; any paid action ends it', () => {
-  let s = fb({ seed: 11 });
-  const pid = s.activePlayerId;
-  s = setSurvivors(s, pid, { 'osei-vance': 'grocery', 'greta-vos': 'school' });
-  assert.equal(tryReduce(s, act.searchDeeper(pid, 'osei-vance')).error, 'searchFirst');
-  s = reduce(s, act.search(pid, 'osei-vance'));
-  const hand = me(s).hand.length; const energy = me(s).energy;
-  s = topDanger(s, 'safe');
-  s = reduce(s, act.searchDeeper(pid, 'osei-vance'));
-  assert.equal(me(s).hand.length, hand + 1);
-  assert.equal(me(s).energy, energy, 'free');
-  assert.ok(s.log.some((e) => e.k === 'exposure' && e.cause === 'deeper'));
-  s = topDanger(s, 'safe');
-  s = reduce(s, act.searchDeeper(pid, 'osei-vance')); // repeatable
-  s = reduce(s, act.barricade(pid, 'greta-vos'));
-  assert.equal(tryReduce(s, act.searchDeeper(pid, 'osei-vance')).error, 'searchFirst');
-  assert.equal(tryReduce(startedGame(), act.searchDeeper(startedGame().activePlayerId, 'x')).ok, false);
 });
 
 test('energy: regen at turn start, carry-over, cap, lower cap when badly hurt', () => {

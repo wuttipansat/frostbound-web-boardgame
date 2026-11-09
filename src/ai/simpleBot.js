@@ -179,22 +179,15 @@ export function biteOdds(s) {
 }
 
 /**
- * Value per energy. Dig deeper while the deck is kind, fight crowds, scavenge, hold the
+ * Value per energy. Fight crowds, scavenge, hold the
  * colony against the forecast, then walk (to empty places when possible, home when hurt).
  */
 function energyActions(s, p, survivors, candidates, cardsOf, isBetrayer, opts) {
   const pid = p.id;
   const can = (sv, kind, to) => p.energy >= actionCost(s, sv.id, kind, to);
-  const bite = biteOdds(s);
   const forecast = spawnForecast(s);
   const armed = !!gearOf(s, pid).weapon;
 
-  // 1. Search deeper right after a search, while it is not too risky.
-  if (p.lastSearch) {
-    const sv = s.survivors[p.lastSearch.survivorId];
-    if (sv?.alive && sv.location === p.lastSearch.locationId && s.locations[sv.location].deck.length
-      && sv.wounds <= 1 && bite <= 0.09 && opts.random() < 0.55) candidates.push(act.searchDeeper(pid, sv.id));
-  }
   for (const sv of survivors) {
     const loc = s.locations[sv.location];
     const safeFight = armed || survivorDef(sv.id).ability.type === 'noAttackExposure';

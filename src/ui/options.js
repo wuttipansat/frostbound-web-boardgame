@@ -39,11 +39,6 @@ export function survivorOptions(state, playerId, survivorId, { lureTo = null } =
     const action = act.useAbility(playerId, survivorId, target?.id ?? survivorId);
     out.push({ id: 'ability', cost: 0, ...(target ? check(state, action) : { action, ok: false, error: 'notWounded' }) });
   }
-  // Right after a search: "search deeper" (free: one more card, then a danger card).
-  const ls = getPlayer(state, playerId).lastSearch;
-  if (ls && ls.survivorId === survivorId && ls.locationId === sv.location) {
-    out.push({ id: 'deeper', cost: 0, ...check(state, act.searchDeeper(playerId, survivorId)) });
-  }
   return out;
 }
 

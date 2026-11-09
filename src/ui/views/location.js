@@ -9,7 +9,7 @@ import { PLAYER_COLORS } from '../../render/pieces.js';
 import { flashTip } from '../tooltip.js';
 import { survivorOptions, lureTargets } from '../options.js';
 
-const ACTION_ICON = { attack: 'attack', search: 'search', barricade: 'barricade', clean: 'clean', lure: 'lure', ability: 'heal', deeper: 'down' };
+const ACTION_ICON = { attack: 'attack', search: 'search', barricade: 'barricade', clean: 'clean', lure: 'lure', ability: 'heal' };
 
 export function renderLocationPanel(el, ctx) {
   const { state: s, ui, art } = ctx;
@@ -75,7 +75,6 @@ export function renderLocationPanel(el, ctx) {
             const tip = [t(`act.${o.id}`),
               o.cost != null ? t('act.cost', { n: o.cost, have: getPlayer(s, me).energy }) : null,
               !o.ok ? t(`err.${o.error}`) : null,
-              o.id === 'deeper' && o.ok ? t('act.deeperTip') : null,
               risky(o) && o.ok ? t('tip.exposure') : null,
               isLure && o.ok ? t('act.pickOnBoard') : null].filter(Boolean).join(' · ');
             return h('button', {

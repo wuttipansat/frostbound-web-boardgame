@@ -44,7 +44,6 @@ export function formatLog(e, state) {
   switch (e.k) {
     case 'move': return t(e.safe ? 'log.moveSafe' : 'log.move', p);
     case 'exposure': return t(e.danger ? 'log.dangerDraw' : 'log.exposure', p);
-    case 'searchDeeper': return t('log.searchDeeper', p);
     case 'dangerShuffle': return t('log.dangerShuffle', { n: e.size });
     case 'dangerAdded': return t('log.dangerAdded', { kind: t(`danger.${e.kind}`) });
     case 'crisisResolved': return t('log.crisisResolved', { ...p, result: t(e.success ? 'log.crisisOk' : 'log.crisisFail') });

@@ -18,7 +18,6 @@ export const A = Object.freeze({
   CALL_VOTE: 'CALL_VOTE',
   CAST_VOTE: 'CAST_VOTE',
   RETURN_CARD: 'RETURN_CARD',
-  SEARCH_DEEPER: 'SEARCH_DEEPER',
   EQUIP: 'EQUIP',
 });
 
@@ -41,7 +40,5 @@ export const requestItem = (playerId, targetId, itemType = null) => ({ type: A.R
 export const respondRequest = (playerId, requestId, cardUid = null) => ({ type: A.RESPOND_REQUEST, playerId, requestId, cardUid });
 export const callVote = (playerId, targetId) => ({ type: A.CALL_VOTE, playerId, targetId });
 export const castVote = (playerId, yes) => ({ type: A.CAST_VOTE, playerId, yes });
-/** One more card right after a search, then a danger card. */
-export const searchDeeper = (playerId, survivorId) => ({ type: A.SEARCH_DEEPER, playerId, survivorId });
 /** Equip a weapon / armor / book from your hand (free; the slot's old item returns to your hand). */
 export const equip = (playerId, cardUid) => ({ type: A.EQUIP, playerId, cardUid });

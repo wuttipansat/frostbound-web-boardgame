@@ -71,7 +71,6 @@ export function beginTurn(s) {
   else p.energy = Math.min(max, p.energy + energyRegen(s, p.id));
   p.energy = Math.min(p.energy, max);
   p.regenPenalty = 0;
-  p.lastSearch = null;
   log(s, 'energy', { playerId: p.id, value: p.energy, max });
   s.pendingCrossroads = null;
 

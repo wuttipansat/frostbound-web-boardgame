@@ -110,7 +110,6 @@ export function createGame(config) {
       energy: 0,       // the survivor's energy (set when the draft ends)
       regenPenalty: 0, // a frost card: lower regen next turn
       fresh: true,     // the first turn starts full
-      lastSearch: null, // { survivorId, locationId } while "search deeper" is possible
       gear: { weapon: null, armor: null, book: null }, // equipped item uids
       objectiveId: pool[i],
       exiled: false,
