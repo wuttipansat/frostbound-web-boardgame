@@ -171,7 +171,7 @@ export default {
   'panel.more': 'More actions',
   'panel.hold': 'hold',
   'panel.tokenLabel': '{name}, {place}, health {hp}/{max}',
-  'hud.crisisShort': '{n}× {item} · {k} in',
+  'hud.crisisShort': '{k}/{n} {item} · scored at dusk',
   'err.notHost': 'Only the host can start.',
   'err.seatsOpen': 'Seats are still open.',
   'err.notStarted': 'The game has not started.',

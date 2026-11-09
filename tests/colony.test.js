@@ -4,7 +4,7 @@ import { reduce } from '../src/core/reducer.js';
 import * as a from '../src/core/actions.js';
 import { colonyPhase, resolveCrisis, spawnZombies, endGame } from '../src/core/rules/flow.js';
 import { addZombies } from '../src/core/rules/helpers.js';
-import { foodNeeded, foodDays, crisisRequirement } from '../src/core/selectors.js';
+import { foodNeeded, foodDays, crisisRequirement, crisisScore } from '../src/core/selectors.js';
 import { startedGame, setSurvivors, giveCard, patch } from './_helpers.js';
 
 /** A started solo game with the team placed as given. */
@@ -69,6 +69,19 @@ test('crisis: matching +1, others -1; tinkerer junk counts; failure applies effe
   assert.equal(wrong.morale, 7, 'whiteout: -1 morale');
   assert.equal(wrong.locations.colony.zombies, 2, 'whiteout: 2 zombies at the colony');
   assert.equal(wrong.waste, undefined, 'no waste pile');
+});
+
+test('daily crisis: +1 item needed every 10 days; the score is visible while handing in', () => {
+  let s = team({ 'corwin-daly': 'colony', 'greta-vos': 'colony' });
+  s = patch(s, (x) => { x.crisis = { id: 'whiteout', contributions: [] }; });
+  for (const [day, need] of [[1, 1], [10, 1], [11, 2], [21, 3], [31, 4]]) assert.equal(crisisRequirement(patch(s, (x) => { x.day = day; })), need, `day ${day}`);
+  let fuel, food;
+  [s, fuel] = giveCard(s, 'jerry-can');
+  [s, food] = giveCard(s, 'canned-beans');
+  s = reduce(s, a.contribute(fuel));
+  assert.equal(crisisScore(s), 1);
+  s = reduce(s, a.contribute(food));
+  assert.equal(crisisScore(s), 0, 'a wrong item counts −1');
 });
 
 test('inspire adds morale when a crisis is averted', () => {

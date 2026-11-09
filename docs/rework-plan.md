@@ -25,7 +25,7 @@ Numbers are starting values; Step 18 tunes them.
 | 8 | Items: weapons (knife +6, crowbar +8, bat +10, bow +12 silent, fire axe +18, guns), armor (−2 / −3 / −5 HP per fight, snow suit), tools (flashlight, map, big backpack, sled, survival guide, tool kit), consumables (bandage +15 HP, first-aid kit +35 HP, painkillers, coffee +20 AP, chocolate, canned food, ammo, firebomb), materials (wood, scrap, cloth, tools, fuel, engine and heater parts). Loot tables per place. Crafting (needs the workshop). | **done** (crafting at the colony; the workshop gate comes in Step 12) |
 | 9 | (skipped for now, at the user's request) New location capacity: remove the slot pedestals. One floating sign per place: name, 👤 2/4, 🧟 3/6 bar, search %, cards left. 6 zombies = the place is overrun (no searching, extra zombies walk to the base). | |
 | 10 | Food every day: everyone at the base eats 1. Missing food: −15 HP each, −1 morale, 50% AP next day. "Food for N days" on the HUD. | **done** |
-| 11 | A crisis every day: revealed at dawn, items handed in during the day (face up), scored at dusk. +1 needed every 10 days. | |
+| 11 | A crisis every day: revealed at dawn, items handed in during the day (face up), scored at dusk. +1 needed every 10 days. | **done** |
 | 12 | Base upgrades (3 levels each, materials + AP, AP carries over): dorm, wall, greenhouse, workshop, infirmary, radio tower. | |
 | 13 | Main goal: the snow crawler in 4 stages (frame, engine, heater, fuel). Rare parts in certain places. Seasons get harsher (cold day 11+, brutes day 21+, storms day 31+). | |
 | 14 | Night attacks on the base: dawn forecast; at night walls and guards stop zombies first; the rest hurt people at the base. Fully predictable ("5 attack, 4 stopped"). | |
@@ -153,3 +153,11 @@ Numbers are starting values; Step 18 tunes them.
 - The HUD food block shows "food for N day(s)" (`foodDays`), red when it is under 2.
 - Step 9 (location signs) was skipped for now and can be done later.
 - Balance (bot, 30 games): beacon 0% won, stores 3%, purge 3%. The bot needs to plan food runs; Step 18.
+
+## Step 11 notes
+
+- One crisis every day: drawn at dawn, items handed in face up during the day (only items at the colony),
+  scored at dusk in the order they were given. Matching items +1 (also `counts` and wild items), others −1.
+- Needed: the crisis's own need (1) **+1 every 10 days** (day 11: 2, day 21: 3, day 31: 4).
+- `crisisScore(s)` shows the running score on the HUD ("1/2 Fuel · scored at dusk").
+- Balance (bot, 30 games): beacon 0%, stores 3%, purge 3% — unchanged; Step 18.

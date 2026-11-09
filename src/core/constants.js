@@ -19,7 +19,8 @@ export const OUTSIDE_LOCATIONS = Object.freeze(LOCATION_IDS.filter((l) => l !== 
 
 export const RULES = Object.freeze({
   TEAM_START: 2,          // survivors picked at the start (solo game)
-  TEAM_MAX: 6,            // the most survivors the team can have
+  TEAM_MAX: 6,
+  CRISIS_STEP_DAYS: 10,   // the daily crisis needs +1 item every 10 days            // the most survivors the team can have
   DRAFT_OPTIONS: 6,
   STARTING_HAND: 3,        // items in the stockpile at the start
   PACK: 3,                // backpack slots per survivor

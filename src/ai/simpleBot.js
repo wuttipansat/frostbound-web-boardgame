@@ -8,7 +8,7 @@ import { PHASES, OUTSIDE_LOCATIONS, ENERGY, RULES } from '../core/constants.js';
 import { gearSlot } from '../content/items.js';
 import {
   aliveSurvivors, survivorDef, itemOf, crisisDef, scenarioDef,
-  freeSurvivorSlots, freeZombieSlots, foodNeeded, actionCost, fightPreview, placeOfItem, packFree, leaveDamage, spawnForecast, crisisRequirement, gearOf,
+  freeSurvivorSlots, freeZombieSlots, foodNeeded, actionCost, fightPreview, placeOfItem, packFree, leaveDamage, spawnForecast, crisisRequirement, crisisScore, gearOf,
 } from '../core/selectors.js';
 import { CROSSROADS_BY_ID } from '../content/crossroads.js';
 
@@ -75,7 +75,7 @@ function turnAction(s, p, opts) {
   if (crisis) {
     const added = s.crisis.contributions.length;
     const match = cardsOf(crisis.item)[0] ?? items.find((u) => itemOf(s, u).counts === crisis.item);
-    if (match && added < crisisRequirement(s) + 1) candidates.push(act.contribute(match));
+    if (match && crisisScore(s) < crisisRequirement(s) + 1 && added < 6) candidates.push(act.contribute(match));
   }
 
   // Scenario deposit.

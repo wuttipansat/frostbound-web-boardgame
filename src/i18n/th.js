@@ -164,7 +164,7 @@ export default {
   'panel.more': 'แอคชันเพิ่มเติม',
   'panel.hold': 'กดค้าง',
   'panel.tokenLabel': '{name}, {place}, พลังชีวิต {hp}/{max}',
-  'hud.crisisShort': '{n}× {item} · ใส่แล้ว {k}',
+  'hud.crisisShort': '{k}/{n} {item} · ตัดสินตอนเย็น',
   'err.notHost': 'เจ้าของห้องเท่านั้นที่เริ่มเกมได้',
   'err.seatsOpen': 'ยังมีที่นั่งว่าง',
   'err.notStarted': 'เกมยังไม่เริ่ม',

@@ -82,7 +82,19 @@ export function foodNeeded(s) {
 export function crisisRequirement(s) {
   const c = crisisDef(s);
   if (!c) return 0;
-  return Math.max(1, c.need ?? 1);
+  return Math.max(1, c.need ?? 1) + Math.floor((s.day - 1) / RULES.CRISIS_STEP_DAYS); // +1 every 10 days
+}
+
+/** Today's crisis score so far (items are handed in face up): matching +1, anything else −1. */
+export function crisisScore(s) {
+  const c = crisisDef(s);
+  if (!c) return 0;
+  return s.crisis.contributions.reduce((n, uid) => n + (crisisMatches(s, c, itemOf(s, uid)) ? 1 : -1), 0);
+}
+
+export function crisisMatches(s, crisis, item) {
+  return item.type === crisis.item || item.counts === crisis.item || !!item.wild
+    || (item.type === 'junk' && teamHasAbility(s, 'tinkerer'));
 }
 
 /** The survivor a crossroads card is "about": highest influence, optionally filtered. */

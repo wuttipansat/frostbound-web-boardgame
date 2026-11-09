@@ -5,7 +5,7 @@ import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
 import { formatLog, describeEffects } from '../../i18n/format.js';
 import {
-  foodNeeded, foodDays, isStorm, crisisDef, crisisRequirement, scenarioProgress, scenarioTarget,
+  foodNeeded, foodDays, isStorm, crisisDef, crisisRequirement, crisisScore, scenarioProgress, scenarioTarget,
 } from '../../core/selectors.js';
 import { counter } from '../ticker.js';
 import { RULES } from '../../core/constants.js';
@@ -46,7 +46,7 @@ export function renderTopbar(el, ctx) {
   art.item(TYPE_REP[crisis.item], 's', { cls: 'crisis-art', alt: t(`item.${crisis.item}`) }),
   h('span', { class: 'lbl' }, t('hud.crisis')),
   h('b', {}, c('crises', crisis.id, 'name')),
-  h('small', {}, t('hud.crisisShort', { n: crisisRequirement(s), item: t(`item.${crisis.item}`), k: s.crisis.contributions.length }))) : null;
+  h('small', {}, t('hud.crisisShort', { n: crisisRequirement(s), item: t(`item.${crisis.item}`), k: crisisScore(s) }))) : null;
 
   const goal = block('goal', t('tip.goal', { text: c('scenarios', s.scenario.id, 'goalText') }), 'goal', t('hud.goal'),
     counter('goal', scenarioProgress(s), { text: (v) => `${v}/${scenarioTarget(s)}` }));
