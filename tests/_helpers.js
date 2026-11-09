@@ -5,10 +5,10 @@ import { draftPick } from '../src/core/actions.js';
 import { newSurvivor } from '../src/core/rules/helpers.js';
 
 export function newGame(opts = {}) {
-  const { players = 3, scenarioId = 'beacon', seed = 42, betrayer = 'never' } = opts;
+  const { players = 3, scenarioId = 'beacon', seed = 42, betrayer = 'never', rules } = opts;
   return createGame({
     players: Array.from({ length: players }, (_, i) => ({ name: `P${i + 1}` })),
-    scenarioId, seed, betrayer,
+    scenarioId, seed, betrayer, rules,
   });
 }
 

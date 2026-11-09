@@ -4,11 +4,14 @@ import { rollD6 } from '../rng.js';
 import { assert } from '../errors.js';
 import {
   getPlayer, survivorDef, freeSurvivorSlots, freeZombieSlots, itemOf, scenarioDef, booksHeld, holdsBlueprint,
+  isFrostbound, actionCost,
 } from '../selectors.js';
 import {
   log, rollExposure, drawItems, wasteCard, removeFromHand, addZombies, removeZombies,
   addBarricades, creditKills, healSurvivor, changeFood, changeHelpless, recruitSurvivor,
+  spendEnergy, gainEnergy, drawDanger,
 } from './helpers.js';
+import { ENERGY } from '../constants.js';
 import { endTurn } from './flow.js';
 import { isPermanent } from '../../content/items.js';
 
@@ -37,6 +40,21 @@ function requireDie(p, dieIndex, min = 1) {
   return die;
 }
 
+/**
+ * Pay for an action: classic = spend a die (value >= min); Frostbound = spend energy (actionCost).
+ * Returns the die value (classic) or null. Any paid action ends a "search deeper" chance.
+ */
+function pay(s, p, survivorId, kind, dieIndex, min = 1, to = null) {
+  if (isFrostbound(s)) {
+    spendEnergy(s, p.id, actionCost(s, survivorId, kind, to));
+    p.lastSearch = null;
+    return null;
+  }
+  const die = requireDie(p, dieIndex, min);
+  die.used = true;
+  return die.v;
+}
+
 function requireCard(s, p, uid) {
   assert(p.hand.includes(uid), 'cardNotInHand', uid);
   return itemOf(s, uid);
@@ -52,12 +70,13 @@ export function attack(s, { playerId, survivorId, dieIndex }) {
   const p = requireTurn(s, playerId);
   const sv = requireSurvivor(s, playerId, survivorId);
   assert(s.locations[sv.location].zombies > 0, 'noZombiesHere');
-  const die = requireDie(p, dieIndex, survivorDef(survivorId).attack);
-  die.used = true;
+  const v = pay(s, p, survivorId, 'attack', dieIndex, survivorDef(survivorId).attack);
   const killed = removeZombies(s, sv.location, ability(survivorId).type === 'killTwo' ? 2 : 1);
   creditKills(s, playerId, killed);
-  log(s, 'attack', { playerId, survivorId, locationId: sv.location, killed, die: die.v });
-  if (ability(survivorId).type !== 'noAttackExposure') rollExposure(s, survivorId, 'attack');
+  log(s, 'attack', { playerId, survivorId, locationId: sv.location, killed, die: v });
+  // Frostbound: only a bare-handed fight is risky (a weapon in hand keeps them at bay).
+  const armed = isFrostbound(s) && p.hand.some((u) => itemOf(s, u).type === 'weapon');
+  if (ability(survivorId).type !== 'noAttackExposure' && !armed) rollExposure(s, survivorId, 'attack');
 }
 
 export function search(s, { playerId, survivorId, dieIndex }) {
@@ -65,16 +84,29 @@ export function search(s, { playerId, survivorId, dieIndex }) {
   const sv = requireSurvivor(s, playerId, survivorId);
   assert(sv.location !== 'colony', 'cannotSearchColony');
   assert(s.locations[sv.location].deck.length > 0, 'deckEmpty');
-  const die = requireDie(p, dieIndex, survivorDef(survivorId).search);
-  die.used = true;
+  const v = pay(s, p, survivorId, 'search', dieIndex, survivorDef(survivorId).search);
   const a = ability(survivorId);
   const n = a.type === 'doubleSearch' && a.location === sv.location ? 2 : 1;
   // A blueprint for this place: draw one extra, then put one back (returnCard).
   const blueprint = holdsBlueprint(s, playerId, sv.location);
   const drawn = drawItems(s, playerId, sv.location, blueprint ? n + 1 : n);
-  log(s, 'search', { playerId, survivorId, locationId: sv.location, count: drawn.length, die: die.v });
+  log(s, 'search', { playerId, survivorId, locationId: sv.location, count: drawn.length, die: v });
   if (blueprint && drawn.length > n) p.pick = { locationId: sv.location, uids: drawn };
+  if (isFrostbound(s)) p.lastSearch = { survivorId, locationId: sv.location };
   return drawn;
+}
+
+/** Frostbound: right after a search, dig deeper for free — one more card, then a danger card. Repeatable. */
+export function searchDeeper(s, { playerId, survivorId }) {
+  const p = requireTurn(s, playerId);
+  assert(isFrostbound(s), 'classicRules');
+  const sv = requireSurvivor(s, playerId, survivorId);
+  assert(p.lastSearch && p.lastSearch.survivorId === survivorId && p.lastSearch.locationId === sv.location, 'searchFirst');
+  assert(s.locations[sv.location].deck.length > 0, 'deckEmpty');
+  const drawn = drawItems(s, playerId, sv.location, 1);
+  log(s, 'searchDeeper', { playerId, survivorId, locationId: sv.location, count: drawn.length });
+  drawDanger(s, survivorId, 'deeper');
+  if (!s.survivors[survivorId].alive) p.lastSearch = null;
 }
 
 /** Resolve a blueprint search: the chosen card goes back to the bottom of that location's deck. */
@@ -91,8 +123,7 @@ export function barricade(s, { playerId, survivorId, dieIndex }) {
   const p = requireTurn(s, playerId);
   const sv = requireSurvivor(s, playerId, survivorId);
   assert(freeZombieSlots(s, sv.location) > 0, 'noBarricadeSpace');
-  const die = requireDie(p, dieIndex);
-  die.used = true;
+  pay(s, p, survivorId, 'barricade', dieIndex);
   const n = (ability(survivorId).type === 'barricadeTwo' ? 2 : 1) + Math.min(1, booksHeld(s, 'barricadePlus', playerId));
   addBarricades(s, sv.location, n);
 }
@@ -102,8 +133,7 @@ export function clean(s, { playerId, survivorId, dieIndex }) {
   const sv = requireSurvivor(s, playerId, survivorId);
   assert(sv.location === 'colony', 'mustBeInColony');
   assert(s.waste > 0, 'nothingToClean');
-  const die = requireDie(p, dieIndex);
-  die.used = true;
+  pay(s, p, survivorId, 'clean', dieIndex);
   const amount = ability(survivorId).type === 'cleanFive' ? 5 : RULES.CLEAN_AMOUNT;
   const removed = Math.min(amount, s.waste);
   s.waste -= removed;
@@ -116,8 +146,7 @@ export function lure(s, { playerId, survivorId, dieIndex, toLocation }) {
   assert(LOCATION_IDS.includes(toLocation), 'noSuchLocation', toLocation);
   assert(toLocation !== sv.location, 'sameLocation');
   assert(s.locations[sv.location].zombies > 0, 'noZombiesHere');
-  const die = requireDie(p, dieIndex);
-  die.used = true;
+  pay(s, p, survivorId, 'lure', dieIndex);
   const moved = removeZombies(s, sv.location, ability(survivorId).type === 'lureTwo' ? 2 : 1);
   log(s, 'lure', { playerId, survivorId, from: sv.location, to: toLocation, n: moved });
   addZombies(s, toLocation, moved, 'lure');
@@ -130,15 +159,20 @@ export function move(s, { playerId, survivorId, toLocation, fuelCardUid }) {
   const sv = requireSurvivor(s, playerId, survivorId);
   assert(LOCATION_IDS.includes(toLocation), 'noSuchLocation', toLocation);
   assert(toLocation !== sv.location, 'sameLocation');
-  assert(!sv.moved, 'alreadyMoved');
+  const fb = isFrostbound(s);
+  // Classic: one free move per survivor per turn. Frostbound: moving costs energy instead.
+  assert(fb || !sv.moved, 'alreadyMoved');
   assert(!(p.exiled && toLocation === 'colony'), 'exiledFromColony');
   assert(freeSurvivorSlots(s, toLocation) > 0, 'locationFull');
   let safe = ability(survivorId).type === 'noMoveExposure';
+  if (fuelCardUid) assert(requireCard(s, p, fuelCardUid).type === 'fuel', 'needFuel');
+  if (fb) pay(s, p, survivorId, 'move', null, 1, toLocation);
   if (fuelCardUid) {
-    assert(requireCard(s, p, fuelCardUid).type === 'fuel', 'needFuel');
     wasteCard(s, playerId, fuelCardUid);
     safe = true;
   }
+  // Frostbound: walking into a place with zombies draws a danger card; empty places are safe.
+  if (fb && s.locations[toLocation].zombies === 0) safe = true;
   const from = sv.location;
   sv.location = toLocation;
   sv.moved = true;
@@ -194,6 +228,7 @@ export function playCard(s, { playerId, cardUid, targetSurvivorId, targetLocatio
       break;
     }
     case 'junk': {
+      if (isFrostbound(s)) { spend(); gainEnergy(s, playerId, ENERGY.JUNK * item.value, ENERGY.MAX + 20); break; }
       const dice = [requireDie(p, dieIndex)];
       if (item.value > 1 && dieIndex2 != null && dieIndex2 !== dieIndex) dice.push(requireDie(p, dieIndex2));
       spend();

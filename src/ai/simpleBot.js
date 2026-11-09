@@ -2,10 +2,10 @@
 // opts.random: () => number in [0,1). When opts.chaos > 0, the bot picks randomly among
 // candidate actions with that probability (used by fuzz tests to explore odd paths).
 import * as act from '../core/actions.js';
-import { PHASES, OUTSIDE_LOCATIONS } from '../core/constants.js';
+import { PHASES, OUTSIDE_LOCATIONS, ENERGY } from '../core/constants.js';
 import {
   getPlayer, aliveSurvivorsOf, survivorDef, itemOf, crisisDef, objectiveDef, scenarioDef,
-  freeSurvivorSlots, freeZombieSlots, foodNeeded,
+  freeSurvivorSlots, freeZombieSlots, foodNeeded, isFrostbound, actionCost, dangerCounts, spawnForecast, crisisRequirement,
 } from '../core/selectors.js';
 import { CROSSROADS_BY_ID } from '../content/crossroads.js';
 
@@ -121,7 +121,7 @@ function turnAction(s, p, isBetrayer, opts) {
     const mine = s.crisis.contributions.filter((c) => c.playerId === pid).length;
     if (!isBetrayer) {
       const match = cardsOf(crisis.item)[0];
-      if (match && mine < 2) candidates.push(act.contribute(pid, match));
+      if (match && mine < (isFrostbound(s) ? Math.max(2, crisisRequirement(s) - 1) : 2)) candidates.push(act.contribute(pid, match));
     } else if (mine === 0) {
       const junk = p.hand.find((u) => itemOf(s, u).type !== crisis.item);
       if (junk && opts.random() < 0.6) candidates.push(act.contribute(pid, junk));
@@ -168,6 +168,11 @@ function turnAction(s, p, isBetrayer, opts) {
   // Recruit survivors found out there.
   const recruit = cardsOf('survivor')[0];
   if (recruit && s.survivorDeck.length && !isBetrayer) candidates.push(act.playCard(pid, recruit));
+
+  if (isFrostbound(s)) {
+    energyActions(s, p, survivors, candidates, cardsOf, isBetrayer, opts);
+    return pickOne(candidates, opts) ?? act.endTurn(pid);
+  }
 
   // Die actions, highest dice first.
   const dice = p.dice.map((d, i) => ({ ...d, i })).filter((d) => !d.used).sort((a, b) => b.v - a.v);
@@ -222,4 +227,72 @@ function turnAction(s, p, isBetrayer, opts) {
   }
 
   return pickOne(candidates, opts) ?? act.endTurn(pid);
+}
+
+/** Chance the next danger card is a bite (public counts only). */
+export function biteOdds(s) {
+  const c = dangerCounts(s) ?? {};
+  const total = Object.values(c).reduce((a, b) => a + b, 0);
+  return total ? (c.bite ?? 0) / total : 0;
+}
+
+/**
+ * Frostbound rules: value per energy. Dig deeper while the deck is kind, fight crowds, scavenge, hold the
+ * colony against the forecast, then walk (to empty places when possible, home when hurt).
+ */
+function energyActions(s, p, survivors, candidates, cardsOf, isBetrayer, opts) {
+  const pid = p.id;
+  const can = (sv, kind, to) => p.energy >= actionCost(s, sv.id, kind, to);
+  const bite = biteOdds(s);
+  const forecast = spawnForecast(s);
+  const armed = cardsOf('weapon').length > 0;
+
+  // 1. Search deeper right after a search, while it is not too risky.
+  if (p.lastSearch) {
+    const sv = s.survivors[p.lastSearch.survivorId];
+    if (sv?.alive && sv.location === p.lastSearch.locationId && s.locations[sv.location].deck.length
+      && sv.wounds <= 1 && bite <= 0.09 && opts.random() < 0.55) candidates.push(act.searchDeeper(pid, sv.id));
+  }
+  for (const sv of survivors) {
+    const loc = s.locations[sv.location];
+    const safeFight = armed || survivorDef(sv.id).ability.type === 'noAttackExposure';
+    // 2. Thin out crowds (bare-handed only when it really matters).
+    const hunt = scenarioDef(s).goal.type === 'kills' && sv.wounds < 2;
+    if (loc.zombies > 0 && can(sv, 'attack') && hunt) candidates.push(act.attack(pid, sv.id, 0));
+    if (loc.zombies >= 2 && can(sv, 'attack') && (safeFight || loc.zombies >= 3)) candidates.push(act.attack(pid, sv.id, 0));
+    // 3. Scavenge.
+    if (sv.location !== 'colony' && loc.deck.length && can(sv, 'search')) candidates.push(act.search(pid, sv.id, 0));
+    if (loc.zombies > 0 && can(sv, 'attack') && safeFight) candidates.push(act.attack(pid, sv.id, 0));
+  }
+  for (const sv of survivors) {
+    const loc = s.locations[sv.location];
+    // 4. Hold the colony against tonight's zombies; clean when it smells.
+    if (freeZombieSlots(s, sv.location) > 0 && can(sv, 'barricade')
+      && ((sv.location === 'colony' && (forecast.colony ?? 0) > s.locations.colony.barricades) || loc.zombies > 0)) {
+      candidates.push(act.barricade(pid, sv.id, 0));
+    }
+    if (sv.location === 'colony' && s.waste >= 4 && can(sv, 'clean')) candidates.push(act.clean(pid, sv.id, 0));
+    if (isBetrayer && loc.zombies > 0 && sv.location !== 'colony' && can(sv, 'lure')) candidates.push(act.lure(pid, sv.id, 0, 'colony'));
+  }
+  // 5. Walk: hurt or done → home; idle in the colony → out to a stocked place, empty ones first.
+  for (const sv of survivors) {
+    const loc = s.locations[sv.location];
+    if (sv.location !== 'colony' && !p.exiled && (sv.wounds >= 2 || !loc.deck.length) && can(sv, 'move', 'colony')) {
+      candidates.push(act.move(pid, sv.id, 'colony', s.locations.colony.zombies ? cardsOf('fuel')[0] : undefined));
+    } else if (sv.location === 'colony' && sv.wounds < 2) {
+      const options = OUTSIDE_LOCATIONS.filter((l) => freeSurvivorSlots(s, l) > 0 && s.locations[l].deck.length && can(sv, 'move', l));
+      // Food short (or stockpiling) → the grocery first; hunting → where the zombies are.
+      const hungry = s.food < foodNeeded(s) + 2 || scenarioDef(s).goal.type === 'stockpile';
+      const hunting = scenarioDef(s).goal.type === 'kills';
+      const score = (l) => (hunting ? -s.locations[l].zombies * 2 : s.locations[l].zombies) - (hungry && l === 'grocery' ? 3 : 0);
+      options.sort((a, b) => score(a) - score(b) || opts.random() - 0.5);
+      const def = survivorDef(sv.id);
+      const preferred = def.ability.type === 'doubleSearch' && options.includes(def.ability.location) ? def.ability.location : options[0];
+      // Leave enough energy to search when we get there.
+      if (preferred && p.energy >= actionCost(s, sv.id, 'move', preferred) + ENERGY.COST.search) candidates.push(act.move(pid, sv.id, preferred));
+    }
+  }
+  // 6. Junk is energy now.
+  const junk = cardsOf('junk')[0];
+  if (junk && p.energy < 40) candidates.push(act.playCard(pid, junk));
 }

@@ -38,6 +38,12 @@ export function viewFor(state, playerId) {
     v[`${key}Count`] = v[key].length;
     v[key] = [];
   }
+  // Step 23: the danger deck's order is secret; how many of each kind are left is public.
+  if (v.danger) {
+    const left = {};
+    for (const k of v.danger.deck) left[k] = (left[k] ?? 0) + 1;
+    v.danger = { left, deckCount: v.danger.deck.length, deck: [], discard: v.danger.discard };
+  }
   // A triggered crossroads card is read aloud, so it stays visible to everyone.
   // Untriggered cards were discarded unseen by the active player and never appear in state.
   return v;

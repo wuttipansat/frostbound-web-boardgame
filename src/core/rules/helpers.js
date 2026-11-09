@@ -1,7 +1,8 @@
 // Low-level state mutations shared by all rule modules.
 // Every function here mutates the draft `s` (a private clone made by the reducer).
-import { EXPOSURE_FACES, OUTSIDE_LOCATIONS, RULES } from '../constants.js';
+import { EXPOSURE_FACES, OUTSIDE_LOCATIONS, RULES, ENERGY } from '../constants.js';
 import { random, rollD6, shuffle } from '../rng.js';
+import { assert } from '../errors.js';
 import { LOCATIONS } from '../../content/locations.js';
 import {
   getPlayer, survivorDef, survivorsAt, woundLimit, freeSurvivorSlots, aliveSurvivorsOf,
@@ -146,6 +147,7 @@ function rollFace(s) {
 export function rollExposure(s, survivorId, cause) {
   const sv = s.survivors[survivorId];
   if (!sv?.alive) return null;
+  if (s.danger) return drawDanger(s, survivorId, cause); // Frostbound rules: the danger deck instead
   const ability = survivorDef(survivorId).ability.type;
   let face = rollFace(s);
   if (ability === 'luckyExposure') {
@@ -261,4 +263,80 @@ export function drawFromDeck(s, deckKey, discardKey) {
     s[discardKey] = [];
   }
   return s[deckKey].pop() ?? null;
+}
+
+// ---------------------------------------------------------------- step 23: danger deck + energy
+
+const DANGER_RANK = { safe: 0, startle: 1, scratch: 2, surrounded: 3, frost: 4, bite: 5 };
+/** How a danger card shows in the existing exposure feedback (popups, log, director). */
+export const DANGER_FACE = { safe: 'blank', scratch: 'wound', frost: 'frostbite', bite: 'bite', startle: 'startle', surrounded: 'surrounded' };
+
+function dangerCard(s) {
+  const d = s.danger;
+  if (!d.deck.length) {
+    d.deck = shuffle(s, d.discard);
+    d.discard = [];
+    log(s, 'dangerShuffle', { size: d.deck.length });
+  }
+  return d.deck.pop() ?? 'safe';
+}
+
+/** Draw from the shared danger deck for a survivor and apply it. Returns the card kind. */
+export function drawDanger(s, survivorId, cause) {
+  const sv = s.survivors[survivorId];
+  if (!sv?.alive) return null;
+  const ability = survivorDef(survivorId).ability.type;
+  let kind = dangerCard(s);
+  if (ability === 'luckyExposure') {
+    let second = dangerCard(s);
+    if (DANGER_RANK[second] < DANGER_RANK[kind]) [kind, second] = [second, kind];
+    s.danger.discard.push(second);
+  }
+  s.danger.discard.push(kind);
+  if (kind === 'frost' && ability === 'ignoreFrostbite') kind = 'safe';
+  const face = DANGER_FACE[kind];
+  s.lastExposure = { survivorId, face, danger: kind, cause, seq: (s.lastExposure?.seq ?? 0) + 1 };
+  log(s, 'exposure', { survivorId, face, danger: kind, cause });
+  const owner = getPlayer(s, sv.owner);
+  switch (kind) {
+    case 'scratch': woundSurvivor(s, survivorId, 'exposure'); break;
+    case 'frost':
+      sv.frostbite = true;
+      owner.regenPenalty = (owner.regenPenalty ?? 0) - ENERGY.REGEN_FROST;
+      woundSurvivor(s, survivorId, 'frostbite');
+      break;
+    case 'startle': owner.energy = Math.max(0, (owner.energy ?? 0) - 10); break;
+    case 'surrounded': addZombies(s, sv.location, 1, 'danger'); break;
+    case 'bite': {
+      const location = sv.location;
+      killSurvivor(s, survivorId, 'bite');
+      const others = survivorsAt(s, location);
+      if (others.length) {
+        others.sort((a, b) => survivorDef(a.id).influence - survivorDef(b.id).influence);
+        log(s, 'infectionSpreads', { from: survivorId, to: others[0].id, location });
+        drawDanger(s, others[0].id, 'infection');
+      }
+      break;
+    }
+    default: break;
+  }
+  return kind;
+}
+
+/** Add a card to the danger deck (escalation) and reshuffle the deck. */
+export function addDangerCard(s, kind, reason) {
+  if (!s.danger) return;
+  s.danger.deck = shuffle(s, [...s.danger.deck, kind]);
+  log(s, 'dangerAdded', { kind, reason });
+}
+
+export function spendEnergy(s, playerId, cost) {
+  const p = getPlayer(s, playerId);
+  assert(p.energy >= cost, 'notEnoughEnergy', `${p.energy} < ${cost}`);
+  p.energy -= cost;
+}
+
+export function gainEnergy(s, playerId, n, max = Infinity) {
+  const p = getPlayer(s, playerId);
+  p.energy = Math.max(0, Math.min(max, (p.energy ?? 0) + n));
 }

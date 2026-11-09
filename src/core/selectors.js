@@ -5,7 +5,7 @@ import { ITEMS } from '../content/items.js';
 import { ALL_OBJECTIVES } from '../content/objectives.js';
 import { SCENARIOS_BY_ID } from '../content/scenarios.js';
 import { CRISES_BY_ID } from '../content/crises.js';
-import { RULES } from './constants.js';
+import { RULES, ENERGY, DANGEROUS_LOCATIONS, OUTSIDE_LOCATIONS } from './constants.js';
 
 export const survivorDef = (id) => SURVIVORS_BY_ID[id];
 export const itemOf = (s, uid) => ITEMS[s.cards[uid]];
@@ -142,4 +142,64 @@ export function pendingActors(s) {
       .map((p) => p.id);
     default: return [];
   }
+}
+
+// ---------------------------------------------------------------- step 23: energy, danger, forecast
+
+export const isFrostbound = (s) => s.config?.rules === 'frostbound';
+export const isNight = (s) => s.round % 2 === 0;
+
+/**
+ * Energy cost of an action for a survivor (move: `to` is the destination). Odd numbers on purpose.
+ * Modifiers: crowded (2+ zombies) search/barricade, dangerous-location search, heavy attack, night outside.
+ */
+export function actionCost(s, survivorId, kind, to = null) {
+  const sv = s.survivors[survivorId];
+  let cost = ENERGY.COST[kind] ?? 0;
+  if (!sv) return cost;
+  const here = sv.location;
+  const zombies = s.locations[here]?.zombies ?? 0;
+  if ((kind === 'search' || kind === 'barricade') && zombies >= 2) cost += ENERGY.CROWDED;
+  if (kind === 'search' && DANGEROUS_LOCATIONS.includes(here)) cost += ENERGY.DANGEROUS;
+  if (kind === 'attack' && survivorDef(survivorId)?.ability.type === 'killTwo') cost += ENERGY.HEAVY;
+  const outside = kind === 'move' ? to && to !== 'colony' : here !== 'colony';
+  if (isNight(s) && outside) cost += ENERGY.NIGHT;
+  return cost;
+}
+
+/** Energy cap for a player: lower while one of their survivors has 2+ wounds. */
+export function energyMax(s, playerId) {
+  return aliveSurvivorsOf(s, playerId).some((sv) => sv.wounds >= 2) ? ENERGY.MAX_HURT : ENERGY.MAX;
+}
+
+/** Energy regained at the start of a turn. */
+export function energyRegen(s, playerId) {
+  const p = getPlayer(s, playerId);
+  let n = s.starvation > 0 ? ENERGY.REGEN_STARVING : ENERGY.REGEN;
+  n += aliveSurvivorsOf(s, playerId).filter((sv) => survivorDef(sv.id).ability.type === 'extraDie').length * ENERGY.ABILITY_REGEN;
+  return Math.max(0, n - (p.regenPenalty ?? 0));
+}
+
+/** Zombies each location would get if the round ended now (same formula as the colony phase). */
+export function spawnForecast(s) {
+  const out = {};
+  for (const loc of OUTSIDE_LOCATIONS) {
+    const here = survivorsAt(s, loc);
+    if (!here.length) continue;
+    const quiet = here.filter((sv) => survivorDef(sv.id).ability.type === 'quiet').length;
+    const n = Math.max(0, Math.ceil(here.length / 2) - quiet);
+    if (n) out[loc] = n;
+  }
+  const n = Math.ceil((survivorsAt(s, 'colony').length + s.helpless) / 3);
+  if (n) out.colony = n;
+  return out;
+}
+
+/** Danger cards left to draw, by kind (public: works on a full state and on a player's view). */
+export function dangerCounts(s) {
+  if (!s.danger) return null;
+  if (s.danger.left) return { ...s.danger.left };
+  const out = {};
+  for (const k of s.danger.deck) out[k] = (out[k] ?? 0) + 1;
+  return out;
 }

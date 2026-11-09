@@ -6,11 +6,12 @@ import { CRISES_BY_ID } from '../../content/crises.js';
 import {
   getPlayer, nextPlayer, survivorDef, survivorsAt, aliveSurvivorsOf, foodNeeded,
   colonyPopulation, crisisRequirement, itemOf, scenarioDef, scenarioTarget, objectiveDef,
-  focusSurvivor, playerHasAbility,
+  focusSurvivor, playerHasAbility, isFrostbound, energyMax, energyRegen, spawnForecast,
 } from '../selectors.js';
 import {
-  log, changeMorale, rollDiceFor, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems,
+  log, changeMorale, rollDiceFor, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems, addDangerCard,
 } from './helpers.js';
+import { ENERGY, DANGER_ESCALATION } from '../constants.js';
 import { applyEffects } from './effects.js';
 import { evaluate, focusFilterFor } from './conditions.js';
 
@@ -34,6 +35,7 @@ export function finishDraft(s) {
   }
   s.leaderId = best.pid;
   log(s, 'draftDone', { leaderId: s.leaderId });
+  if (isFrostbound(s)) for (const p of s.players) p.energy = ENERGY.START;
   // Everyone starts with a few scavenged items from random locations.
   for (const p of s.players) {
     for (let i = 0; i < RULES.STARTING_HAND; i++) {
@@ -52,7 +54,7 @@ export function startRound(s) {
   const crisisId = drawFromDeck(s, 'crisisDeck', 'crisisDiscard');
   s.crisis = { id: crisisId, contributions: [] };
   log(s, 'roundStart', { round: s.round, crisisId, leaderId: s.leaderId });
-  for (const p of s.players) rollDiceFor(s, p.id);
+  if (!isFrostbound(s)) for (const p of s.players) rollDiceFor(s, p.id);
   s.activePlayerId = s.leaderId;
   beginTurn(s);
 }
@@ -63,6 +65,17 @@ export function beginTurn(s) {
   p.abilityUsed = {};
   p.usedCards = [];
   p.pick = null;
+  if (isFrostbound(s)) {
+    // Regain energy (carry-over stays, capped); a frost card's penalty applies to this one regen.
+    // The first turn of the game starts full, so it gets nothing extra.
+    const max = energyMax(s, p.id);
+    if (p.fresh !== false) p.fresh = false;
+    else p.energy = Math.min(max, p.energy + energyRegen(s, p.id));
+    p.energy = Math.min(p.energy, max);
+    p.regenPenalty = 0;
+    p.lastSearch = null;
+    log(s, 'energy', { playerId: p.id, value: p.energy, max });
+  }
   s.pendingCrossroads = null;
 
   const reader = nextPlayer(s, p.id);
@@ -137,6 +150,9 @@ export function colonyPhase(s) {
     else woundSurvivor(s, sv.id, 'frostbite');
   }
 
+  // 6. Frostbound: the danger deck gets meaner as the winter goes on.
+  if (DANGER_ESCALATION[s.round] && s.danger) addDangerCard(s, DANGER_ESCALATION[s.round], 'winter');
+
   s.reports.colony = report;
   if (s.morale <= 0) return endGame(s, 'moraleCollapse');
 
@@ -172,6 +188,7 @@ export function resolveCrisis(s) {
     if (bonus) changeMorale(s, bonus, 'crisisAverted');
   } else {
     applyEffects(s, crisis.fail, { reason: 'crisisFailed' });
+    if (s.danger) addDangerCard(s, 'scratch', 'crisisFailed');
   }
   s.crisisDiscard.push(s.crisis.id);
   s.crisis = null;
@@ -179,17 +196,9 @@ export function resolveCrisis(s) {
 }
 
 export function spawnZombies(s) {
-  const spawns = {};
-  for (const loc of OUTSIDE_LOCATIONS) {
-    const here = survivorsAt(s, loc);
-    if (!here.length) continue;
-    const quiet = here.filter((sv) => survivorDef(sv.id).ability.type === 'quiet').length;
-    const n = Math.max(0, Math.ceil(here.length / 2) - quiet);
-    if (n) { addZombies(s, loc, n, 'colonyPhase'); spawns[loc] = n; }
-  }
-  const colonyPeople = survivorsAt(s, 'colony').length + s.helpless;
-  const n = Math.ceil(colonyPeople / 3);
-  if (n) { addZombies(s, 'colony', n, 'colonyPhase'); spawns.colony = n; }
+  // The same numbers the threat forecast shows (selectors.spawnForecast).
+  const spawns = spawnForecast(s);
+  for (const [loc, n] of Object.entries(spawns)) addZombies(s, loc, n, 'colonyPhase');
   return spawns;
 }
 

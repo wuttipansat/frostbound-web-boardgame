@@ -18,6 +18,7 @@ export const A = Object.freeze({
   CALL_VOTE: 'CALL_VOTE',
   CAST_VOTE: 'CAST_VOTE',
   RETURN_CARD: 'RETURN_CARD',
+  SEARCH_DEEPER: 'SEARCH_DEEPER',
 });
 
 export const draftPick = (playerId, survivorIds) => ({ type: A.DRAFT_PICK, playerId, survivorIds });
@@ -39,3 +40,5 @@ export const requestItem = (playerId, targetId, itemType = null) => ({ type: A.R
 export const respondRequest = (playerId, requestId, cardUid = null) => ({ type: A.RESPOND_REQUEST, playerId, requestId, cardUid });
 export const callVote = (playerId, targetId) => ({ type: A.CALL_VOTE, playerId, targetId });
 export const castVote = (playerId, yes) => ({ type: A.CAST_VOTE, playerId, yes });
+/** Frostbound rules: one more card right after a search, then a danger card. */
+export const searchDeeper = (playerId, survivorId) => ({ type: A.SEARCH_DEEPER, playerId, survivorId });

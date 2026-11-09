@@ -1,6 +1,7 @@
 // createGame(config) -> a fresh, fully JSON-serializable GameState.
 import { PHASES, LOCATION_IDS, RULES } from './constants.js';
 import { normalizeSeed, shuffle } from './rng.js';
+import { RULESETS, DANGER_DECK } from './constants.js';
 import { assert } from './errors.js';
 import { LOCATIONS } from '../content/locations.js';
 import { SURVIVORS } from '../content/survivors.js';
@@ -28,7 +29,7 @@ export function createGame(config) {
   const s = {
     version: STATE_VERSION,
     rng: normalizeSeed(config.seed),
-    config: { playerCount: players.length, scenarioId: scenario.id, betrayer: betrayerMode },
+    config: { playerCount: players.length, scenarioId: scenario.id, betrayer: betrayerMode, rules: RULESETS.includes(config.rules) ? config.rules : 'classic' },
     phase: PHASES.DRAFT,
     round: 1,
     scenario: { id: scenario.id, rounds: scenario.rounds, deposited: 0 },
@@ -117,5 +118,11 @@ export function createGame(config) {
     });
   });
   s.survivorDeck = survivorPool;
+  // Step 23: the danger deck (shuffled last, so classic games keep their exact seeds).
+  if (s.config.rules === 'frostbound') {
+    const deck = Object.entries(DANGER_DECK).flatMap(([kind, n]) => Array(n).fill(kind));
+    s.danger = { deck: shuffle(s, deck), discard: [] };
+    for (const p of s.players) { p.energy = 0; p.regenPenalty = 0; p.lastSearch = null; }
+  }
   return s;
 }

@@ -1,11 +1,12 @@
 // Data-driven effect interpreter shared by crossroads choices and crisis outcomes.
 // ctx = { playerId, focusSurvivorId } — both optional (crisis effects have no player).
+import { ENERGY } from '../constants.js';
 import { OUTSIDE_LOCATIONS } from '../constants.js';
 import { pick } from '../rng.js';
 import { getPlayer, itemOf, focusSurvivor } from '../selectors.js';
 import {
   changeMorale, changeFood, changeWaste, changeHelpless, drawItems, wasteCard, addZombies,
-  removeZombies, addBarricades, woundSurvivor, healSurvivor, rollExposure, addDie, loseDie, log,
+  removeZombies, addBarricades, woundSurvivor, healSurvivor, rollExposure, addDie, loseDie, log, gainEnergy,
 } from './helpers.js';
 
 function focus(s, ctx) {
@@ -55,8 +56,9 @@ const EFFECTS = {
   wound: (s, ctx) => { const sv = focus(s, ctx); if (sv) woundSurvivor(s, sv.id, 'crossroads'); },
   heal: (s, ctx) => { const sv = focus(s, ctx); if (sv) healSurvivor(s, sv.id); },
   exposure: (s, ctx) => { const sv = focus(s, ctx); if (sv) rollExposure(s, sv.id, 'crossroads'); },
-  gainDie: (s, ctx, e) => { if (ctx.playerId) for (let i = 0; i < e.n; i++) addDie(s, ctx.playerId); },
-  loseDie: (s, ctx, e) => { if (ctx.playerId) for (let i = 0; i < e.n; i++) loseDie(s, ctx.playerId); },
+  // Frostbound: a die is worth ENERGY.CARD energy.
+  gainDie: (s, ctx, e) => { if (!ctx.playerId) return; if (s.danger) gainEnergy(s, ctx.playerId, ENERGY.CARD * e.n, ENERGY.MAX + 20); else for (let i = 0; i < e.n; i++) addDie(s, ctx.playerId); },
+  loseDie: (s, ctx, e) => { if (!ctx.playerId) return; if (s.danger) gainEnergy(s, ctx.playerId, -ENERGY.CARD * e.n); else for (let i = 0; i < e.n; i++) loseDie(s, ctx.playerId); },
   moveHome: (s, ctx) => {
     const sv = focus(s, ctx);
     if (!sv || getPlayer(s, sv.owner).exiled || sv.location === 'colony') return;
