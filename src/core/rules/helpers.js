@@ -128,6 +128,9 @@ export function addZombies(s, locationId, n, reason) {
       log(s, 'barricadeBroken', { locationId });
     } else if (loc.zombies < slots) {
       loc.zombies += 1;
+    } else if (locationId !== 'colony') {
+      // Step 9: a full place is overrun; the extra zombies walk on to the colony gate.
+      addZombies(s, 'colony', 1, 'overflow');
     } else {
       overrun(s, locationId);
     }

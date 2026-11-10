@@ -5,7 +5,7 @@ import { random } from '../rng.js';
 import { assert } from '../errors.js';
 import {
   survivorDef, gearOf, freeSurvivorSlots, freeZombieSlots, itemOf, scenarioDef, booksHeld, holdsBlueprint,
-  actionCost, killsPerAttack, apMax, fightPreview, leaveDamage, holderOf, placeOfItem, packFree, searchSpawnChance, baseLevel, nextLevel, teamHasAbility,
+  actionCost, killsPerAttack, apMax, fightPreview, leaveDamage, holderOf, placeOfItem, packFree, searchSpawnChance, baseLevel, nextLevel, isOverrun, teamHasAbility,
 } from '../selectors.js';
 import {
   log, drawItems, discardCard, removeFromHand, addZombies, removeZombies,
@@ -91,6 +91,7 @@ export function search(s, { survivorId }) {
   const sv = requireActive(s, survivorId);
   assert(sv.location !== 'colony', 'cannotSearchColony');
   assert(s.locations[sv.location].deck.length > 0, 'deckEmpty');
+  assert(!isOverrun(s, sv.location), 'placeOverrun');
   const a = ability(survivorId);
   const n = Math.min(packFree(s, survivorId), a.type === 'doubleSearch' && a.location === sv.location ? 2 : 1);
   assert(n > 0, 'packFull');

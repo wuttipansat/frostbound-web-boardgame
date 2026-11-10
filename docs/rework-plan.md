@@ -23,7 +23,7 @@ Numbers are starting values; Step 18 tunes them.
 | 6 | HP 100 and fights. One attack = one zombie dead, costs 15 AP. HP lost = `max(0, zombie ferocity − (AP left + ATK)) ÷ 3` rounded up, minus armor. Walker ferocity 110, brute 150 (day 21+). Leaving a place with zombies: 5 HP per zombie. Guns: kill without losing HP, 10 AP + 1 ammo, a chance a new zombie appears (pistol 40%, shotgun 50% and kills 2, silenced rifle 15%). | **done** |
 | 7 | Expeditions: walking costs AP by distance (12 / 17 / 23), search 17 AP into the survivor's backpack (3 slots). Items count only once carried home (`s.stockpile`). A search may make a zombie appear (10–25% by place, +10% per extra search there that day; it appears, it does not bite at once). Hand items over for free at the same place. No player hand. | **done** |
 | 8 | Items: weapons (knife +6, crowbar +8, bat +10, bow +12 silent, fire axe +18, guns), armor (−2 / −3 / −5 HP per fight, snow suit), tools (flashlight, map, big backpack, sled, survival guide, tool kit), consumables (bandage +15 HP, first-aid kit +35 HP, painkillers, coffee +20 AP, chocolate, canned food, ammo, firebomb), materials (wood, scrap, cloth, tools, fuel, engine and heater parts). Loot tables per place. Crafting (needs the workshop). | **done** (crafting at the colony; the workshop gate comes in Step 12) |
-| 9 | (skipped for now, at the user's request) New location capacity: remove the slot pedestals. One floating sign per place: name, 👤 2/4, 🧟 3/6 bar, search %, cards left. 6 zombies = the place is overrun (no searching, extra zombies walk to the base). | |
+| 9 | New location capacity: remove the slot pedestals. One floating sign per place: name, 👤 2/4, 🧟 3/6 bar, search %, cards left. 6 zombies = the place is overrun (no searching, extra zombies walk to the base). | **done** (after Step 18) |
 | 10 | Food every day: everyone at the base eats 1. Missing food: −15 HP each, −1 morale, 50% AP next day. "Food for N days" on the HUD. | **done** |
 | 11 | A crisis every day: revealed at dawn, items handed in during the day (face up), scored at dusk. +1 needed every 10 days. | **done** |
 | 12 | Base upgrades (3 levels each, materials + AP, AP carries over): dorm, wall, greenhouse, workshop, infirmary, radio tower. | **done** |
@@ -264,3 +264,15 @@ and perf (initial download 251 kB as the perf script measures it, 3 ms frames) a
 
 Publish: `.github/workflows/pages.yml` builds, tests and deploys `dist/` to GitHub Pages on pushes to `main` (or by
 hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHub Actions.
+
+## Step 9 notes (done after Step 18) and leftovers
+
+- Balance after this change (bot, normal, 50 games): crawler 34% won, average win day 28.9.
+- Every outside place holds **6 zombies**. At 6 it is **overrun**: no searching there, and extra zombies walk on to
+  the colony gate (they join the night attack). A full colony gate still hurts the weakest survivor there (30 HP).
+- The slot pedestals are gone. Each place has one floating sign: name, 👤 people / max, 🧟 n/6 with a bar, the search
+  zombie chance (or "overrun"), items left, and the walk price in AP when a survivor is selected. The hover name tag
+  is hidden (the sign carries the name).
+- Night attack scene: at night a callout over the colony shows a row of skulls (the stopped ones greyed out),
+  "5 attack · 4 stopped" and the HP lost.
+- Limited palette: near-duplicate tones now share one swatch (snow shades, road, wood, pine, window, danger, slot).

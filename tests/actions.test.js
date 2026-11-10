@@ -81,7 +81,8 @@ test('barricade: limited by free slots; zombies smash barricades first', () => {
   let r = reduce(s, a.barricade('nia-calloway'));
   assert.equal(r.locations.police.barricades, 2, 'locksmith places two');
   r = reduce(r, a.barricade('nia-calloway'));
-  assert.equal(r.locations.police.barricades, 3, 'capped at the 3 zombie slots');
+  r = reduce(r, a.barricade('nia-calloway'));
+  assert.equal(r.locations.police.barricades, 6, 'capped at the 6 zombie spots');
   assert.equal(tryReduce(r, a.barricade('nia-calloway')).error, 'noBarricadeSpace');
   r = reduce(r, a.barricade('corwin-daly'));
   assert.equal(r.locations.colony.barricades, 1);

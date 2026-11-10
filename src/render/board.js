@@ -35,7 +35,7 @@ export function computeLayout() {
       facing: Math.atan2(toColony.x, toColony.z),
       label: at(-1, 0).setY(10),
       // Zombies crowd the entrance; survivors stand on pads on the road side.
-      zombieSlots: [-1.6, 0, 1.6].map((l) => at(8, l)),
+      zombieSlots: [[8, -1.6], [8, 0], [8, 1.6], [6.4, -0.8], [6.4, 0.8], [6.4, 2.4]].map(([f, l]) => at(f, l)),
       survivorSlots: Array.from({ length: nSurv }, (_, k) => at(11, (k - (nSurv - 1) / 2) * 2.1)),
       hitRadius: 8.5,
     };
@@ -138,23 +138,6 @@ function scatter(layout, roads, count, seed, minGap = 2.4) {
 }
 
 
-/** HD slot markers: a bevelled 6×6 plate with a carved emblem (snowflake for survivors, claw marks for zombies). */
-function slotMarkerHD(kind) {
-  const m = new VoxelModel();
-  const survivor = kind === 'survivor';
-  const rim = survivor ? 0x7f97b8 : P.dangerDark;
-  const fill = survivor ? 0xd8e6f5 : P.danger;
-  m.box(0, 0, 0, 6, 1, 6, (x, _y, z) => {
-    const corner = (x === 0 || x === 5) && (z === 0 || z === 5);
-    if (corner) return null;
-    return x === 0 || x === 5 || z === 0 || z === 5 ? rim : fill;
-  });
-  const emblem = survivor
-    ? [[2, 1], [3, 1], [1, 2], [4, 2], [1, 3], [4, 3], [2, 4], [3, 4], [2, 2], [3, 3]]
-    : [[1, 1], [2, 2], [3, 3], [2, 1], [3, 2], [4, 3], [3, 1], [4, 2]];
-  for (const [x, z] of emblem) m.set(x, 0, z, survivor ? 0x9fc4e6 : 0x3a1010);
-  return m;
-}
 
 /** A soft glowing ring texture for hover/selection halos. */
 function haloTexture() {
@@ -208,20 +191,12 @@ export function createBoard() {
   }
   locationGroups.colony = colonyGroup;
 
-  // Slot markers (instanced): pale pads for survivors, blood-red tiles for zombies.
-  const survivorTransforms = [];
-  const zombieTransforms = [];
-  const tmp = new THREE.Object3D();
-  for (const L of Object.values(layout)) {
-    for (const p of L.survivorSlots) { tmp.position.set(p.x, 0.01, p.z); tmp.rotation.y = L.facing; tmp.updateMatrix(); survivorTransforms.push(tmp.matrix.clone()); }
-    for (const p of L.zombieSlots) { tmp.position.set(p.x, 0.01, p.z); tmp.rotation.y = L.facing; tmp.updateMatrix(); zombieTransforms.push(tmp.matrix.clone()); }
-  }
-  root.add(instanced(slotMarkerHD('survivor'), 0.225, survivorTransforms, { castShadow: false, jitter: 0 }));
-  root.add(instanced(slotMarkerHD('zombie'), 0.225, zombieTransforms, { castShadow: false, jitter: 0 }));
+  // Step 9: no slot pedestals any more; each place has one floating sign (see main.js labels).
 
   // Forest + rocks (instanced)
   const trees = scatter(layout, roads, 90, 3);
   // 3 silhouettes, one instanced mesh each, size varied by scale (fewer draw calls than one mesh per shape × size).
+  const tmp = new THREE.Object3D();
   const groups = 3;
   const bucket = Array.from({ length: groups }, () => []);
   for (const t of trees) {

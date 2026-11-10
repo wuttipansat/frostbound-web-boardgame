@@ -19,7 +19,8 @@ import { c, t as tr } from './i18n/index.js';
 import { LOCATION_IDS } from './core/constants.js';
 import { ITEMS } from './content/items.js';
 import { tryReduce } from './core/reducer.js';
-import { actionCost } from './core/selectors.js';
+import { actionCost, searchSpawnChance, isOverrun } from './core/selectors.js';
+import { LOCATIONS } from './content/locations.js';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -98,17 +99,36 @@ $('labels').appendChild(nameTag);
 let hoveredLoc = null;
 
 function refreshLabels(state) {
-  // Step 16: with a survivor selected, every place shows the AP that walk costs (the road's price).
+  // Step 9: one floating sign per place — name, people n/max, a zombie bar n/6, search %, items left,
+  // and (with a survivor selected) the AP the walk there costs (Step 16).
   const sel = state && app?.ui.selSurvivor && state.survivors[app.ui.selSurvivor]?.alive ? app.ui.selSurvivor : null;
+  const span = (cls, ...kids) => { const e = document.createElement('span'); e.className = cls; e.append(...kids); return e; };
   for (const id of LOCATION_IDS) {
-    const z = state?.locations[id].zombies ?? 0;
+    const el = labels[id];
+    el.replaceChildren();
+    el.dataset.loc = id;
+    el.className = 'loc-label sign';
+    if (!state) { el.classList.add('empty'); continue; }
+    const loc = state.locations[id];
+    const def = LOCATIONS[id];
+    const z = loc.zombies;
+    const people = Object.values(state.survivors).filter((v) => v.alive && v.location === id).length;
+    const over = isOverrun(state, id);
+    el.classList.toggle('overrun', over);
+    el.append(span('sg-name', c('locations', id, 'name')));
+    const row = span('sg-row');
+    row.append(span('sg-ppl', icon('person'), def.survivorSlots ? `${people}/${def.survivorSlots}` : `${people}`));
+    const bar = span('sg-zbar');
+    for (let k = 0; k < Math.min(def.zombieSlots, 12); k++) { const i = document.createElement('i'); if (k < z) i.className = 'on'; bar.append(i); }
+    row.append(span('sg-z', icon('skull'), `${z}/${def.zombieSlots}`), bar);
+    if (id !== 'colony') {
+      row.append(span('sg-srch', icon('search'), over ? tr('sign.overrun') : `${Math.round(searchSpawnChance(state, id) * 100)}%`));
+      row.append(span('sg-left', icon('log'), `${loc.deck?.length ?? 0}`));
+    }
     const walk = sel && state.survivors[sel].location !== id ? actionCost(state, sel, 'move', id) : null;
-    labels[id].replaceChildren();
-    labels[id].classList.toggle('empty', !z && walk == null);
-    labels[id].dataset.loc = id;
-    if (z) labels[id].append(icon('skull'), String(z));
-    if (walk != null) { const b = document.createElement('b'); b.className = 'walk-ap'; b.textContent = `${walk} AP`; labels[id].append(b); }
-    labels[id].setAttribute('aria-label', `${c('locations', id, 'name')}: ${z}`);
+    if (walk != null) { const b = document.createElement('b'); b.className = 'walk-ap'; b.textContent = `${walk} AP`; row.append(b); }
+    el.append(row);
+    el.setAttribute('aria-label', `${c('locations', id, 'name')}: ${people} ${z}/${def.zombieSlots}`);
   }
 }
 
@@ -130,6 +150,15 @@ function sceneCallout(ev, state) {
     case 'build': el.append(icon('barricade')); res.append(tr(`bld.${ev.building}`), ev.level ? ` ${tr('scene.level', { n: ev.level })}` : ` +${ev.n} AP`); break;
     case 'unpack': el.append(...cardBacks(ev.n)); res.append(tr('scene.unpack', { n: ev.n })); break;
     case 'nap': el.append(icon('hourglass')); res.append(tr('act.nap')); break;
+    case 'siege': {
+      // The night attack: a row of skulls, the stopped ones crossed out, then the bites.
+      const row = document.createElement('span'); row.className = 'siege-row';
+      for (let i = 0; i < Math.min(ev.n, 12); i++) { const sk = icon('skull'); if (i < ev.k) sk.classList.add('stopped'); sk.style.setProperty('--i', i); row.append(sk); }
+      el.append(row);
+      res.append(tr('scene.siege', { n: ev.n, k: ev.k }));
+      if (ev.hits) { const d = document.createElement('em'); d.className = 'dmg'; d.textContent = `−${ev.hits * 10} HP`; el.append(d); }
+      break;
+    }
     case 'barricade': res.append(`+${ev.n}`); break;
     case 'lure': res.append(`${ev.n}`, icon('skull'), ' → ', c('locations', ev.to, 'name')); break;
     case 'contribute': el.append(...cardBacks(1)); break;

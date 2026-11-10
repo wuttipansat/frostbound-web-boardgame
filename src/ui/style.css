@@ -1699,3 +1699,23 @@ img.art-item.blank { image-rendering: auto; background: none; }
 .icon-act .need-badge.risk.bad { background: #b8433a; color: #fff; }
 .toast.tip { background: #22324a; border-left: 3px solid #f2b33d; }
 @media (prefers-reduced-motion: reduce) { .scene-callout .dmg { animation: none; } }
+/* Step 9: one sign per place */
+.loc-label.sign { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 8px; border-radius: 10px; font-size: 11px; line-height: 1.2; }
+.loc-label.sign.empty { display: none; }
+.loc-label.sign .sg-name { font-weight: 800; font-size: 12px; }
+.loc-label.sign .sg-row { display: flex; align-items: center; gap: 6px; }
+.loc-label.sign .sg-row > span { display: inline-flex; align-items: center; gap: 2px; }
+.loc-label.sign .icon { width: 11px; height: 11px; }
+.loc-label.sign .sg-z { color: #e2a399; }
+.loc-label.sign .sg-zbar { display: inline-flex; gap: 1px; }
+.loc-label.sign .sg-zbar i { width: 4px; height: 8px; border-radius: 1px; background: rgba(255,255,255,.18); }
+.loc-label.sign .sg-zbar i.on { background: #d9534f; }
+.loc-label.sign .sg-left { opacity: .75; }
+.loc-label.sign.overrun { border-color: #d9534f; box-shadow: 0 0 0 1px #d9534f; }
+@media (max-width: 760px) { .loc-label.sign .sg-zbar, .loc-label.sign .sg-left { display: none; } .loc-label.sign { font-size: 10px; } }
+.scene-callout .siege-row { display: inline-flex; gap: 2px; }
+.scene-callout .siege-row .icon { width: 14px; height: 14px; color: #ff6b5e; animation: siege-in .25s ease-out both; animation-delay: calc(var(--i) * 80ms); }
+.scene-callout .siege-row .icon.stopped { color: #8fa3b8; opacity: .55; }
+@keyframes siege-in { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .scene-callout .siege-row .icon { animation: none; } }
+#loc-name { display: none !important; } /* Step 9: the sign carries the name */

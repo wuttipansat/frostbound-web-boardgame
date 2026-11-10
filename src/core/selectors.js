@@ -284,6 +284,10 @@ export function missionStatus(s) {
   return { ...m, progress: Math.max(0, (s.stats?.[m.stat] ?? 0) - m.base), daysLeft: m.until - s.day };
 }
 
+/** Step 9: an outside place at its zombie cap (6) is overrun: no searching there. */
+export const isOverrun = (s, id) => id !== 'colony' && (s.locations[id]?.zombies ?? 0) >= LOCATIONS_BY_ID(id).zombieSlots;
+const LOCATIONS_BY_ID = (id) => LOCATIONS[id];
+
 /** Base upgrade level (0..3). */
 export const baseLevel = (s, id) => s.base?.[id] ?? 0;
 /** Beds at the colony: 2, +2 per dorm level. */

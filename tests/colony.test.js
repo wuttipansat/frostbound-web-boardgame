@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { reduce } from '../src/core/reducer.js';
+import { reduce, tryReduce } from '../src/core/reducer.js';
 import * as a from '../src/core/actions.js';
 import { colonyPhase, resolveCrisis, spawnZombies, endGame } from '../src/core/rules/flow.js';
 import { addZombies } from '../src/core/rules/helpers.js';
@@ -98,13 +98,15 @@ test('spawning: ceil(n/2) outside; the colony gets a night attack instead', () =
   assert.deepEqual(s.spawns, { school: 1 });
 });
 
-test('overrun: a full entrance hurts the weakest survivor there for 30 HP', () => {
-  let s = team({ 'corwin-daly': 'school', 'dot-ferreira': 'school', 'greta-vos': 'colony' });
-  s = patch(s, (x) => { x.survivors['dot-ferreira'].hp = 60; x.locations.school.zombies = 3; x.morale = 8; addZombies(x, 'school', 1); });
-  assert.equal(s.survivors['dot-ferreira'].hp, 30);
-  assert.equal(s.survivors['corwin-daly'].hp, 100);
-  s = patch(s, (x) => { x.survivors['greta-vos'].hp = 20; x.locations.colony.zombies = 12; addZombies(x, 'colony', 1); });
-  assert.equal(s.survivors['greta-vos'].alive, false, 'at 0 HP they die');
+test('overrun: a place with 6 zombies blocks searching and sends extra zombies to the colony; a full colony hurts', async () => {
+  const { search } = await import('../src/core/actions.js');
+  let s = team({ 'corwin-daly': 'school', 'greta-vos': 'colony' });
+  s = patch(s, (x) => { x.locations.school.zombies = 6; x.locations.colony.zombies = 0; addZombies(x, 'school', 2); });
+  assert.equal(s.locations.school.zombies, 6);
+  assert.equal(s.locations.colony.zombies, 2, 'the overflow walks to the colony gate');
+  assert.equal(tryReduce(s, search('corwin-daly')).error, 'placeOverrun');
+  s = patch(s, (x) => { x.survivors['greta-vos'].hp = 60; x.locations.colony.zombies = 12; addZombies(x, 'colony', 1); });
+  assert.equal(s.survivors['greta-vos'].hp, 30, 'a full colony: the weakest there loses 30 HP');
 });
 
 test('barricades absorb zombies before they fill slots', () => {

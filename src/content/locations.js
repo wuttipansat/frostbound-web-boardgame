@@ -16,7 +16,7 @@ export const LOCATIONS = {
     name: 'Police Station',
     blurb: 'Precinct 9. The evidence locker still hums on a backup battery.',
     survivorSlots: 3,
-    zombieSlots: 3,
+    zombieSlots: 6,
     deck: {
       ammo: 2, crowbar: 1, scrap: 4, wood: 1, 'engine-part': 1,
       'glock-19': 2, 'riot-baton': 2, 'remington-870': 1, 'mosin-nagant': 1, 'first-aid-pouch': 2,
@@ -28,7 +28,7 @@ export const LOCATIONS = {
     name: 'Grocery Store',
     blurb: 'FreshCo Market. The freezers stopped mattering weeks ago.',
     survivorSlots: 4,
-    zombieSlots: 3,
+    zombieSlots: 6,
     deck: {
       coffee: 1, chocolate: 1, 'kitchen-knife': 1, cloth: 3,
       'canned-beans': 4, 'beef-jerky': 3, 'rice-sack': 2, 'first-aid-pouch': 1, 'jerry-can': 1,
@@ -40,7 +40,7 @@ export const LOCATIONS = {
     name: 'School',
     blurb: 'Larkspur Elementary. Crayon drawings still cover the gym doors.',
     survivorSlots: 4,
-    zombieSlots: 3,
+    zombieSlots: 6,
     deck: {
       'baseball-bat': 1, cloth: 2, wood: 4, 'big-backpack': 1, 'heater-part': 1,
       'canned-beans': 2, 'beef-jerky': 1, 'jerry-can': 1, 'first-aid-pouch': 2, 'duct-tape': 2,
@@ -52,7 +52,7 @@ export const LOCATIONS = {
     name: 'Hospital',
     blurb: 'St. Aurelia General. The lobby lights flicker in a slow heartbeat.',
     survivorSlots: 3,
-    zombieSlots: 3,
+    zombieSlots: 6,
     deck: {
       bandage: 2, 'first-aid-kit': 1, painkillers: 1, cloth: 3, 'heater-part': 1,
       'first-aid-pouch': 4, antibiotics: 2, 'canned-beans': 1, 'rice-sack': 1, 'jerry-can': 1,
@@ -64,7 +64,7 @@ export const LOCATIONS = {
     name: 'Library',
     blurb: 'Ashgrove Public Library. Paper burns; knowledge keeps you alive.',
     survivorSlots: 3,
-    zombieSlots: 3,
+    zombieSlots: 6,
     deck: {
       'city-map': 1, 'hunting-bow': 1, wood: 4, 'snow-suit': 1, 'heater-part': 1, flashlight: 1,
       'duct-tape': 2, 'zip-ties': 2, 'socket-set': 1, 'field-manual': 1, 'blueprint-library': 1, 'jerry-can': 2,
@@ -76,7 +76,7 @@ export const LOCATIONS = {
     name: 'Gas Station',
     blurb: 'Northstar Fuel & Snacks. The pumps are dry, the tanks underneath are not.',
     survivorSlots: 3,
-    zombieSlots: 3,
+    zombieSlots: 6,
     deck: {
       'tool-kit': 1, sled: 1, scrap: 4, 'engine-part': 2, 'scrap-plate': 1,
       'jerry-can': 6, 'beef-jerky': 1, 'socket-set': 1, 'riot-baton': 1, 'motor-junk': 2,

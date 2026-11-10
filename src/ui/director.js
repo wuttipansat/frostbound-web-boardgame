@@ -6,7 +6,7 @@
 /** Seconds each scene holds at normal speed: [watched, own move]. */
 const DURATION = {
   move: [1.5, 0.15], attack: [1.3, 0.25], search: [1.35, 0.25], barricade: [1.05, 0.2],
-  lure: [1.35, 0.2], play: [1.0, 0.15], craft: [1.0, 0.2], build: [1.1, 0.25], unpack: [0.9, 0.2], give: [0.8, 0.15], nap: [0.8, 0.15], contribute: [0.9, 0.15], deposit: [1.0, 0.15], exposure: [2.9, 2.5], turn: [0.55, 0],
+  lure: [1.35, 0.2], play: [1.0, 0.15], craft: [1.0, 0.2], siege: [1.8, 1.4], build: [1.1, 0.25], unpack: [0.9, 0.2], give: [0.8, 0.15], nap: [0.8, 0.15], contribute: [0.9, 0.15], deposit: [1.0, 0.15], exposure: [2.9, 2.5], turn: [0.55, 0],
 };
 const MAX_SCENE = 4; // seconds: nothing may hold the queue longer, whatever the frame rate
 export const SPEED = { normal: 1, fast: 0.55 };
@@ -30,6 +30,7 @@ export function eventsFromLog(entries, state) {
       case 'unpack': ev = { kind: 'unpack', survivorId: e.survivorId, at: 'colony', n: e.count }; break;
       case 'give': ev = { kind: 'give', survivorId: e.survivorId, at: locOf(e.survivorId), card: e.card }; break;
       case 'nap': ev = { kind: 'nap', survivorId: e.survivorId, at: 'colony' }; break;
+      case 'siege': if (e.attackers) ev = { kind: 'siege', at: 'colony', n: e.attackers, k: e.stopped, hits: e.hits }; break;
       case 'barricade': ev = { kind: 'barricade', at: e.locationId, n: e.n ?? 1 }; break;
       case 'lure': ev = { kind: 'lure', survivorId: e.survivorId, from: e.from, to: e.to, at: e.to, n: e.n ?? 0 }; break;
       case 'play': ev = { kind: 'play', at: 'colony', card: e.card, type: e.type }; break;
