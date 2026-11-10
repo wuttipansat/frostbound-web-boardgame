@@ -128,6 +128,8 @@ export default {
   'err.placeOverrun': 'Overrun: 6 zombies here. Clear some before searching.',
   'scene.siege': '{n} attack · {k} stopped',
   'view.reset': 'Back to the usual view',
+  'hud.today': 'Today',
+  'hud.menu': 'Menu',
   'act.cost': "costs {n} AP (has {have})",
   'panel.energyTip': "{name}: AP {n}/{max} · tonight: {sleep}, wakes with {wake} AP",
   'confirm.end.energy': 'Your team still has {n} AP and something to do. Unspent AP carries over; sleep tops it up.',

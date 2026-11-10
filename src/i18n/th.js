@@ -127,6 +127,8 @@ export default {
   'err.placeOverrun': 'ซอมบี้ยึดที่นี่แล้ว (6 ตัว) ต้องกำจัดก่อนถึงจะค้นได้',
   'scene.siege': 'บุก {n} · กันได้ {k}',
   'view.reset': 'กลับมุมมองเดิม',
+  'hud.today': 'สรุปวันนี้',
+  'hud.menu': 'เมนู',
   'act.cost': "ใช้ AP {n} (มี {have})",
   'panel.energyTip': "{name}: AP {n}/{max} · คืนนี้: {sleep} ตื่นมามี {wake} AP",
   'confirm.end.energy': 'ทีมยังมี AP รวม {n} และยังทำอะไรได้อีก AP ที่เหลือยกไปพรุ่งนี้ การนอนจะเติมให้',

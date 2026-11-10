@@ -368,7 +368,8 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
       ev.preventDefault(); director.skip(); return;
     }
     if (ev.key !== 'Escape') return;
-    if (ui.crisisOpen) set({ crisisOpen: false });
+    if (ui.infoOpen || ui.topMore) set({ infoOpen: false, topMore: false });
+    else if (ui.crisisOpen) set({ crisisOpen: false });
     else if (ui.moreOpen) set({ moreOpen: false });
     else if (ui.logOpen) set({ logOpen: false });
     else if (ui.picking) set({ picking: null });
@@ -381,6 +382,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
   document.addEventListener('click', (ev) => {
     if (ui.crisisOpen && !ev.target.closest?.('.crisis-pop, .stat-block.crisis')) set({ crisisOpen: false });
     if (ui.moreOpen && !ev.target.closest?.('.more-menu, .icon-btn.more')) set({ moreOpen: false });
+    if ((ui.infoOpen || ui.topMore) && !ev.target.closest?.('.info-pop, .top-menu, .info-btn, .top-more, .crisis-pop')) set({ infoOpen: false, topMore: false });
   });
 
   render();

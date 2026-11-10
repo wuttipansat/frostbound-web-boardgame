@@ -59,13 +59,33 @@ export function renderTopbar(el, ctx) {
   const goal = block('goal', t('tip.goal', { text: c('scenarios', s.scenario.id, 'goalText') }), 'goal', t('hud.goal'),
     counter('goal', scenarioProgress(s), { text: (v) => `${v}/${scenarioTarget(s)}` }));
 
+  // UI-2: one row — morale, day, food, and an ⓘ button; everything else sits in the "today" card.
+  const alert = sf.hits > 0 || (crisis && crisisScore(s) < crisisRequirement(s));
+  const infoBtn = h('button', {
+    class: `icon-btn info-btn${alert ? ' alert' : ''}${ui.infoOpen ? ' on' : ''}`, tip: t('hud.today'), 'aria-label': t('hud.today'),
+    'aria-expanded': ui.infoOpen ? 'true' : 'false',
+    onclick: (ev) => { ev.stopPropagation(); ctx.set({ infoOpen: !ui.infoOpen, topMore: false }); },
+  }, h('b', {}, 'i'));
+  const moreBtn = h('button', {
+    class: `icon-btn top-more${ui.topMore ? ' on' : ''}`, tip: t('hud.menu'), 'aria-label': t('hud.menu'),
+    onclick: (ev) => { ev.stopPropagation(); ctx.set({ topMore: !ui.topMore, infoOpen: false }); },
+  }, icon('more'));
   mount(el,
     h('div', { class: 'brand-mini' }, 'FROSTBOUND'),
-    morale, food, team, siege, round, goal, mission, crisisChip,
+    morale, round, food,
     h('div', { class: 'spacer' }),
-    h('button', { class: 'icon-btn rules-btn', tip: t('hud.rules'), 'aria-label': t('hud.rules'), onclick: () => ctx.set({ modal: 'rules' }) }, '?'),
-    h('button', { class: `icon-btn${ui.logOpen ? ' on' : ''}`, tip: t('hud.log'), 'aria-label': t('hud.log'), onclick: () => ctx.set({ logOpen: !ui.logOpen }) }, icon('log')),
-    h('button', { class: 'icon-btn', tip: t('hud.settings'), 'aria-label': t('hud.settings'), onclick: () => ctx.set({ modal: 'settings' }) }, icon('settings')));
+    infoBtn, moreBtn);
+  if (ui.infoOpen) {
+    el.append(h('div', { class: 'popover info-pop panel', role: 'dialog', 'aria-label': t('hud.today'), onclick: (ev) => ev.stopPropagation() },
+      h('h3', {}, t('hud.today')), crisisChip, siege, goal, mission, team));
+  }
+  if (ui.topMore) {
+    const item = (label, ico, fn) => h('button', { class: 'menu-item', onclick: (ev) => { ev.stopPropagation(); ctx.set({ topMore: false }); fn(); } }, ico, h('span', {}, label));
+    el.append(h('div', { class: 'popover top-menu panel', role: 'menu', onclick: (ev) => ev.stopPropagation() },
+      item(t('hud.rules'), h('b', {}, '?'), () => ctx.set({ modal: 'rules' })),
+      item(t('hud.log'), icon('log'), () => ctx.set({ logOpen: !ui.logOpen })),
+      item(t('hud.settings'), icon('settings'), () => ctx.set({ modal: 'settings' }))));
+  }
 
   if (crisis && ui.crisisOpen) {
     el.append(h('div', { class: 'popover crisis-pop panel', role: 'dialog', onclick: (ev) => ev.stopPropagation() },

@@ -1724,3 +1724,14 @@ img.art-item.blank { image-rendering: auto; background: none; }
 /* UI-1: one small "usual view" button, bottom right above the end-day button */
 #view-ctl { left: auto !important; top: auto !important; right: calc(12px + env(safe-area-inset-right, 0px)); bottom: calc(var(--player-h, 64px) + 70px + env(safe-area-inset-bottom, 0px)); flex-direction: row; z-index: 6; }
 #view-ctl .view-btn { width: 40px !important; height: 40px !important; opacity: .85; }
+/* UI-2: one-row top bar; "today" card and menu float under it */
+#topbar { flex-wrap: nowrap !important; overflow: visible; }
+#topbar .info-btn b { font: 800 15px/1 var(--head, serif); font-style: italic; }
+#topbar .info-btn.alert { box-shadow: 0 0 0 2px #d9534f; position: relative; }
+#topbar .info-btn.alert::after { content: ""; position: absolute; top: 2px; right: 2px; width: 8px; height: 8px; border-radius: 50%; background: #ff6b5e; }
+#topbar .popover.info-pop, #topbar .popover.top-menu { position: absolute; top: calc(100% + 6px); right: calc(8px + env(safe-area-inset-right, 0px)); left: auto; z-index: 40; display: flex; flex-direction: column; gap: 6px; padding: 10px; width: min(320px, calc(100vw - 16px)); max-height: 70vh; overflow: auto; }
+#topbar .info-pop h3 { margin: 0 0 2px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; opacity: .75; }
+#topbar .info-pop .stat-block { width: 100%; max-width: none; }
+#topbar .top-menu { width: 200px !important; }
+#topbar .menu-item { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+#topbar .menu-item:hover, #topbar .menu-item:focus-visible { background: rgba(255,255,255,.08); }
