@@ -106,8 +106,9 @@ export function buildTerrainHD({ radius, distRoad, distPlot }) {
   };
   const column = (x, z) => {
     const wx = (x + 0.5) * cell; const wz = (z + 0.5) * cell;
-    const r = Math.hypot(wx, wz);
-    const edge = radius - 1.5 + hash3(Math.floor(x / 2), 7, Math.floor(z / 2)) * 2;
+    // UI-13: a square city slab (the diorama sits on a floating block of packed snow).
+    const r = Math.max(Math.abs(wx), Math.abs(wz));
+    const edge = radius - 3;
     if (r > edge) return null;
     const roadD = distRoad(wx, wz);
     const plotD = distPlot(wx, wz);
@@ -117,10 +118,18 @@ export function buildTerrainHD({ radius, distRoad, distPlot }) {
     if (flat > 2) h = Math.max(0, Math.round((noise + 0.4) * 2 * Math.min(1, (flat - 2) / 3)));
     if (r > radius - 6) h = Math.max(h, Math.floor(hash3(Math.floor(x / 2), 3, Math.floor(z / 2)) * 3));
     let top;
-    if (roadD < 1.9) {
-      top = roadD > 1.25 ? P.roadEdge : P.road;
-      if (Math.abs(roadD - 0.7) < 0.2) top = P.roadDark; // tyre ruts
-      if (roadD > 1.2 && hash3(x, 5, z) < 0.05) top = shadeHex(P.road, 0.75); // footprints
+    if (roadD < 2.2) {
+      // Snow-packed street: two dark asphalt ruts, grey slush between, a few half-buried dashes.
+      top = P.snowShade;
+      if (Math.abs(roadD - 1.0) < 0.3) top = P.asphalt;
+      else if (roadD < 0.3 && (Math.floor((wx + wz) * 0.7) % 3 === 0)) top = 0xe9edf2; // dash
+      else if (roadD < 0.7) top = P.slush;
+      if (hash3(x, 5, z) < 0.04) top = shadeHex(top, 0.85);
+      h = 0;
+    } else if (roadD < 3.6) {
+      // Sidewalk tiles under snow: a faint grid shows through, a kerb at the road side.
+      top = (x % 4 === 0 || z % 4 === 0) && bayer(x, 1, z) < 0.5 ? P.paving : P.snow;
+      if (roadD < 2.6) top = P.kerb;
       h = 0;
     } else {
       const coarseN = hash3(Math.floor(x / 5), 9, Math.floor(z / 5));

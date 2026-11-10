@@ -35,4 +35,10 @@ export const P = {
   blue: 0x2f5fa8,
   yellow: 0xe8b830,
   green: 0x3f7f4f,
+  // UI-13 city: asphalt ruts, slush, sidewalk tiles and kerbs under snow; the backdrop.
+  asphalt: 0x23272e,
+  slush: 0x9aa6b6,
+  paving: 0xbcc6d2,
+  kerb: 0xd8dee6,
+  backdrop: 0x1a2130,
 };

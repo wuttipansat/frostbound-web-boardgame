@@ -333,3 +333,10 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - Bot scouts when needed parts are only under the fog, or from day 3. Balance crawler normal (30 games): 27% (was 30%).
 - Not done from the prompt: the board does not physically grow and camera limits do not change with the open area — the fog lifts by sector over the same island.
 - Fixed: a faded suggestion left an empty box on screen.
+
+### UI-13 part A–B — snowed-in city ground (done)
+- docs/art-style.md: the style guide.
+- The board is a floating square slab over a dark backdrop (no sky); desktop view zoomed out to show it whole.
+- Streets: packed snow with dark asphalt ruts, slush, half-buried dashes, sidewalk tiles and kerbs.
+- Props (src/render/props.js, instanced): wrecked cars (3 variants, one with headlights), street lamps, snow-capped container stacks.
+- Left for parts C–D: new place buildings (neon signs, roof props, ruins), characters in winter clothes, voxel item icons, fog along the slab edge, day/night tint.

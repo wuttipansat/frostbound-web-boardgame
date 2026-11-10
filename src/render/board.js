@@ -7,6 +7,7 @@ import {
   LOCATION_BUILDERS_HD, colonyHD, treeModelHD, rockModelHD,
 } from './buildings.js';
 import { buildTerrainHD } from './terrain.js';
+import { carModel, lampModel, containerModel } from './props.js';
 import { LOCATIONS } from '../content/locations.js';
 import { OUTSIDE_LOCATIONS } from '../core/constants.js';
 
@@ -256,6 +257,42 @@ export function createBoard() {
     rockBuckets[i % rockBuckets.length].push(tmp.matrix.clone());
   });
   rockBuckets.forEach((list, shape) => root.add(instanced(rockModelHD(shape), 0.25, list, { cacheKey: `rock-${shape}`, jitter: 0 })));
+
+  // UI-13 city props: wrecked cars and lamps along the streets, container stacks on empty lots.
+  {
+    const cars = [[], [], []]; const lamps = [];
+    roads.forEach(([a, b], i) => {
+      const dir = b.clone().sub(a); const len = dir.length(); dir.normalize();
+      const side = new THREE.Vector3(-dir.z, 0, dir.x);
+      const at = (t, lat) => a.clone().addScaledVector(dir, len * t).addScaledVector(side, lat);
+      if (len > 6 && hash3(i, 1, 2) < 0.7) {
+        const p = at(0.35 + hash3(i, 2, 2) * 0.3, (hash3(i, 3, 2) < 0.5 ? -1 : 1) * 1.3);
+        tmp.position.copy(p); tmp.rotation.set(0, Math.atan2(dir.x, dir.z) - Math.PI / 2 + (hash3(i, 4, 2) - 0.5) * 0.6, 0); tmp.scale.setScalar(1); tmp.updateMatrix();
+        cars[i % 3].push(tmp.matrix.clone());
+      }
+      if (len > 8) {
+        tmp.position.copy(at(0.5, 3.1)); tmp.rotation.set(0, Math.atan2(side.x, side.z) - Math.PI / 2, 0); tmp.updateMatrix();
+        lamps.push(tmp.matrix.clone());
+      }
+    });
+    cars.forEach((list, v) => { if (list.length) root.add(instanced(carModel(v), 0.15, list, { cacheKey: `car-${v}`, jitter: 0 })); });
+    if (lamps.length) root.add(instanced(lampModel(), 0.15, lamps, { cacheKey: 'lamp', jitter: 0, castShadow: false }));
+    const lots = scatter(layout, roads, 7, 23, 7);
+    const yards = [[], [], []];
+    lots.forEach((p, i) => { tmp.position.set(p.x, 0, p.z); tmp.rotation.set(0, Math.round(p.r * 4) * Math.PI / 2, 0); tmp.updateMatrix(); yards[i % 3].push(tmp.matrix.clone()); });
+    yards.forEach((list, k) => { if (list.length) root.add(instanced(containerModel(k, 1 + (k % 2)), 0.2, list, { cacheKey: `container-${k}`, jitter: 0 })); });
+  }
+
+  // The slab's soft shadow on the backdrop.
+  {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const g = cv.getContext('2d'); const gr = g.createRadialGradient(32, 32, 10, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(0,0,0,0.65)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    const sh = new THREE.Mesh(new THREE.PlaneGeometry(BOARD.radius * 3, BOARD.radius * 3), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false, fog: false }));
+    sh.rotation.x = -Math.PI / 2; sh.position.set(4, -16, 6); sh.renderOrder = -1;
+    root.add(sh);
+  }
 
   // Pick targets (invisible cylinders) and hover rings.
   const pickTargets = [];

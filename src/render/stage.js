@@ -21,8 +21,9 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   renderer.info.autoReset = false; // count every pass of a frame (reset manually each frame)
 
   const scene = new THREE.Scene();
-  scene.background = q.sky ? skyTexture() : new THREE.Color(P.night);
-  scene.fog = new THREE.FogExp2(P.fog, 0.002); // less fog: the whole town stays readable
+  // UI-13: a plain dark backdrop (the diorama floats over it) instead of the night sky.
+  scene.background = new THREE.Color(P.backdrop);
+  scene.fog = new THREE.FogExp2(P.backdrop, 0.0015); // less fog: the whole town stays readable
 
   // Isometric-ish orthographic camera.
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 400);
@@ -123,7 +124,7 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
       else { tex.repeat.set(1, ta / aspect); tex.offset.set(0, 1 - ta / aspect); }
     }
     // On narrow (portrait) screens, keep the whole board width visible.
-    const viewH = aspect < 1.1 ? (VIEW_HEIGHT * 1.34) / Math.max(aspect, 0.42) : VIEW_HEIGHT;
+    const viewH = aspect < 1.1 ? (VIEW_HEIGHT * 1.34) / Math.max(aspect, 0.42) : VIEW_HEIGHT * 1.3; // UI-13: the whole slab floats in view
     camera.left = (-viewH * aspect) / 2;
     camera.right = (viewH * aspect) / 2;
     camera.top = viewH / 2;
