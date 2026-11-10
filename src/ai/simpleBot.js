@@ -8,8 +8,7 @@ import { PHASES, OUTSIDE_LOCATIONS, ENERGY, RULES } from '../core/constants.js';
 import { gearSlot, ITEMS } from '../content/items.js';
 import {
   aliveSurvivors, survivorDef, itemOf, crisisDef, scenarioDef,
-  freeSurvivorSlots, freeZombieSlots, foodNeeded, actionCost, fightPreview, siegeForecast, placeOfItem, packFree, leaveDamage, spawnForecast, crisisRequirement, crisisScore, gearOf,
-} from '../core/selectors.js';
+  freeSurvivorSlots, freeZombieSlots, foodNeeded, actionCost, fightPreview, siegeForecast, placeOfItem, packFree, leaveDamage, spawnForecast, crisisRequirement, crisisScore, gearOf, isOpen, frontier } from '../core/selectors.js';
 import { CROSSROADS_BY_ID } from '../content/crossroads.js';
 import { LOCATIONS } from '../content/locations.js';
 import { CRAWLER } from '../content/buildings.js';
@@ -181,6 +180,12 @@ function energyActions(s, p, survivors, candidates, cardsOf, opts) {
     const hunt = scenarioDef(s).goal.type === 'kills' && sv.wounds < 2;
     if (loc.zombies > 0 && can(sv, 'attack') && hunt) candidates.push(act.attack(sv.id));
     if (loc.zombies >= 2 && can(sv, 'attack') && true) candidates.push(act.attack(sv.id));
+    // 2b. Fog of war: scout when what the colony needs is only found under the fog (or this place is bare).
+    if (sv.location !== 'colony' && frontier(s, sv.location).length && can(sv, 'scout')) {
+      const want = s.scenario.id === 'crawler' ? crawlerWants(s) : [];
+      const openHas = (id) => OUTSIDE_LOCATIONS.some((l) => isOpen(s, l) && LOCATIONS[l].deck?.[id]);
+      if (want.some((id) => !openHas(id)) || !loc.deck.length || s.day >= 3) candidates.push(act.scout(sv.id));
+    }
     // 3. Scavenge.
     if (sv.location !== 'colony' && loc.deck.length && can(sv, 'search')) candidates.push(act.search(sv.id));
     if (loc.zombies > 0 && can(sv, 'attack')) candidates.push(act.attack(sv.id));
@@ -215,7 +220,7 @@ function energyActions(s, p, survivors, candidates, cardsOf, opts) {
   }
   function pushOut(sv) {
     {
-      const options = OUTSIDE_LOCATIONS.filter((l) => freeSurvivorSlots(s, l) > 0 && s.locations[l].deck.length && can(sv, 'move', l));
+      const options = OUTSIDE_LOCATIONS.filter((l) => isOpen(s, l) && freeSurvivorSlots(s, l) > 0 && s.locations[l].deck.length && can(sv, 'move', l));
       // Food short (or stockpiling) → the grocery first; hunting → where the zombies are.
       const hungry = s.food < foodNeeded(s) + 2 || scenarioDef(s).goal.type === 'stockpile';
       const hunting = scenarioDef(s).goal.type === 'kills';

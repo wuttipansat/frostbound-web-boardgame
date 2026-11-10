@@ -5,7 +5,7 @@ import { LOCATIONS } from '../content/locations.js';
 import { ITEMS } from '../content/items.js';
 import { SCENARIOS_BY_ID } from '../content/scenarios.js';
 import { CRISES_BY_ID } from '../content/crises.js';
-import { RULES, ENERGY, REST, FIGHT, SEASON, SIEGE, XP, BOND, DIFFICULTY, RING, SEARCH_SPAWN, DANGEROUS_LOCATIONS, OUTSIDE_LOCATIONS } from './constants.js';
+import { RULES, ENERGY, REST, FIGHT, SEASON, SIEGE, XP, BOND, DIFFICULTY, RING, SEARCH_SPAWN, DANGEROUS_LOCATIONS, OUTSIDE_LOCATIONS, NEIGHBORS } from './constants.js';
 
 export const survivorDef = (id) => SURVIVORS_BY_ID[id];
 export const itemOf = (s, uid) => ITEMS[s.cards[uid]];
@@ -334,3 +334,9 @@ export function siegeForecast(s) {
   const targets = home.length ? Array.from({ length: hits }, (_, i) => home[i % home.length].id) : [];
   return { attackers, wall, guards, barricades, stopped, hits, targets };
 }
+
+// ---------------------------------------------------------------- UI-10: fog of war
+/** Is a place open (not under fog)? Old saves without `unlocked` have the whole town open. */
+export const isOpen = (s, id) => !s.unlocked || s.unlocked.includes(id);
+/** Locked places a scout from `from` would open. */
+export const frontier = (s, from) => (NEIGHBORS[from] ?? []).filter((id) => !isOpen(s, id));

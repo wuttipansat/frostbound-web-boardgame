@@ -16,6 +16,13 @@ export const GAME_DAYS = 40;
 
 export const LOCATION_IDS = Object.freeze(['colony', 'police', 'grocery', 'school', 'hospital', 'library', 'gas']);
 export const OUTSIDE_LOCATIONS = Object.freeze(LOCATION_IDS.filter((l) => l !== 'colony'));
+// UI-10 fog of war: the town opens place by place. Places sit on a circle; scouting from an open place
+// clears the fog over its locked neighbours.
+export const START_OPEN = Object.freeze(['colony', 'grocery', 'gas']);
+export const NEIGHBORS = Object.freeze({
+  police: ['gas', 'grocery'], grocery: ['police', 'school'], school: ['grocery', 'hospital'],
+  hospital: ['school', 'library'], library: ['hospital', 'gas'], gas: ['library', 'police'],
+});
 
 export const RULES = Object.freeze({
   TEAM_START: 2,          // survivors picked at the start (solo game)
@@ -38,7 +45,7 @@ export const ENERGY = Object.freeze({
   STARVING: 20,           // the colony is starving: regen this much less
   HURT: 20,               // 2+ wounds: the pool's max is this much lower
   STORM: 4,               // storm days (every 3rd day): actions outside the colony cost more
-  COST: Object.freeze({ move: 12, barricade: 19, lure: 11 }),
+  COST: Object.freeze({ move: 12, barricade: 19, lure: 11, scout: 15 }),
   WALK: Object.freeze([12, 17, 23]), // walking: near / mid / far
   SEARCH: 17,
   PER_SKILL: 2,

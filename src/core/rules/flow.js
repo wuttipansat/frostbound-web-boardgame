@@ -7,8 +7,7 @@ import { CROSSROADS_BY_ID } from '../../content/crossroads.js';
 import { CRISES_BY_ID } from '../../content/crises.js';
 import {
   aliveSurvivors, foodNeeded, colonyPopulation, crisisRequirement, itemOf, scenarioDef, scenarioTarget,
-  focusSurvivor, teamHasAbility, crisisMatches, baseLevel, siegeForecast, bondKey, missionStatus, apMax, sleepPlan, spawnForecast,
-} from '../selectors.js';
+  focusSurvivor, teamHasAbility, crisisMatches, baseLevel, siegeForecast, bondKey, missionStatus, apMax, sleepPlan, spawnForecast, isOpen } from '../selectors.js';
 import {
   log, changeMorale, giveTrait, changeFood, recruitSurvivor, healHp, damageSurvivor, unpack, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems,
 } from './helpers.js';
@@ -40,7 +39,7 @@ export function finishDraft(s) {
   log(s, 'draftDone', { survivorIds: t.survivors.slice() });
   // A few scavenged items from random locations.
   for (let i = 0; i < RULES.STARTING_HAND; i++) {
-    const stocked = OUTSIDE_LOCATIONS.filter((l) => s.locations[l].deck.length);
+    const stocked = OUTSIDE_LOCATIONS.filter((l) => s.locations[l].deck.length && isOpen(s, l));
     if (stocked.length) drawItems(s, pick(s, stocked), 1);
   }
   startRound(s);
@@ -249,7 +248,7 @@ export function restock(s) {
   if (s.day <= 1) return;
   for (const loc of OUTSIDE_LOCATIONS) {
     const table = LOCATIONS[loc].deck;
-    if (!table) continue;
+    if (!table || !isOpen(s, loc)) continue;
     const ids = Object.keys(table).filter((id) => !RARE_PARTS.includes(id)); // the crawler's rare parts never drift in
     const total = ids.reduce((n, id) => n + table[id], 0);
     let r = random(s) * total;

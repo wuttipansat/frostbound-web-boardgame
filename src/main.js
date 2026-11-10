@@ -19,7 +19,7 @@ import { c, t as tr } from './i18n/index.js';
 import { LOCATION_IDS } from './core/constants.js';
 import { ITEMS } from './content/items.js';
 import { tryReduce } from './core/reducer.js';
-import { actionCost, searchSpawnChance, isOverrun } from './core/selectors.js';
+import { actionCost, searchSpawnChance, isOverrun, isOpen } from './core/selectors.js';
 import { LOCATIONS } from './content/locations.js';
 
 const params = new URLSearchParams(location.search);
@@ -106,6 +106,12 @@ function refreshLabels(state) {
     el.dataset.loc = id;
     el.className = 'loc-label pin';
     if (!state) { el.classList.add('empty'); continue; }
+    if (!isOpen(state, id)) { // UI-10: under the fog — a '?' pin only
+      el.classList.add('locked'); el.textContent = '?';
+      el.setAttribute('aria-label', tr('loc.locked'));
+      el.onclick = (ev) => { ev.stopPropagation(); app?.onBoardPick({ locationId: id }); };
+      continue;
+    }
     const z = state.locations[id].zombies;
     const people = Object.values(state.survivors).filter((v) => v.alive && v.location === id).length;
     el.classList.toggle('overrun', isOverrun(state, id));

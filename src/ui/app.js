@@ -4,7 +4,8 @@ import { createGame } from '../core/state.js';
 import { tryReduce } from '../core/reducer.js';
 import { PHASES } from '../core/constants.js';
 import { t, c, setLang, getLang } from '../i18n/index.js';
-import { itemOf } from '../core/selectors.js';
+import { itemOf, isOpen } from '../core/selectors.js';
+import { OUTSIDE_LOCATIONS as OUTSIDE_IDS } from '../core/constants.js';
 import { formatLog } from '../i18n/format.js';
 import { sound, soundForLog } from '../audio/sound.js';
 import { mount } from './dom.js';
@@ -94,6 +95,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
 
   // ---------------------------------------------------------------- state changes
 
+  let lastLockKey = null;
   function set(patch) {
     Object.assign(ui, patch);
     render();
@@ -310,6 +312,9 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
       hints = moveTargets(state, ui.selSurvivor);
     }
     board.setHints?.(hints);
+    // UI-10: fog over the places still locked (snap on a new or loaded game, animate when one opens).
+    const lockKey = state ? OUTSIDE_IDS.filter((l) => !isOpen(state, l)).join(',') : '';
+    if (lockKey !== lastLockKey) { board.setLocked?.(lockKey ? lockKey.split(',') : [], { snap: lastLockKey === null || !!lockKey && lockKey.length > (lastLockKey ?? '').length }); lastLockKey = lockKey; }
     pieces.setActing?.(x.canAct ? actingSurvivors(state) : []);
     const tutVisible = ui.tutStep < DONE && tutorialVisible(ui.tutStep, {
       canAct: x.canAct && !build,

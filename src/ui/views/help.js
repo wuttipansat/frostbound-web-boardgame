@@ -50,17 +50,17 @@ const hintSeen = { day: 0, keys: new Set(), timer: null };
 export function renderHint(el, ctx) {
   const { state: s, ui } = ctx;
   const hint = s && ctx.canAct && ui.hints !== false && !ctx.watching && !ui.selCard ? suggestion(s) : null;
-  el.classList.toggle('hidden', !hint);
+  el.classList.toggle('hidden', !hint || (el.dataset.gone === `${hint.text}|${hint.why}`)); // faded ones stay hidden
   if (!hint) { mount(el); el.dataset.key = ''; return; }
   const key = `${hint.text}|${hint.why}`;
   if (el.dataset.key === key) return;
   el.dataset.key = key;
   // UI-7: a suggestion shows for 6 seconds, and the same one only once a day.
   if (hintSeen.day !== s.day) { hintSeen.day = s.day; hintSeen.keys.clear(); }
-  if (hintSeen.keys.has(key)) { el.classList.add('hidden'); mount(el); return; }
+  if (hintSeen.keys.has(key)) { el.dataset.gone = key; el.classList.add('hidden'); mount(el); return; }
   hintSeen.keys.add(key);
   clearTimeout(hintSeen.timer);
-  hintSeen.timer = setTimeout(() => { if (el.dataset.key === key) { el.classList.add('hidden'); mount(el); } }, 6000);
+  hintSeen.timer = setTimeout(() => { if (el.dataset.key === key) { el.dataset.gone = key; el.classList.add('hidden'); mount(el); } }, 6000);
   const show = () => {
     const pt = hint.point;
     if (pt.end) { const b = document.querySelector('#pp-actions .btn.end-turn'); b?.classList.remove('nudge'); void b?.offsetWidth; b?.classList.add('nudge'); b?.focus(); return; }

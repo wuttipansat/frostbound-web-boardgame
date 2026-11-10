@@ -1953,3 +1953,6 @@ body.radial-open #toasts { bottom: 250px; }
 .rd-meta .icon, .bld-row .icon { width: 12px !important; height: 12px !important; color: #9fd4ff; }
 .icon-bolt { color: #ffd34d !important; } .icon-heartIco { color: #ff6b6b !important; }
 .rd-meta .hp { display: inline-flex; align-items: center; gap: 2px; } .rd-meta .hp .icon { width: 12px; height: 12px; }
+/* UI-10: places under the fog */
+#labels .loc-label.pin.locked { min-width: 30px; justify-content: center; font: 800 14px/1 var(--head, sans-serif); color: #1b2738; background: rgba(240,246,255,.9); border-color: rgba(255,255,255,.9); }
+.rd-sub { font-size: 11px; opacity: .75; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

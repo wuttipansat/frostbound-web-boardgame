@@ -3,7 +3,7 @@
 import { ENERGY } from '../constants.js';
 import { OUTSIDE_LOCATIONS } from '../constants.js';
 import { pick } from '../rng.js';
-import { itemOf, focusSurvivor, aliveSurvivors } from '../selectors.js';
+import { itemOf, focusSurvivor, aliveSurvivors, isOpen } from '../selectors.js';
 import {
   changeMorale, changeFood, recruitSurvivor, drawItems, discardCard, addZombies,
   removeZombies, addBarricades, woundSurvivor, healSurvivor, log, gainEnergy,
@@ -36,7 +36,7 @@ const EFFECTS = {
   drawItem: (s, ctx, e) => {
     let from = resolveWhere(s, ctx, e.from);
     if (from === 'any' || !s.locations[from]?.deck?.length) {
-      const stocked = OUTSIDE_LOCATIONS.filter((l) => s.locations[l].deck.length);
+      const stocked = OUTSIDE_LOCATIONS.filter((l) => s.locations[l].deck.length && isOpen(s, l));
       if (!stocked.length) return;
       from = pick(s, stocked);
     }

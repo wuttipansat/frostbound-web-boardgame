@@ -1,5 +1,5 @@
 // createGame(config) -> a fresh, fully JSON-serializable GameState.
-import { PHASES, LOCATION_IDS, RULES, DIFFICULTY } from './constants.js';
+import { PHASES, LOCATION_IDS, RULES, DIFFICULTY, START_OPEN } from './constants.js';
 import { random, normalizeSeed, shuffle } from './rng.js';
 import { assert } from './errors.js';
 import { LOCATIONS } from '../content/locations.js';
@@ -30,6 +30,7 @@ export function createGame(config = {}) {
     phase: PHASES.DRAFT,
     day: 1,
     time: 'dawn', // dawn | day | dusk | night
+    unlocked: [...START_OPEN], // fog of war (UI-10)
     scenario: { id: scenario.id, days: config.days ?? scenario.days, deposited: 0 }, // 0 = endless winter
     morale: Math.min(10, scenario.morale + (DIFFICULTY[config.difficulty]?.morale ?? 0)),
     maxMorale: 10,

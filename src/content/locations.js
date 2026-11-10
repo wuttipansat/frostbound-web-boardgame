@@ -66,7 +66,7 @@ export const LOCATIONS = {
     survivorSlots: 3,
     zombieSlots: 6,
     deck: {
-      'city-map': 1, 'hunting-bow': 1, wood: 4, 'snow-suit': 1, 'heater-part': 1, flashlight: 1,
+      'city-map': 1, 'hunting-bow': 1, wood: 4, 'snow-suit': 1, 'heater-part': 1, 'engine-part': 2, flashlight: 1,
       'duct-tape': 2, 'zip-ties': 2, 'socket-set': 1, 'field-manual': 1, 'blueprint-library': 1, 'jerry-can': 2,
       'canned-beans': 1, 'rice-sack': 1, 'first-aid-pouch': 1, bedpan: 1, 'stranger-with-child': 1, 'survival-guide': 1,
     },
@@ -78,7 +78,7 @@ export const LOCATIONS = {
     survivorSlots: 3,
     zombieSlots: 6,
     deck: {
-      'tool-kit': 1, sled: 1, scrap: 4, 'engine-part': 2, 'scrap-plate': 1,
+      'tool-kit': 1, sled: 1, scrap: 4, 'scrap-plate': 1,
       'jerry-can': 6, 'beef-jerky': 1, 'socket-set': 1, 'riot-baton': 1, 'motor-junk': 2,
       'duct-tape': 1, 'zip-ties': 1, 'blueprint-gas': 1, 'canned-beans': 1, 'winter-boots': 1, 'fire-axe': 1,
     },

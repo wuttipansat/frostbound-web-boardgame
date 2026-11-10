@@ -21,6 +21,7 @@ const HANDLERS = {
   [A.RETURN_CARD]: turn.returnCard,
   [A.EQUIP]: turn.equip,
   [A.NAP]: turn.nap,
+  [A.SCOUT]: turn.scout,
   [A.GIVE]: turn.give,
   [A.CRAFT]: turn.craft,
   [A.BUILD]: turn.build,

@@ -324,3 +324,12 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 ### Build shifts and the night attack (done)
 - Building is done in shifts: each tap puts a fixed 20 AP (or what is left of the job) from one survivor, who must have that much. Progress still carries over between taps, survivors and days. The upgrade rows show "ครั้งละ 20".
 - Night attack is not random: zombies = 1 + 1 per 4 days (+difficulty) + zombies at the gate; wall level, guards and barricades stop that many; each remaining bite is −10 HP, handed round to survivors at the colony from the healthiest down. Nobody home: −1 food per bite. The "today" card now names who will be bitten and for how much.
+
+### UI-10 — fog of war (done)
+- Start: colony, grocery and gas are open; police, school, hospital and library sit under white fog with a "?" pin.
+- New action SCOUT (15 AP, from an open place in town): opens that place's locked neighbours on the circle (NEIGHBORS in constants). Locked places reject move and lure (`locked`); restock and random item draws skip them. Old saves without `s.unlocked` keep the whole town open.
+- Rare crawler parts moved off the gas station (library now has 2 engine parts), so the goal needs scouting.
+- Rendering: 16 soft sprite puffs per locked place; buildings are buried under it and rise as it rolls back (~1.5 s). Tapping a fogged place opens the action bar with Scout buttons (faces of survivors at a neighbour) or a hint where to stand.
+- Bot scouts when needed parts are only under the fog, or from day 3. Balance crawler normal (30 games): 27% (was 30%).
+- Not done from the prompt: the board does not physically grow and camera limits do not change with the open area — the fog lifts by sector over the same island.
+- Fixed: a faded suggestion left an empty box on screen.

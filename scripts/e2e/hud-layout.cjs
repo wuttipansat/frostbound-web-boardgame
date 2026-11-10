@@ -89,7 +89,7 @@ function boxes() {
       a.set({ handCompact: true, locInfo: false });
       for (const id of ['colony', 'police', 'grocery', 'school', 'hospital', 'library', 'gas']) {
         a.selectLocation(id);
-        out.push([id, document.querySelectorAll('#radial:not(.hidden) .rd-btn').length]);
+        out.push([id, document.querySelectorAll('#radial:not(.hidden) .rd-btn, #radial:not(.hidden) .ab-empty').length]); // a place in the fog may show only its hint
       }
       return out;
     });

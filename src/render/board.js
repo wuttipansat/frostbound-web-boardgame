@@ -191,6 +191,44 @@ export function createBoard() {
   }
   locationGroups.colony = colonyGroup;
 
+  // UI-10 fog of war: a bank of soft white puffs over every place still locked. Unlocking rolls it back
+  // (puffs fade and drift outwards) and the building rises out of the snow.
+  const fogTex = (() => {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const g = cv.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.55, 'rgba(240,246,255,0.6)'); gr.addColorStop(1, 'rgba(240,246,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; return tex;
+  })();
+  const fogs = {}; // id -> { puffs: [{ sprite, base, out }], k: 1 = covered … 0 = clear, target }
+  for (const id of OUTSIDE_LOCATIONS) {
+    const L = layout[id];
+    const out = L.center.clone().setY(0).normalize();
+    const puffs = [];
+    for (let i = 0; i < 16; i++) {
+      const mat = new THREE.SpriteMaterial({ map: fogTex, color: 0xf3f7ff, transparent: true, opacity: 0.9, depthWrite: false, fog: false });
+      const sp = new THREE.Sprite(mat);
+      const a = hash3(i, 7, id.length) * Math.PI * 2;
+      const r = 2 + hash3(i, 3, 1) * 8;
+      const base = L.center.clone().add(new THREE.Vector3(Math.cos(a) * r, 2 + hash3(i, 9, 2) * 7, Math.sin(a) * r)).addScaledVector(out, 6);
+      sp.position.copy(base);
+      const s = 10 + hash3(i, 5, 4) * 7;
+      sp.scale.set(s, s * 0.7, 1);
+      sp.renderOrder = 5;
+      root.add(sp);
+      puffs.push({ sprite: sp, base, out, phase: hash3(i, 1, 9) * 6 });
+    }
+    fogs[id] = { puffs, k: 0, target: 0 };
+  }
+  const setFogVisual = (id) => {
+    const f = fogs[id];
+    const k = f.k;
+    for (const p of f.puffs) { p.sprite.visible = k > 0.01; p.sprite.material.opacity = 0.85 * k; }
+    const g = locationGroups[id];
+    g.position.y = -9 * Math.min(1, k * 1.2); // buried under the fog; rises as it clears
+    g.visible = k < 0.98;
+  };
+
   // Step 9: no slot pedestals any more; each place has one floating sign (see main.js labels).
 
   // Forest + rocks (instanced)
@@ -311,9 +349,31 @@ export function createBoard() {
     setFire(k) { fireLevel = k; },
     setHovered(id) { hovered = id; },
     setSelected(id) { selected = id; },
+    /** UI-10: which places are under fog. The first call snaps; later changes animate (~1.5 s). */
+    setLocked(ids, { snap = false } = {}) {
+      const set = new Set(ids ?? []);
+      for (const id of OUTSIDE_LOCATIONS) {
+        const f = fogs[id];
+        f.target = set.has(id) ? 1 : 0;
+        if (snap) { f.k = f.target; setFogVisual(id); }
+      }
+    },
     /** Location hints: { locationId: 'ok' | 'full' | 'lure' | 'blocked' } (e.g. where a survivor can move). */
     setHints(next) { hints = next ?? {}; },
     update(t) {
+      for (const [id, f] of Object.entries(fogs)) {
+        if (f.k !== f.target) {
+          f.k += Math.sign(f.target - f.k) * Math.min(Math.abs(f.target - f.k), 1 / 90); // ~1.5 s at 60 fps
+          setFogVisual(id);
+        }
+        if (f.k > 0.01) {
+          const away = (1 - f.k) * 14; // clearing: the bank drifts outwards
+          for (const p of f.puffs) {
+            p.sprite.position.copy(p.base).addScaledVector(p.out, away);
+            p.sprite.position.y += Math.sin(t * 0.4 + p.phase) * 0.4;
+          }
+        }
+      }
       // Flame: flicker in height and sway.
       const fl = Math.min(1.3, fireLevel);
       flameMesh.visible = fl > 0.15; // a dead colony: the fire is out

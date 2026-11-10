@@ -5,8 +5,7 @@ import { random } from '../rng.js';
 import { assert } from '../errors.js';
 import {
   survivorDef, gearOf, freeSurvivorSlots, freeZombieSlots, itemOf, scenarioDef, booksHeld, holdsBlueprint,
-  actionCost, killsPerAttack, apMax, fightPreview, leaveDamage, holderOf, placeOfItem, packFree, searchSpawnChance, baseLevel, nextLevel, isOverrun, teamHasAbility,
-} from '../selectors.js';
+  actionCost, killsPerAttack, apMax, fightPreview, leaveDamage, holderOf, placeOfItem, packFree, searchSpawnChance, baseLevel, nextLevel, isOverrun, teamHasAbility, isOpen, frontier } from '../selectors.js';
 import {
   log, drawItems, discardCard, removeFromHand, addZombies, removeZombies,
   addBarricades, creditKills, healSurvivor, changeFood, changeMorale, recruitSurvivor,
@@ -135,6 +134,7 @@ export function lure(s, { survivorId, toLocation }) {
   requireTurn(s);
   const sv = requireActive(s, survivorId);
   assert(LOCATION_IDS.includes(toLocation), 'noSuchLocation', toLocation);
+  assert(isOpen(s, toLocation), 'locked');
   assert(toLocation !== sv.location, 'sameLocation');
   assert(s.locations[sv.location].zombies > 0, 'noZombiesHere');
   pay(s, survivorId, 'lure');
@@ -150,6 +150,7 @@ export function move(s, { survivorId, toLocation, fuelCardUid }) {
   const p = requireTurn(s);
   const sv = requireActive(s, survivorId);
   assert(LOCATION_IDS.includes(toLocation), 'noSuchLocation', toLocation);
+  assert(isOpen(s, toLocation), 'locked');
   assert(toLocation !== sv.location, 'sameLocation');
   assert(freeSurvivorSlots(s, toLocation) > 0, 'locationFull');
   if (fuelCardUid) { assert(requireCard(s, p, fuelCardUid).type === 'fuel', 'needFuel'); requireSamePlace(s, fuelCardUid, survivorId); }
@@ -416,4 +417,16 @@ export function finishTurn(s) {
 function holderTrait(s, holder) {
   if (holder && holder !== 'stockpile') return s.survivors[holder]?.trait;
   return Object.values(s.survivors).some((v) => v.alive && v.location === 'colony' && v.trait === 'medic') ? 'medic' : null;
+}
+
+/** UI-10: scout from an open place in town — the fog over its locked neighbours clears. */
+export function scout(s, { survivorId }) {
+  requireTurn(s);
+  const sv = requireActive(s, survivorId);
+  assert(sv.location !== 'colony', 'scoutFromTown');
+  const opens = frontier(s, sv.location);
+  assert(opens.length > 0, 'nothingToScout');
+  pay(s, survivorId, 'scout');
+  s.unlocked.push(...opens);
+  log(s, 'scouted', { survivorId, from: sv.location, opened: opens });
 }

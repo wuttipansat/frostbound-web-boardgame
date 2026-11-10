@@ -1,5 +1,6 @@
 // Turns engine log entries and effect lists into localized text.
 import { t, c, signed, crossChoice } from './index.js';
+import { survivorDef } from '../core/selectors.js';
 
 const QUIET = new Set(['turnEnd', 'roll', 'draw', 'energy']); // too noisy for the log panel
 
@@ -41,6 +42,7 @@ export function formatLog(e, state) {
     case 'infectionSpreads': return t('log.infectionSpreads', p);
     case 'lure': return t('log.lure', p);
     case 'unpack': return t('log.unpack', { ...p, count: e.count });
+    case 'scouted': return t('log.scouted', { name: survivorDef(e.survivorId)?.name ?? '', from: c('locations', e.from, 'name'), places: e.opened.map((l) => c('locations', l, 'name')).join(', ') });
     case 'built': return t('log.built', { building: t(`bld.${e.buildingId}`), level: e.level });
     case 'building': return t('log.building', { ...p, building: t(`bld.${e.buildingId}`), n: e.n });
     case 'siege': return t('log.siege', { attackers: e.attackers, stopped: e.stopped, hits: e.hits });

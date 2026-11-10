@@ -6,7 +6,7 @@ import { survivorDef, itemOf, scenarioDef, actionCost, fightPreview } from '../c
 import { gearSlot } from '../content/items.js';
 import { LOCATION_IDS } from '../core/constants.js';
 
-const check = (state, action) => {
+export const check = (state, action) => {
   const r = tryReduce(state, action);
   return { action, ok: r.ok, error: r.ok ? null : r.error };
 };
