@@ -4,6 +4,7 @@ import { reduce, tryReduce } from '../src/core/reducer.js';
 import * as a from '../src/core/actions.js';
 import { actionCost, apMax, searchSpawnChance } from '../src/core/selectors.js';
 import { ENERGY, FOOD } from '../src/core/constants.js';
+import { LOCATIONS } from '../src/content/locations.js';
 import { startedGame, setSurvivors, setEnergy, giveCard, patch } from './_helpers.js';
 
 function setup(placements, energy = 100, opts = {}) {
@@ -77,15 +78,14 @@ test('search: not in colony, draws from location deck, specialists draw two', ()
 });
 
 test('barricade: limited by free slots; zombies smash barricades first', () => {
-  let { s } = setup({ 'nia-calloway': 'police', 'corwin-daly': 'colony' });
+  let { s } = setup({ 'nia-calloway': 'colony', 'corwin-daly': 'police' });
+  assert.equal(tryReduce(s, a.barricade('corwin-daly')).error, 'mustBeInColony', 'only at the base');
+  s = patch(s, (x) => { x.locations.colony.zombies = LOCATIONS.colony.zombieSlots - 3; });
   let r = reduce(s, a.barricade('nia-calloway'));
-  assert.equal(r.locations.police.barricades, 2, 'locksmith places two');
+  assert.equal(r.locations.colony.barricades, 2, 'locksmith places two');
   r = reduce(r, a.barricade('nia-calloway'));
-  r = reduce(r, a.barricade('nia-calloway'));
-  assert.equal(r.locations.police.barricades, 6, 'capped at the 6 zombie spots');
+  assert.equal(r.locations.colony.barricades, 3, 'capped at the free zombie spots');
   assert.equal(tryReduce(r, a.barricade('nia-calloway')).error, 'noBarricadeSpace');
-  r = reduce(r, a.barricade('corwin-daly'));
-  assert.equal(r.locations.colony.barricades, 1);
 });
 
 test('lure: moves zombies from your location to another', () => {
@@ -146,9 +146,9 @@ test('playing cards: food, medicine, tools, junk (energy); gear must be equipped
 
   const healed = reduce(s, a.playCard(med, { targetSurvivorId: 'corwin-daly' }));
   assert.equal(healed.survivors['corwin-daly'].wounds, 0);
-  assert.equal(tryReduce(healed, a.playCard(tool, { targetSurvivorId: 'nobody' })).error, 'noSuchSurvivor');
-  const boarded = reduce(s, a.playCard(tool, { targetSurvivorId: 'corwin-daly' }));
-  assert.equal(boarded.locations.police.barricades, 1);
+  assert.equal(tryReduce(s, a.playCard(med, { targetSurvivorId: 'nobody' })).error, 'noSuchSurvivor');
+  const boarded = reduce(patch(s, (x) => { x.stockpile.push(tool); for (const v of Object.values(x.survivors)) v.pack = (v.pack ?? []).filter((u) => u !== tool); }), a.playCard(tool));
+  assert.equal(boarded.locations.colony.barricades, 1, 'tools board up the base, no target');
 
   assert.equal(tryReduce(s, a.playCard(gun, { targetSurvivorId: 'corwin-daly' })).error, 'equipInstead');
   const charged = reduce(s, a.playCard(junk, { targetSurvivorId: 'corwin-daly' }));

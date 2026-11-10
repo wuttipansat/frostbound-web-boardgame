@@ -48,12 +48,12 @@ test('tier scales medicine, tools and junk; motor junk is wild in a crisis', () 
   s = patch(s, (x) => { x.survivors['corwin-daly'].wounds = 1; x.survivors['corwin-daly'].frostbite = true; });
   let med, set, junk;
   [s, med] = giveCard(s, 'antibiotics');
-  [s, set] = giveCard(s, 'socket-set');
+  [s, set] = giveCard(s, 'socket-set', 'stockpile');
   [s, junk] = giveCard(s, 'motor-junk');
   const healed = reduce(s, a.playCard(med, { targetSurvivorId: 'corwin-daly' }));
   assert.equal(healed.survivors['corwin-daly'].wounds, 0);
   assert.equal(healed.survivors['corwin-daly'].frostbite, false);
-  assert.equal(reduce(s, a.playCard(set, { targetSurvivorId: 'corwin-daly' })).locations.police.barricades, 2);
+  assert.equal(reduce(s, a.playCard(set)).locations.colony.barricades, 2);
   const re = reduce(s, a.playCard(junk, { targetSurvivorId: 'corwin-daly' }));
   assert.ok(!re.stockpile.includes(junk));
   assert.equal(re.survivors['corwin-daly'].ap, 20 + 24, 'motor junk = 2 × 12 energy');
@@ -113,7 +113,7 @@ test('books work while equipped (one book slot per survivor): cookbook saves foo
   let manual; [s, manual] = giveCard(s, 'field-manual');
   s = reduce(s, a.equip(manual));
   assert.equal(foodNeeded(s), need, 'the cookbook went back to the hand');
-  assert.equal(reduce(s, a.barricade('corwin-daly')).locations.police.barricades, 2);
+  assert.equal(reduce(patch(s, (x) => { x.survivors['corwin-daly'].location = 'colony'; }), a.barricade('corwin-daly')).locations.colony.barricades, 2);
   assert.ok(holderOf(s, book));
 });
 

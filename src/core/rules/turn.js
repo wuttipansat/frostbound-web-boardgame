@@ -124,6 +124,7 @@ export function returnCard(s, { cardUid }) {
 export function barricade(s, { survivorId }) {
   requireTurn(s);
   const sv = requireActive(s, survivorId);
+  assert(sv.location === 'colony', 'mustBeInColony'); // barricades only matter at the base
   assert(freeZombieSlots(s, sv.location) > 0, 'noBarricadeSpace');
   pay(s, survivorId, 'barricade');
   const n = (ability(survivorId).type === 'barricadeTwo' ? 2 : 1) + Math.min(1, booksHeld(s, 'barricadePlus'));
@@ -192,7 +193,7 @@ export function equip(s, { cardUid, survivorId = null }) {
 
 /**
  * Play an item card for its effect (strength = item.value).
- * food -> colony supply; medicine -> heal targetSurvivorId; tools -> barricades at targetSurvivorId;
+ * food -> colony supply; medicine -> heal targetSurvivorId; tools -> barricades at the colony;
  * junk -> energy; survivor -> a newcomer joins the team (+1 morale; a full team: +2 morale).
  * Gear is equipped (equip), fuel is burnt when moving.
  */
@@ -215,11 +216,11 @@ export function playCard(s, { cardUid, targetSurvivorId }) {
       break;
     }
     case 'tools': {
-      const sv = requireSurvivor(s, targetSurvivorId);
-      assert(freeZombieSlots(s, sv.location) > 0, 'noBarricadeSpace');
-      requireSamePlace(s, cardUid, sv.id);
+      // Tools go straight onto the base's defences: no target, the card must be at the colony.
+      requireHome(s, cardUid);
+      assert(freeZombieSlots(s, 'colony') > 0, 'noBarricadeSpace');
       spend();
-      addBarricades(s, sv.location, item.value);
+      addBarricades(s, 'colony', item.value);
       break;
     }
     case 'junk': {

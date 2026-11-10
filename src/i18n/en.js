@@ -297,7 +297,7 @@ export default {
   'itemPlay.fuel': 'Burn it while moving: drive there.',
   'itemPlay.junk': "Scrap it for {n} energy.",
   'itemPlay.medicine': 'Heal {n} (a wound or frostbite each) on the selected survivor.',
-  'itemPlay.tools': 'Add {n} barricade(s) where the selected survivor stands.',
+  'itemPlay.tools': 'Add {n} barricade(s) at the base at once (the card must be at the base).',
   'itemPlay.weapon': 'Equip (melee): ATK +{n}. Each hit kills 1 zombie; higher ATK and AP left mean less HP lost.',
   'itemPlay.junkWild': "Scrap it for {n} energy. In a crisis it counts as a matching item.",
   'itemPlay.recruit': 'Play: a newcomer joins your team (+1 morale; a full team: +2 morale).',
@@ -358,7 +358,7 @@ export default {
   'eff.discard': 'Discard {n} {item}',
   'eff.wound': 'Wound your survivor',
   'eff.heal': 'Heal your survivor',
-  'eff.energy': 'Energy {d}',
+  'eff.energy': 'Everyone: energy {d}',
   'eff.moveHome': 'Return to the colony',
   'eff.nothing': 'Nothing happens',
   'where.here': 'your location',
@@ -620,4 +620,5 @@ export default {
   'loc.cardsShort': 'items left', 'loc.forecastShort': 'zombies tonight', 'build.working': 'Building',
   'pack.far': '{name} is at {place} and cannot reach it', 'act.contributeWhy': 'Give to the crisis: a matching item counts +1, any other −1. Reach the number before dusk.',
   'cross.youChose': 'You chose',
+  'cross.who': 'Happens to {name}',
 };

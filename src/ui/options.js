@@ -72,7 +72,7 @@ export function endTurnOption(state) {
 
 // ---------------------------------------------------------------- step 8: explicit targets & board hints
 
-const TARGETED = ['consumable', 'medicine', 'tools'];
+const TARGETED = ['consumable', 'medicine'];
 
 /** Does playing this card need the player to choose a survivor? */
 export function cardNeeds(state, uid) {

@@ -184,7 +184,7 @@ export function crossroadsModal(ctx) {
           h('small', { class: 'kicker', tip: t('cross.because', { why: describeTrigger(card.trigger) }) }, t('cross.title')),
           h('h2', {}, c('crossroads', card.id, 'title')),
           // Who it happened to. What each choice does is revealed after.
-          focus ? h('p', { class: 'muted small read-aloud' }, icon('person'), ` ${focus.name}`) : null,
+          focus ? h('p', { class: 'cross-who' }, ctx.art.portrait(pend.focusSurvivorId, 's', { alt: '' }), h('span', {}, t('cross.who', { name: focus.name }))) : null,
           h('p', { class: 'story' }, c('crossroads', card.id, 'text')),
           h('div', { class: 'choices' }, card.choices.map((_, i) => h('button', {
             class: 'choice',
@@ -201,6 +201,7 @@ export function crossResultModal(ctx, q) {
     h('h2', {}, c('crossroads', card.id, 'title')),
     h('div', { class: 'choices' }, h('div', { class: 'choice chosen' },
       h('small', {}, t('cross.youChose')), h('b', {}, crossChoice(card.id, q.choice)))),
+    q.focus ? h('p', { class: 'cross-who' }, ctx.art.portrait(q.focus, 's', { alt: '' }), h('span', {}, t('cross.who', { name: survivorDef(q.focus).name }))) : null,
     h('p', { class: 'outcome' }, effectArt(ctx, effects), icon('check'), ` ${describeEffects(effects)}`),
     h('div', { class: 'row end' }, h('button', { class: 'btn primary', onclick: ctx.dismissQueue }, t('colony.continue'))));
 }

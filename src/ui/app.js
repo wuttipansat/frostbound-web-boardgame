@@ -124,6 +124,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
       return false;
     }
     const prevLog = state.log;
+    ui.crossFocus = state.pendingCrossroads?.focusSurvivorId ?? null;
     const packBefore = action.survivorId ? state.survivors[action.survivorId]?.pack ?? [] : [];
     state = res.state;
     // UI-6: say what a search found.
@@ -146,7 +147,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
     if (e.k === 'crisisResolved' && state.reports.colony) ui.queue.push({ type: 'colony', report: structuredClone(state.reports.colony), morale: null, day: e.r });
     // What was chosen and what it did (the choice buttons only show the words).
     if (e.k === 'roundStart' && e.day <= 3 && ui.hints !== false) ui.pendingTip = t(`tut.day${e.day}`); // UI-7: shown once nothing else is up
-    if (e.k === 'crossroadsChoice') ui.queue.push({ type: 'cross', cardId: e.cardId, choice: e.choice });
+    if (e.k === 'crossroadsChoice') ui.queue.push({ type: 'cross', cardId: e.cardId, choice: e.choice, focus: ui.crossFocus });
     if (TOAST_KEYS.has(e.k) && e.k !== 'crisisResolved') {
       const text = formatLog(e, state);
       if (text) toast(text, 'bad', { survivorId: e.survivorId ?? (e.k === 'infectionSpreads' ? e.to : null) });

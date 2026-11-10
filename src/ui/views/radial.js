@@ -9,7 +9,7 @@ import { actionCost, leaveDamage, searchSpawnChance, survivorDef, aliveSurvivors
 import { survivorOptions, moveOption, actingSurvivors, lureTargets } from '../options.js';
 
 const ICON = { walk: 'move', drive: 'fuel', attack: 'attack', search: 'search', barricade: 'barricade', lure: 'lure', ability: 'heal', nap: 'hourglass', guard: 'door', unguard: 'door', build: 'goal', info: 'log' };
-const COLONY_ONLY = ['nap', 'guard', 'unguard'];
+const COLONY_ONLY = ['nap', 'guard', 'unguard', 'barricade'];
 
 /** The survivor the ring acts for: the selected one, else the first who can still act, else the first alive. */
 export function ringSurvivor(state, ui) {
@@ -25,11 +25,14 @@ export function ringItems(state, ui, at, ctx = {}) {
   if (!svId || state.phase !== 'turn') return [info];
   const sv = state.survivors[svId];
   if (sv.location !== at) {
-    const walk = moveOption(state, svId, at, false);
-    const hurt = leaveDamage(state, svId);
-    items.push({ id: 'walk', ...walk, cost: actionCost(state, svId, 'move', at), risk: hurt ? `−${hurt}` : null, label: t('bar.walk'), move: true });
+    // Walking is a tap on a face: one button per survivor who is somewhere else (the selected one first).
+    const walkers = aliveSurvivors(state).filter((v) => v.location !== at).sort((x, y) => (y.id === svId) - (x.id === svId));
+    for (const v of walkers) {
+      const hurt = leaveDamage(state, v.id);
+      items.push({ id: 'walk', ...moveOption(state, v.id, at, false), cost: actionCost(state, v.id, 'move', at), risk: hurt ? `−${hurt}` : null, label: t('bar.walk'), move: true, face: v.id });
+    }
     const drive = moveOption(state, svId, at, true);
-    if (drive.fuel && drive.ok) items.push({ id: 'drive', ...drive, cost: actionCost(state, svId, 'move', at), label: t('bar.drive'), move: true });
+    if (drive.fuel && drive.ok) items.push({ id: 'drive', ...drive, cost: actionCost(state, svId, 'move', at), label: t('bar.drive'), move: true, face: svId });
   } else {
     for (const o of survivorOptions(state, svId)) {
       if (COLONY_ONLY.includes(o.id) && at !== 'colony') continue;
@@ -68,21 +71,22 @@ export function renderRadial(el, ctx) {
   const ap = svId ? s.survivors[svId].ap : 0;
   const off = (ev, it) => { ev.stopPropagation(); if (!it.ok) { flashTip(ev.currentTarget); return true; } return false; };
   const button = (it) => {
-    const meta = [it.cost ? `AP ${it.cost}` : null, it.risk ? (it.risk.endsWith('%') ? t('bar.risk', { n: it.risk }) : `${it.risk} HP`) : null].filter(Boolean);
+    const risk = it.risk ? (it.risk.endsWith('%') ? t('bar.risk', { n: it.risk }) : `${it.risk} HP`) : null;
+    const meta = it.cost || risk ? [it.cost ? h('span', { class: 'ap' }, icon('exposure'), String(it.cost)) : null, it.cost && risk ? ' · ' : null, risk].filter(Boolean) : [];
     const tip = [it.label, it.cost != null ? t('act.cost', { n: it.cost, have: ap }) : null, !it.ok ? t(`err.${it.error}`) : null].filter(Boolean).join(' · ');
     return h('button', {
-      class: `rd-btn${it.ok ? '' : ' off'}${it.move ? ' move' : ''}`, dataset: { act: it.id },
+      class: `rd-btn${it.ok ? '' : ' off'}${it.move ? ' move' : ''}`, dataset: { act: it.id, sv: it.face ?? '' },
       tip: it.ok ? null : tip, 'aria-label': tip, 'aria-disabled': it.ok ? null : 'true',
       onclick: (ev) => {
         if (off(ev, it)) return undefined;
         if (it.fn) return it.fn();
-        if (ctx.dispatch(it.action) && svId) ctx.set({ selSurvivor: svId });
+        if (ctx.dispatch(it.action) && (it.face ?? svId)) ctx.set({ selSurvivor: it.face ?? svId });
         return undefined;
       },
     },
-    icon(ICON[it.id] ?? 'ability'),
+    it.face ? h('span', { class: 'rd-face' }, ctx.art.portrait(it.face, 's', { alt: survivorDef(it.face).name }), icon(ICON[it.id])) : icon(ICON[it.id] ?? 'ability'),
     h('span', { class: 'rd-label' }, it.label),
-    meta.length ? h('span', { class: `rd-meta${it.risk ? ' risky' : ''}` }, meta.join(' · ')) : null);
+    meta.length ? h('span', { class: `rd-meta${it.risk ? ' risky' : ''}` }, ...meta) : null);
   };
   mount(el,
     h('div', { class: 'ab-head' },
@@ -94,7 +98,7 @@ export function renderRadial(el, ctx) {
       h('button', { class: 'ab-icon', dataset: { act: 'info' }, 'aria-label': t('ring.info'), tip: t('ring.info'), onclick: (ev) => { ev.stopPropagation(); ctx.set({ locInfo: true, picking: null }); } }, h('b', {}, 'i')),
       h('button', { class: 'ab-icon ab-close', 'aria-label': t('settings.close'), onclick: (ev) => { ev.stopPropagation(); ctx.set({ picking: null }); ctx.selectLocation(null); } }, icon('close'))),
     // Who acts: tap a face to switch.
-    s.phase === 'turn' ? h('div', { class: 'ab-who', role: 'group' }, aliveSurvivors(s).map((v) => h('button', {
+    s.phase === 'turn' && !items.some((it) => it.id === 'walk') ? h('div', { class: 'ab-who', role: 'group' }, aliveSurvivors(s).map((v) => h('button', {
       class: `ab-face${v.id === svId ? ' on' : ''}`, 'aria-pressed': v.id === svId ? 'true' : 'false', 'aria-label': survivorDef(v.id).name,
       onclick: (ev) => { ev.stopPropagation(); ctx.set({ selSurvivor: v.id, picking: null }); },
     }, ctx.art.portrait(v.id, 's', { alt: '' }), h('span', {}, icon('exposure'), String(v.ap)),

@@ -308,3 +308,10 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - Card sheet: says when the selected survivor cannot reach the card, lists why a target is blocked, "บริจาคให้วิกฤต" with a one-line rule.
 - Night report: one boxed line per event, the continue button is always visible. Crossroads result shows only the chosen option.
 - Phone camera fits the whole island with its pins. Not done: skipping the day-1 crossroads during the tutorial (needs a core change).
+
+### UI-8 — item tiles, faces to tap, base-only barricades (done)
+- Crossroads show who they happen to (face + name), before and after the choice; party-wide energy says "ทุกคน".
+- Items are small square tiles with an icon and the name under it; details stay in the sheet.
+- Walking: one button per survivor elsewhere, with their face. Giving: tap a face (or the stockpile button).
+- Rule change: barricades only at the colony. Tool cards add barricades at the base at once (no target; the card must be at the base). Bot and tests updated.
+- Action costs show the energy icon instead of "AP".

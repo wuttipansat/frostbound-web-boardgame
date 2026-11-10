@@ -189,7 +189,7 @@ function energyActions(s, p, survivors, candidates, cardsOf, opts) {
     const loc = s.locations[sv.location];
     // 4. Hold the colony against tonight's zombies.
     if (freeZombieSlots(s, sv.location) > 0 && can(sv, 'barricade')
-      && ((sv.location === 'colony' && siegeForecast(s).hits > 0) || loc.zombies > 0)) {
+      && sv.location === 'colony' && siegeForecast(s).hits > 0) {
       candidates.push(act.barricade(sv.id));
     }
   }

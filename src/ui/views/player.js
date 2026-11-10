@@ -52,8 +52,10 @@ function cardDetail(ctx, shown, uid) {
     far ? h('small', { class: 'away' }, ` — ${t('pack.far', { name: survivorDef(actor.id).name.split(' ')[0], place: c('locations', actor.location, 'name') })}`) : null);
 
   const giveRow = gives.length ? h('div', { class: 'picker' }, h('h4', {}, t('act.give')),
-    h('div', { class: 'picker-row' }, gives.map((g) => h('button', { class: 'btn small-act', onclick: () => go(g.action, 'play') },
-      g.survivorId ? survivorDef(g.survivorId).name : t('pack.toStockpile'))))) : null;
+    // Hand-overs are a tap on a face (or on the stockpile's round button).
+    h('div', { class: 'picker-row round-row' }, gives.map((g) => (g.survivorId
+      ? roundTarget(art, g.survivorId, true, `${t('act.give')}: ${survivorDef(g.survivorId).name}`, () => go(g.action, 'play'))
+      : h('button', { class: 'pick round stock', tip: t('pack.toStockpile'), 'aria-label': t('pack.toStockpile'), onclick: () => go(g.action, 'play') }, icon('goal')))))) : null;
   const flavour = [c('items', item.id, 'text'), isPermanent(item) ? t(`itemPlay.permanent.${item.type}`) : null].filter(Boolean).join(' — ');
   return h('div', { class: `card-detail panel t-${item.type} tier-${item.tier}`, role: 'dialog', 'aria-label': t('panel.cardDetail') },
     h('button', { class: 'close', 'aria-label': t('act.close'), onclick: close }, icon('close')),
