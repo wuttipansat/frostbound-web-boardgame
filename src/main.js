@@ -99,36 +99,23 @@ $('labels').appendChild(nameTag);
 let hoveredLoc = null;
 
 function refreshLabels(state) {
-  // Step 9: one floating sign per place — name, people n/max, a zombie bar n/6, search %, items left,
-  // and (with a survivor selected) the AP the walk there costs (Step 16).
-  const sel = state && app?.ui.selSurvivor && state.survivors[app.ui.selSurvivor]?.alive ? app.ui.selSurvivor : null;
-  const span = (cls, ...kids) => { const e = document.createElement('span'); e.className = cls; e.append(...kids); return e; };
+  // UI-3: a small pin per place — zombies (red ring when overrun) and our people there. Details: tap → the place's card.
   for (const id of LOCATION_IDS) {
     const el = labels[id];
     el.replaceChildren();
     el.dataset.loc = id;
-    el.className = 'loc-label sign';
+    el.className = 'loc-label pin';
     if (!state) { el.classList.add('empty'); continue; }
-    const loc = state.locations[id];
-    const def = LOCATIONS[id];
-    const z = loc.zombies;
+    const z = state.locations[id].zombies;
     const people = Object.values(state.survivors).filter((v) => v.alive && v.location === id).length;
-    const over = isOverrun(state, id);
-    el.classList.toggle('overrun', over);
-    el.append(span('sg-name', c('locations', id, 'name')));
-    const row = span('sg-row');
-    row.append(span('sg-ppl', icon('person'), def.survivorSlots ? `${people}/${def.survivorSlots}` : `${people}`));
-    const bar = span('sg-zbar');
-    for (let k = 0; k < Math.min(def.zombieSlots, 12); k++) { const i = document.createElement('i'); if (k < z) i.className = 'on'; bar.append(i); }
-    row.append(span('sg-z', icon('skull'), `${z}/${def.zombieSlots}`), bar);
-    if (id !== 'colony') {
-      row.append(span('sg-srch', icon('search'), over ? tr('sign.overrun') : `${Math.round(searchSpawnChance(state, id) * 100)}%`));
-      row.append(span('sg-left', icon('log'), `${loc.deck?.length ?? 0}`));
-    }
-    const walk = sel && state.survivors[sel].location !== id ? actionCost(state, sel, 'move', id) : null;
-    if (walk != null) { const b = document.createElement('b'); b.className = 'walk-ap'; b.textContent = `${walk} AP`; row.append(b); }
-    el.append(row);
-    el.setAttribute('aria-label', `${c('locations', id, 'name')}: ${people} ${z}/${def.zombieSlots}`);
+    el.classList.toggle('overrun', isOverrun(state, id));
+    el.classList.toggle('ours', people > 0);
+    el.classList.toggle('active', app?.ui.selLoc === id);
+    if (z) { const b = document.createElement('span'); b.className = 'pz'; b.append(icon('skull'), String(z)); el.append(b); }
+    if (people) { const b = document.createElement('span'); b.className = 'pp'; b.append(icon('person'), String(people)); el.append(b); }
+    if (!z && !people) el.classList.add('quiet');
+    el.setAttribute('aria-label', `${c('locations', id, 'name')}: ${z}`);
+    el.onclick = (ev) => { ev.stopPropagation(); app?.onBoardPick({ locationId: id }); };
   }
 }
 
@@ -227,7 +214,6 @@ const app = createApp({
       updateWinter(state && app?.ui.queue[0]?.type === 'colony' ? { ...state, time: 'night' } : state);
       refreshLabels(state);
       document.getElementById('view-ctl')?.classList.toggle('hidden', !state || state.phase === 'draft' || state.phase === 'gameOver');
-      for (const [id, el] of Object.entries(labels)) el.classList.toggle('active', app?.ui.selLoc === id);
     },
   },
 });

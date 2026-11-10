@@ -1735,3 +1735,14 @@ img.art-item.blank { image-rendering: auto; background: none; }
 #topbar .top-menu { width: 200px !important; }
 #topbar .menu-item { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 #topbar .menu-item:hover, #topbar .menu-item:focus-visible { background: rgba(255,255,255,.08); }
+/* UI-3: small pins instead of big signs */
+#labels .loc-label.pin { pointer-events: auto; cursor: pointer; display: inline-flex; flex-direction: row; gap: 6px; align-items: center; padding: 3px 8px; min-height: 24px; border-radius: 999px; font: 700 12px/1 var(--head, sans-serif); background: rgba(11,20,36,.78); }
+#labels .loc-label.pin.quiet { width: 12px; height: 12px; min-height: 0; padding: 0; background: rgba(223,232,245,.55); border: 2px solid rgba(11,20,36,.7); }
+#labels .loc-label.pin.empty { display: none; }
+#labels .loc-label.pin .pz { color: #ff8a7e; display: inline-flex; gap: 2px; align-items: center; }
+#labels .loc-label.pin .pp { color: #f2b33d; display: inline-flex; gap: 2px; align-items: center; }
+#labels .loc-label.pin .icon { width: 12px; height: 12px; }
+#labels .loc-label.pin.overrun { box-shadow: 0 0 0 2px #d9534f; }
+#labels .loc-label.pin.active { box-shadow: 0 0 0 2px #f2b33d; }
+#labels .loc-label.pin.covered { opacity: 0 !important; pointer-events: none; }
+body.radial-open #labels .loc-label.pin:not(.active) { opacity: .45; }
