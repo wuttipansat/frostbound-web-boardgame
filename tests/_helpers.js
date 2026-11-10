@@ -16,7 +16,6 @@ export function startedGame(opts = {}) {
   let s = newGame(opts);
   s = reduce(s, draftPick(s.team.draftOptions.slice(0, RULES.TEAM_START)));
   s = forceTurn(s);
-  if (!opts.fog) delete s.unlocked; // rule tests play on the whole town; fog tests opt in
   return s;
 }
 

@@ -4,8 +4,7 @@ import { createGame } from '../core/state.js';
 import { tryReduce } from '../core/reducer.js';
 import { PHASES } from '../core/constants.js';
 import { t, c, setLang, getLang } from '../i18n/index.js';
-import { itemOf, isOpen } from '../core/selectors.js';
-import { OUTSIDE_LOCATIONS as OUTSIDE_IDS } from '../core/constants.js';
+import { itemOf, mapOf } from '../core/selectors.js';
 import { formatLog } from '../i18n/format.js';
 import { sound, soundForLog } from '../audio/sound.js';
 import { mount } from './dom.js';
@@ -22,7 +21,7 @@ import {
   setupScreen, settingsModal, draftModal, crossroadsModal, gameOverModal, toastLayer, colonyModal,
   confirmEndModal, pickModal, crossResultModal,
 } from './views/modals.js';
-import { moveTargets, lureTargets, actingSurvivors, allItems } from './options.js';
+import { lureTargets, actingSurvivors, allItems } from './options.js';
 
 /** Log entries added since `prev` (the log is capped at RULES.MAX_LOG, so it may have shifted). */
 export function newLogEntries(prev, next) {
@@ -95,7 +94,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
 
   // ---------------------------------------------------------------- state changes
 
-  let lastLockKey = null;
+  let lastMapKey = null;
   function set(patch) {
     Object.assign(ui, patch);
     render();
@@ -135,6 +134,10 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
       toast(got.length ? t('toast.found', { items: got.join(', ') }) : t('toast.foundNone'), got.length ? 'good' : '');
     }
     const added = newLogEntries(prevLog, state.log);
+    // MAP-1: a city map turned up / the city grew.
+    if (added.some((e) => e.k === 'mapFound')) toast(t('toast.mapFound'), 'good');
+    const grown = added.find((e) => e.k === 'mapGrown');
+    if (grown) toast(t('toast.mapGrown', { n: grown.places?.length ?? 0 }), 'good');
     for (const e of added) onLogEntry(e);
     present(added);
     for (const q of ui.queue) if (q.type === 'colony' && q.morale == null) q.morale = state.morale;
@@ -304,17 +307,13 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
       if (build && target && (!dom.modal.contains(prevFocus) || key !== modalKey)) target.focus({ preventScroll: true });
     }
     modalKey = key;
-    // Board hints: survivors that can still act glow; where the selected survivor can go (or lure to) lights up.
-    let hints = {};
-    if (x.canAct && ui.picking?.type === 'lure') {
-      for (const tg of lureTargets(state, ui.picking.survivorId)) hints[tg.to] = tg.ok ? 'lure' : 'blocked';
-    } else if (x.canAct && ui.selSurvivor && state.survivors[ui.selSurvivor]?.alive && !state.survivors[ui.selSurvivor].moved) {
-      hints = moveTargets(state, ui.selSurvivor);
+    // MAP-1: the city grows a stage at a time (snap on a new or loaded game, pop in when a map is read).
+    const map = state ? mapOf(state) : null;
+    const mapKey = map ? `${map.stage}:${Object.keys(map.blocks).join(';')}` : '';
+    if (map && mapKey !== lastMapKey) {
+      board.setMap?.(map, { snap: lastMapKey === null || map.stage <= +lastMapKey.split(':')[0] });
+      lastMapKey = mapKey;
     }
-    board.setHints?.(hints);
-    // UI-10: fog over the places still locked (snap on a new or loaded game, animate when one opens).
-    const lockKey = state ? OUTSIDE_IDS.filter((l) => !isOpen(state, l)).join(',') : '';
-    if (lockKey !== lastLockKey) { board.setLocked?.(lockKey ? lockKey.split(',') : [], { snap: lastLockKey === null || !!lockKey && lockKey.length > (lastLockKey ?? '').length }); lastLockKey = lockKey; }
     pieces.setActing?.(x.canAct ? actingSurvivors(state) : []);
     const tutVisible = ui.tutStep < DONE && tutorialVisible(ui.tutStep, {
       canAct: x.canAct && !build,

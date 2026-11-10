@@ -1,11 +1,13 @@
 // Active-player actions. Everything that takes effort costs the survivor's energy (no dice anywhere);
 // cards, gear and abilities are free.
-import { PHASES, LOCATION_IDS, ENERGY, REST, RULES, FOOD, BUILD_STEP } from '../constants.js';
+import { PHASES, ENERGY, REST, RULES, FOOD, BUILD_STEP } from '../constants.js';
 import { random } from '../rng.js';
 import { assert } from '../errors.js';
 import {
   survivorDef, gearOf, freeSurvivorSlots, freeZombieSlots, itemOf, scenarioDef, booksHeld, holdsBlueprint,
-  actionCost, killsPerAttack, apMax, fightPreview, leaveDamage, holderOf, placeOfItem, packFree, searchSpawnChance, baseLevel, nextLevel, isOverrun, teamHasAbility, isOpen, frontier } from '../selectors.js';
+  actionCost, killsPerAttack, apMax, fightPreview, leaveDamage, holderOf, placeOfItem, packFree, searchSpawnChance, baseLevel, nextLevel, isOverrun, teamHasAbility, mapProgress, typeOf } from '../selectors.js';
+import { growCity } from './city.js';
+import { newMap } from '../map.js';
 import {
   log, drawItems, discardCard, removeFromHand, addZombies, removeZombies,
   addBarricades, creditKills, healSurvivor, changeFood, changeMorale, recruitSurvivor,
@@ -92,12 +94,13 @@ export function search(s, { survivorId }) {
   assert(s.locations[sv.location].deck.length > 0, 'deckEmpty');
   assert(!isOverrun(s, sv.location), 'placeOverrun');
   const a = ability(survivorId);
-  const n = Math.min(packFree(s, survivorId), a.type === 'doubleSearch' && a.location === sv.location ? 2 : 1);
+  const n = Math.min(packFree(s, survivorId), a.type === 'doubleSearch' && a.location === typeOf(s, sv.location) ? 2 : 1);
   assert(n > 0, 'packFull');
   const chance = Math.max(0, searchSpawnChance(s, sv.location) - (sv.trait === 'scavenger' ? 0.05 : 0));
   pay(s, survivorId, 'search');
   // A blueprint for this place: draw one extra, then put one back (returnCard).
   const blueprint = holdsBlueprint(s, survivorId, sv.location);
+  const map = rollMap(s, sv.location);
   const drawn = drawItems(s, sv.location, blueprint ? n + 1 : n, survivorId);
   s.searches[sv.location] = (s.searches[sv.location] ?? 0) + 1;
   s.stats.searches += 1;
@@ -105,9 +108,25 @@ export function search(s, { survivorId }) {
   // The noise may make a zombie appear (it does not bite at once).
   const spawned = random(s) < chance;
   log(s, 'search', { survivorId, locationId: sv.location, count: drawn.length, spawned });
+  if (map) log(s, 'mapFound', { survivorId, locationId: sv.location });
   if (spawned) addZombies(s, sv.location, 1, 'search');
   if (blueprint && drawn.length > n) p.pick = { locationId: sv.location, uids: drawn };
   return drawn;
+}
+
+/** MAP-1: count a search towards the next city map; when it turns up, it lies on top of the pile (drawn now). */
+function rollMap(s, locationId) {
+  const pr = mapProgress(s);
+  if (!pr) return null;
+  if (!s.map) s.map = newMap(); // old saves: the stage-1 town
+  const k = (s.map.searchesSinceMap = pr.done + 1);
+  if (k < pr.min || (k < pr.max && random(s) >= 1 / (pr.max - k + 1))) return null;
+  const uid = `map${s.map.stage + 1}`;
+  s.cards[uid] = 'city-map-piece';
+  s.locations[locationId].deck.push(uid);
+  s.map.searchesSinceMap = 0;
+  s.map.pending = true;
+  return uid;
 }
 
 /** Resolve a blueprint search: the chosen card goes back to the bottom of that location's deck. */
@@ -133,8 +152,7 @@ export function barricade(s, { survivorId }) {
 export function lure(s, { survivorId, toLocation }) {
   requireTurn(s);
   const sv = requireActive(s, survivorId);
-  assert(LOCATION_IDS.includes(toLocation), 'noSuchLocation', toLocation);
-  assert(isOpen(s, toLocation), 'locked');
+  assert(s.locations[toLocation], 'noSuchLocation', toLocation);
   assert(toLocation !== sv.location, 'sameLocation');
   assert(s.locations[sv.location].zombies > 0, 'noZombiesHere');
   pay(s, survivorId, 'lure');
@@ -149,8 +167,7 @@ export function lure(s, { survivorId, toLocation }) {
 export function move(s, { survivorId, toLocation, fuelCardUid }) {
   const p = requireTurn(s);
   const sv = requireActive(s, survivorId);
-  assert(LOCATION_IDS.includes(toLocation), 'noSuchLocation', toLocation);
-  assert(isOpen(s, toLocation), 'locked');
+  assert(s.locations[toLocation], 'noSuchLocation', toLocation);
   assert(toLocation !== sv.location, 'sameLocation');
   assert(freeSurvivorSlots(s, toLocation) > 0, 'locationFull');
   if (fuelCardUid) { assert(requireCard(s, p, fuelCardUid).type === 'fuel', 'needFuel'); requireSamePlace(s, fuelCardUid, survivorId); }
@@ -202,6 +219,12 @@ export function playCard(s, { cardUid, targetSurvivorId }) {
   const p = requireTurn(s);
   const item = requireCard(s, p, cardUid);
   const spend = () => { if (!isPermanent(item)) discardCard(s, cardUid); };
+  if (item.growMap) { // MAP-1: read the map at the colony — the city grows one stage
+    requireHome(s, cardUid);
+    discardCard(s, cardUid);
+    growCity(s);
+    return;
+  }
   switch (item.type) {
     case 'food':
       requireHome(s, cardUid);
@@ -417,16 +440,4 @@ export function finishTurn(s) {
 function holderTrait(s, holder) {
   if (holder && holder !== 'stockpile') return s.survivors[holder]?.trait;
   return Object.values(s.survivors).some((v) => v.alive && v.location === 'colony' && v.trait === 'medic') ? 'medic' : null;
-}
-
-/** UI-10: scout from an open place in town — the fog over its locked neighbours clears. */
-export function scout(s, { survivorId }) {
-  requireTurn(s);
-  const sv = requireActive(s, survivorId);
-  assert(sv.location !== 'colony', 'scoutFromTown');
-  const opens = frontier(s, sv.location);
-  assert(opens.length > 0, 'nothingToScout');
-  pay(s, survivorId, 'scout');
-  s.unlocked.push(...opens);
-  log(s, 'scouted', { survivorId, from: sv.location, opened: opens });
 }

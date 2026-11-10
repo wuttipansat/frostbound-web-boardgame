@@ -64,7 +64,8 @@ export const ITEMS = {
   'snow-suit':       { id: 'snow-suit', type: 'armor', tier: 2, value: 1, coldProof: true, name: 'Snow Suit', text: 'Storms cost nothing extra.' },
   // GADGETS (tool slot)
   flashlight:        { id: 'flashlight', type: 'gadget', tier: 1, value: 0, searchMod: -5, name: 'Flashlight', text: 'Searching costs 5 less AP.' },
-  'city-map':        { id: 'city-map', type: 'gadget', tier: 1, value: 0, walkMod: -3, name: 'City Map', text: 'Walking costs 3 less AP.' },
+  'city-map':        { id: 'city-map', type: 'gadget', tier: 1, value: 0, walkMod: -3, name: 'Shortcut Map', text: 'Walking costs 3 less AP.' },
+  'city-map-piece':  { id: 'city-map-piece', type: 'map', tier: 3, value: 0, growMap: true, name: 'City Map', text: 'Use it at the colony: the city grows one stage.' },
   'big-backpack':    { id: 'big-backpack', type: 'gadget', tier: 2, value: 0, pack: 2, name: 'Big Backpack', text: '+2 backpack slots.' },
   sled:              { id: 'sled', type: 'gadget', tier: 2, value: 0, pack: 3, walkMod: 2, name: 'Sled', text: '+3 slots, walking costs 2 more.' },
   'tool-kit':        { id: 'tool-kit', type: 'gadget', tier: 2, value: 0, barricadeMod: -5, name: 'Tool Kit', text: 'Barricades cost 5 less AP.' },

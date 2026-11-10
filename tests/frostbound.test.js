@@ -57,7 +57,7 @@ test('gear: equip is free, swaps back to hand, changes personal stats, and is wo
   const r = reduce(s, act.attack('corwin-daly'));
   assert.equal(r.locations.police.zombies, 1 + r.log.findLast((e) => e.k === 'attack').drawn, 'kills 2 (the noise may draw one)');
   s = reduce(s, act.equip(boots));
-  assert.equal(actionCost(s, 'corwin-daly', 'move', 'colony'), ENERGY.WALK[2] - 5);
+  assert.equal(actionCost(s, 'corwin-daly', 'move', 'colony'), 16 - 5);
   const wake = sleepPlan(s)['corwin-daly'].ap;
   s = reduce(s, act.equip(guide));
   assert.equal(sleepPlan(s)['corwin-daly'].ap, Math.min(apMax(s, 'corwin-daly'), wake + 10));
@@ -91,7 +91,7 @@ test('moving: costs energy, repeatable, and walking in among zombies is safe for
   s = setSurvivors(s, { 'osei-vance': 'colony', 'greta-vos': 'colony' });
   setAp(s, 'osei-vance', 80);
   s = reduce(s, act.move('osei-vance', 'grocery'));
-  assert.equal(ap(s, 'osei-vance'), 80 - ENERGY.COST.move - (s.day % 3 === 0 ? ENERGY.STORM : 0));
+  assert.equal(ap(s, 'osei-vance'), 80 - 16 - (s.day % 3 === 0 ? ENERGY.STORM : 0));
   s = reduce(s, act.move('osei-vance', 'school')); // a second move is fine
   s.locations.police.zombies = 2;
   s = reduce(s, act.move('greta-vos', 'police'));
@@ -102,7 +102,7 @@ test('moving: costs energy, repeatable, and walking in among zombies is safe for
 test('new abilities: cheaper moves, attacks and barricades, cold-proof nights, double junk', () => {
   let s = fb({ seed: 7 });
   s = setSurvivors(s, { 'maren-holt': 'colony', 'ilse-brandt': 'police', 'wren-okafor': 'school', 'bo-lindqvist': 'gas', 'corwin-daly': 'school' });
-  assert.equal(actionCost(s, 'maren-holt', 'move', 'school'), ENERGY.WALK[0] - ENERGY.SKILLED);
+  assert.equal(actionCost(s, 'maren-holt', 'move', 'school'), 16 - ENERGY.SKILLED);
   assert.equal(actionCost(s, 'ilse-brandt', 'attack'), FIGHT.MELEE_AP - ENERGY.SKILLED);
   assert.equal(actionCost(s, 'wren-okafor', 'barricade'), actionCost(s, 'corwin-daly', 'barricade') - ENERGY.SKILLED);
   s.day = 3; // storm

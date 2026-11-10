@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { reduce, tryReduce } from '../src/core/reducer.js';
 import * as a from '../src/core/actions.js';
-import { actionCost, apMax, searchSpawnChance } from '../src/core/selectors.js';
+import { walkCost, actionCost, apMax, searchSpawnChance } from '../src/core/selectors.js';
 import { ENERGY, FOOD } from '../src/core/constants.js';
 import { LOCATIONS } from '../src/content/locations.js';
 import { startedGame, setSurvivors, setEnergy, giveCard, patch } from './_helpers.js';
@@ -32,9 +32,9 @@ test('costs are personal: attack / search come from the survivor\'s skills (2..6
   for (const id of ['corwin-daly', 'teodor-rusu']) {
     assert.equal(c(id, 'search') % 2, 1, 'odd');
   }
-  assert.equal(actionCost(s, 'teodor-rusu', 'move', 'school'), ENERGY.WALK[0], 'near: 12');
-  assert.equal(actionCost(s, 'teodor-rusu', 'move', 'gas'), ENERGY.WALK[1], 'mid: 17');
-  assert.equal(actionCost(s, 'teodor-rusu', 'move', 'hospital'), ENERGY.WALK[2], 'far: 23');
+  // MAP-1: walking = 12 + 4 per block of street (12 + 4 per block; every stage-1 place is next door to the colony).
+  assert.equal(walkCost(s, 'colony', 'hospital'), 16);
+  assert.equal(walkCost(s, 'police', 'hospital'), 20, 'two blocks by street');
 });
 
 test('attack: needs zombies and energy; kills one', () => {
@@ -103,7 +103,7 @@ test('move: costs energy, repeatable, respects slots; fuel drives; the trucker p
   let r = reduce(s, a.move('corwin-daly', 'hospital'));
   assert.equal(r.survivors['corwin-daly'].location, 'hospital');
   assert.equal(r.log.findLast((e) => e.k === 'move').safe, false, 'zombies there');
-  assert.equal(energy(r), 100 - ENERGY.WALK[2] - (r.day % 3 === 0 ? ENERGY.STORM : 0));
+  assert.equal(energy(r), 100 - 16 - (r.day % 3 === 0 ? ENERGY.STORM : 0));
   const again = reduce(r, a.move('corwin-daly', 'library'));
   assert.equal(again.log.findLast((e) => e.k === 'move').safe, true, 'empty place');
 

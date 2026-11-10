@@ -47,6 +47,9 @@ export function t(key, params = {}) {
 
 /** Localized content text, e.g. c('locations', 'police', 'name'). */
 export function c(kind, id, field) {
+  // MAP-1: a second place of the same type ('grocery-2') reads 'Grocery Store 2'.
+  const dup = kind === 'locations' && !SOURCES.locations[id] && /^(.+)-(\d+)$/.exec(id ?? '');
+  if (dup) return field === 'name' ? `${c(kind, dup[1], field)} ${dup[2]}` : c(kind, dup[1], field);
   const o = CONTENT_OVERRIDES[lang]?.[kind]?.[id]?.[field];
   if (o != null) return o;
   return SOURCES[kind]?.[id]?.[field] ?? id;

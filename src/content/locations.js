@@ -83,4 +83,38 @@ export const LOCATIONS = {
       'duct-tape': 1, 'zip-ties': 1, 'blueprint-gas': 1, 'canned-beans': 1, 'winter-boots': 1, 'fire-axe': 1,
     },
   },
+  // MAP-1: places that turn up as the city grows (stage 2+).
+  warehouse: {
+    id: 'warehouse', name: 'Warehouse', blurb: 'Bay doors frozen half open. Pallets under drifts of snow.',
+    survivorSlots: 3, zombieSlots: 6,
+    deck: { scrap: 4, wood: 3, 'tool-kit': 1, 'jerry-can': 2, 'canned-beans': 2, 'rice-sack': 1, 'zip-ties': 2, 'duct-tape': 2, 'engine-part': 1, crowbar: 1 },
+  },
+  motel: {
+    id: 'motel', name: 'Motel', blurb: 'Pine Rest Motel. Every room key is still on its hook but one.',
+    survivorSlots: 4, zombieSlots: 6,
+    deck: { cloth: 4, 'canned-beans': 2, 'beef-jerky': 2, coffee: 1, bandage: 1, 'first-aid-pouch': 2, 'lone-wanderer': 1, 'padded-parka': 1, 'kitchen-knife': 1, bedpan: 1 },
+  },
+  apartment: {
+    id: 'apartment', name: 'Apartment Block', blurb: 'Six floors of locked doors and somebody else\'s groceries.',
+    survivorSlots: 4, zombieSlots: 6,
+    deck: { 'canned-beans': 3, 'rice-sack': 2, chocolate: 1, cloth: 2, wood: 2, 'first-aid-pouch': 2, painkillers: 1, 'stranger-with-child': 1, 'baseball-bat': 1, 'heater-part': 1, 'winter-boots': 1 },
+  },
+  church: {
+    id: 'church', name: 'Church', blurb: 'St. Bride\'s. The bell rope is frozen stiff; the crypt is dry.',
+    survivorSlots: 3, zombieSlots: 6,
+    deck: { 'canned-beans': 3, 'rice-sack': 2, cloth: 2, bandage: 1, 'first-aid-kit': 1, 'lone-wanderer': 1, 'stranger-with-child': 1, wood: 3, 'survival-guide': 1 },
+  },
+  farmhouse: {
+    id: 'farmhouse', name: 'Farmhouse', blurb: 'A red barn sunk in snow. The root cellar was never found.',
+    survivorSlots: 3, zombieSlots: 6,
+    deck: { 'rice-sack': 3, 'canned-beans': 2, 'beef-jerky': 2, wood: 4, 'hunting-bow': 1, 'jerry-can': 2, sled: 1, 'fire-axe': 1, 'engine-part': 1 },
+  },
 };
+
+/** MAP-1: place types for new blocks: [type, weight at stage 2, extra weight per stage]. */
+export const PLACE_TABLE = [
+  ['grocery', 2, 0], ['school', 1, 0], ['gas', 2, 0], ['library', 1, 0], ['police', 1, 0.5], ['hospital', 1, 0.5],
+  ['warehouse', 3, 0.5], ['motel', 2, 0.5], ['apartment', 3, 1], ['church', 1, 0.5], ['farmhouse', 1, 1],
+];
+/** Blocks without a place. */
+export const FILLER_KINDS = ['plaza', 'parking', 'containers', 'park', 'ruins', 'rail'];

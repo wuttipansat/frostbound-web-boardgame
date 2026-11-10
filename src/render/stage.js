@@ -215,6 +215,7 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
     const need = Math.max(Math.max(...us) - Math.min(...us), (Math.max(...vs) - Math.min(...vs)) * 0.82);
     const portrait = camera.right - camera.left < camera.top - camera.bottom; // narrow screens: leave more margin
     homeView.zoom = Math.min(controls.maxZoom, 1.05 * (full / Math.max(need, full * 0.45)) * (portrait ? 0.82 : 1));
+    controls.minZoom = Math.min(0.75, homeView.zoom * 0.8); // MAP-1: a bigger city can be zoomed out further
     view.reset();
   };
   view.reset = () => {

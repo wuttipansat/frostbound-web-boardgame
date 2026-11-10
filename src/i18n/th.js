@@ -605,7 +605,6 @@ export default {
   'cross.youChose': 'คุณเลือก',
   'cross.who': 'เกิดกับ {name}',
   'build.shift': 'ครั้งละ {n}', 'hud.siegeWho': 'จะโดนกัด: {list} HP (คนเลือดมากสุดโดนก่อน)', 'hud.siegeFood': 'ไม่มีใครอยู่ฐาน: เสียอาหาร {n}',
-  'bar.scout': 'สำรวจ', 'bar.lockedHint': 'ในหมอก: ไปยืนที่ {from} แล้วกดสำรวจเพื่อเปิด',
-  'err.locked': 'ยังอยู่ในหมอก ต้องสำรวจจากที่ข้างเคียงก่อน', 'err.scoutFromTown': 'สำรวจได้จากสถานที่ในเมืองเท่านั้น', 'err.nothingToScout': 'รอบนี้ไม่มีอะไรให้สำรวจแล้ว',
-  'log.scouted': '{name} สำรวจจาก{from}: เปิด {places}', 'loc.locked': 'ในหมอก',
+  'toast.mapFound': 'พบแผนที่เมือง! นำกลับฐานแล้วกดใช้เพื่อขยายเมือง', 'toast.mapGrown': 'เมืองขยาย! พบสถานที่ใหม่ {n} แห่ง',
+  'log.mapFound': '{name} พบแผนที่เมืองที่{place}', 'log.mapGrown': 'เมืองขยายเป็นสเตจ {stage}: สถานที่ใหม่ {places}',
 };

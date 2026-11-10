@@ -299,6 +299,11 @@ export const LOCATION_BUILDERS = {
   hospital: city.hospital,
   library: city.library,
   gas: city.gasStation,
+  warehouse: city.warehouse,
+  motel: city.motel,
+  apartment: city.apartment,
+  church: city.church,
+  farmhouse: city.farmhouse,
 };
 
 // ---------------------------------------------------------------- HD (2×) versions

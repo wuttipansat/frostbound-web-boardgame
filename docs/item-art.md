@@ -47,7 +47,8 @@ the game checks each file once and swaps the frame for the picture.
 | `scrap-plate.png` | armor | Scrap Plate Armor |
 | `snow-suit.png` | armor | Snow Suit |
 | `flashlight.png` | gadget | Flashlight |
-| `city-map.png` | gadget | City Map |
+| `city-map.png` | gadget | Shortcut Map |
+| `city-map-piece.png` | map | City Map (grows the city) |
 | `big-backpack.png` | gadget | Big Backpack |
 | `sled.png` | gadget | Sled |
 | `tool-kit.png` | gadget | Tool Kit |

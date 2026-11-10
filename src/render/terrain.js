@@ -93,10 +93,13 @@ export function heightmapGeometry({ n, cell, column, side, bottom = -12, aoStren
  * The FROSTBOUND plateau at 2× resolution.
  * env: { radius, distRoad(x,z) -> distance to nearest road (world), distPlot(x,z) -> distance to building plots }
  */
-export function buildTerrainHD({ radius, distRoad, distPlot, clip = null }) {
+export function buildTerrainHD({ radius, distRoad, distPlot, clip = null, center = null, half = null, edgeDist = null }) {
   const cell = 0.5;
-  const n = Math.ceil(radius / cell) + 1;
-  const strata = (x, z, y) => {
+  // MAP-1: a block-sized piece (center + half size) instead of the whole slab; edgeDist = distance to the slab's rim.
+  const ox = center ? Math.round(center[0] / cell) : 0; const oz = center ? Math.round(center[1] / cell) : 0;
+  const n = Math.ceil((half ?? radius) / cell) + 1;
+  const strata = (lx, lz, y) => {
+    const x = lx + ox; const z = lz + oz;
     const w = y * cell; // world height of this row
     if (w >= -1.5) return bayer(x, y, z) < 0.3 ? P.snowShade : P.snowBlue;
     if (w >= -2.5) return mixHex(P.dirt, 0x5a4638, hash3(x, y, z) * 0.6);
@@ -104,12 +107,12 @@ export function buildTerrainHD({ radius, distRoad, distPlot, clip = null }) {
     if (y % 5 === 0) return shadeHex(P.rock, 0.72);
     return hash3(Math.floor(x / 2), y, Math.floor(z / 2)) > 0.5 ? P.rock : P.rockLight;
   };
-  const column = (x, z) => {
+  const column = (lx, lz) => {
+    const x = lx + ox; const z = lz + oz;
     const wx = (x + 0.5) * cell; const wz = (z + 0.5) * cell;
     // UI-13: a square city slab (the diorama sits on a floating block of packed snow).
-    const r = Math.max(Math.abs(wx), Math.abs(wz));
-    const edge = radius - 3;
-    if (r > edge) return null;
+    const rim = edgeDist ? edgeDist(wx, wz) : radius - Math.max(Math.abs(wx), Math.abs(wz));
+    if (rim < 3) return null;
     if (clip && !clip(wx, wz)) return null; // UI-13: one block of the city at a time
     const roadD = distRoad(wx, wz);
     const plotD = distPlot(wx, wz);
@@ -117,7 +120,7 @@ export function buildTerrainHD({ radius, distRoad, distPlot, clip = null }) {
     const noise = Math.sin(wx * 0.21) * Math.cos(wz * 0.17) + Math.sin((wx + wz) * 0.09) * 0.8 + hash3(x, 1, z) * 0.18;
     let h = 0;
     if (flat > 2) h = Math.max(0, Math.round((noise + 0.4) * 2 * Math.min(1, (flat - 2) / 3)));
-    if (r > radius - 6) h = Math.max(h, Math.floor(hash3(Math.floor(x / 2), 3, Math.floor(z / 2)) * 3));
+    if (rim < 6) h = Math.max(h, Math.floor(hash3(Math.floor(x / 2), 3, Math.floor(z / 2)) * 3));
     let top;
     if (roadD < 2.2) {
       // Snow-packed street: two dark asphalt ruts, grey slush between, a few half-buried dashes.
@@ -143,5 +146,7 @@ export function buildTerrainHD({ radius, distRoad, distPlot, clip = null }) {
     }
     return { h, top };
   };
-  return heightmapGeometry({ n, cell, column, side: strata, bottom: -12 });
+  const g = heightmapGeometry({ n, cell, column, side: strata, bottom: -12 });
+  if (ox || oz) { g.translate(ox * cell, 0, oz * cell); g.computeBoundingSphere(); }
+  return g;
 }

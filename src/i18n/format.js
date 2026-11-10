@@ -42,7 +42,8 @@ export function formatLog(e, state) {
     case 'infectionSpreads': return t('log.infectionSpreads', p);
     case 'lure': return t('log.lure', p);
     case 'unpack': return t('log.unpack', { ...p, count: e.count });
-    case 'scouted': return t('log.scouted', { name: survivorDef(e.survivorId)?.name ?? '', from: c('locations', e.from, 'name'), places: e.opened.map((l) => c('locations', l, 'name')).join(', ') });
+    case 'mapFound': return t('log.mapFound', { name: survivorDef(e.survivorId)?.name ?? '', place: c('locations', e.locationId, 'name') });
+    case 'mapGrown': return t('log.mapGrown', { stage: e.stage, places: (e.places ?? []).map((l) => c('locations', l, 'name')).join(', ') });
     case 'built': return t('log.built', { building: t(`bld.${e.buildingId}`), level: e.level });
     case 'building': return t('log.building', { ...p, building: t(`bld.${e.buildingId}`), n: e.n });
     case 'siege': return t('log.siege', { attackers: e.attackers, stopped: e.stopped, hits: e.hits });

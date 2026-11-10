@@ -622,7 +622,6 @@ export default {
   'cross.youChose': 'You chose',
   'cross.who': 'Happens to {name}',
   'build.shift': '{n} per tap', 'hud.siegeWho': 'Will be bitten: {list} HP (healthiest first)', 'hud.siegeFood': 'Nobody home: lose {n} food',
-  'bar.scout': 'Scout', 'bar.lockedHint': 'In the fog: stand at {from} and scout to open it',
-  'err.locked': 'Still in the fog — scout from a neighbouring place first', 'err.scoutFromTown': 'Scout from a place in town', 'err.nothingToScout': 'Nothing left to scout from here',
-  'log.scouted': '{name} scouted from {from}: opened {places}', 'loc.locked': 'In the fog',
+  'toast.mapFound': 'A city map! Bring it home and use it to grow the city', 'toast.mapGrown': 'The city grows! {n} new places',
+  'log.mapFound': '{name} found a city map at {place}', 'log.mapGrown': 'The city grows to stage {stage}: new {places}',
 };

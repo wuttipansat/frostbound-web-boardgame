@@ -44,7 +44,7 @@ test('every location deck references valid items and every item type is findable
       seen.add(ITEMS[itemId].type);
     }
   }
-  for (const t of ITEM_TYPES) assert.ok(seen.has(t), t);
+  for (const t of ITEM_TYPES) if (t !== 'map') assert.ok(seen.has(t), t); // MAP-1: city maps turn up by searching
   for (const item of Object.values(ITEMS)) assert.ok(ITEM_TYPES.includes(item.type));
 });
 

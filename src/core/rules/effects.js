@@ -1,9 +1,8 @@
 // Data-driven effect interpreter shared by crossroads choices and crisis outcomes.
 // ctx = { focusSurvivorId, reason } — focus is optional (crisis effects have none).
 import { ENERGY } from '../constants.js';
-import { OUTSIDE_LOCATIONS } from '../constants.js';
 import { pick } from '../rng.js';
-import { itemOf, focusSurvivor, aliveSurvivors, isOpen } from '../selectors.js';
+import { itemOf, focusSurvivor, aliveSurvivors, outsideOf } from '../selectors.js';
 import {
   changeMorale, changeFood, recruitSurvivor, drawItems, discardCard, addZombies,
   removeZombies, addBarricades, woundSurvivor, healSurvivor, log, gainEnergy,
@@ -36,7 +35,7 @@ const EFFECTS = {
   drawItem: (s, ctx, e) => {
     let from = resolveWhere(s, ctx, e.from);
     if (from === 'any' || !s.locations[from]?.deck?.length) {
-      const stocked = OUTSIDE_LOCATIONS.filter((l) => s.locations[l].deck.length && isOpen(s, l));
+      const stocked = outsideOf(s).filter((l) => s.locations[l].deck.length);
       if (!stocked.length) return;
       from = pick(s, stocked);
     }

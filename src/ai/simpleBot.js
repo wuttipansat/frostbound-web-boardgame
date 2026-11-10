@@ -4,13 +4,12 @@ import { tryReduce } from '../core/reducer.js';
 // opts.random: () => number in [0,1). When opts.chaos > 0, the bot picks randomly among
 // candidate actions with that probability (used by fuzz tests to explore odd paths).
 import * as act from '../core/actions.js';
-import { PHASES, OUTSIDE_LOCATIONS, ENERGY, RULES } from '../core/constants.js';
+import { PHASES, ENERGY, RULES } from '../core/constants.js';
 import { gearSlot, ITEMS } from '../content/items.js';
 import {
   aliveSurvivors, survivorDef, itemOf, crisisDef, scenarioDef,
-  freeSurvivorSlots, freeZombieSlots, foodNeeded, actionCost, fightPreview, siegeForecast, placeOfItem, packFree, leaveDamage, spawnForecast, crisisRequirement, crisisScore, gearOf, isOpen, frontier } from '../core/selectors.js';
+  freeSurvivorSlots, freeZombieSlots, foodNeeded, actionCost, fightPreview, siegeForecast, placeOfItem, packFree, leaveDamage, spawnForecast, crisisRequirement, crisisScore, gearOf, outsideOf, locDef } from '../core/selectors.js';
 import { CROSSROADS_BY_ID } from '../content/crossroads.js';
-import { LOCATIONS } from '../content/locations.js';
 import { CRAWLER } from '../content/buildings.js';
 
 /** Item ids still missing (at the colony) for the next crawler stage. */
@@ -149,6 +148,9 @@ function turnAction(s, p, opts) {
   const recruit = cardsOf('survivor')[0];
   if (recruit && s.food >= foodNeeded(s) * 4) candidates.push(act.playCard(recruit));
 
+  // MAP-1: a city map at the colony is read at once (the city grows).
+  const mapCard = [...s.stockpile, ...survivors.flatMap((v) => v.pack ?? [])].find((u) => s.cards[u] === 'city-map-piece' && placeOfItem(s, u) === 'colony');
+  if (mapCard && !globalThis.process?.env?.NOGROW) candidates.unshift(act.playCard(mapCard));
   energyActions(s, p, survivors, candidates, cardsOf, opts);
   return pickOne(candidates.filter((c) => tryReduce(s, c).ok), opts) ?? act.endTurn();
 }
@@ -180,12 +182,6 @@ function energyActions(s, p, survivors, candidates, cardsOf, opts) {
     const hunt = scenarioDef(s).goal.type === 'kills' && sv.wounds < 2;
     if (loc.zombies > 0 && can(sv, 'attack') && hunt) candidates.push(act.attack(sv.id));
     if (loc.zombies >= 2 && can(sv, 'attack') && true) candidates.push(act.attack(sv.id));
-    // 2b. Fog of war: scout when what the colony needs is only found under the fog (or this place is bare).
-    if (sv.location !== 'colony' && frontier(s, sv.location).length && can(sv, 'scout')) {
-      const want = s.scenario.id === 'crawler' ? crawlerWants(s) : [];
-      const openHas = (id) => OUTSIDE_LOCATIONS.some((l) => isOpen(s, l) && LOCATIONS[l].deck?.[id]);
-      if (want.some((id) => !openHas(id)) || !loc.deck.length || s.day >= 3) candidates.push(act.scout(sv.id));
-    }
     // 3. Scavenge.
     if (sv.location !== 'colony' && loc.deck.length && can(sv, 'search')) candidates.push(act.search(sv.id));
     if (loc.zombies > 0 && can(sv, 'attack')) candidates.push(act.attack(sv.id));
@@ -209,7 +205,7 @@ function energyActions(s, p, survivors, candidates, cardsOf, opts) {
       candidates.push(act.move(sv.id, 'colony', s.locations.colony.zombies ? cardsOf('fuel')[0] : undefined));
     } else if (goal.type === 'kills' && sv.wounds < 2) {
       // Hunting: go where the dead are thickest (a weapon makes it safe and cheap).
-      const prey = OUTSIDE_LOCATIONS.concat(['colony']).filter((l) => l !== sv.location && s.locations[l].zombies >= 2
+      const prey = outsideOf(s).concat(['colony']).filter((l) => l !== sv.location && s.locations[l].zombies >= 2
         && freeSurvivorSlots(s, l) > 0 && sv.ap >= actionCost(s, sv.id, 'move', l) + actionCost(s, sv.id, 'attack'))
         .sort((a, b) => s.locations[b].zombies - s.locations[a].zombies)[0];
       if (prey && loc.zombies === 0) candidates.push(act.move(sv.id, prey));
@@ -220,17 +216,17 @@ function energyActions(s, p, survivors, candidates, cardsOf, opts) {
   }
   function pushOut(sv) {
     {
-      const options = OUTSIDE_LOCATIONS.filter((l) => isOpen(s, l) && freeSurvivorSlots(s, l) > 0 && s.locations[l].deck.length && can(sv, 'move', l));
+      const options = outsideOf(s).filter((l) => freeSurvivorSlots(s, l) > 0 && s.locations[l].deck.length && can(sv, 'move', l));
       // Food short (or stockpiling) → the grocery first; hunting → where the zombies are.
       const hungry = s.food < foodNeeded(s) + 2 || scenarioDef(s).goal.type === 'stockpile';
       const hunting = scenarioDef(s).goal.type === 'kills';
       // Snow crawler: go where the next stage's missing materials can be found.
       const want = crawlerWants(s);
-      const loot = (l) => want.reduce((n, id) => n + (LOCATIONS[l].deck?.[id] ?? 0), 0);
+      const loot = (l) => want.reduce((n, id) => n + (locDef(s, l).deck?.[id] ?? 0), 0);
       // Food first when the larder runs low: places whose loot table has the most food.
-      const foodLoot = (l) => Object.entries(LOCATIONS[l].deck ?? {}).reduce((n, [id, k]) => n + (ITEMS[id].type === 'food' ? k : 0), 0);
+      const foodLoot = (l) => Object.entries(locDef(s, l).deck ?? {}).reduce((n, [id, k]) => n + (ITEMS[id].type === 'food' ? k : 0), 0);
       const lowFood = s.food < foodNeeded(s) * 2;
-      const score = (l) => (hunting ? -s.locations[l].zombies * 2 : s.locations[l].zombies) - (hungry && l === 'grocery' ? 3 : 0) - Math.min(4, loot(l)) - (lowFood ? foodLoot(l) * 2 : 0);
+      const score = (l) => (hunting ? -s.locations[l].zombies * 2 : s.locations[l].zombies) - (hungry && l === 'grocery' ? 3 : 0) - Math.min(4, loot(l)) - (lowFood ? foodLoot(l) * 2 : 0) + actionCost(s, sv.id, 'move', l) / 4; // MAP-1: far places cost more to reach
       options.sort((a, b) => score(a) - score(b) || opts.random() - 0.5);
       const def = survivorDef(sv.id);
       const preferred = def.ability.type === 'doubleSearch' && options.includes(def.ability.location) ? def.ability.location : options[0];

@@ -10,7 +10,6 @@ import {
 import { ease } from './tween.js';
 import { SURVIVORS_BY_ID } from '../content/survivors.js';
 import { LOCATIONS } from '../content/locations.js';
-import { LOCATION_IDS } from '../core/constants.js';
 
 const SURVIVOR_SCALE = 1.3;
 const OUTLINE_MAT = new THREE.MeshBasicMaterial({ color: 0x0c0f14, side: THREE.BackSide });
@@ -50,9 +49,12 @@ export function zombieSlotIndex(locationId, i) {
   return (i % gates) * per + Math.floor(i / gates);
 }
 
+/** Zombie slots of a place (MAP-1: 'grocery-2' is a grocery). */
+const zSlots = (id) => LOCATIONS[id]?.zombieSlots ?? LOCATIONS[id.replace(/-\d+$/, '')]?.zombieSlots ?? 6;
+
 /** Barricades fill zombie slots from the far end so they never overlap zombies (z + b <= slots). */
 export function barricadeSlotIndex(locationId, j) {
-  return zombieSlotIndex(locationId, LOCATIONS[locationId].zombieSlots - 1 - j);
+  return zombieSlotIndex(locationId, zSlots(locationId) - 1 - j);
 }
 
 // ---------------------------------------------------------------- instanced pool
@@ -170,9 +172,11 @@ export function createPieces(board, tweens) {
   const discMats = PLAYER_COLORS.map((c) => new THREE.MeshBasicMaterial({ color: c, toneMapped: false }));
 
   const survivors = new Map(); // id -> visual
-  const slots = new Map(LOCATION_IDS.map((id) => [id, new Map()])); // loc -> Map(id -> slot)
-  const zombies = new Map(LOCATION_IDS.map((id) => [id, []]));
-  const barricades = new Map(LOCATION_IDS.map((id) => [id, []]));
+  // Per place (MAP-1: places appear as the city grows, so these fill in lazily).
+  const lazy = (mk) => { const m = new Map(); const get = m.get.bind(m); m.get = (k) => get(k) ?? (m.set(k, mk()), get(k)); return m; };
+  const slots = lazy(() => new Map()); // loc -> Map(id -> slot)
+  const zombies = lazy(() => []);
+  const barricades = lazy(() => []);
   let pending = 0; // running piece animations
 
   // Selection ring that follows the highlighted survivor.
@@ -367,7 +371,7 @@ export function createPieces(board, tweens) {
   }
 
   function addBarricade(locId, j, animate) {
-    const pos = zombieSlotPos(locId, LOCATIONS[locId].zombieSlots - 1 - j);
+    const pos = zombieSlotPos(locId, zSlots(locId) - 1 - j);
     const item = barricadePool.add({
       x: pos.x, y: 0, z: pos.z, rotY: faceToward(pos, layout[locId].center) + Math.PI / 2, scale: animate ? 0.01 : 1,
     });
@@ -398,7 +402,7 @@ export function createPieces(board, tweens) {
     }
 
     // Survivors: assign slots per location, then animate differences.
-    const byLoc = new Map(LOCATION_IDS.map((id) => [id, []]));
+    const byLoc = new Map(Object.keys(state.locations).map((id) => [id, []]));
     for (const sv of Object.values(state.survivors)) if (sv.alive) byLoc.get(sv.location).push(sv.id);
     for (const [loc, ids] of byLoc) {
       // Survivors who were already here keep priority on their old slots.
@@ -424,7 +428,8 @@ export function createPieces(board, tweens) {
     }
 
     // Zombies and barricades: counts per location.
-    for (const id of LOCATION_IDS) {
+    for (const id of Object.keys(state.locations)) {
+      if (!layout[id]) continue;
       const zs = zombies.get(id);
       const target = state.locations[id].zombies;
       while (zs.length > target) removeZombie(zs.pop(), animate);

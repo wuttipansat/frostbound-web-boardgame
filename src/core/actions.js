@@ -20,7 +20,6 @@ export const A = Object.freeze({
   CRAFT: 'CRAFT',
   BUILD: 'BUILD',
   SET_REST: 'SET_REST',
-  SCOUT: 'SCOUT',
 });
 
 export const draftPick = (survivorIds) => ({ type: A.DRAFT_PICK, survivorIds });
@@ -50,5 +49,3 @@ export const craft = (recipeId, survivorId) => ({ type: A.CRAFT, recipeId, survi
 /** Work on a base upgrade at the colony (materials when a level starts, then AP; progress carries over). */
 export const build = (buildingId, survivorId) => ({ type: A.BUILD, buildingId, survivorId });
 
-/** UI-10: scout from an open place; the fog over its locked neighbours clears. */
-export const scout = (survivorId) => ({ type: A.SCOUT, survivorId });

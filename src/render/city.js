@@ -373,3 +373,146 @@ export function containerYard() {
   for (const [x, z] of [[30, 40], [33, 41]]) m.box(x, 1, z, 2, 4, 2, 0x2f5fa8);
   return m.snowCap(P.snow, 0.75, 1);
 }
+
+// ---------------------------------------------------------------- MAP-1: places found as the city grows
+
+export function warehouse() {
+  const m = new VoxelModel(); const w = 46; const d = 28;
+  pad(m, -4, -4, w + 8, d + 14, 31);
+  m.walls(0, 1, 0, w, 14, d, C.sageDark);
+  m.box(1, 14, 1, w - 2, 1, d - 2, C.roofDark);
+  for (let x = 0; x < w; x++) for (let k = 0; k < 4; k++) m.set(x, 15 + k, Math.floor(d / 2) - 8 + k * 4, k % 2 ? C.roof : C.roofDark); // ribbed roof
+  m.box(0, 15, 0, w, 1, d, C.roof);
+  for (let x = 0; x < w; x += 2) m.box(x, 1, d - 1, 1, 13, 1, C.sageDark); // corrugated ribs
+  for (const bx of [4, 18, 32]) { // roller doors, one jammed half open
+    m.clearBox(bx, 1, d - 1, 10, 10, 1);
+    for (let y = 1; y <= 10; y++) for (let x = bx; x < bx + 10; x++) if (bx !== 18 || y > 5) m.set(x, y, d - 1, y % 2 ? C.metal : C.metalDark);
+  }
+  neon(m, 'DEPOT', 23, 16, d, C.neonWarm, 1);
+  for (const [x, z] of [[2, d + 4], [8, d + 6], [38, d + 5]]) m.box(x, 1, z, 4, 2, 4, 0x8a5a2b); // pallets
+  graffiti(m, 34, 3, d, 6);
+  return dust(m);
+}
+
+export function motel() {
+  const m = new VoxelModel(); const w = 48; const d = 18;
+  pad(m, -4, -4, w + 8, d + 16, 32);
+  block(m, { w, d, floors: 2, wall: C.ochre, trim: C.ochreDark, seed: 33 });
+  m.box(0, FH, d, w, 1, 4, C.trim); // walkway
+  for (let x = 0; x < w; x += 2) m.set(x, FH + 1, d + 3, C.metal);
+  for (let x = 3; x < w - 3; x += 7) { m.clearBox(x, 1, d - 1, 3, 7, 1); m.box(x, 1, d - 1, 3, 7, 1, x % 3 ? C.board : 0x7a2f2a); }
+  m.box(w + 2, 1, d + 6, 2, 16, 2, C.metalDark); m.box(w - 4, 17, d + 6, 14, 6, 2, C.trim); // road sign
+  neon(m, 'MOTEL', w + 3, 18, d + 8, C.neonPink, 4);
+  return dust(m);
+}
+
+export function apartment() {
+  const m = new VoxelModel(); const w = 34; const d = 30;
+  pad(m, -4, -4, w + 8, d + 14, 34);
+  block(m, { w, d, floors: 4, wall: C.brick, trim: C.trim, seed: 35, balconies: true });
+  m.clearBox(14, 1, d - 1, 6, 7, 1); m.box(14, 1, d - 1, 6, 7, 1, C.glass);
+  m.box(12, 8, d, 10, 1, 3, C.trim);
+  for (const [x, z] of [[2, d + 5], [26, d + 6]]) m.box(x, 1, z, 5, 4, 3, 0x3f6a4a); // bins
+  graffiti(m, 2, 2, d, 8);
+  return dust(m);
+}
+
+export function church() {
+  const m = new VoxelModel(); const w = 24; const d = 38;
+  pad(m, -4, -4, w + 8, d + 12, 36);
+  m.walls(0, 1, 0, w, 16, d, C.cream);
+  m.box(1, 16, 1, w - 2, 1, d - 2, C.roofDark);
+  for (let k = 0; k <= 12; k++) m.box(k, 17 + k, 0, w - 2 * k, 1, d, k % 3 === 0 ? C.roofDark : C.roof); // pitched roof
+  for (let z = 6; z < d - 6; z += 8) for (const x of [0, w - 1]) for (let y = 4; y < 13; y++) m.set(x, y, z, y > 10 ? C.neonWarm : C.glass, y > 10);
+  // Bell tower over the door.
+  m.walls(7, 1, d - 10, 10, 40, 10, C.creamDark);
+  for (let k = 0; k < 6; k++) m.box(7 + k, 41 + k * 2, d - 10 + k, 10 - 2 * k, 2, 10 - 2 * k, C.roofDark);
+  m.box(11, 53, d - 6, 2, 6, 2, C.trim); m.box(9, 56, d - 6, 6, 1, 2, C.trim); // cross
+  m.clearBox(10, 1, d - 1, 4, 9, 1); m.box(10, 1, d - 1, 4, 9, 1, C.board);
+  m.box(10, 32, d - 1, 4, 5, 1, 0x15191e);
+  return dust(m);
+}
+
+export function farmhouse() {
+  const m = new VoxelModel();
+  for (let x = -4; x < 52; x++) for (let z = -4; z < 44; z++) m.set(x, 0, z, hash3(x, 2, z) < 0.12 ? C.mossDark : P.snow);
+  // Red barn.
+  m.walls(0, 1, 0, 24, 14, 30, C.brick);
+  for (let k = 0; k <= 12; k++) m.box(k, 15 + k, 0, 24 - 2 * k, 1, 30, k % 4 === 0 ? C.roofDark : C.roof);
+  m.clearBox(7, 1, 29, 10, 11, 1);
+  for (let y = 1; y < 12; y++) for (let x = 7; x < 17; x++) if (x === 7 || x === 16 || y === 11 || x - 7 === y - 1 || 16 - x === y - 1) m.set(x, y, 29, C.trim);
+  // Farmhouse with a porch.
+  block(m, { x0: 30, z0: 8, w: 18, d: 16, floors: 2, wall: C.cream, trim: C.creamDark, seed: 37 });
+  m.box(30, 1, 24, 18, 1, 4, 0x7a5a3a);
+  for (const x of [30, 47]) m.box(x, 2, 27, 1, 8, 1, 0x7a5a3a);
+  for (let x = 30; x < 48; x++) m.set(x, 10, 27, C.creamDark);
+  // Fence and hay bales.
+  for (let z = 0; z < 40; z += 2) m.box(-3, 1, z, 1, 3, 1, 0x7a5a3a);
+  for (const [x, z] of [[26, 34], [30, 36], [40, 35]]) m.box(x, 1, z, 4, 3, 3, 0xd8b03a);
+  return dust(m);
+}
+
+// ---------------------------------------------------------------- MAP-1: blocks without a place
+
+/** A town square: paving, a frozen fountain, benches and bare trees. */
+export function plaza() {
+  const m = new VoxelModel();
+  pad(m, 0, 0, 56, 48, 41);
+  for (let x = 0; x < 12; x++) for (let z = 0; z < 12; z++) {
+    const r = Math.hypot(x - 5.5, z - 5.5);
+    if (r < 6) m.box(22 + x, 1, 18 + z, 1, r > 4.6 ? 2 : 1, 1, r > 4.6 ? C.trim : 0xbfe3f5);
+  }
+  m.box(27, 1, 23, 2, 6, 2, C.trim); m.box(26, 7, 22, 4, 1, 4, C.trim);
+  for (const [x, z, r] of [[8, 10, 0], [44, 10, 0], [8, 36, 1], [44, 36, 1]]) {
+    m.box(x, 1, z, 7, 1, 2, 0x7a5a3a); m.box(x, 2, z + (r ? 0 : 1), 7, 2, 1, 0x7a5a3a);
+  }
+  for (const [x, z] of [[4, 4], [50, 4], [4, 42], [50, 42]]) { m.box(x, 1, z, 1, 9, 1, 0x4b3a2c); m.box(x - 2, 7, z, 5, 1, 1, 0x4b3a2c); m.box(x, 8, z - 2, 1, 1, 5, 0x4b3a2c); }
+  return m.snowCap(P.snow, 0.8, 1);
+}
+
+/** A snowed-in park: pines, a frozen pond, a playground frame. */
+export function park() {
+  const m = new VoxelModel();
+  for (let x = 0; x < 56; x++) for (let z = 0; z < 48; z++) {
+    const pond = Math.hypot((x - 36) / 1.3, z - 30) < 8;
+    m.set(x, 0, z, pond ? (hash3(x, 1, z) < 0.1 ? 0xe9f6ff : 0xa9cdea) : hash3(x, 3, z) < 0.05 ? C.mossDark : P.snow);
+  }
+  for (const [x, z, h] of [[6, 6, 14], [14, 30, 18], [46, 8, 16], [6, 40, 12], [26, 12, 15]]) {
+    m.box(x, 1, z, 1, 3, 1, 0x4b3a2c);
+    for (let k = 0; k < h - 3; k++) { const r = Math.max(0, Math.floor((h - 3 - k) / 3)); m.box(x - r, 4 + k, z - r, 2 * r + 1, 1, 2 * r + 1, k % 3 === 0 ? P.snow : 0x2f5a3c); }
+  }
+  for (const x of [16, 26]) m.box(x, 1, 40, 1, 8, 1, C.metal);
+  m.box(16, 8, 40, 11, 1, 1, C.metal);
+  m.box(19, 2, 40, 1, 6, 1, C.metalDark); m.box(23, 2, 40, 1, 6, 1, C.metalDark);
+  return m.snowCap(P.snow, 0.8, 1);
+}
+
+/** A collapsed building: broken walls, rubble, a bent girder. */
+export function ruins() {
+  const m = new VoxelModel();
+  pad(m, 0, 0, 56, 48, 43);
+  m.walls(8, 1, 8, 30, 10, 26, C.grey);
+  for (let x = 8; x < 38; x++) for (let z = 8; z < 34; z++) for (let y = 1; y < 11; y++) {
+    if (hash3(Math.floor(x / 3), y, Math.floor(z / 3)) < 0.35 + y * 0.05) m.remove?.(x, y, z);
+  }
+  for (let i = 0; i < 70; i++) {
+    const x = 6 + Math.floor(hash3(i, 1, 9) * 40); const z = 6 + Math.floor(hash3(i, 2, 9) * 34);
+    m.box(x, 1, z, 2, 1 + Math.floor(hash3(i, 3, 9) * 3), 2, hash3(i, 4, 9) < 0.5 ? C.greyDark : C.grey);
+  }
+  for (let k = 0; k < 14; k++) m.set(40 + Math.floor(k / 3), 1 + k, 20, C.rust);
+  return m.snowCap(P.snow, 0.75, 1);
+}
+
+/** A rail yard: two tracks, a boxcar, a signal. */
+export function railYard() {
+  const m = new VoxelModel();
+  for (let x = 0; x < 56; x++) for (let z = 0; z < 48; z++) m.set(x, 0, z, hash3(x, 5, z) < 0.3 ? 0x6c665e : P.snow);
+  for (const tz of [14, 32]) for (let x = 0; x < 56; x++) {
+    if (x % 3 === 0) m.box(x, 1, tz - 3, 1, 1, 8, 0x5a4232);
+    m.set(x, 2, tz - 2, C.metal); m.set(x, 2, tz + 3, C.metal);
+  }
+  m.box(10, 3, 29, 24, 9, 7, C.cont[0]); m.box(10, 12, 29, 24, 1, 7, C.roofDark);
+  m.clearBox(20, 4, 35, 4, 7, 1);
+  m.box(44, 1, 22, 1, 14, 1, C.metalDark); m.box(43, 13, 22, 3, 3, 1, 0x15191e); m.set(44, 14, 23, C.neonRed, true);
+  return m.snowCap(P.snow, 0.75, 1);
+}

@@ -16,10 +16,9 @@ import { icon } from './ui/icons.js';
 import { installTooltips } from './ui/tooltip.js';
 import { sound } from './audio/sound.js';
 import { c, t as tr } from './i18n/index.js';
-import { LOCATION_IDS, NEIGHBORS } from './core/constants.js';
 import { ITEMS } from './content/items.js';
 import { tryReduce } from './core/reducer.js';
-import { actionCost, searchSpawnChance, isOverrun, isOpen } from './core/selectors.js';
+import { actionCost, searchSpawnChance, isOverrun } from './core/selectors.js';
 import { LOCATIONS } from './content/locations.js';
 
 const params = new URLSearchParams(location.search);
@@ -86,13 +85,19 @@ stage.scene.add(particles.group);
 // Step 15: no permanent name signs. Each location keeps a small zombie badge (only when zombies are there);
 // the name shows over the building that is hovered, tapped or selected.
 
+// MAP-1: one pin per place on the board; new places get theirs when the city grows.
 const labels = {};
-for (const id of LOCATION_IDS) {
-  const el = document.createElement('div');
-  el.className = 'loc-label zbadge';
-  $('labels').appendChild(el);
-  labels[id] = el;
+const placeIds = () => Object.keys(board.layout);
+function syncLabels() {
+  for (const id of placeIds()) {
+    if (labels[id]) continue;
+    const el = document.createElement('div');
+    el.className = 'loc-label zbadge';
+    $('labels').appendChild(el);
+    labels[id] = el;
+  }
 }
+syncLabels();
 const nameTag = document.createElement('div');
 nameTag.id = 'loc-name';
 nameTag.setAttribute('aria-hidden', 'true');
@@ -101,21 +106,14 @@ let hoveredLoc = null;
 
 function refreshLabels(state) {
   // UI-3: a small pin per place — zombies (red ring when overrun) and our people there. Details: tap → the place's card.
-  for (const id of LOCATION_IDS) {
+  syncLabels();
+  for (const id of placeIds()) {
     const el = labels[id];
     el.replaceChildren();
     el.dataset.loc = id;
     el.className = 'loc-label pin';
     if (!state) { el.classList.add('empty'); continue; }
-    if (!isOpen(state, id)) {
-      // UI-13: a locked block is not drawn; only the next blocks to open (next to an open place) get a '?'.
-      const next = (NEIGHBORS[id] ?? []).some((n) => isOpen(state, n));
-      if (!next) { el.classList.add('empty'); continue; }
-      el.classList.add('locked'); el.textContent = '?';
-      el.setAttribute('aria-label', tr('loc.locked'));
-      el.onclick = (ev) => { ev.stopPropagation(); app?.onBoardPick({ locationId: id }); };
-      continue;
-    }
+    if (!state.locations[id]) { el.classList.add('empty'); continue; }
     const z = state.locations[id].zombies;
     const people = Object.values(state.survivors).filter((v) => v.alive && v.location === id).length;
     el.classList.toggle('overrun', isOverrun(state, id));
@@ -296,7 +294,8 @@ stage.onFrame(() => {
   const { clientWidth: w, clientHeight: h } = stage.renderer.domElement;
   const rects = PANELS.filter((el) => el && !el.classList.contains('hidden') && el.offsetWidth).map((el) => el.getBoundingClientRect());
   const barBottom = document.getElementById('topbar').getBoundingClientRect().bottom;
-  for (const id of LOCATION_IDS) {
+  for (const id of placeIds()) {
+    if (!labels[id]) continue;
     v.copy(board.layout[id].label).project(stage.camera);
     const x = ((v.x + 1) / 2) * w;
     // Labels hang above their anchor (translate -100%): keep the whole pill below the top bar.
@@ -324,7 +323,7 @@ stage.onFrame(() => {
     nameTag.style.left = `${((v.x + 1) / 2) * w}px`;
     nameTag.style.top = `${Math.max(((1 - v.y) / 2) * h, barBottom + 30)}px`;
   }
-  for (const id of LOCATION_IDS) labels[id].classList.toggle('named', id === named);
+  for (const id of placeIds()) labels[id]?.classList.toggle('named', id === named);
   // The "who goes there" picker floats by the location's survivor pads.
   const mp = $('move-pick');
   const at = app?.ui.movePick;

@@ -1,5 +1,6 @@
 // createGame(config) -> a fresh, fully JSON-serializable GameState.
-import { PHASES, LOCATION_IDS, RULES, DIFFICULTY, START_OPEN } from './constants.js';
+import { PHASES, LOCATION_IDS, RULES, DIFFICULTY } from './constants.js';
+import { newMap } from './map.js';
 import { random, normalizeSeed, shuffle } from './rng.js';
 import { assert } from './errors.js';
 import { LOCATIONS } from '../content/locations.js';
@@ -30,7 +31,7 @@ export function createGame(config = {}) {
     phase: PHASES.DRAFT,
     day: 1,
     time: 'dawn', // dawn | day | dusk | night
-    unlocked: [...START_OPEN], // fog of war (UI-10)
+    map: newMap(), // MAP-1: the city grows a stage per map found
     scenario: { id: scenario.id, days: config.days ?? scenario.days, deposited: 0 }, // 0 = endless winter
     morale: Math.min(10, scenario.morale + (DIFFICULTY[config.difficulty]?.morale ?? 0)),
     maxMorale: 10,
@@ -57,29 +58,7 @@ export function createGame(config = {}) {
   };
 
   // Item decks: one card instance per copy, keyed by a unique uid.
-  let uid = 0;
-  for (const locId of LOCATION_IDS) {
-    const def = LOCATIONS[locId];
-    const deck = [];
-    if (def.deck) {
-      for (const [itemId, copies] of Object.entries(def.deck)) {
-        for (let i = 0; i < copies; i++) {
-          const id = `c${uid++}`;
-          s.cards[id] = itemId;
-          deck.push(id);
-        }
-      }
-    }
-    // The crawler's rare parts lie deep: somewhere in the lower half of their pile (decks are drawn from the end).
-    const pile = def.deck ? shuffle(s, deck) : null;
-    if (pile) {
-      for (const uid of pile.filter((u) => RARE.includes(s.cards[u]))) {
-        pile.splice(pile.indexOf(uid), 1);
-        pile.splice(Math.floor(random(s) * (pile.length / 2)), 0, uid);
-      }
-    }
-    s.locations[locId] = { zombies: 0, barricades: 0, deck: pile };
-  }
+  for (const locId of LOCATION_IDS) s.locations[locId] = stockPlace(s, locId, locId, 'c');
 
   s.crisisDeck = shuffle(s, CRISES.map((c) => c.id));
   s.crossroadsDeck = shuffle(s, CROSSROADS.map((c) => c.id));
@@ -102,4 +81,31 @@ export function createGame(config = {}) {
   s.searches = {};  // searches per location today (each extra one raises the zombie chance)
   s.survivorDeck = survivorPool;
   return s;
+}
+
+/** A fresh place of `type`: zombies, barricades and its shuffled item pile (uids prefixed so they stay unique). */
+export function stockPlace(s, id, type, prefix, zombies = 0) {
+  const def = LOCATIONS[type];
+  const deck = [];
+  let n = 0;
+  if (def.deck) {
+    for (const [itemId, copies] of Object.entries(def.deck)) {
+      for (let i = 0; i < copies; i++) {
+        const uid = prefix === 'c' ? `c${Object.keys(s.cards).length}` : `${prefix}${id}.${n++}`;
+        s.cards[uid] = itemId;
+        deck.push(uid);
+      }
+    }
+  }
+  // The crawler's rare parts lie deep: somewhere in the lower half of their pile (decks are drawn from the end).
+  const pile = def.deck ? shuffle(s, deck) : null;
+  if (pile) {
+    for (const uid of pile.filter((u) => RARE.includes(s.cards[u]))) {
+      pile.splice(pile.indexOf(uid), 1);
+      pile.splice(Math.floor(random(s) * (pile.length / 2)), 0, uid);
+    }
+  }
+  const loc = { zombies, barricades: 0, deck: pile };
+  if (type !== id) loc.type = type;
+  return loc;
 }

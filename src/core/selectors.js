@@ -1,11 +1,13 @@
 import { BUILDINGS, CRAWLER } from '../content/buildings.js';
 // Read-only derived queries over GameState. Safe to use from UI/renderer.
 import { SURVIVORS_BY_ID } from '../content/survivors.js';
-import { LOCATIONS } from '../content/locations.js';
 import { ITEMS } from '../content/items.js';
 import { SCENARIOS_BY_ID } from '../content/scenarios.js';
 import { CRISES_BY_ID } from '../content/crises.js';
-import { RULES, ENERGY, REST, FIGHT, SEASON, SIEGE, XP, BOND, DIFFICULTY, RING, SEARCH_SPAWN, DANGEROUS_LOCATIONS, OUTSIDE_LOCATIONS, NEIGHBORS } from './constants.js';
+import { RULES, ENERGY, REST, FIGHT, SEASON, SIEGE, XP, BOND, DIFFICULTY, SEARCH_SPAWN } from './constants.js';
+import { locDef, typeOf, outsideOf, roadDistance, ringOf, mapOf, mapRange } from './map.js';
+
+export { locDef, typeOf, outsideOf, placesOf, mapOf, mapRange, ringOf } from './map.js';
 
 export const survivorDef = (id) => SURVIVORS_BY_ID[id];
 export const itemOf = (s, uid) => ITEMS[s.cards[uid]];
@@ -43,7 +45,7 @@ export function booksHeld(s, passive) {
 
 /** This survivor has the blueprint for this location equipped. */
 export function holdsBlueprint(s, survivorId, locationId) {
-  return gearOf(s, survivorId).book?.blueprint === locationId;
+  return gearOf(s, survivorId).book?.blueprint === typeOf(s, locationId);
 }
 
 /** Does a living survivor of the team have this ability? */
@@ -56,7 +58,7 @@ export function woundLimit(survivorId) {
 }
 
 export function freeSurvivorSlots(s, locationId) {
-  const slots = LOCATIONS[locationId].survivorSlots;
+  const slots = locDef(s, locationId).survivorSlots;
   if (slots == null) return Infinity;
   return slots - survivorsAt(s, locationId).length;
 }
@@ -64,7 +66,7 @@ export function freeSurvivorSlots(s, locationId) {
 /** Free zombie/barricade slots at a location. */
 export function freeZombieSlots(s, locationId) {
   const loc = s.locations[locationId];
-  return LOCATIONS[locationId].zombieSlots - loc.zombies - loc.barricades;
+  return locDef(s, locationId).zombieSlots - loc.zombies - loc.barricades;
 }
 
 /** People the colony must feed: survivors standing in the colony. */
@@ -147,7 +149,7 @@ export function actionCost(s, survivorId, kind, to = null) {
   let cost = ENERGY.COST[kind] ?? 0;
   if (kind === 'attack') cost = gear.weapon?.gun ? FIGHT.GUN_AP : FIGHT.MELEE_AP;
   if (kind === 'search') cost = ENERGY.SEARCH;
-  if (kind === 'move') cost = walkCost(sv?.location ?? 'colony', to ?? 'colony') + (gear.armor?.moveMod ?? 0) + (gear.tool?.walkMod ?? 0) - (sv?.trait === 'quick' ? 2 : 0);
+  if (kind === 'move') cost = walkCost(s, sv?.location ?? 'colony', to ?? 'colony') + (gear.armor?.moveMod ?? 0) + (gear.tool?.walkMod ?? 0) - (sv?.trait === 'quick' ? 2 : 0);
   if (kind === 'search') cost += (gear.tool?.searchMod ?? 0) - XP.SEARCH_AP * xpLevel(sv, 'search');
   if (kind === 'barricade') cost += gear.tool?.barricadeMod ?? 0;
   if (!sv) return cost;
@@ -163,17 +165,16 @@ export function actionCost(s, survivorId, kind, to = null) {
   return Math.max(1, cost);
 }
 
-/** Walking cost between two places by distance: near 12, mid 17, far 23. */
-export function walkCost(from, to) {
+/** MAP-1: walking cost = 8 + 4 per block of street between the two places (cap 40). */
+export function walkCost(s, from, to) {
   if (from === to) return 0;
-  const a = RING[from] ?? 1, b = RING[to] ?? 1;
-  const tier = a === 0 || b === 0 ? Math.max(a, b) : Math.min(3, Math.ceil((a + b) / 2));
-  return ENERGY.WALK[tier - 1];
+  return Math.min(ENERGY.WALK_CAP, ENERGY.WALK_BASE + ENERGY.WALK_BLOCK * roadDistance(s, from, to));
 }
 
-/** Chance (0..1) that searching here makes a zombie appear: by place, +10% per extra search there today. */
+/** Chance (0..1) that searching here makes a zombie appear: by place type and ring, +10% per extra search there today. */
 export function searchSpawnChance(s, locationId) {
-  return Math.max(0, Math.min(1, (SEARCH_SPAWN[locationId] ?? 0) + SEARCH_SPAWN.EXTRA * (s.searches?.[locationId] ?? 0)));
+  const base = (SEARCH_SPAWN[typeOf(s, locationId)] ?? 0.15) + SEARCH_SPAWN.RING * Math.max(0, ringOf(s, locationId) - 1);
+  return Math.max(0, Math.min(1, base + SEARCH_SPAWN.EXTRA * (s.searches?.[locationId] ?? 0)));
 }
 
 /** Who holds an item: 'stockpile' (at the colony), a survivor id (backpack), or null. */
@@ -285,8 +286,7 @@ export function missionStatus(s) {
 }
 
 /** Step 9: an outside place at its zombie cap (6) is overrun: no searching there. */
-export const isOverrun = (s, id) => id !== 'colony' && (s.locations[id]?.zombies ?? 0) >= LOCATIONS_BY_ID(id).zombieSlots;
-const LOCATIONS_BY_ID = (id) => LOCATIONS[id];
+export const isOverrun = (s, id) => id !== 'colony' && (s.locations[id]?.zombies ?? 0) >= locDef(s, id).zombieSlots;
 
 /** Base upgrade level (0..3). */
 export const baseLevel = (s, id) => s.base?.[id] ?? 0;
@@ -308,7 +308,7 @@ export const guardsOnDuty = (s) => aliveSurvivors(s).filter((sv) => sv.location 
 /** Zombies each location would get if the round ended now (same formula as the colony phase). */
 export function spawnForecast(s) {
   const out = {};
-  for (const loc of OUTSIDE_LOCATIONS) {
+  for (const loc of outsideOf(s)) {
     const here = survivorsAt(s, loc);
     if (!here.length) continue;
     const quiet = here.filter((sv) => survivorDef(sv.id).ability.type === 'quiet').length;
@@ -335,8 +335,11 @@ export function siegeForecast(s) {
   return { attackers, wall, guards, barricades, stopped, hits, targets };
 }
 
-// ---------------------------------------------------------------- UI-10: fog of war
-/** Is a place open (not under fog)? Old saves without `unlocked` have the whole town open. */
-export const isOpen = (s, id) => !s.unlocked || s.unlocked.includes(id);
-/** Locked places a scout from `from` would open. */
-export const frontier = (s, from) => (NEIGHBORS[from] ?? []).filter((id) => !isOpen(s, id));
+// ---------------------------------------------------------------- MAP-1: finding maps
+/** Searches done towards the next city map, and the range it is found in (null while one waits to be used). */
+export function mapProgress(s) {
+  const m = mapOf(s);
+  if (m.pending) return null;
+  const [min, max] = mapRange(m.stage);
+  return { done: m.searchesSinceMap ?? 0, min, max };
+}

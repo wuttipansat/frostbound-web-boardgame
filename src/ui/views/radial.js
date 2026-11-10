@@ -5,13 +5,12 @@ import { h, mount } from '../dom.js';
 import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
 import { flashTip } from '../tooltip.js';
-import { actionCost, leaveDamage, searchSpawnChance, survivorDef, aliveSurvivors, isOpen, frontier } from '../../core/selectors.js';
-import { NEIGHBORS } from '../../core/constants.js';
+import { actionCost, leaveDamage, searchSpawnChance, survivorDef, aliveSurvivors } from '../../core/selectors.js';
 import * as act from '../../core/actions.js';
 
 import { survivorOptions, moveOption, actingSurvivors, lureTargets, check } from '../options.js';
 
-const ICON = { scout: 'search', walk: 'move', drive: 'fuel', attack: 'attack', search: 'search', barricade: 'barricade', lure: 'lure', ability: 'heal', nap: 'hourglass', guard: 'door', unguard: 'door', build: 'goal', info: 'log' };
+const ICON = { walk: 'move', drive: 'fuel', attack: 'attack', search: 'search', barricade: 'barricade', lure: 'lure', ability: 'heal', nap: 'hourglass', guard: 'door', unguard: 'door', build: 'goal', info: 'log' };
 const COLONY_ONLY = ['nap', 'guard', 'unguard', 'barricade'];
 
 /** The survivor the ring acts for: the selected one, else the first who can still act, else the first alive. */
@@ -27,14 +26,6 @@ export function ringItems(state, ui, at, ctx = {}) {
   const info = { id: 'info', ok: true, label: t('ring.info'), fn: () => ctx.set?.({ locInfo: true }) };
   if (!svId || state.phase !== 'turn') return [info];
   const sv = state.survivors[svId];
-  // UI-10: a place under the fog — only scouting from a neighbour can open it.
-  if (!isOpen(state, at)) {
-    for (const v of aliveSurvivors(state).filter((x) => (NEIGHBORS[at] ?? []).includes(x.location) && isOpen(state, x.location))) {
-      items.push({ id: 'scout', ...check(state, act.scout(v.id)), cost: actionCost(state, v.id, 'scout'), label: t('bar.scout'), face: v.id });
-    }
-    items.note = t('bar.lockedHint', { from: (NEIGHBORS[at] ?? []).filter((l) => isOpen(state, l)).map((l) => c('locations', l, 'name')).join(' / ') || '—' });
-    return items;
-  }
   if (sv.location !== at) {
     // Walking is a tap on a face: one button per survivor who is somewhere else (the selected one first).
     const walkers = aliveSurvivors(state).filter((v) => v.location !== at).sort((x, y) => (y.id === svId) - (x.id === svId));
@@ -55,7 +46,6 @@ export function ringItems(state, ui, at, ctx = {}) {
       if (o.id === 'lure') item.fn = () => ctx.set?.({ picking: { type: 'lure', survivorId: svId } });
       items.push(item);
     }
-    if (at !== 'colony' && frontier(state, at).length) items.push({ id: 'scout', ...check(state, act.scout(svId)), cost: actionCost(state, svId, 'scout'), label: t('bar.scout'), sub: frontier(state, at).map((l) => c('locations', l, 'name')).join(', ') });
     if (at === 'colony') items.push({ id: 'build', ok: true, label: t('bar.build'), fn: () => ctx.set?.({ locInfo: true }) });
   }
   items.push(info);

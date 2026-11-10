@@ -31,6 +31,7 @@ const PATHS = {
   check: S(`<path ${st} d="M5 12l5 5L20 7"/>`),
   more: S(`<circle fill="currentColor" cx="5" cy="12" r="1.8"/><circle fill="currentColor" cx="12" cy="12" r="1.8"/><circle fill="currentColor" cx="19" cy="12" r="1.8"/>`),
   fuel: S(`<path ${st} d="M6 21V6l3-3h6v18zM9 9h6M17 9l3 3v6a1.5 1.5 0 0 1-3 0v-3"/>`),
+  map: S(`<path ${st} d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/>`),
   target: S(`<circle ${st} cx="12" cy="12" r="7"/><path ${st} d="M12 2v5M12 17v5M2 12h5M17 12h5"/>`),
   bolt: S(`<path fill="currentColor" d="M13 2L4 14h6l-1 8 9-12h-6z"/>`),
   heartIco: S(`<path fill="currentColor" d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z"/>`),

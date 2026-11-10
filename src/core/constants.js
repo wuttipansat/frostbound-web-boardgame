@@ -8,7 +8,7 @@ export const PHASES = Object.freeze({
   GAME_OVER: 'gameOver',
 });
 
-export const ITEM_TYPES = Object.freeze(['food', 'medicine', 'fuel', 'tools', 'weapon', 'armor', 'junk', 'survivor', 'book', 'gadget', 'consumable', 'material']);
+export const ITEM_TYPES = Object.freeze(['food', 'medicine', 'fuel', 'tools', 'weapon', 'armor', 'junk', 'survivor', 'book', 'gadget', 'consumable', 'material', 'map']);
 
 /** Parts of a day: dawn (crisis, crossroads) → day (your actions) → dusk (food, crisis) → night (zombies). */
 export const TIMES = Object.freeze(['dawn', 'day', 'dusk', 'night']);
@@ -16,14 +16,6 @@ export const GAME_DAYS = 40;
 
 export const LOCATION_IDS = Object.freeze(['colony', 'police', 'grocery', 'school', 'hospital', 'library', 'gas']);
 export const OUTSIDE_LOCATIONS = Object.freeze(LOCATION_IDS.filter((l) => l !== 'colony'));
-// UI-10 fog of war: the town opens place by place. Places sit on a circle; scouting from an open place
-// clears the fog over its locked neighbours.
-export const START_OPEN = Object.freeze(['colony', 'grocery', 'gas']);
-export const NEIGHBORS = Object.freeze({
-  police: ['gas', 'grocery'], grocery: ['police', 'school'], school: ['grocery', 'hospital'],
-  hospital: ['school', 'library'], library: ['hospital', 'gas'], gas: ['library', 'police'],
-});
-
 export const RULES = Object.freeze({
   TEAM_START: 2,          // survivors picked at the start (solo game)
   TEAM_MAX: 6,
@@ -45,8 +37,8 @@ export const ENERGY = Object.freeze({
   STARVING: 20,           // the colony is starving: regen this much less
   HURT: 20,               // 2+ wounds: the pool's max is this much lower
   STORM: 4,               // storm days (every 3rd day): actions outside the colony cost more
-  COST: Object.freeze({ move: 12, barricade: 19, lure: 11, scout: 15 }),
-  WALK: Object.freeze([12, 17, 23]), // walking: near / mid / far
+  COST: Object.freeze({ move: 12, barricade: 19, lure: 11 }),
+  WALK_BASE: 12, WALK_BLOCK: 4, WALK_CAP: 40, // MAP-1: walking = 8 + 4 per block of street
   SEARCH: 17,
   PER_SKILL: 2,
   CROWDED: 7,             // 2+ zombies here: search / barricade cost more
@@ -80,9 +72,8 @@ export const FIGHT = Object.freeze({
   LEAVE_HP: 5,            // leaving a place with zombies: HP per zombie
   NIGHT_BITE: 5,          // sleeping outside: HP per zombie there
 });
-// Distance rings from the colony (1 near … 3 far) and the chance a search makes a zombie appear.
-export const RING = Object.freeze({ colony: 0, grocery: 1, school: 1, gas: 2, library: 2, police: 3, hospital: 3 });
-export const SEARCH_SPAWN = Object.freeze({ grocery: 0.1, school: 0.15, library: 0.1, gas: 0.15, police: 0.25, hospital: 0.2, EXTRA: 0.1 });
+// The chance a search makes a zombie appear, by place type (+RING per ring past the first).
+export const SEARCH_SPAWN = Object.freeze({ grocery: 0.1, school: 0.15, library: 0.1, gas: 0.15, police: 0.25, hospital: 0.2, warehouse: 0.15, motel: 0.15, apartment: 0.2, church: 0.1, farmhouse: 0.1, EXTRA: 0.1, RING: 0.03 });
 // ---------------------------------------------------------------- food (every day)
 export const FOOD = Object.freeze({ HUNGRY_HP: 15, HUNGRY_MORALE: 1, MEALS: 4 }); // a food card feeds 4 × its value
 // Seasons get harsher: cold nights (sleeping outside −10 HP), brutes (FIGHT.BRUTE_DAY), daily storms.

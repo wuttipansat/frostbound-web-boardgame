@@ -1,13 +1,12 @@
-import { LOCATIONS } from '../../content/locations.js';
 // Game flow (solo): pick survivors -> rounds (crisis, one turn w/ crossroads, energy) -> colony phase -> end checks.
-import { PHASES, OUTSIDE_LOCATIONS, RULES, FIGHT, FOOD, SEASON, SIEGE, BOND, MISSIONS, MISSION_REWARD } from '../constants.js';
+import { PHASES, RULES, FIGHT, FOOD, SEASON, SIEGE, BOND, MISSIONS, MISSION_REWARD } from '../constants.js';
 import { shuffle, pick, random } from '../rng.js';
 import { assert } from '../errors.js';
 import { CROSSROADS_BY_ID } from '../../content/crossroads.js';
 import { CRISES_BY_ID } from '../../content/crises.js';
 import {
   aliveSurvivors, foodNeeded, colonyPopulation, crisisRequirement, itemOf, scenarioDef, scenarioTarget,
-  focusSurvivor, teamHasAbility, crisisMatches, baseLevel, siegeForecast, bondKey, missionStatus, apMax, sleepPlan, spawnForecast, isOpen } from '../selectors.js';
+  focusSurvivor, teamHasAbility, crisisMatches, baseLevel, siegeForecast, bondKey, missionStatus, apMax, sleepPlan, spawnForecast, outsideOf, locDef, ringOf } from '../selectors.js';
 import {
   log, changeMorale, giveTrait, changeFood, recruitSurvivor, healHp, damageSurvivor, unpack, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems,
 } from './helpers.js';
@@ -39,7 +38,7 @@ export function finishDraft(s) {
   log(s, 'draftDone', { survivorIds: t.survivors.slice() });
   // A few scavenged items from random locations.
   for (let i = 0; i < RULES.STARTING_HAND; i++) {
-    const stocked = OUTSIDE_LOCATIONS.filter((l) => s.locations[l].deck.length && isOpen(s, l));
+    const stocked = outsideOf(s).filter((l) => s.locations[l].deck.length);
     if (stocked.length) drawItems(s, pick(s, stocked), 1);
   }
   startRound(s);
@@ -246,9 +245,11 @@ export function nightSiege(s) {
 const RARE_PARTS = ['engine-part', 'heater-part'];
 export function restock(s) {
   if (s.day <= 1) return;
-  for (const loc of OUTSIDE_LOCATIONS) {
-    const table = LOCATIONS[loc].deck;
-    if (!table || !isOpen(s, loc)) continue;
+  // MAP-1: only places within one ring past the furthest survivor (keeps a big city cheap).
+  const reach = 1 + Math.max(1, ...Object.values(s.survivors).filter((v) => v.alive).map((v) => ringOf(s, v.location)));
+  for (const loc of outsideOf(s)) {
+    const table = locDef(s, loc).deck;
+    if (!table || ringOf(s, loc) > reach) continue;
     const ids = Object.keys(table).filter((id) => !RARE_PARTS.includes(id)); // the crawler's rare parts never drift in
     const total = ids.reduce((n, id) => n + table[id], 0);
     let r = random(s) * total;

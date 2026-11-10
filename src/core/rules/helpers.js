@@ -3,7 +3,7 @@
 import { RULES, TRAITS, XP } from '../constants.js';
 import { shuffle, random } from '../rng.js';
 import { assert } from '../errors.js';
-import { LOCATIONS } from '../../content/locations.js';
+import { locDef } from '../map.js';
 
 import {
   survivorDef, survivorsAt, woundLimit, apMax,
@@ -121,7 +121,7 @@ export function healSurvivor(s, survivorId) {
 
 export function addZombies(s, locationId, n, reason) {
   const loc = s.locations[locationId];
-  const slots = LOCATIONS[locationId].zombieSlots;
+  const slots = locDef(s, locationId).zombieSlots;
   for (let i = 0; i < n; i++) {
     if (loc.barricades > 0) {
       loc.barricades -= 1;
@@ -156,7 +156,7 @@ export function removeZombies(s, locationId, n) {
 
 export function addBarricades(s, locationId, n) {
   const loc = s.locations[locationId];
-  const slots = LOCATIONS[locationId].zombieSlots;
+  const slots = locDef(s, locationId).zombieSlots;
   const added = Math.max(0, Math.min(n, slots - loc.zombies - loc.barricades));
   loc.barricades += added;
   if (added) log(s, 'barricade', { locationId, n: added });

@@ -4,7 +4,7 @@ import * as act from '../core/actions.js';
 import { tryReduce } from '../core/reducer.js';
 import { survivorDef, itemOf, scenarioDef, actionCost, fightPreview } from '../core/selectors.js';
 import { gearSlot } from '../content/items.js';
-import { LOCATION_IDS } from '../core/constants.js';
+import { placesOf, roadDistance } from '../core/map.js';
 
 export const check = (state, action) => {
   const r = tryReduce(state, action);
@@ -25,7 +25,7 @@ export function survivorOptions(state, survivorId, { lureTo = null } = {}) {
   out[out.length - 1].fight = fightPreview(state, survivorId);
   add('search', act.search(survivorId));
   add('barricade', act.barricade(survivorId));
-  add('lure', act.lure(survivorId, lureTo ?? LOCATION_IDS.find((l) => l !== sv.location)));
+  add('lure', act.lure(survivorId, lureTo ?? placesOf(state).find((l) => l !== sv.location)));
   if (def.ability.type === 'healer') {
     const patients = Object.values(state.survivors)
       .filter((o) => o.alive && o.location === sv.location && (o.wounds > 0 || o.frostbite));
@@ -107,7 +107,10 @@ export function allItems(state) {
 export function lureTargets(state, survivorId) {
   const sv = state.survivors[survivorId];
   if (!sv?.alive) return [];
-  return LOCATION_IDS.filter((l) => l !== sv.location).map((to) => ({ to, ...check(state, act.lure(survivorId, to)) }));
+  // MAP-1: the nearest places by street (a big city would make a very long list).
+  return placesOf(state).filter((l) => l !== sv.location)
+    .map((to) => [to, roadDistance(state, sv.location, to)]).sort((a, b) => a[1] - b[1]).slice(0, 6)
+    .map(([to]) => ({ to, ...check(state, act.lure(survivorId, to)) }));
 }
 
 /** Board hint for a selected survivor: each location -> 'ok' | 'full' | 'blocked' (no entry for its own location). */
@@ -115,7 +118,7 @@ export function moveTargets(state, survivorId) {
   const sv = state.survivors[survivorId];
   if (!sv?.alive) return {};
   const out = {};
-  for (const to of LOCATION_IDS) {
+  for (const to of placesOf(state)) {
     if (to === sv.location) continue;
     const r = moveOption(state, survivorId, to);
     out[to] = r.ok ? 'ok' : r.error === 'locationFull' ? 'full' : 'blocked';

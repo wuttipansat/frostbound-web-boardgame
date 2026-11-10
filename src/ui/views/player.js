@@ -184,7 +184,7 @@ function slots(container) {
 }
 
 // UI-6: a card without a picture shows its type's icon instead of an empty frame.
-const TYPE_ICON = { weapon: 'attack', armor: 'barricade', food: 'food', medicine: 'heal', consumable: 'heal', fuel: 'fuel', tools: 'settings', gadget: 'star', book: 'log', junk: 'goal', material: 'goal' };
+const TYPE_ICON = { weapon: 'attack', armor: 'barricade', food: 'food', medicine: 'heal', consumable: 'heal', fuel: 'fuel', tools: 'settings', gadget: 'star', book: 'log', junk: 'goal', material: 'goal', map: 'map' };
 
 function renderHand(container, ctx, shown, hand, { isActor, compact, phoneLoc }) {
   handCtx = ctx;

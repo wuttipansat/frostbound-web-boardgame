@@ -1,60 +1,59 @@
-// The diorama board: snowy plateau, roads, colony at the centre, six locations around it,
-// survivor/zombie slot markers, instanced pines and rocks, and pick targets for each location.
+// The diorama board: a snowed-in city built block by block from the game map (MAP-1). The colony sits in
+// the middle block; places, filler blocks (parking, plaza, park, ruins, rail yard, containers), streets on
+// the block edges, instanced trees / rocks / cars / lamps, and pick targets for each place.
 import * as THREE from 'three';
 import { VoxelModel, hash3, MATERIALS } from './voxel.js';
 import { P } from './palette.js';
-import {
-  LOCATION_BUILDERS_HD, colonyHD, treeModelHD, rockModelHD,
-} from './buildings.js';
+import { LOCATION_BUILDERS_HD, colonyHD, treeModelHD, rockModelHD } from './buildings.js';
 import { buildTerrainHD } from './terrain.js';
 import { carModel, lampModel, containerModel } from './props.js';
-import { parkingLot, containerYard } from './city.js';
+import * as city from './city.js';
 import { LOCATIONS } from '../content/locations.js';
-import { OUTSIDE_LOCATIONS } from '../core/constants.js';
-
-// Block of each place on the 3×3 grid (x, z), colony at (0, 0); FILLER blocks hold props only.
-const BLOCKS = { police: [0, -1], grocery: [1, -1], school: [1, 0], hospital: [0, 1], library: [-1, 0], gas: [-1, -1] };
-export const FILLER = { parking: [1, 1], containers: [-1, 1] };
+import { START_MAP } from '../core/map.js';
 
 export const BOARD = {
   block: 26,          // UI-13: distance between block centres (world)
-  street: 13,         // streets run at ±street on both axes
-  radius: 46,         // plateau radius (world units)
-  locationRadius: 27, // distance of location centres from the colony
+  street: 13,         // streets run on the block edges (±13 around the colony)
+  radius: 46,         // stage-1 slab half size (world units)
+  locationRadius: 27,
   colonyRadius: 9,    // palisade radius (world units)
   ringRoad: 12.5,
   buildingScale: 0.6, // world units per building voxel
 };
+const FILLER_MODELS = { parking: city.parkingLot, containers: city.containerYard, plaza: city.plaza, park: city.park, ruins: city.ruins, rail: city.railYard };
+// The six starting places keep their old fronts; new ones face a street (+z / +x first: the sides the camera sees).
+const START_FRONT = { police: 'z', grocery: 'z', school: 'z', hospital: 'x', library: 'x', gas: 'x' };
 
-/** Board-space layout for every location (positions, facing, slot anchors). */
-export function computeLayout() {
-  const layout = {};
-  // UI-13: a 3×3 grid of city blocks, the colony in the middle. Two blocks are filler (parking, containers).
-  OUTSIDE_LOCATIONS.forEach((id, i) => {
-    const [bx, bz] = BLOCKS[id];
-    const theta = Math.atan2(bz, bx);
-    const c = new THREE.Vector3(bx * BOARD.block, 0, bz * BOARD.block);
-    // Fronts face a side the camera sees (+x or +z), towards the colony where possible.
-    const toColony = Math.abs(bx) >= Math.abs(bz) && bx < 0 ? new THREE.Vector3(1, 0, 0)
-      : bz < 0 ? new THREE.Vector3(0, 0, 1) : bx > 0 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0);
-    const side = new THREE.Vector3(-toColony.z, 0, toColony.x);
-    const at = (forward, lateral) => c.clone().addScaledVector(toColony, forward).addScaledVector(side, lateral);
-    const nSurv = LOCATIONS[id].survivorSlots;
-    layout[id] = {
-      id,
-      theta,
-      center: c,
-      facing: Math.atan2(toColony.x, toColony.z),
-      label: at(-1, 0).setY(10),
-      // Zombies crowd the entrance; survivors stand on pads on the road side.
-      zombieSlots: [[8, -1.6], [8, 0], [8, 1.6], [6.4, -0.8], [6.4, 0.8], [6.4, 2.4]].map(([f, l]) => at(f, l)),
-      survivorSlots: Array.from({ length: nSurv }, (_, k) => at(11, (k - (nSurv - 1) / 2) * 2.1)),
-      hitRadius: 8.5,
-    };
-  });
+const parse = (k) => k.split(',').map(Number);
+/** World position of a street corner (cx,cz = top-left corner of block cx,cz). */
+const cornerPos = (cx, cz) => [(cx - 0.5) * BOARD.block, (cz - 0.5) * BOARD.block];
+
+function placeLayout(id, type, bx, bz, roads) {
+  const c = new THREE.Vector3(bx * BOARD.block, 0, bz * BOARD.block);
+  const fronts = { z: `${bx},${bz + 1},h`, x: `${bx + 1},${bz},v`, '-z': `${bx},${bz},h`, '-x': `${bx},${bz},v` };
+  const pick = START_FRONT[id] ?? ['z', 'x', '-z', '-x'].find((f) => roads.has(fronts[f])) ?? 'z';
+  const toFront = { z: [0, 1], x: [1, 0], '-z': [0, -1], '-x': [-1, 0] }[pick];
+  const fwd = new THREE.Vector3(toFront[0], 0, toFront[1]);
+  const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
+  const at = (forward, lateral) => c.clone().addScaledVector(fwd, forward).addScaledVector(side, lateral);
+  const nSurv = LOCATIONS[type]?.survivorSlots ?? 3;
+  return {
+    id,
+    theta: Math.atan2(bz, bx),
+    center: c,
+    facing: Math.atan2(fwd.x, fwd.z),
+    label: at(-1, 0).setY(10),
+    // Zombies crowd the entrance; survivors stand on pads on the road side.
+    zombieSlots: [[8, -1.6], [8, 0], [8, 1.6], [6.4, -0.8], [6.4, 0.8], [6.4, 2.4]].map(([f, l]) => at(f, l)),
+    survivorSlots: Array.from({ length: nSurv }, (_, k) => at(11, (k - (nSurv - 1) / 2) * 2.1)),
+    hitRadius: 8.5,
+  };
+}
+
+function colonyLayout() {
   // Colony: 4 gates (N/E/S/W) with 3 zombie slots each, a ring of survivor spots by the fire.
   const gateDirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
-  layout.colony = {
+  return {
     id: 'colony',
     theta: 0,
     center: new THREE.Vector3(0, 0, 0),
@@ -70,10 +69,20 @@ export function computeLayout() {
     gates: gateDirs.map(([dx, dz]) => new THREE.Vector3(dx * BOARD.colonyRadius, 0, dz * BOARD.colonyRadius)),
     hitRadius: BOARD.colonyRadius + 1,
   };
-  return layout;
 }
 
-// ---------------------------------------------------------------- terrain
+/** Board-space layout for every place on a map (positions, facing, slot anchors). */
+export function computeLayout(map = START_MAP, into = {}) {
+  const roads = new Set(map.roads);
+  for (const [k, b] of Object.entries(map.blocks)) {
+    if (b.kind !== 'place' || into[b.placeId]) continue;
+    into[b.placeId] = placeLayout(b.placeId, b.type ?? b.placeId, ...parse(k), roads);
+  }
+  into.colony ??= colonyLayout();
+  return into;
+}
+
+// ---------------------------------------------------------------- streets
 
 function distToSegment(px, pz, a, b) {
   const abx = b.x - a.x; const abz = b.z - a.z;
@@ -81,43 +90,17 @@ function distToSegment(px, pz, a, b) {
   return Math.hypot(px - (a.x + abx * t), pz - (a.z + abz * t));
 }
 
-function computeRoads(layout) {
-  // UI-13: a straight street grid — two streets each way across the slab, plus a short road from each colony gate.
-  const E = BOARD.radius - 4; const S = BOARD.street;
-  const roads = [];
-  for (const k of [-S, S]) {
-    roads.push([new THREE.Vector3(k, 0, -E), new THREE.Vector3(k, 0, E)]);
-    roads.push([new THREE.Vector3(-E, 0, k), new THREE.Vector3(E, 0, k)]);
+/** Street segments (world) of a map, plus a short road from each colony gate to the streets. */
+function streetSegments(roadKeys, layout) {
+  const out = [];
+  for (const seg of roadKeys) {
+    const [cx, cz, d] = seg.split(',');
+    const [x0, z0] = cornerPos(+cx, +cz);
+    const [x1, z1] = d === 'h' ? cornerPos(+cx + 1, +cz) : cornerPos(+cx, +cz + 1);
+    out.push([new THREE.Vector3(x0, 0, z0), new THREE.Vector3(x1, 0, z1), seg]);
   }
-  for (const g of layout.colony.gates) roads.push([g.clone(), g.clone().normalize().multiplyScalar(S)]);
-  return roads;
-}
-
-function distances(layout, roads) {
-  const tmp = new THREE.Vector3();
-  return {
-    distRoad: (x, z) => {
-      let d = Infinity;
-      for (const [a, b] of roads) d = Math.min(d, distToSegment(x, z, a, b));
-      return d;
-    },
-    distPlot: (x, z) => {
-      let d = Math.hypot(x, z) - (BOARD.colonyRadius + 2);
-      for (const id of OUTSIDE_LOCATIONS) d = Math.min(d, layout[id].center.distanceTo(tmp.set(x, 0, z)) - 9);
-      return d;
-    },
-  };
-}
-
-
-/** Is a spot clear of roads, plots and the colony (for trees and rocks)? */
-function isFreeForDecoration(x, z, layout, roads) {
-  const r = Math.max(Math.abs(x), Math.abs(z));
-  if (r > BOARD.radius - 5 || r < BOARD.colonyRadius + 3) return false;
-  for (const [fx, fz] of Object.values(FILLER)) if (Math.max(Math.abs(x - fx * BOARD.block), Math.abs(z - fz * BOARD.block)) < 10) return false;
-  for (const id of OUTSIDE_LOCATIONS) if (layout[id].center.distanceTo(new THREE.Vector3(x, 0, z)) < 13) return false;
-  for (const [a, b] of roads) if (distToSegment(x, z, a, b) < 3.5) return false;
-  return true;
+  for (const g of layout.colony.gates) out.push([g.clone(), g.clone().normalize().multiplyScalar(BOARD.street), 'gate']);
+  return out;
 }
 
 // ---------------------------------------------------------------- decorations
@@ -135,22 +118,6 @@ function instanced(model, scale, transforms, { castShadow = true, cacheKey = nul
   }
   return group;
 }
-
-function scatter(layout, roads, count, seed, minGap = 2.4) {
-  const pts = [];
-  let i = 0;
-  while (pts.length < count && i < count * 40) {
-    i++;
-    const x = (hash3(i, seed, 11) * 2 - 1) * (BOARD.radius - 5);
-    const z = (hash3(i, seed, 13) * 2 - 1) * (BOARD.radius - 5);
-    if (!isFreeForDecoration(x, z, layout, roads)) continue;
-    if (pts.some((p) => Math.hypot(p.x - x, p.z - z) < minGap)) continue;
-    pts.push({ x, z, r: hash3(i, seed, 17), s: hash3(i, seed, 19) });
-  }
-  return pts;
-}
-
-
 
 /** A soft glowing ring texture for hover/selection halos. */
 function haloTexture() {
@@ -172,144 +139,71 @@ function haloTexture() {
 export function createBoard() {
   const root = new THREE.Group();
   root.name = 'board';
-  const layout = computeLayout();
-  const roads = computeRoads(layout);
+  const layout = computeLayout(START_MAP);
   // HD models are authored at 2× resolution, so each voxel is half the size.
   const bScale = BOARD.buildingScale / 2;
+  const B = BOARD.block; const half = B / 2;
+  const jitter = 0; // city models carry their texture in their colours
 
-  // UI-13: the city grows block by block. Each of the 9 grid cells is its own group (terrain chunk, building,
-  // props); a locked cell is not drawn at all, and opening one lifts it up into place.
-  const cellOf = (x, z) => `${x < -BOARD.street ? -1 : x > BOARD.street ? 1 : 0},${z < -BOARD.street ? -1 : z > BOARD.street ? 1 : 0}`;
-  const cells = {};
-  const dist = distances(layout, roads);
-  for (let cx = -1; cx <= 1; cx++) for (let cz = -1; cz <= 1; cz++) {
-    const key = `${cx},${cz}`;
-    const g = new THREE.Group(); g.name = `cell ${key}`;
-    const chunk = new THREE.Mesh(buildTerrainHD({ radius: BOARD.radius, ...dist, clip: (x, z) => cellOf(x, z) === key }), MATERIALS.lit);
-    chunk.receiveShadow = true;
-    g.add(chunk);
-    root.add(g);
-    cells[key] = { group: g, k: 1, target: 1 };
-  }
-  const addAt = (obj, x, z) => cells[cellOf(x, z)].group.add(obj);
-  /** Instanced props split by cell, so each cell can show or hide its own. */
-  const addInstanced = (model, scale, matrices, opts) => {
-    const by = {};
-    for (const mx of matrices) (by[cellOf(mx.elements[12], mx.elements[14])] ??= []).push(mx);
-    for (const [key, list] of Object.entries(by)) cells[key].group.add(instanced(model, scale, list, opts));
-  };
-  const terrain = cells['0,0'].group.children[0];
-  terrain.name = 'terrain';
-
-  // Colony
-  // HD models carry their texture in material patterns, so skip the extra per-voxel jitter: it would stop
-  // neighbouring faces from merging and multiply the triangle count.
-  const jitter = 0;
-  const colonyGroup = colonyHD(BOARD.colonyRadius * 2).build({ size: bScale, jitter });
-  colonyGroup.position.y = 0;
-  colonyGroup.name = 'colony';
-  addAt(colonyGroup, 0, 0);
-
-  // Locations
-  const locationGroups = {};
-  for (const id of OUTSIDE_LOCATIONS) {
-    const L = layout[id];
-    const g = LOCATION_BUILDERS_HD[id]().build({ size: bScale, jitter });
-    g.position.copy(L.center);
-    g.rotation.y = L.facing;
-    g.name = id;
-    addAt(g, L.center.x, L.center.z);
-    locationGroups[id] = g;
-  }
-  locationGroups.colony = colonyGroup;
-
-
-
-  // Step 9: no slot pedestals any more; each place has one floating sign (see main.js labels).
-
-  // Forest + rocks (instanced)
-  const trees = scatter(layout, roads, 34, 3, 3); // UI-13: a city — a few trees in the gaps
-  // 3 silhouettes, one instanced mesh each, size varied by scale (fewer draw calls than one mesh per shape × size).
-  const tmp = new THREE.Object3D();
-  const groups = 3;
-  const bucket = Array.from({ length: groups }, () => []);
-  for (const t of trees) {
-    tmp.position.set(t.x, 0, t.z);
-    tmp.rotation.y = Math.floor(t.r * 4) * (Math.PI / 2);
-    tmp.scale.setScalar(0.75 + t.s * 0.6);
-    tmp.updateMatrix();
-    const g = Math.floor(hash3(Math.round(t.x * 10), 5, Math.round(t.z * 10)) * 3);
-    bucket[g].push(tmp.matrix.clone());
-  }
-  bucket.forEach((list, i) => {
-    if (!list.length) return;
-    addInstanced(treeModelHD(i, 1), 0.25, list, { cacheKey: `tree-${i}`, jitter: 0 });
-  });
-  const rockSpots = scatter(layout, roads, 30, 9, 3);
-  const rockBuckets = Array.from({ length: 3 }, () => []);
-  rockSpots.forEach((t, i) => {
-    tmp.position.set(t.x, 0, t.z); tmp.rotation.y = t.r * Math.PI * 2; tmp.scale.setScalar(0.8 + t.s); tmp.updateMatrix();
-    rockBuckets[i % rockBuckets.length].push(tmp.matrix.clone());
-  });
-  rockBuckets.forEach((list, shape) => addInstanced(rockModelHD(shape), 0.25, list, { cacheKey: `rock-${shape}`, jitter: 0 }));
-
-  // UI-13 city props: wrecked cars and lamps along the streets, container stacks on empty lots.
-  {
-    const cars = [[], [], []]; const lamps = [];
-    roads.forEach(([a, b], i) => {
-      const dir = b.clone().sub(a); const len = dir.length(); dir.normalize();
-      const side = new THREE.Vector3(-dir.z, 0, dir.x);
-      const at = (t, lat) => a.clone().addScaledVector(dir, len * t).addScaledVector(side, lat);
-      if (len > 6 && hash3(i, 1, 2) < 0.7) {
-        const p = at(0.35 + hash3(i, 2, 2) * 0.3, (hash3(i, 3, 2) < 0.5 ? -1 : 1) * 1.3);
-        tmp.position.copy(p); tmp.rotation.set(0, Math.atan2(dir.x, dir.z) - Math.PI / 2 + (hash3(i, 4, 2) - 0.5) * 0.6, 0); tmp.scale.setScalar(1); tmp.updateMatrix();
-        cars[i % 3].push(tmp.matrix.clone());
-      }
-      if (len > 8) {
-        tmp.position.copy(at(0.5, 3.1)); tmp.rotation.set(0, Math.atan2(side.x, side.z) - Math.PI / 2, 0); tmp.updateMatrix();
-        lamps.push(tmp.matrix.clone());
-      }
-    });
-    cars.forEach((list, v) => { if (list.length) addInstanced(carModel(v), 0.15, list, { cacheKey: `car-${v}`, jitter: 0 }); });
-    if (lamps.length) addInstanced(lampModel(), 0.15, lamps, { cacheKey: 'lamp', jitter: 0, castShadow: false });
-    const lots = scatter(layout, roads, 7, 23, 7);
-    const yards = [[], [], []];
-    lots.forEach((p, i) => { tmp.position.set(p.x, 0, p.z); tmp.rotation.set(0, Math.round(p.r * 4) * Math.PI / 2, 0); tmp.updateMatrix(); yards[i % 3].push(tmp.matrix.clone()); });
-    yards.forEach((list, k) => { if (list.length) addInstanced(containerModel(k, 1 + (k % 2)), 0.2, list, { cacheKey: `container-${k}`, jitter: 0 }); });
-  }
-
-  // UI-13: the two filler blocks.
-  for (const [name, [fx, fz]] of Object.entries(FILLER)) {
-    const g = (name === 'parking' ? parkingLot() : containerYard()).build({ size: bScale, jitter: 0, cacheKey: `filler-${name}` });
-    g.position.set(fx * BOARD.block, 0, fz * BOARD.block);
-    addAt(g, fx * BOARD.block, fz * BOARD.block);
-  }
-
-  // The slab's soft shadow on the backdrop.
-  {
-    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
-    const g = cv.getContext('2d'); const gr = g.createRadialGradient(32, 32, 10, 32, 32, 32);
-    gr.addColorStop(0, 'rgba(0,0,0,0.65)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
-    const sh = new THREE.Mesh(new THREE.PlaneGeometry(BOARD.radius * 3, BOARD.radius * 3), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false, fog: false }));
-    sh.rotation.x = -Math.PI / 2; sh.position.set(4, -16, 6); sh.renderOrder = -1;
-    root.add(sh);
-  }
-
-  // Pick targets (invisible cylinders) and hover rings.
+  let map = null;     // the map currently drawn
+  let streets = [];   // world street segments
+  const cells = {};   // block key -> { group, terrain, k, target, delay }
+  const batches = []; // instanced props per growth: { group, k, target, delay }
   const pickTargets = [];
   const rings = {};
+  const locationGroups = {};
+  const glowMats = [];
   const halo = haloTexture();
-  for (const L of Object.values(layout)) {
-    const hit = new THREE.Mesh(
-      new THREE.CylinderGeometry(L.hitRadius, L.hitRadius, 10, 16),
-      new THREE.MeshBasicMaterial({ visible: false }),
-    );
+  const tmp = new THREE.Object3D();
+  const cellOf = (x, z) => `${Math.round(x / B)},${Math.round(z / B)}`;
+  const has = (bx, bz) => !!map?.blocks[`${bx},${bz}`];
+
+  /** Distance from a point to the slab rim: Chebyshev distance to the nearest missing neighbour block. */
+  const edgeDist = (bx, bz) => {
+    const gaps = [];
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if ((dx || dz) && !has(bx + dx, bz + dz)) gaps.push([bx + dx, bz + dz]);
+    return (x, z) => {
+      let d = Infinity;
+      for (const [gx, gz] of gaps) {
+        const ex = Math.max(0, Math.abs(x - gx * B) - half); const ez = Math.max(0, Math.abs(z - gz * B) - half);
+        d = Math.min(d, Math.max(ex, ez));
+      }
+      return d;
+    };
+  };
+  const terrainFor = (key) => {
+    const [bx, bz] = parse(key);
+    const cx = bx * B; const cz = bz * B;
+    const near = streets.filter(([a, b]) => Math.min(a.x, b.x) < cx + half + 4 && Math.max(a.x, b.x) > cx - half - 4 && Math.min(a.z, b.z) < cz + half + 4 && Math.max(a.z, b.z) > cz - half - 4);
+    const plots = Object.values(layout).filter((L) => Math.abs(L.center.x - cx) <= B && Math.abs(L.center.z - cz) <= B);
+    const geo = buildTerrainHD({
+      center: [cx, cz], half, edgeDist: edgeDist(bx, bz),
+      clip: (x, z) => cellOf(x, z) === key,
+      distRoad: (x, z) => { let d = Infinity; for (const [a, b] of near) d = Math.min(d, distToSegment(x, z, a, b)); return d; },
+      distPlot: (x, z) => {
+        let d = Infinity;
+        for (const L of plots) d = Math.min(d, Math.hypot(x - L.center.x, z - L.center.z) - (L.id === 'colony' ? BOARD.colonyRadius + 2 : 9));
+        return d;
+      },
+    });
+    const mesh = new THREE.Mesh(geo, MATERIALS.lit);
+    mesh.receiveShadow = true;
+    mesh.name = 'terrain';
+    return mesh;
+  };
+  const trackGlow = (g) => g.traverse((o) => {
+    if (o.isMesh && o.material === MATERIALS.glow) {
+      o.material = MATERIALS.glow.clone();
+      glowMats.push({ mat: o.material, base: MATERIALS.glow.color.r, phase: Math.random() * 10 });
+    }
+  });
+
+  function addPick(L) {
+    const hit = new THREE.Mesh(new THREE.CylinderGeometry(L.hitRadius, L.hitRadius, 10, 16), new THREE.MeshBasicMaterial({ visible: false }));
     hit.position.set(L.center.x, 5, L.center.z);
     hit.userData.locationId = L.id;
     root.add(hit);
     pickTargets.push(hit);
-
     // Soft additive halo (instead of a hard flat ring) for hover / selection.
     const ring = new THREE.Mesh(
       new THREE.PlaneGeometry((L.hitRadius + 2.2) * 2, (L.hitRadius + 2.2) * 2),
@@ -321,7 +215,100 @@ export function createBoard() {
     rings[L.id] = ring;
   }
 
-  // Warm light sources: campfire + a lamp at each location door.
+  /** One block: terrain, its building / colony / filler. */
+  function buildBlock(key, b) {
+    const [bx, bz] = parse(key);
+    const g = new THREE.Group(); g.name = `cell ${key}`;
+    const terrain = terrainFor(key);
+    g.add(terrain);
+    let model = null;
+    if (b.kind === 'colony') {
+      model = colonyHD(BOARD.colonyRadius * 2).build({ size: bScale, jitter });
+      model.name = 'colony';
+      locationGroups.colony = model;
+    } else if (b.kind === 'place') {
+      const L = layout[b.placeId];
+      const type = b.type ?? b.placeId;
+      model = (LOCATION_BUILDERS_HD[type] ?? LOCATION_BUILDERS_HD.grocery)().build({ size: bScale, jitter, cacheKey: `place-${type}` });
+      model.position.copy(L.center);
+      model.rotation.y = L.facing;
+      model.name = b.placeId;
+      locationGroups[b.placeId] = model;
+      addPick(L);
+    } else if (FILLER_MODELS[b.kind]) {
+      model = FILLER_MODELS[b.kind]().build({ size: bScale, jitter, cacheKey: `filler-${b.kind}` });
+      model.position.set(bx * B, 0, bz * B);
+      model.rotation.y = Math.floor(hash3(bx, 7, bz) * 2) * Math.PI;
+    }
+    if (model) { g.add(model); trackGlow(model); }
+    root.add(g);
+    return { group: g, terrain, k: 0, target: 1, delay: 0 };
+  }
+
+  /** Instanced trees, rocks, cars and lamps for a set of new blocks and streets: one group per growth. */
+  function buildProps(keys, newStreets) {
+    const group = new THREE.Group(); group.name = 'props';
+    const trees = [[], [], []]; const rocks = [[], [], []]; const cars = [[], [], []]; const lamps = []; const yards = [[], [], []];
+    const free = (x, z, b) => {
+      for (const [a, c] of streets) if (distToSegment(x, z, a, c) < 3.6) return false;
+      if (b.kind === 'colony') return Math.hypot(x, z) > BOARD.colonyRadius + 3;
+      return Math.max(Math.abs(x - Math.round(x / B) * B), Math.abs(z - Math.round(z / B) * B)) > (b.kind === 'place' ? 9.5 : 9);
+    };
+    for (const key of keys) {
+      const b = map.blocks[key];
+      const [bx, bz] = parse(key);
+      const spots = [];
+      for (let i = 0; i < 40 && spots.length < 7; i++) {
+        const x = bx * B + (hash3(i, bx * 7 + 3, bz * 13 + 11) * 2 - 1) * (half - 2);
+        const z = bz * B + (hash3(i, bx * 7 + 5, bz * 13 + 17) * 2 - 1) * (half - 2);
+        if (edgeDist(bx, bz)(x, z) < 4 || !free(x, z, b) || spots.some((p) => Math.hypot(p[0] - x, p[1] - z) < 3)) continue;
+        spots.push([x, z]);
+      }
+      spots.forEach(([x, z], i) => {
+        const r = hash3(Math.round(x * 10), 5, Math.round(z * 10));
+        tmp.position.set(x, 0, z); tmp.rotation.set(0, Math.floor(r * 4) * (Math.PI / 2), 0); tmp.scale.setScalar(0.75 + r * 0.6); tmp.updateMatrix();
+        if (i % 3 === 2) rocks[Math.floor(r * 3)].push(tmp.matrix.clone());
+        else if (i === 0 && b.kind === 'place' && r < 0.3) yards[Math.floor(r * 9) % 3].push(tmp.matrix.clone());
+        else trees[Math.floor(r * 3)].push(tmp.matrix.clone());
+      });
+    }
+    newStreets.forEach(([a, b, seg], i) => {
+      const dir = b.clone().sub(a); const len = dir.length(); dir.normalize();
+      const side = new THREE.Vector3(-dir.z, 0, dir.x);
+      const at = (t, lat) => a.clone().addScaledVector(dir, len * t).addScaledVector(side, lat);
+      const h = (k) => hash3(i, k, seg.length * 3 + (seg.charCodeAt(0) ?? 0));
+      if (len > 6 && h(2) < 0.6) {
+        tmp.position.copy(at(0.3 + h(3) * 0.4, (h(4) < 0.5 ? -1 : 1) * 1.3));
+        tmp.rotation.set(0, Math.atan2(dir.x, dir.z) - Math.PI / 2 + (h(5) - 0.5) * 0.6, 0); tmp.scale.setScalar(1); tmp.updateMatrix();
+        cars[Math.floor(h(6) * 3)].push(tmp.matrix.clone());
+      }
+      if (len > 8 && h(7) < 0.75) {
+        tmp.position.copy(at(0.5, 3.1)); tmp.rotation.set(0, Math.atan2(side.x, side.z) - Math.PI / 2, 0); tmp.scale.setScalar(1); tmp.updateMatrix();
+        lamps.push(tmp.matrix.clone());
+      }
+    });
+    trees.forEach((list, k) => { if (list.length) group.add(instanced(treeModelHD(k, 1), 0.25, list, { cacheKey: `tree-${k}`, jitter: 0 })); });
+    rocks.forEach((list, k) => { if (list.length) group.add(instanced(rockModelHD(k), 0.25, list, { cacheKey: `rock-${k}`, jitter: 0 })); });
+    cars.forEach((list, v) => { if (list.length) group.add(instanced(carModel(v), 0.15, list, { cacheKey: `car-${v}`, jitter: 0 })); });
+    if (lamps.length) group.add(instanced(lampModel(), 0.15, lamps, { cacheKey: 'lamp', jitter: 0, castShadow: false }));
+    yards.forEach((list, k) => { if (list.length) group.add(instanced(containerModel(k, 1 + (k % 2)), 0.2, list, { cacheKey: `container-${k}`, jitter: 0 })); });
+    root.add(group);
+    return { group, k: 0, target: 1, delay: 0 };
+  }
+
+  // The slab's soft shadow on the backdrop (follows the city's outline).
+  const shadow = (() => {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const g = cv.getContext('2d'); const gr = g.createRadialGradient(32, 32, 10, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(0,0,0,0.65)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    const sh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false, fog: false }));
+    sh.rotation.x = -Math.PI / 2; sh.position.set(4, -16, 6); sh.renderOrder = -1;
+    root.add(sh);
+    return sh;
+  })();
+
+  // Warm light sources: campfire + a lamp at each of the first six places (lights are costly; new places glow).
   const lights = [];
   let fireLevel = 1;
   // A gentle light set high up, so survivors around the fire stay readable instead of blowing out.
@@ -330,12 +317,12 @@ export function createBoard() {
   fire.position.set(0, 4.5, 0);
   root.add(fire);
   lights.push({ light: fire, base: fireBase, flicker: 0.25 });
-  for (const id of OUTSIDE_LOCATIONS) {
+  for (const id of Object.keys(START_FRONT)) {
     const L = layout[id];
     const lamp = new THREE.PointLight(0xffa552, 45, 16, 1.5);
     const p = L.center.clone().addScaledVector(L.center.clone().normalize(), -6.5);
     lamp.position.set(p.x, 3, p.z);
-    addAt(lamp, p.x, p.z);
+    root.add(lamp);
     lights.push({ light: lamp, base: 45, flicker: 0.08 });
   }
 
@@ -362,23 +349,11 @@ export function createBoard() {
   flameMesh.position.copy(fx.fire).setY(fx.fire.y + 0.25);
   root.add(flameMesh);
 
-  // Each building gets its own glow material so windows can breathe independently.
-  const glowMats = [];
-  for (const g of Object.values(locationGroups)) {
-    g.traverse((o) => {
-      if (o.isMesh && o.material === MATERIALS.glow) {
-        o.material = MATERIALS.glow.clone();
-        glowMats.push({ mat: o.material, base: MATERIALS.glow.color.r, phase: Math.random() * 10 });
-      }
-    });
-  }
-
   let hovered = null;
   let selected = null;
-  let hints = {};
-  const HINT = { ok: [0x7fd18a, 0.4], lure: [0xffb347, 0.5], full: [0x8a96a8, 0.22] };
+  let lastT = null;
 
-  const showCell = (c) => {
+  const show = (c) => {
     c.group.visible = c.k > 0.001;
     const e = 1 - (1 - c.k) ** 3; // ease out
     c.group.position.y = -22 * (1 - e);
@@ -394,30 +369,63 @@ export function createBoard() {
     setFire(k) { fireLevel = k; },
     setHovered(id) { hovered = id; },
     setSelected(id) { selected = id; },
-    /** UI-13: which places are still locked. Their blocks are not drawn; a block (or a filler next to an open
-     *  place) appears by rising into place. The first call snaps. Calls onBounds with the open area. */
-    setLocked(ids, { snap = false } = {}) {
-      const locked = new Set(ids ?? []);
-      const open = new Set(['0,0']);
-      const blockKey = (id) => cellOf(layout[id].center.x, layout[id].center.z);
-      for (const id of OUTSIDE_LOCATIONS) if (!locked.has(id)) open.add(blockKey(id));
-      for (const [fx, fz] of Object.values(FILLER)) {
-        if ([[fx - 1, fz], [fx + 1, fz], [fx, fz - 1], [fx, fz + 1]].some(([x, z]) => open.has(`${x},${z}`) && `${x},${z}` !== '0,0')) open.add(`${fx},${fz}`);
+    /** MAP-1: draw the game's map. New blocks rise into place (staggered outward); the first call snaps.
+     *  Calls onBounds with the city's outline. */
+    setMap(next, { snap = false } = {}) {
+      // A different city (new game, loaded save): start over.
+      if (Object.entries(cells).some(([k, c]) => c.sig !== JSON.stringify(next.blocks[k] ?? null))) {
+        for (const c of [...Object.values(cells), ...batches]) { root.remove(c.group); }
+        for (const k of Object.keys(cells)) delete cells[k];
+        batches.length = 0;
+        for (const h of pickTargets.splice(0)) root.remove(h);
+        for (const [id, r] of Object.entries(rings)) { root.remove(r); delete rings[id]; }
+        for (const id of Object.keys(layout)) if (id !== 'colony') delete layout[id];
+        for (const id of Object.keys(locationGroups)) delete locationGroups[id];
+        glowMats.length = 0;
+        map = null;
+        snap = true;
       }
-      for (const [key, c] of Object.entries(cells)) {
-        c.target = open.has(key) ? 1 : 0;
-        if (snap) { c.k = c.target; showCell(c); }
+      const fresh = Object.keys(next.blocks).filter((k) => !cells[k]);
+      const oldRoads = new Set(map?.roads ?? []);
+      map = next;
+      computeLayout(map, layout);
+      streets = streetSegments(map.roads, layout);
+      const newStreets = streets.filter(([, , seg]) => seg === 'gate' ? !oldRoads.size : !oldRoads.has(seg));
+      // Old blocks next to new ones (or new streets) get fresh terrain: their rim is now inside the city.
+      const touched = new Set();
+      for (const k of fresh) { const [bx, bz] = parse(k); for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) touched.add(`${bx + dx},${bz + dz}`); }
+      for (const [a, b] of newStreets) touched.add(cellOf((a.x + b.x) / 2 + 1, (a.z + b.z) / 2 + 1)).add(cellOf((a.x + b.x) / 2 - 1, (a.z + b.z) / 2 - 1));
+      for (const k of touched) {
+        const c = cells[k];
+        if (!c) continue;
+        c.group.remove(c.terrain); c.terrain.geometry.dispose();
+        c.terrain = terrainFor(k); c.group.add(c.terrain);
       }
-      const xs = [...open].map((k) => +k.split(',')[0]); const zs = [...open].map((k) => +k.split(',')[1]);
-      api.onBounds?.({ minX: Math.min(...xs), maxX: Math.max(...xs), minZ: Math.min(...zs), maxZ: Math.max(...zs), block: BOARD.block, snap });
+      fresh.sort((a, b) => Math.hypot(...parse(a)) - Math.hypot(...parse(b)));
+      fresh.forEach((k, i) => {
+        cells[k] = buildBlock(k, map.blocks[k]);
+        cells[k].sig = JSON.stringify(map.blocks[k]);
+        cells[k].delay = snap ? 0 : i * 0.06; // seconds
+      });
+      if (fresh.length) {
+        const batch = buildProps(fresh, newStreets);
+        batch.delay = snap ? 0 : fresh.length * 0.06;
+        batches.push(batch);
+      }
+      for (const c of [...Object.values(cells), ...batches]) if (snap) { c.k = c.target; c.delay = 0; show(c); } else show(c);
+      const xs = Object.keys(map.blocks).map((k) => parse(k)[0]); const zs = Object.keys(map.blocks).map((k) => parse(k)[1]);
+      const bounds = { minX: Math.min(...xs), maxX: Math.max(...xs), minZ: Math.min(...zs), maxZ: Math.max(...zs), block: B, snap };
+      shadow.scale.set((bounds.maxX - bounds.minX + 2.4) * B, (bounds.maxZ - bounds.minZ + 2.4) * B, 1);
+      shadow.position.set((bounds.minX + bounds.maxX) / 2 * B + 4, -16, (bounds.minZ + bounds.maxZ) / 2 * B + 6);
+      api.onBounds?.(bounds);
     },
-    /** Location hints: { locationId: 'ok' | 'full' | 'lure' | 'blocked' } (e.g. where a survivor can move). */
-    setHints(next) { hints = next ?? {}; },
     update(t) {
-      for (const c of Object.values(cells)) {
+      const dt = Math.min(0.1, Math.max(0, t - (lastT ?? t))); lastT = t;
+      for (const c of [...Object.values(cells), ...batches]) {
         if (c.k === c.target) continue;
-        c.k += Math.sign(c.target - c.k) * Math.min(Math.abs(c.target - c.k), 1 / 75); // ~1.25 s
-        showCell(c);
+        if (c.delay > 0) { c.delay -= dt; continue; }
+        c.k += Math.sign(c.target - c.k) * Math.min(Math.abs(c.target - c.k), dt / 1.1); // ~1.1 s
+        show(c);
       }
       // Flame: flicker in height and sway.
       const fl = Math.min(1.3, fireLevel);
@@ -434,14 +442,15 @@ export function createBoard() {
         l.light.intensity = l.base * (1 + f * l.flicker) * (i === 0 ? fireLevel : 1);
       }
       for (const [id, ring] of Object.entries(rings)) {
-        const hint = HINT[hints[id]];
-        const target = id === selected ? 0.9 : id === hovered ? 0.55 : hint ? hint[1] * (0.8 + Math.sin(t * 3) * 0.2) : 0;
+        const target = id === selected ? 0.9 : id === hovered ? 0.55 : 0;
+        if (target === 0 && ring.material.opacity < 0.002) { ring.visible = false; continue; }
+        ring.visible = true;
         ring.material.opacity += (target - ring.material.opacity) * 0.2;
-        ring.material.color.setHex(id === selected ? 0xffc46b : id === hovered && !hint ? 0xbfdcff : hint ? hint[0] : 0xbfdcff);
-        const s = 1 + (id === selected ? Math.sin(t * 3) * 0.03 : 0);
-        ring.scale.setScalar(s);
+        ring.material.color.setHex(id === selected ? 0xffc46b : 0xbfdcff);
+        ring.scale.setScalar(1 + (id === selected ? Math.sin(t * 3) * 0.03 : 0));
       }
     },
   };
+  api.setMap(START_MAP, { snap: true });
   return api;
 }
