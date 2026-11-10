@@ -17,7 +17,8 @@ const ACTION_ICON = { attack: 'attack', search: 'search', barricade: 'barricade'
 
 export function renderLocationPanel(el, ctx) {
   const { state: s, ui, art } = ctx;
-  const id = ui.selLoc;
+  // UI-4: the place's card floats only when asked for (ⓘ / build / craft in the ring), or while picking a lure target.
+  const id = ui.selLoc && (ui.locInfo || ui.picking?.type === 'lure') ? ui.selLoc : null;
   el.classList.toggle('hidden', !id);
   document.body.classList.toggle('loc-open', !!id);
   if (!id) return;
@@ -61,37 +62,6 @@ export function renderLocationPanel(el, ctx) {
         }, c('locations', tg.to, 'name')))),
         h('button', { class: 'btn ghost', onclick: () => ctx.set({ picking: null }) }, t('act.cancel'))));
     } else {
-      // Moving is done from the round faces that float by the location (views/movepick.js).
-      const mine = aliveSurvivors(s).filter((sv) => sv.location === id);
-      const focus = sel && sel.location === id ? [sel] : mine;
-      for (const sv of focus) {
-        const opts = survivorOptions(s, sv.id);
-        actions.push(h('div', { class: 'act-box' },
-          h('h4', { tip: t('loc.actionsFor', { name: survivorDef(sv.id).name }) }, art.portrait(sv.id, 's', { cls: 'h4-face', alt: survivorDef(sv.id).name })),
-          h('div', { class: 'act-grid icons' }, opts.map((o) => {
-            const isLure = o.id === 'lure';
-            // Icon only; the name, the energy it costs and why it can't be done now are in the tooltip.
-            const tip = [t(`act.${o.id}`),
-              o.cost != null ? t('act.cost', { n: o.cost, have: sv.ap }) : null,
-              o.id === 'search' && o.ok ? t('act.searchChance', { p: Math.round(searchSpawnChance(s, sv.location) * 100) }) : null,
-              o.id === 'attack' && o.fight ? (o.fight.gun ? t('act.shot', { p: Math.round(o.fight.spawn * 100), ammo: o.fight.ammo }) : t('act.fight', { hp: o.fight.hp })) : null,
-              !o.ok ? t(`err.${o.error}`) : null,
-              isLure && o.ok ? t('act.pickOnBoard') : null].filter(Boolean).join(' · ');
-            return h('button', {
-              class: `btn act icon-act${o.ok ? '' : ' off'}`, 'aria-disabled': o.ok ? null : 'true', tip, 'aria-label': tip,
-              dataset: { act: o.id },
-              onclick: (ev) => {
-                if (!o.ok) return flashTip(ev.currentTarget);
-                return isLure ? ctx.set({ picking: { type: 'lure', survivorId: sv.id } }) : ctx.dispatch(o.action);
-              },
-            },
-            icon(ACTION_ICON[o.id] ?? 'ability', 'act-ico'),
-            o.cost ? h('span', { class: 'need-badge cost', 'aria-hidden': 'true' }, String(o.cost)) : null,
-            o.id === 'attack' && o.ok && o.fight ? h('span', { class: `need-badge risk${o.fight.hp || o.fight.spawn ? ' bad' : ''}`, 'aria-hidden': 'true' }, o.fight.gun ? `${Math.round(o.fight.spawn * 100)}%` : `−${o.fight.hp}`) : null,
-            o.id === 'search' && o.ok ? h('span', { class: 'need-badge risk', 'aria-hidden': 'true' }, `${Math.round(searchSpawnChance(s, sv.location) * 100)}%`) : null,
-            null);
-          }))));
-      }
       if (id === 'colony') {
         // Base upgrades: level, next level's cost and progress; buttons for the selected survivor at home.
         actions.push(h('div', { class: 'act-box build' }, h('h4', {}, t('act.build')),
@@ -115,12 +85,11 @@ export function renderLocationPanel(el, ctx) {
             onclick: (ev) => (x.ok ? ctx.dispatch(x.action) : flashTip(ev.currentTarget)),
           }, c('items', x.r.makes, 'name'))))));
       }
-      if (!sel && !mine.length) actions.push(h('p', { class: 'muted small' }, t('panel.selectHint')));
     }
   }
 
   mount(el,
-    h('button', { class: 'close', 'aria-label': t('settings.close'), onclick: () => ctx.selectLocation(null) }, icon('close')),
+    h('button', { class: 'close', 'aria-label': t('settings.close'), onclick: () => ctx.set({ locInfo: false, picking: null }) }, icon('close')),
     h('h2', { tip: c('locations', id, 'blurb') }, c('locations', id, 'name')),
     stats, people, actions);
 }

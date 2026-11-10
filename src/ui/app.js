@@ -13,7 +13,7 @@ import { renderTopbar, renderLog, renderPhase } from './views/hud.js';
 import { resetTicker } from './ticker.js';
 import { renderPlayerPanel } from './views/player.js';
 import { renderLocationPanel } from './views/location.js';
-import { renderMovePicker } from './views/movepick.js';
+import { renderRadial, ringSurvivor } from './views/radial.js';
 import { renderHint, rulesModal } from './views/help.js';
 import { createDirector, eventsFromLog } from './director.js';
 import {
@@ -274,11 +274,14 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
     dom.player.classList.remove('hidden');
     // While drafting, the draft cards own the screen (no HUD underneath).
     document.body.classList.toggle('drafting', state.phase === PHASES.DRAFT);
+    // UI-4: there is always someone to act for when it's your turn.
+    if (x.canAct && !(ui.selSurvivor && state.survivors[ui.selSurvivor]?.alive)) ui.selSurvivor = ringSurvivor(state, ui);
     renderTopbar(dom.topbar, x);
     if (dom.phase) renderPhase(dom.phase, x);
     renderLog(dom.log, x);
     renderLocationPanel(dom.loc, x);
-    if (dom.movePick) renderMovePicker(dom.movePick, x);
+    if (dom.movePick) dom.movePick.classList.add('hidden');
+    if (dom.radial) renderRadial(dom.radial, x);
     if (dom.hint) renderHint(dom.hint, { ...x, ui: { ...ui, hints: ui.hints && ui.tutStep >= DONE } });
     renderPlayerPanel(dom.playerRefs, x);
     // Animated reveal modals keep their DOM while they stay on screen, so the animation isn't restarted.
@@ -340,11 +343,12 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
       return;
     }
     const sv = survivorId && state.survivors[survivorId];
-    if (sv?.alive) { selectSurvivor(survivorId); return; }
+    if (sv?.alive) { ui.locInfo = false; selectSurvivor(survivorId); return; }
     const loc = locationId ?? sv?.location ?? null;
-    // During the turn, a location opens "who goes there" (your survivors as round faces).
-    ui.movePick = loc && ctx().canAct ? loc : null;
-    selectLocation(loc);
+    // UI-4: a place opens its ring of round icons; tapping the same place again closes it.
+    ui.movePick = null;
+    ui.locInfo = false;
+    selectLocation(loc && loc === ui.selLoc ? null : loc);
   }
 
   /** Quick start for testing/screenshots. */
@@ -374,6 +378,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
     else if (ui.logOpen) set({ logOpen: false });
     else if (ui.picking) set({ picking: null });
     else if (ui.movePick) set({ movePick: null });
+    else if (ui.locInfo) set({ locInfo: false });
     else if (ui.selCard) set({ selCard: null });
     else if (ui.modal) set({ modal: null });
     else if (ui.selLoc) selectLocation(null);

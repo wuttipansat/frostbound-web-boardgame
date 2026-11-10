@@ -207,6 +207,7 @@ const app = createApp({
   dom: {
     topbar: $('topbar'), phase: $('phase'), log: $('log'), loc: $('locpanel'), player: $('player'), modal: $('modal'), toasts: $('toasts'), tutorial: $('tutorial'),
     movePick: $('move-pick'),
+    radial: (() => { const r = document.createElement('div'); r.id = 'radial'; r.className = 'hidden'; r.setAttribute('role', 'group'); document.body.append(r); return r; })(),
     hint: $('hint'),
     playerRefs: { head: $('pp-head'), survivors: $('pp-survivors'), chips: $('pp-chips'), hand: $('pp-hand'), actions: $('pp-actions') },
     onRender: (state) => {
@@ -300,6 +301,15 @@ stage.onFrame(() => {
     nameTag.style.top = `${Math.max(((1 - v.y) / 2) * h, barBottom + 30)}px`;
   }
   for (const id of LOCATION_IDS) labels[id].classList.toggle('named', id === named);
+  // UI-4: the ring of round icons floats over the tapped place (kept on screen, clear of the top bar).
+  const rd = document.getElementById('radial');
+  const rat = rd?.dataset.at;
+  if (rd && rat && !rd.classList.contains('hidden')) {
+    const R = parseFloat(rd.style.getPropertyValue('--r')) || 60;
+    v.copy(board.layout[rat].center).setY(3).project(stage.camera);
+    rd.style.left = `${Math.min(w - R - 30, Math.max(R + 30, ((v.x + 1) / 2) * w))}px`;
+    rd.style.top = `${Math.min(h - 150, Math.max(barBottom + R + 30, ((1 - v.y) / 2) * h))}px`;
+  }
   // The "who goes there" picker floats by the location's survivor pads.
   const mp = $('move-pick');
   const at = app?.ui.movePick;

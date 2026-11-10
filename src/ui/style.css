@@ -1746,3 +1746,28 @@ img.art-item.blank { image-rendering: auto; background: none; }
 #labels .loc-label.pin.active { box-shadow: 0 0 0 2px #f2b33d; }
 #labels .loc-label.pin.covered { opacity: 0 !important; pointer-events: none; }
 body.radial-open #labels .loc-label.pin:not(.active) { opacity: .45; }
+/* UI-4: the ring of round icons over a place */
+#radial { position: fixed; z-index: 7; width: 0; height: 0; }
+#radial.hidden { display: none; }
+body:not(.in-game) #radial, body.drafting #radial { display: none; }
+#radial .rd-btn { position: absolute; left: 0; top: 0; width: 44px; height: 44px; margin: -22px 0 0 -22px; display: grid; place-items: center; padding: 0; border-radius: 50%; border: 2px solid rgba(242,179,61,.9); background: #16202f; color: #eef3fa; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,.45); transform: translate(var(--x), var(--y)); animation: rd-in .14s ease-out both; animation-delay: calc(var(--i) * 25ms); }
+#radial .rd-btn .icon { width: 20px; height: 20px; }
+#radial .rd-btn.move { border-color: #8fc0ff; background: #183152; }
+#radial .rd-btn.off { opacity: .45; border-color: rgba(255,255,255,.25); }
+#radial .rd-btn:hover:not(.off), #radial .rd-btn:focus-visible { background: #25344a; outline: none; box-shadow: 0 0 0 3px rgba(242,179,61,.5), 0 4px 12px rgba(0,0,0,.45); }
+#radial .rd-cost { position: absolute; right: -6px; bottom: -6px; min-width: 18px; padding: 0 4px; border-radius: 9px; background: #f2b33d; color: #1b1d1e; font: 800 10px/16px var(--head, sans-serif); }
+#radial .rd-risk { position: absolute; left: -8px; bottom: -6px; padding: 0 4px; border-radius: 9px; background: #b8433a; color: #fff; font: 800 10px/16px var(--head, sans-serif); }
+#radial .rd-who { position: absolute; left: 0; top: 0; transform: translate(-50%, 6px); display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 2px; border-radius: 999px; background: rgba(11,20,36,.85); font: 700 11px/1 var(--head, sans-serif); color: #f2b33d; pointer-events: none; }
+#radial .rd-who img { width: 22px; height: 22px; border-radius: 50%; }
+@keyframes rd-in { from { transform: translate(0, 0) scale(.4); opacity: 0; } to { transform: translate(var(--x), var(--y)); opacity: 1; } }
+@media (min-width: 761px) { #radial .rd-btn { width: 40px; height: 40px; margin: -20px 0 0 -20px; } }
+@media (prefers-reduced-motion: reduce) { #radial .rd-btn { animation: none; } }
+/* the place card floats instead of a side panel */
+#locpanel { z-index: 8; }
+/* UI-4: nothing else sits over the ring */
+body.radial-open #hint { display: none !important; }
+#radial .rd-who { transform: translate(-50%, 18px); }
+@media (max-width: 760px) {
+  #hint { max-width: calc(100vw - 32px); }
+  #pp-head { display: none !important; } /* the round faces already show the team */
+}
