@@ -93,7 +93,7 @@ export function heightmapGeometry({ n, cell, column, side, bottom = -12, aoStren
  * The FROSTBOUND plateau at 2× resolution.
  * env: { radius, distRoad(x,z) -> distance to nearest road (world), distPlot(x,z) -> distance to building plots }
  */
-export function buildTerrainHD({ radius, distRoad, distPlot }) {
+export function buildTerrainHD({ radius, distRoad, distPlot, clip = null }) {
   const cell = 0.5;
   const n = Math.ceil(radius / cell) + 1;
   const strata = (x, z, y) => {
@@ -110,6 +110,7 @@ export function buildTerrainHD({ radius, distRoad, distPlot }) {
     const r = Math.max(Math.abs(wx), Math.abs(wz));
     const edge = radius - 3;
     if (r > edge) return null;
+    if (clip && !clip(wx, wz)) return null; // UI-13: one block of the city at a time
     const roadD = distRoad(wx, wz);
     const plotD = distPlot(wx, wz);
     const flat = Math.min(roadD - 1.5, plotD);

@@ -347,3 +347,8 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - Buildings: hollow concrete shells with floor ledges, framed windows (lit / dark / broken / boarded), shopfronts with shutters and awnings, balconies, drainpipes, wall and roof AC units, stair huts, water tanks, moss, graffiti, neon signs with one dead letter (POLICE, MART, SCHOOL, ER + red cross, BOOKS, GAS). Library has a collapsed corner; colony is a container-wall fort with barricaded gates.
 - Streets are ploughed asphalt with a centre dash and snow banks; moonlight moved to light the visible façades.
 - Tests updated for the grid layout and full-resolution models.
+
+### The city grows instead of fog (done)
+- The white fog puffs are gone. The board is split into its 9 grid blocks (terrain chunk, building and props per block); a locked block is not drawn at all.
+- Start: colony, gas station and grocery (plus nothing else). Scouting opens a place's block, which rises into place (~1.25 s); a filler block (parking lot, container yard) appears once a place next to it is open.
+- '?' markers only on the next blocks that can be opened. The usual camera view (and its reset button) fits the open blocks and widens as the city grows.

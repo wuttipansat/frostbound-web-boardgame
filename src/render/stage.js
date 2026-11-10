@@ -200,6 +200,23 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   };
   // The starting view, for the "back to the usual view" button.
   const homeView = { pos: camera.position.clone(), target: controls.target.clone(), zoom: 1.05 };
+  /** UI-13: fit the usual view to the open part of the city (grid cells minX..maxX, minZ..maxZ). */
+  view.fit = ({ minX, maxX, minZ, maxZ, block }, { snap = false } = {}) => {
+    // Work in the camera's ground axes (u = across the screen, v = up the screen) so the open blocks sit centred.
+    const h = block / 2;
+    const xs = [minX * block - h, (maxX + 1) * block - h]; const zs = [minZ * block - h, (maxZ + 1) * block - h];
+    const us = []; const vs = [];
+    for (const x of xs) for (const z of zs) { us.push((x - z) / Math.SQRT2); vs.push((x + z) / Math.SQRT2); }
+    const u = (Math.min(...us) + Math.max(...us)) / 2; const v = (Math.min(...vs) + Math.max(...vs)) / 2;
+    const off = homeView.pos.clone().sub(homeView.target);
+    homeView.target.set((u + v) / Math.SQRT2, 0, (v - u) / Math.SQRT2);
+    homeView.pos.copy(homeView.target).add(off);
+    const full = 3 * block * Math.SQRT2;
+    const need = Math.max(Math.max(...us) - Math.min(...us), (Math.max(...vs) - Math.min(...vs)) * 0.82);
+    const portrait = camera.right - camera.left < camera.top - camera.bottom; // narrow screens: leave more margin
+    homeView.zoom = Math.min(controls.maxZoom, 1.05 * (full / Math.max(need, full * 0.45)) * (portrait ? 0.82 : 1));
+    view.reset();
+  };
   view.reset = () => {
     camera.position.copy(homeView.pos);
     controls.target.copy(homeView.target);

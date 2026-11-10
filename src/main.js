@@ -16,7 +16,7 @@ import { icon } from './ui/icons.js';
 import { installTooltips } from './ui/tooltip.js';
 import { sound } from './audio/sound.js';
 import { c, t as tr } from './i18n/index.js';
-import { LOCATION_IDS } from './core/constants.js';
+import { LOCATION_IDS, NEIGHBORS } from './core/constants.js';
 import { ITEMS } from './content/items.js';
 import { tryReduce } from './core/reducer.js';
 import { actionCost, searchSpawnChance, isOverrun, isOpen } from './core/selectors.js';
@@ -43,6 +43,7 @@ document.body.dataset.gfx = governor.tier;
 stage.onFrameTime((dt, _ms, every) => { if (every === 1) governor.sample(dt); });
 boot(0.55);
 const board = createBoard();
+board.onBounds = (b) => stage.view.fit(b, { snap: b.snap }); // UI-13: the usual view follows the open blocks
 stage.scene.add(board.root);
 const tweens = new Tweens();
 boot(0.7);
@@ -106,7 +107,10 @@ function refreshLabels(state) {
     el.dataset.loc = id;
     el.className = 'loc-label pin';
     if (!state) { el.classList.add('empty'); continue; }
-    if (!isOpen(state, id)) { // UI-10: under the fog — a '?' pin only
+    if (!isOpen(state, id)) {
+      // UI-13: a locked block is not drawn; only the next blocks to open (next to an open place) get a '?'.
+      const next = (NEIGHBORS[id] ?? []).some((n) => isOpen(state, n));
+      if (!next) { el.classList.add('empty'); continue; }
       el.classList.add('locked'); el.textContent = '?';
       el.setAttribute('aria-label', tr('loc.locked'));
       el.onclick = (ev) => { ev.stopPropagation(); app?.onBoardPick({ locationId: id }); };

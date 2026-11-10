@@ -177,10 +177,29 @@ export function createBoard() {
   // HD models are authored at 2× resolution, so each voxel is half the size.
   const bScale = BOARD.buildingScale / 2;
 
-  const terrain = new THREE.Mesh(buildTerrainHD({ radius: BOARD.radius, ...distances(layout, roads) }), MATERIALS.lit);
-  terrain.receiveShadow = true;
+  // UI-13: the city grows block by block. Each of the 9 grid cells is its own group (terrain chunk, building,
+  // props); a locked cell is not drawn at all, and opening one lifts it up into place.
+  const cellOf = (x, z) => `${x < -BOARD.street ? -1 : x > BOARD.street ? 1 : 0},${z < -BOARD.street ? -1 : z > BOARD.street ? 1 : 0}`;
+  const cells = {};
+  const dist = distances(layout, roads);
+  for (let cx = -1; cx <= 1; cx++) for (let cz = -1; cz <= 1; cz++) {
+    const key = `${cx},${cz}`;
+    const g = new THREE.Group(); g.name = `cell ${key}`;
+    const chunk = new THREE.Mesh(buildTerrainHD({ radius: BOARD.radius, ...dist, clip: (x, z) => cellOf(x, z) === key }), MATERIALS.lit);
+    chunk.receiveShadow = true;
+    g.add(chunk);
+    root.add(g);
+    cells[key] = { group: g, k: 1, target: 1 };
+  }
+  const addAt = (obj, x, z) => cells[cellOf(x, z)].group.add(obj);
+  /** Instanced props split by cell, so each cell can show or hide its own. */
+  const addInstanced = (model, scale, matrices, opts) => {
+    const by = {};
+    for (const mx of matrices) (by[cellOf(mx.elements[12], mx.elements[14])] ??= []).push(mx);
+    for (const [key, list] of Object.entries(by)) cells[key].group.add(instanced(model, scale, list, opts));
+  };
+  const terrain = cells['0,0'].group.children[0];
   terrain.name = 'terrain';
-  root.add(terrain);
 
   // Colony
   // HD models carry their texture in material patterns, so skip the extra per-voxel jitter: it would stop
@@ -189,7 +208,7 @@ export function createBoard() {
   const colonyGroup = colonyHD(BOARD.colonyRadius * 2).build({ size: bScale, jitter });
   colonyGroup.position.y = 0;
   colonyGroup.name = 'colony';
-  root.add(colonyGroup);
+  addAt(colonyGroup, 0, 0);
 
   // Locations
   const locationGroups = {};
@@ -199,48 +218,12 @@ export function createBoard() {
     g.position.copy(L.center);
     g.rotation.y = L.facing;
     g.name = id;
-    root.add(g);
+    addAt(g, L.center.x, L.center.z);
     locationGroups[id] = g;
   }
   locationGroups.colony = colonyGroup;
 
-  // UI-10 fog of war: a bank of soft white puffs over every place still locked. Unlocking rolls it back
-  // (puffs fade and drift outwards) and the building rises out of the snow.
-  const fogTex = (() => {
-    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
-    const g = cv.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.55, 'rgba(240,246,255,0.6)'); gr.addColorStop(1, 'rgba(240,246,255,0)');
-    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
-    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; return tex;
-  })();
-  const fogs = {}; // id -> { puffs: [{ sprite, base, out }], k: 1 = covered … 0 = clear, target }
-  for (const id of OUTSIDE_LOCATIONS) {
-    const L = layout[id];
-    const out = L.center.clone().setY(0).normalize();
-    const puffs = [];
-    for (let i = 0; i < 16; i++) {
-      const mat = new THREE.SpriteMaterial({ map: fogTex, color: 0xf3f7ff, transparent: true, opacity: 0.9, depthWrite: false, fog: false });
-      const sp = new THREE.Sprite(mat);
-      const a = hash3(i, 7, id.length) * Math.PI * 2;
-      const r = 2 + hash3(i, 3, 1) * 8;
-      const base = L.center.clone().add(new THREE.Vector3(Math.cos(a) * r, 2 + hash3(i, 9, 2) * 7, Math.sin(a) * r)).addScaledVector(out, 6);
-      sp.position.copy(base);
-      const s = 10 + hash3(i, 5, 4) * 7;
-      sp.scale.set(s, s * 0.7, 1);
-      sp.renderOrder = 5;
-      root.add(sp);
-      puffs.push({ sprite: sp, base, out, phase: hash3(i, 1, 9) * 6 });
-    }
-    fogs[id] = { puffs, k: 0, target: 0 };
-  }
-  const setFogVisual = (id) => {
-    const f = fogs[id];
-    const k = f.k;
-    for (const p of f.puffs) { p.sprite.visible = k > 0.01; p.sprite.material.opacity = 0.85 * k; }
-    const g = locationGroups[id];
-    g.position.y = -9 * Math.min(1, k * 1.2); // buried under the fog; rises as it clears
-    g.visible = k < 0.98;
-  };
+
 
   // Step 9: no slot pedestals any more; each place has one floating sign (see main.js labels).
 
@@ -260,7 +243,7 @@ export function createBoard() {
   }
   bucket.forEach((list, i) => {
     if (!list.length) return;
-    root.add(instanced(treeModelHD(i, 1), 0.25, list, { cacheKey: `tree-${i}`, jitter: 0 }));
+    addInstanced(treeModelHD(i, 1), 0.25, list, { cacheKey: `tree-${i}`, jitter: 0 });
   });
   const rockSpots = scatter(layout, roads, 30, 9, 3);
   const rockBuckets = Array.from({ length: 3 }, () => []);
@@ -268,7 +251,7 @@ export function createBoard() {
     tmp.position.set(t.x, 0, t.z); tmp.rotation.y = t.r * Math.PI * 2; tmp.scale.setScalar(0.8 + t.s); tmp.updateMatrix();
     rockBuckets[i % rockBuckets.length].push(tmp.matrix.clone());
   });
-  rockBuckets.forEach((list, shape) => root.add(instanced(rockModelHD(shape), 0.25, list, { cacheKey: `rock-${shape}`, jitter: 0 })));
+  rockBuckets.forEach((list, shape) => addInstanced(rockModelHD(shape), 0.25, list, { cacheKey: `rock-${shape}`, jitter: 0 }));
 
   // UI-13 city props: wrecked cars and lamps along the streets, container stacks on empty lots.
   {
@@ -287,19 +270,19 @@ export function createBoard() {
         lamps.push(tmp.matrix.clone());
       }
     });
-    cars.forEach((list, v) => { if (list.length) root.add(instanced(carModel(v), 0.15, list, { cacheKey: `car-${v}`, jitter: 0 })); });
-    if (lamps.length) root.add(instanced(lampModel(), 0.15, lamps, { cacheKey: 'lamp', jitter: 0, castShadow: false }));
+    cars.forEach((list, v) => { if (list.length) addInstanced(carModel(v), 0.15, list, { cacheKey: `car-${v}`, jitter: 0 }); });
+    if (lamps.length) addInstanced(lampModel(), 0.15, lamps, { cacheKey: 'lamp', jitter: 0, castShadow: false });
     const lots = scatter(layout, roads, 7, 23, 7);
     const yards = [[], [], []];
     lots.forEach((p, i) => { tmp.position.set(p.x, 0, p.z); tmp.rotation.set(0, Math.round(p.r * 4) * Math.PI / 2, 0); tmp.updateMatrix(); yards[i % 3].push(tmp.matrix.clone()); });
-    yards.forEach((list, k) => { if (list.length) root.add(instanced(containerModel(k, 1 + (k % 2)), 0.2, list, { cacheKey: `container-${k}`, jitter: 0 })); });
+    yards.forEach((list, k) => { if (list.length) addInstanced(containerModel(k, 1 + (k % 2)), 0.2, list, { cacheKey: `container-${k}`, jitter: 0 }); });
   }
 
   // UI-13: the two filler blocks.
   for (const [name, [fx, fz]] of Object.entries(FILLER)) {
     const g = (name === 'parking' ? parkingLot() : containerYard()).build({ size: bScale, jitter: 0, cacheKey: `filler-${name}` });
     g.position.set(fx * BOARD.block, 0, fz * BOARD.block);
-    root.add(g);
+    addAt(g, fx * BOARD.block, fz * BOARD.block);
   }
 
   // The slab's soft shadow on the backdrop.
@@ -352,7 +335,7 @@ export function createBoard() {
     const lamp = new THREE.PointLight(0xffa552, 45, 16, 1.5);
     const p = L.center.clone().addScaledVector(L.center.clone().normalize(), -6.5);
     lamp.position.set(p.x, 3, p.z);
-    root.add(lamp);
+    addAt(lamp, p.x, p.z);
     lights.push({ light: lamp, base: 45, flicker: 0.08 });
   }
 
@@ -395,7 +378,13 @@ export function createBoard() {
   let hints = {};
   const HINT = { ok: [0x7fd18a, 0.4], lure: [0xffb347, 0.5], full: [0x8a96a8, 0.22] };
 
-  return {
+  const showCell = (c) => {
+    c.group.visible = c.k > 0.001;
+    const e = 1 - (1 - c.k) ** 3; // ease out
+    c.group.position.y = -22 * (1 - e);
+  };
+
+  const api = {
     root,
     layout,
     fx,
@@ -405,30 +394,30 @@ export function createBoard() {
     setFire(k) { fireLevel = k; },
     setHovered(id) { hovered = id; },
     setSelected(id) { selected = id; },
-    /** UI-10: which places are under fog. The first call snaps; later changes animate (~1.5 s). */
+    /** UI-13: which places are still locked. Their blocks are not drawn; a block (or a filler next to an open
+     *  place) appears by rising into place. The first call snaps. Calls onBounds with the open area. */
     setLocked(ids, { snap = false } = {}) {
-      const set = new Set(ids ?? []);
-      for (const id of OUTSIDE_LOCATIONS) {
-        const f = fogs[id];
-        f.target = set.has(id) ? 1 : 0;
-        if (snap) { f.k = f.target; setFogVisual(id); }
+      const locked = new Set(ids ?? []);
+      const open = new Set(['0,0']);
+      const blockKey = (id) => cellOf(layout[id].center.x, layout[id].center.z);
+      for (const id of OUTSIDE_LOCATIONS) if (!locked.has(id)) open.add(blockKey(id));
+      for (const [fx, fz] of Object.values(FILLER)) {
+        if ([[fx - 1, fz], [fx + 1, fz], [fx, fz - 1], [fx, fz + 1]].some(([x, z]) => open.has(`${x},${z}`) && `${x},${z}` !== '0,0')) open.add(`${fx},${fz}`);
       }
+      for (const [key, c] of Object.entries(cells)) {
+        c.target = open.has(key) ? 1 : 0;
+        if (snap) { c.k = c.target; showCell(c); }
+      }
+      const xs = [...open].map((k) => +k.split(',')[0]); const zs = [...open].map((k) => +k.split(',')[1]);
+      api.onBounds?.({ minX: Math.min(...xs), maxX: Math.max(...xs), minZ: Math.min(...zs), maxZ: Math.max(...zs), block: BOARD.block, snap });
     },
     /** Location hints: { locationId: 'ok' | 'full' | 'lure' | 'blocked' } (e.g. where a survivor can move). */
     setHints(next) { hints = next ?? {}; },
     update(t) {
-      for (const [id, f] of Object.entries(fogs)) {
-        if (f.k !== f.target) {
-          f.k += Math.sign(f.target - f.k) * Math.min(Math.abs(f.target - f.k), 1 / 90); // ~1.5 s at 60 fps
-          setFogVisual(id);
-        }
-        if (f.k > 0.01) {
-          const away = (1 - f.k) * 14; // clearing: the bank drifts outwards
-          for (const p of f.puffs) {
-            p.sprite.position.copy(p.base).addScaledVector(p.out, away);
-            p.sprite.position.y += Math.sin(t * 0.4 + p.phase) * 0.4;
-          }
-        }
+      for (const c of Object.values(cells)) {
+        if (c.k === c.target) continue;
+        c.k += Math.sign(c.target - c.k) * Math.min(Math.abs(c.target - c.k), 1 / 75); // ~1.25 s
+        showCell(c);
       }
       // Flame: flicker in height and sway.
       const fl = Math.min(1.3, fireLevel);
@@ -454,4 +443,5 @@ export function createBoard() {
       }
     },
   };
+  return api;
 }
