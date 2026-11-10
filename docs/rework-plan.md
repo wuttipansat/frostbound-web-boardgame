@@ -276,3 +276,18 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - Night attack scene: at night a callout over the colony shows a row of skulls (the stopped ones greyed out),
   "5 attack · 4 stopped" and the HP lost.
 - Limited palette: near-duplicate tones now share one swatch (snow shades, road, wood, pine, window, danger, slot).
+
+## UI rework (UI-1 … UI-5): less on screen
+
+- **UI-1 camera:** free again — drag to pan, two fingers / right drag to turn, pinch / wheel to zoom (tilt 40–65°).
+  One small "usual view" button bottom right; Q / E / + / − still work.
+- **UI-2 top bar:** one row — morale, day, food, an ⓘ "Today" button (red dot when tonight bites or the crisis is short)
+  and a menu (rules, log, settings). The "Today" card holds the crisis, the night attack, the goal, the mission and the team.
+- **UI-3 pins:** each place shows only a small pin (zombies, our people, red ring when overrun). Tap it to open the place.
+- **UI-4 ring:** tapping a place floats small round icons in an arc over it, for the selected survivor (or the first who can
+  act). Elsewhere: walk (and drive with fuel), with the AP and any HP lost on the icon. Here: search / attack / barricade /
+  lure (outside) or nap / guard / build (colony), with AP and risk badges; disabled icons stay in place and explain on tap.
+  ⓘ opens the place card (stats, build, craft). Walking from the colony to a place and searching takes 3 taps.
+- **UI-5 items:** folded into one round button with the item count. Open: tabs for the stockpile and each backpack;
+  using a card folds the list again.
+- e2e: smoke walks and searches through the ring; hud-layout checks the ring at all 7 places on desktop, tablet and phone.

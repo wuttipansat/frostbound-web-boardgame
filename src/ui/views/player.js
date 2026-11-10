@@ -32,7 +32,8 @@ function cardDetail(ctx, shown, uid) {
   const opts = cardOptions(s, uid).filter((o) => o.id !== 'play' || !need);
   const close = () => ctx.set({ selCard: null });
   // Every use goes through the legal action; the card flies to where it went (board, crisis, goal).
-  const go = (action, kind = 'play') => { flyCard(uid, kind); if (ctx.dispatch(action)) close(); };
+  // UI-5: using a card closes the list again.
+  const go = (action, kind = 'play') => { flyCard(uid, kind); if (ctx.dispatch(action)) { close(); ctx.setHandCompact(true); } };
   let picker = null;
   if (need === 'survivor') {
     picker = h('div', { class: 'picker', 'data-target-picker': '' },
@@ -127,14 +128,18 @@ export function renderPlayerPanel(refs, ctx) {
     })));
 
   // ---- hand: a floating pile or a fan
-  const hand = allItems(s);
-  // Phones: an open location sheet takes the room, so the hand folds into its pile.
+  // UI-5: one list at a time — the colony stockpile, or one survivor's backpack (tabs while open).
+  const all = allItems(s);
+  const tabs = ['stockpile', ...s.team.survivors.filter((id) => s.survivors[id]?.alive && s.survivors[id].pack?.length)];
+  const tab = tabs.includes(ui.handTab) ? ui.handTab : (s.stockpile.length || tabs.length === 1 ? 'stockpile' : tabs[1]);
+  const hand = all.filter((u) => (tab === 'stockpile' ? s.stockpile.includes(u) : s.survivors[tab]?.pack?.includes(u)));
+  // Phones: an open ring or place card takes the room, so the hand folds into its button.
   const phoneLoc = window.innerWidth <= 760 && !!ui.selLoc;
   // A card picked by other means (keyboard, tutorial, a test) opens the fan while its sheet is up.
   const picked = !!(ui.selCard && hand.includes(ui.selCard));
   const compact = (ui.handCompact || phoneLoc) && !picked;
   document.body.classList.toggle('hand-full', !compact && hand.length > 0);
-  renderHand(refs.hand, ctx, shown, hand, { isActor, compact, phoneLoc });
+  renderHand(refs.hand, { ...ctx, handTabs: tabs, handTab: tab }, shown, hand, { isActor, compact, phoneLoc });
 
   // ---- actions: End turn, everything else behind the round "more" button
   const end = isActor ? endTurnOption(s) : null;
@@ -187,7 +192,7 @@ function renderHand(container, ctx, shown, hand, { isActor, compact, phoneLoc })
   const { fan, ctl, sheet } = slots(container);
   const n = hand.length;
   const mode = compact ? 'pile' : 'fan';
-  container.classList.toggle('empty', !n);
+  container.classList.toggle('empty', !allItems(ctx.state).length);
   fan.classList.toggle('pile', compact);
   fan.classList.toggle('fanned', !compact);
   fan.style.setProperty('--n', String(Math.max(1, n)));
@@ -225,12 +230,20 @@ function renderHand(container, ctx, shown, hand, { isActor, compact, phoneLoc })
   });
 
   const count = h('span', { class: 'count' }, String(n));
+  const total = allItems(ctx.state).length;
+  const s = ctx.state;
+  const tabRow = !compact && ctx.handTabs.length > 1 ? h('div', { class: 'hand-tabs', role: 'tablist' }, ctx.handTabs.map((id) => h('button', {
+    class: `hand-tab${id === ctx.handTab ? ' on' : ''}`, role: 'tab', 'aria-selected': id === ctx.handTab ? 'true' : 'false',
+    onclick: (ev) => { ev.stopPropagation(); ctx.set({ handTab: id, selCard: null }); },
+  }, id === 'stockpile' ? t('pack.toStockpile') : survivorDef(id).name.split(' ')[0],
+  h('small', {}, String(id === 'stockpile' ? s.stockpile.length : s.survivors[id].pack.length))))) : null;
   mount(ctl,
-    !n ? null : compact
+    tabRow,
+    !total ? null : compact
       ? h('button', {
         class: 'pile-btn', 'aria-label': `${t('panel.handExpand')} (${n})`, tip: t('panel.handExpand'), 'aria-expanded': 'false',
         onclick: () => { if (phoneLoc) ctx.selectLocation(null); ctx.setHandCompact(false); },
-      }, count)
+      }, icon('hand'), h('span', { class: 'count' }, String(total)))
       : h('button', {
         class: 'icon-btn round hand-toggle', 'aria-label': t('panel.handCompact'), tip: t('panel.handCompact'), 'aria-expanded': 'true',
         onclick: () => { ctx.set({ selCard: null }); ctx.setHandCompact(true); },

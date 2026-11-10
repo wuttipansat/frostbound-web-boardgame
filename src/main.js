@@ -214,6 +214,7 @@ const app = createApp({
       // While the night report is on screen, the board shows night.
       updateWinter(state && app?.ui.queue[0]?.type === 'colony' ? { ...state, time: 'night' } : state);
       refreshLabels(state);
+      placeRing();
       document.getElementById('view-ctl')?.classList.toggle('hidden', !state || state.phase === 'draft' || state.phase === 'gameOver');
     },
   },
@@ -267,6 +268,18 @@ stage.onFrame((_t, dt) => {
     p.el.style.top = `${((1 - v.y) / 2) * ch}px`;
   }
 });
+/** UI-4: put the ring over its place (every frame, and right after each render so it never shows at 0,0). */
+function placeRing() {
+  const rd = document.getElementById('radial');
+  const rat = rd?.dataset.at;
+  if (!rd || !rat || rd.classList.contains('hidden')) return;
+  const { clientWidth: w, clientHeight: h } = stage.renderer.domElement;
+  const barBottom = document.getElementById('topbar').getBoundingClientRect().bottom;
+  const R = parseFloat(rd.style.getPropertyValue('--r')) || 60;
+  v.copy(board.layout[rat].center).setY(3).project(stage.camera);
+  rd.style.left = `${Math.min(w - R - 30, Math.max(R + 30, ((v.x + 1) / 2) * w))}px`;
+  rd.style.top = `${Math.max(barBottom + R * 0.85 + 30, Math.min(h - 110, ((1 - v.y) / 2) * h))}px`; // never under the top bar
+}
 const PANELS = ['topbar', 'pp-left', 'pp-hand', 'pp-actions', 'locpanel', 'log', 'pp-survivors'].map((id) => document.getElementById(id));
 stage.onFrame(() => {
   const { clientWidth: w, clientHeight: h } = stage.renderer.domElement;
@@ -302,14 +315,7 @@ stage.onFrame(() => {
   }
   for (const id of LOCATION_IDS) labels[id].classList.toggle('named', id === named);
   // UI-4: the ring of round icons floats over the tapped place (kept on screen, clear of the top bar).
-  const rd = document.getElementById('radial');
-  const rat = rd?.dataset.at;
-  if (rd && rat && !rd.classList.contains('hidden')) {
-    const R = parseFloat(rd.style.getPropertyValue('--r')) || 60;
-    v.copy(board.layout[rat].center).setY(3).project(stage.camera);
-    rd.style.left = `${Math.min(w - R - 30, Math.max(R + 30, ((v.x + 1) / 2) * w))}px`;
-    rd.style.top = `${Math.min(h - 150, Math.max(barBottom + R + 30, ((1 - v.y) / 2) * h))}px`;
-  }
+  placeRing();
   // The "who goes there" picker floats by the location's survivor pads.
   const mp = $('move-pick');
   const at = app?.ui.movePick;

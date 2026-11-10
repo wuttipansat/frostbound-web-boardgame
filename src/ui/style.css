@@ -1771,3 +1771,19 @@ body.radial-open #hint { display: none !important; }
   #hint { max-width: calc(100vw - 32px); }
   #pp-head { display: none !important; } /* the round faces already show the team */
 }
+/* UI-5: folded = one round button; open = a list with tabs (stockpile | each backpack) */
+.hand-fan.pile .item-card { display: none !important; }
+#pp-hand .pile-btn { width: 52px !important; height: 52px !important; border-radius: 50% !important; display: inline-grid; grid-auto-flow: column; place-items: center; gap: 2px; background: #16202f; border: 2px solid rgba(242,179,61,.8); color: #eef3fa; }
+#pp-hand .pile-btn .count { position: absolute; top: -6px; right: -6px; min-width: 20px; padding: 0 5px; border-radius: 10px; background: #f2b33d; color: #1b1d1e; font: 800 11px/20px var(--head, sans-serif); }
+#pp-hand .hand-ctl { display: flex; align-items: flex-end; gap: 6px; flex-wrap: wrap; }
+.hand-tabs { display: flex; gap: 4px; flex-wrap: wrap; max-width: 100%; }
+.hand-tab { min-height: 36px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.18); background: rgba(11,20,36,.85); color: inherit; font: 600 12px/1 inherit; display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.hand-tab.on { background: #f2b33d; color: #1b1d1e; border-color: #f2b33d; }
+.hand-tab small { opacity: .7; }
+/* UI-5 polish: the ring replaces its place's pin; the hint stays small on phones and steps aside for lists */
+body.radial-open #labels .loc-label.pin.active { opacity: 0; pointer-events: none; }
+@media (max-width: 760px) {
+  body.hand-full #hint, body.loc-open #hint { display: none !important; }
+  #hint { font-size: 12px; padding: 6px 10px !important; }
+  #hint .hint-why, #hint small { display: none; }
+}

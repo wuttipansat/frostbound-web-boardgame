@@ -49,6 +49,7 @@ function boxes() {
     tokens: union(q('.sv-token')),
     hint: union(q('#hint:not(.hidden)')),
     location: loc.classList.contains('hidden') ? null : union([loc]),
+    ring: union(q('#radial:not(.hidden) .rd-btn')),
   };
 }
 
@@ -78,12 +79,27 @@ function boxes() {
       }
       for (const k of keys) {
         const A = r[k];
-        if (A.left < -1 || A.right > vp.width + 1 || A.bottom > vp.height + 1) problems.push(`${name}/${state}: ${k} is off screen`);
+        if (A.left < -1 || A.right > vp.width + 1 || A.bottom > vp.height + 1) problems.push(`${name}/${state}: ${k} is off screen ${JSON.stringify([Math.round(A.left), Math.round(A.top), Math.round(A.right), Math.round(A.bottom)])}`);
       }
       if (out) await p.screenshot({ path: `${out}/after-${name}-${state}.jpg`, type: 'jpeg', quality: 82 });
     }
-    const actions = await p.evaluate(() => document.querySelectorAll('#locpanel .btn.icon-act').length);
-    if (actions < 5) problems.push(`${name}: only ${actions} icon actions in the location panel`);
+    // UI-4: every place opens a ring of round icons that stays on screen and clear of the top bar and the end button.
+    const ring = await p.evaluate(() => {
+      const a = window.__frostbound.app; const out = [];
+      a.set({ handCompact: true, locInfo: false });
+      for (const id of ['colony', 'police', 'grocery', 'school', 'hospital', 'library', 'gas']) {
+        a.selectLocation(id);
+        out.push([id, document.querySelectorAll('#radial:not(.hidden) .rd-btn').length]);
+      }
+      return out;
+    });
+    await p.waitForTimeout(1500); // the ring's open animation (slow under software rendering)
+    for (const [id, n] of ring) if (!n) problems.push(`${name}: no ring icons at ${id}`);
+    const ringBox = await p.evaluate(() => {
+      const top = document.getElementById('topbar').getBoundingClientRect().bottom;
+      return [...document.querySelectorAll('#radial .rd-btn')].map((e) => e.getBoundingClientRect()).filter((r) => r.top < top || r.left < 0 || r.right > innerWidth).length;
+    });
+    if (ringBox) problems.push(`${name}: ${ringBox} ring icons under the top bar or off screen`);
     if (errors.length) problems.push(`${name}: page errors ${errors.join(' | ')}`);
     await p.close();
   }

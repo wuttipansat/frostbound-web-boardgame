@@ -52,10 +52,14 @@ export function renderRadial(el, ctx) {
   const open = !!(at && s.phase !== 'draft' && s.phase !== 'gameOver' && !ui.locInfo && !ui.picking && !ctx.watching && !ui.modal && !ui.queue?.length);
   el.classList.toggle('hidden', !open);
   document.body.classList.toggle('radial-open', open);
-  if (!open) { mount(el); el.dataset.at = ''; return; }
+  if (!open) { mount(el); el.dataset.at = ''; el.dataset.key = ''; return; }
   el.dataset.at = at;
   const items = ringItems(s, ui, at, ctx);
   const svId = ringSurvivor(s, ui);
+  // Re-build only when something on it changed, so the open animation plays once.
+  const key = [at, svId, svId ? s.survivors[svId].ap : 0, ...items.map((it) => `${it.id}:${it.ok}:${it.cost ?? ''}:${it.risk ?? ''}`)].join('|');
+  if (el.dataset.key === key) return;
+  el.dataset.key = key;
   const n = items.length;
   const R = Math.max(62, Math.round((54 * (n + 1)) / Math.PI)); // about 54px between icon centres
   el.style.setProperty('--r', `${R}px`);

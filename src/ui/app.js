@@ -66,7 +66,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
     playSpeed: settings.playSpeed ?? 'normal',
     graphics: graphics?.mode ?? settings.graphics ?? 'auto', // step 22: auto | high | saver
     movePick: null, // location whose "who goes there" picker is open
-    handCompact: settings.handCompact ?? (typeof window !== 'undefined' && (window.innerWidth <= 760 || window.innerHeight <= 800)),
+    handCompact: true, // UI-5: the items list starts folded into its button
   };
   // Step 15: what happened plays out one scene at a time (camera, effect, callout).
   const director = createDirector({
