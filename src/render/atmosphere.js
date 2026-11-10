@@ -9,7 +9,7 @@ const DUSK = { dawn: 0.3, day: 0, dusk: 0.65, night: 1 };
 
 export function atmosphereFor(s) {
   if (!s || !s.scenario) return { storm: 0.35, dusk: 0.5, fire: 1, mood: 'calm' };
-  const rounds = s.scenario.days || 1;
+  const rounds = s.scenario.days || 40;
   const progress = clamp((s.day - 1) / Math.max(1, rounds - 1));
   const morale = clamp(s.morale / (s.maxMorale || 10));
   // The light follows the time of day (the colony reveal shows dusk → night).

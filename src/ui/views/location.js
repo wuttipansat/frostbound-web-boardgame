@@ -81,7 +81,7 @@ export function renderLocationPanel(el, ctx) {
             },
             h('b', {}, t(`bld.${bid}`), h('em', {}, ` ${s.base[bid]}/${max}`)),
             h('small', { class: 'fx' }, t(`bld.${bid}.fx`)),
-            h('span', { class: 'cost' }, !nx ? t('build.max') : nx.started ? [`${t('build.working')} ${nx.spent}/${nx.ap} `, icon('exposure')] : [...parts, h('span', { class: 'need' }, icon('exposure'), `${nx.ap}`)]));
+            h('span', { class: 'cost' }, !nx ? t('build.max') : nx.started ? [`${t('build.working')} ${nx.spent}/${nx.ap} `, icon('bolt')] : [...parts, h('span', { class: 'need' }, icon('bolt'), `${nx.ap}`)]));
           }))));
       }
       if (id === 'colony' && sel?.location === 'colony') {
@@ -91,7 +91,7 @@ export function renderLocationPanel(el, ctx) {
             class: `bld-row${x.ok ? '' : ' off'}`,
             tip: `${Object.entries(x.r.needs).map(([i, n]) => `${n}× ${c('items', i, 'name')}`).join(' + ')} + ${x.r.ap} AP${x.ok ? '' : ` · ${t(`err.${x.error}`)}`}`,
             onclick: (ev) => (x.ok ? ctx.dispatch(x.action) : flashTip(ev.currentTarget)),
-          }, h('b', {}, c('items', x.r.makes, 'name')), h('small', {}, `${Object.entries(x.r.needs).map(([i, n]) => `${c('items', i, 'name')} ${Math.min(n, s.stockpile.filter((u) => s.cards[u] === i).length)}/${n}`).join(' · ')}`), h('small', {}, icon('exposure'), `${x.r.ap}`))))));
+          }, h('b', {}, c('items', x.r.makes, 'name')), h('small', {}, `${Object.entries(x.r.needs).map(([i, n]) => `${c('items', i, 'name')} ${Math.min(n, s.stockpile.filter((u) => s.cards[u] === i).length)}/${n}`).join(' · ')}`), h('small', {}, icon('bolt'), `${x.r.ap}`))))));
       }
     }
   }

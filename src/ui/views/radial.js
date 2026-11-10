@@ -71,8 +71,8 @@ export function renderRadial(el, ctx) {
   const ap = svId ? s.survivors[svId].ap : 0;
   const off = (ev, it) => { ev.stopPropagation(); if (!it.ok) { flashTip(ev.currentTarget); return true; } return false; };
   const button = (it) => {
-    const risk = it.risk ? (it.risk.endsWith('%') ? t('bar.risk', { n: it.risk }) : `${it.risk} HP`) : null;
-    const meta = it.cost || risk ? [it.cost ? h('span', { class: 'ap' }, icon('exposure'), String(it.cost)) : null, it.cost && risk ? ' · ' : null, risk].filter(Boolean) : [];
+    const risk = it.risk ? (it.risk.endsWith('%') ? t('bar.risk', { n: it.risk }) : h('span', { class: 'hp' }, icon('heartIco'), it.risk)) : null;
+    const meta = it.cost || risk ? [it.cost ? h('span', { class: 'ap' }, icon('bolt'), String(it.cost)) : null, it.cost && risk ? ' · ' : null, risk].filter(Boolean) : [];
     const tip = [it.label, it.cost != null ? t('act.cost', { n: it.cost, have: ap }) : null, !it.ok ? t(`err.${it.error}`) : null].filter(Boolean).join(' · ');
     return h('button', {
       class: `rd-btn${it.ok ? '' : ' off'}${it.move ? ' move' : ''}`, dataset: { act: it.id, sv: it.face ?? '' },
@@ -101,7 +101,7 @@ export function renderRadial(el, ctx) {
     s.phase === 'turn' && !items.some((it) => it.id === 'walk') ? h('div', { class: 'ab-who', role: 'group' }, aliveSurvivors(s).map((v) => h('button', {
       class: `ab-face${v.id === svId ? ' on' : ''}`, 'aria-pressed': v.id === svId ? 'true' : 'false', 'aria-label': survivorDef(v.id).name,
       onclick: (ev) => { ev.stopPropagation(); ctx.set({ selSurvivor: v.id, picking: null }); },
-    }, ctx.art.portrait(v.id, 's', { alt: '' }), h('span', {}, icon('exposure'), String(v.ap)),
+    }, ctx.art.portrait(v.id, 's', { alt: '' }), h('span', {}, icon('bolt'), String(v.ap)),
     v.id === svId ? h('small', {}, v.location === at ? t('bar.here') : c('locations', v.location, 'name')) : null))) : null,
     h('div', { class: 'ab-row' }, luring
       ? [...lures.map((tg) => h('button', {

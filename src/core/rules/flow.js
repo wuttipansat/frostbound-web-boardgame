@@ -201,7 +201,7 @@ export function colonyPhase(s) {
   // 6. Main objective, then round tracker.
   if (checkScenarioGoal(s)) return endGame(s, 'objectiveComplete');
   s.day += 1;
-  if (s.day > s.scenario.days) return endGame(s, 'timeOut');
+  if (s.scenario.days && s.day > s.scenario.days) return endGame(s, 'timeOut'); // days 0 = no limit
   startRound(s);
 }
 

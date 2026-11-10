@@ -131,7 +131,7 @@ test('scenario goal is checked in the colony phase; time running out ends the ga
   assert.equal(s.result.reason, 'objectiveComplete');
 
   let t = team({ 'corwin-daly': 'colony' });
-  t = patch(t, (x) => { x.day = x.scenario.days; x.food = 10; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
+  t = patch(t, (x) => { x.scenario.days = 40; x.day = 40; x.food = 10; x.crisis = { id: 'whiteout', contributions: [] }; colonyPhase(x); });
   assert.equal(t.result.reason, 'timeOut');
 });
 

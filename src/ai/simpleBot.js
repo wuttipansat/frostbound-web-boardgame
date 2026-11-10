@@ -196,7 +196,7 @@ function energyActions(s, p, survivors, candidates, cardsOf, opts) {
   // 5. Walk: hurt, done, or carrying the goal home → colony; idle in the colony → out to a stocked place.
   const goal = scenarioDef(s).goal;
   const carrying = goal.type === 'deposit' ? cardsOf(goal.item).length : 0;
-  const lateRound = s.day >= s.scenario.days - 1;
+  const lateRound = !!s.scenario.days && s.day >= s.scenario.days - 1;
   for (const sv of survivors) {
     const loc = s.locations[sv.location];
     const bringHome = carrying >= 2 || (carrying >= 1 && lateRound);
@@ -239,7 +239,7 @@ function energyActions(s, p, survivors, candidates, cardsOf, opts) {
   if (junk && tired && tired.ap < 30) candidates.push(act.playCard(junk, { targetSurvivorId: tired.id }));
   // 7. Rest: a worn-out survivor at home naps before doing anything; one spent survivor guards when zombies are due.
   for (const sv of survivors) {
-    if (sv.location === 'colony' && !sv.acted && !sv.moved && !sv.napped && sv.ap < 30) candidates.push(act.nap(sv.id));
+
   }
   const guard = survivors.find((sv) => sv.location === 'colony' && sv.ap < 15 && sv.rest !== 'guard');
   if (guard && siegeForecast(s).hits > 0 && !survivors.some((sv) => sv.rest === 'guard')) candidates.push(act.setRest(guard.id, 'guard'));

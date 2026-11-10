@@ -122,7 +122,7 @@ export function scenarioProgress(s) {
 }
 
 export function roundsRemaining(s) {
-  return s.scenario.days - s.day + 1;
+  return s.scenario.days ? s.scenario.days - s.day + 1 : Infinity;
 }
 
 // ---------------------------------------------------------------- energy, forecast

@@ -30,7 +30,7 @@ export function createGame(config = {}) {
     phase: PHASES.DRAFT,
     day: 1,
     time: 'dawn', // dawn | day | dusk | night
-    scenario: { id: scenario.id, days: scenario.days, deposited: 0 },
+    scenario: { id: scenario.id, days: config.days ?? scenario.days, deposited: 0 }, // 0 = endless winter
     morale: Math.min(10, scenario.morale + (DIFFICULTY[config.difficulty]?.morale ?? 0)),
     maxMorale: 10,
     food: Math.max(0, scenario.startFood + (DIFFICULTY[config.difficulty]?.food ?? 0)),

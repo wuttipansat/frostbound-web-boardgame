@@ -23,15 +23,15 @@ export function renderTopbar(el, ctx) {
     style: cnt?.live ? { animationDelay: `${-Math.round(cnt.age)}ms` } : {},
   }, icon(ico, 'stat-ico'), h('span', { class: 'lbl' }, label), cnt?.num ?? null, cnt?.tag ?? null, body);
 
-  const lastRound = s.day === s.scenario.days;
+  const lastRound = !!s.scenario.days && s.day === s.scenario.days;
   const cMorale = counter('morale', s.morale);
   const morale = block(`morale${s.morale <= 3 ? ' critical' : ''}`, t('tip.morale'), 'morale', t('hud.morale'), cMorale,
     h('div', { class: 'meter' }, Array.from({ length: s.maxMorale }, (_, i) => h('i', { class: i < s.morale ? (s.morale <= 3 ? 'on low' : 'on') : '' }))));
   // Calendar: day n / 40, the time of day, and how much of the winter has passed.
   const round = block(`round calendar${lastRound ? ' critical' : ''}`, t('tip.day'), 'round', t('hud.day'),
-    counter('round', s.day, { text: (v) => `${v}/${s.scenario.days}` }),
+    counter('round', s.day, { text: (v) => (s.scenario.days ? `${v}/${s.scenario.days}` : `${v}`) }),
     h('small', { class: `time t-${s.time ?? 'day'}` }, t(`time.${s.time ?? 'day'}`), h('span', { class: 'extra' }, isStorm(s) ? ` · ${t('hud.storm')}` : '', ` · ${t(`hud.season.${season(s)}`)}`)),
-    h('div', { class: 'mini-bar' }, h('i', { style: { width: `${Math.round((s.day / s.scenario.days) * 100)}%` } })));
+    h('div', { class: 'mini-bar' }, h('i', { style: { width: `${s.scenario.days ? Math.round((s.day / s.scenario.days) * 100) : 0}%` } })));
   const food = block(`food${s.food < need ? ' critical' : ''}`, t('tip.food'), 'food', t('hud.food'), counter('food', s.food),
     h('small', {}, t('hud.foodNeed', { n: need })),
     h('small', { class: foodDays(s) < 2 ? 'bad' : '' }, foodDays(s) === Infinity ? '' : t('hud.foodDays', { n: foodDays(s) })),

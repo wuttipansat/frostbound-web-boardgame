@@ -315,3 +315,8 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - Walking: one button per survivor elsewhere, with their face. Giving: tap a face (or the stockpile button).
 - Rule change: barricades only at the colony. Tool cards add barricades at the base at once (no target; the card must be at the base). Bot and tests updated.
 - Action costs show the energy icon instead of "AP".
+
+### UI-9 — endless winter, no nap, icons (done)
+- No day limit: scenarios have `days: 0` (no time-out); the top bar shows only the day number. Bots, the balance script and simulation tests still play a fixed 40-day winter (`createGame({ days })`) so they finish.
+- Nap removed from the UI and the bot (the reducer action stays for old saves and tests).
+- Energy shows a yellow lightning icon; HP in costs shows a red heart. The HP bar on faces is unchanged.

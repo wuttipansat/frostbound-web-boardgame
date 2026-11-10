@@ -34,7 +34,6 @@ export function survivorOptions(state, survivorId, { lureTo = null } = {}) {
     out.push({ id: 'ability', cost: 0, ...(target ? check(state, action) : { action, ok: false, error: 'notWounded' }) });
   }
   // Rest: a nap now (skips the day), or tonight's guard duty (toggle).
-  out.push({ id: 'nap', cost: null, ...check(state, act.nap(survivorId)) });
   out.push({ id: sv.rest === 'guard' ? 'unguard' : 'guard', cost: null,
     ...check(state, act.setRest(survivorId, sv.rest === 'guard' ? 'sleep' : 'guard')) });
   return out;

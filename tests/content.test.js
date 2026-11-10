@@ -71,5 +71,5 @@ test('crises and scenarios reference known types', () => {
     for (const e of c.fail) assert.ok(EFFECT_TYPES.includes(e.type));
   }
   for (const sc of SCENARIOS) assert.ok(sc.goal.target > 0, `${sc.id}: a fixed solo target`);
-  for (const sc of SCENARIOS) assert.equal(sc.days, 40, `${sc.id}: a 40-day winter`);
+  for (const sc of SCENARIOS) assert.equal(sc.days, 0, `${sc.id}: no day limit`);
 });
