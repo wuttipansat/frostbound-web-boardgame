@@ -42,10 +42,14 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   controls.dampingFactor = 0.08;
   controls.minZoom = 0.75;
   controls.maxZoom = 3.5;
-  controls.minPolarAngle = polar;
-  controls.maxPolarAngle = polar;
-  controls.enableRotate = false; // rotate with the buttons / Q E (90° steps)
-  controls.enableZoom = false;   // zoom with the buttons / wheel / + − (3 levels)
+  // UI-1: free camera again — drag to pan, two fingers / right drag to turn, pinch / wheel to zoom.
+  controls.minPolarAngle = THREE.MathUtils.degToRad(40);
+  controls.maxPolarAngle = THREE.MathUtils.degToRad(65);
+  controls.enableRotate = true;
+  controls.enableZoom = true;
+  controls.screenSpacePanning = false;
+  controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+  controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
   controls.screenSpacePanning = false;
   controls.zoomToCursor = true;
   controls.target.set(0, 0, 0);
@@ -173,7 +177,7 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
     ZOOMS,
     get zoomLevel() { return zoomIdx; },
     zoomTo(i) { zoomIdx = Math.max(0, Math.min(ZOOMS.length - 1, i)); view.goalZoom = ZOOMS[zoomIdx]; },
-    zoomStep(d) { view.zoomTo(zoomIdx + d); },
+    zoomStep(d) { view.goalZoom = Math.max(controls.minZoom, Math.min(controls.maxZoom, (view.goalZoom ?? camera.zoom) * (d > 0 ? 1.3 : 1 / 1.3))); },
     rotate(dir) { turnLeft += dir * Math.PI / 2; },
     goalZoom: null,
     tick(dt) {
@@ -193,11 +197,14 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
       }
     },
   };
-  canvas.addEventListener('wheel', (ev) => {
-    ev.preventDefault();
-    if (view.goalZoom != null) return; // one step per gesture
-    view.zoomStep(ev.deltaY < 0 ? 1 : -1);
-  }, { passive: false });
+  // The starting view, for the "back to the usual view" button.
+  const homeView = { pos: camera.position.clone(), target: controls.target.clone(), zoom: 1.05 };
+  view.reset = () => {
+    camera.position.copy(homeView.pos);
+    controls.target.copy(homeView.target);
+    view.goalZoom = homeView.zoom;
+    controls.update();
+  };
 
   return {
     view,

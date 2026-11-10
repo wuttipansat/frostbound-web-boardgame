@@ -1719,3 +1719,8 @@ img.art-item.blank { image-rendering: auto; background: none; }
 @keyframes siege-in { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .scene-callout .siege-row .icon { animation: none; } }
 #loc-name { display: none !important; } /* Step 9: the sign carries the name */
+
+/* ================================================================ UI rework (UI-1..UI-5): less on screen */
+/* UI-1: one small "usual view" button, bottom right above the end-day button */
+#view-ctl { left: auto !important; top: auto !important; right: calc(12px + env(safe-area-inset-right, 0px)); bottom: calc(var(--player-h, 64px) + 70px + env(safe-area-inset-bottom, 0px)); flex-direction: row; z-index: 6; }
+#view-ctl .view-btn { width: 40px !important; height: 40px !important; opacity: .85; }

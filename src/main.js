@@ -239,10 +239,8 @@ updateWinter(null);
   const bar = document.createElement('div');
   bar.id = 'view-ctl';
   const btn = (ico, label, fn) => { const b = document.createElement('button'); b.className = 'btn round view-btn'; b.setAttribute('aria-label', label); b.setAttribute('tip', label); b.append(icon(ico)); b.onclick = fn; bar.append(b); };
-  btn('left', tr('view.left'), () => stage.view.rotate(-1));
-  btn('right', tr('view.right'), () => stage.view.rotate(1));
-  btn('up', tr('view.in'), () => stage.view.zoomStep(1));
-  btn('down', tr('view.out'), () => stage.view.zoomStep(-1));
+  // UI-1: the camera moves freely; one small button brings the usual view back.
+  btn('move', tr('view.reset'), () => stage.view.reset());
   document.body.append(bar);
   window.addEventListener('keydown', (ev) => {
     if (ev.target.closest?.('input, textarea')) return;
