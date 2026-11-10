@@ -136,9 +136,9 @@ function turnAction(s, p, opts) {
     }
   }
   // Build: one survivor at home with spare AP works on the most useful upgrade it can.
-  const builder = survivors.find((sv) => sv.location === 'colony' && sv.ap >= 10 && sv.ap < 40 && !sv.napped); // leftovers only: building takes all the AP they have
+  const builder = survivors.find((sv) => sv.location === 'colony' && sv.ap >= 20 && sv.ap < 60 && !sv.napped); // spare AP, one 20-AP shift per tap
   // The snow crawler is the win: anyone at home works on it as soon as the next stage's materials are in.
-  const crawlerSv = s.scenario.id === 'crawler' && survivors.find((sv) => sv.location === 'colony' && sv.ap >= 10 && !sv.napped);
+  const crawlerSv = s.scenario.id === 'crawler' && survivors.find((sv) => sv.location === 'colony' && sv.ap >= 20 && !sv.napped);
   if (crawlerSv) candidates.unshift(act.build('crawler', crawlerSv.id));
   const saving = s.scenario.id === 'crawler' && crawlerWants(s).some((id) => ['wood', 'scrap', 'cloth'].includes(id)) || (s.scenario.id === 'crawler' && (s.base?.crawler ?? 0) === 0);
   if (builder && !saving) for (const b of ['workshop', 'dorm', 'greenhouse', 'wall', 'infirmary', 'radio']) candidates.push(act.build(b, builder.id));

@@ -320,3 +320,7 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - No day limit: scenarios have `days: 0` (no time-out); the top bar shows only the day number. Bots, the balance script and simulation tests still play a fixed 40-day winter (`createGame({ days })`) so they finish.
 - Nap removed from the UI and the bot (the reducer action stays for old saves and tests).
 - Energy shows a yellow lightning icon; HP in costs shows a red heart. The HP bar on faces is unchanged.
+
+### Build shifts and the night attack (done)
+- Building is done in shifts: each tap puts a fixed 20 AP (or what is left of the job) from one survivor, who must have that much. Progress still carries over between taps, survivors and days. The upgrade rows show "ครั้งละ 20".
+- Night attack is not random: zombies = 1 + 1 per 4 days (+difficulty) + zombies at the gate; wall level, guards and barricades stop that many; each remaining bite is −10 HP, handed round to survivors at the colony from the healthiest down. Nobody home: −1 food per bite. The "today" card now names who will be bitten and for how much.

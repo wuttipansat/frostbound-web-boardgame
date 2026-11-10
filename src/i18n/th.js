@@ -604,4 +604,5 @@ export default {
   'pack.far': '{name} อยู่ที่{place} หยิบไม่ถึง', 'act.contributeWhy': 'บริจาคให้วิกฤต: ของชนิดที่ตรงนับ +1 ชนิดอื่น −1 ครบตามจำนวนก่อนค่ำจึงผ่าน',
   'cross.youChose': 'คุณเลือก',
   'cross.who': 'เกิดกับ {name}',
+  'build.shift': 'ครั้งละ {n}', 'hud.siegeWho': 'จะโดนกัด: {list} HP (คนเลือดมากสุดโดนก่อน)', 'hud.siegeFood': 'ไม่มีใครอยู่ฐาน: เสียอาหาร {n}',
 };

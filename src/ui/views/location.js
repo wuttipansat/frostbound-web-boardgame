@@ -81,7 +81,7 @@ export function renderLocationPanel(el, ctx) {
             },
             h('b', {}, t(`bld.${bid}`), h('em', {}, ` ${s.base[bid]}/${max}`)),
             h('small', { class: 'fx' }, t(`bld.${bid}.fx`)),
-            h('span', { class: 'cost' }, !nx ? t('build.max') : nx.started ? [`${t('build.working')} ${nx.spent}/${nx.ap} `, icon('bolt')] : [...parts, h('span', { class: 'need' }, icon('bolt'), `${nx.ap}`)]));
+            h('span', { class: 'cost' }, !nx ? t('build.max') : nx.started ? [`${t('build.working')} ${nx.spent}/${nx.ap} `, icon('bolt'), ` · ${t('build.shift', { n: Math.min(20, nx.ap - nx.spent) })}`] : [...parts, h('span', { class: 'need' }, icon('bolt'), `${nx.ap} · ${t('build.shift', { n: Math.min(20, nx.ap) })}`)]));
           }))));
       }
       if (id === 'colony' && sel?.location === 'colony') {

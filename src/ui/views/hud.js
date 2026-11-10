@@ -40,7 +40,9 @@ export function renderTopbar(el, ctx) {
   const sf = siegeForecast(s);
   const siege = block(`siege${sf.hits ? ' critical' : ''}`, t('tip.siege', { wall: sf.wall, guards: sf.guards, barricades: sf.barricades }), 'skull', t('hud.siege'), null,
     h('b', {}, t('hud.siegeShort', { n: sf.attackers, k: sf.stopped })),
-    sf.hits ? h('small', { class: 'bad' }, t('hud.siegeHits', { n: sf.hits, hp: sf.hits * 10 })) : null);
+    sf.hits ? h('small', { class: 'bad' }, sf.targets.length
+      ? t('hud.siegeWho', { list: Object.entries(sf.targets.reduce((m, id) => ({ ...m, [id]: (m[id] ?? 0) + 10 }), {})).map(([id, hp]) => `${c('survivors', id, 'name').split(' ')[0]} −${hp}`).join(', ') })
+      : t('hud.siegeFood', { n: sf.hits })) : null);
   const ms = missionStatus(s);
   const mission = ms ? block('mission', t('tip.mission', { days: ms.daysLeft, n: 2 }), 'star', t('hud.mission'), null,
     h('b', {}, `${Math.min(ms.progress, ms.target)}/${ms.target}`), h('small', {}, t(`mission.${ms.id}`, { n: ms.target }))) : null;

@@ -82,6 +82,7 @@ export const FOOD = Object.freeze({ HUNGRY_HP: 15, HUNGRY_MORALE: 1, MEALS: 4 })
 export const SEASON = Object.freeze({ COLD: 11, COLD_HP: 10, STORMS: 31 });
 // Night attack on the base: attackers = BASE + 1 per EVERY days (+ zombies already at the colony gate).
 // Walls (per level), guards and colony barricades each stop 1; every attacker left bites someone at the base.
+export const BUILD_STEP = 20; // AP one survivor puts into an upgrade per tap (or what is left, if less)
 export const SIEGE = Object.freeze({ BASE: 1, EVERY: 4, GUARD: 1, HIT_HP: 10, NO_ONE_FOOD: 1 });
 // ---------------------------------------------------------------- solo fun (Step 15)
 export const DIFFICULTY = Object.freeze({

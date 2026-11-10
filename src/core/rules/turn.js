@@ -1,6 +1,6 @@
 // Active-player actions. Everything that takes effort costs the survivor's energy (no dice anywhere);
 // cards, gear and abilities are free.
-import { PHASES, LOCATION_IDS, ENERGY, REST, RULES, FOOD } from '../constants.js';
+import { PHASES, LOCATION_IDS, ENERGY, REST, RULES, FOOD, BUILD_STEP } from '../constants.js';
 import { random } from '../rng.js';
 import { assert } from '../errors.js';
 import {
@@ -360,7 +360,9 @@ export function build(s, { buildingId, survivorId }) {
   assert(sv.location === 'colony', 'mustBeInColony');
   const next = nextLevel(s, buildingId);
   assert(next, 'maxLevel', buildingId);
-  assert(sv.ap > 0, 'notEnoughEnergy');
+  // One shift of work: a fixed BUILD_STEP from this survivor (or what is left of the job). Not enough AP: no work.
+  const put = Math.min(BUILD_STEP, next.ap - (next.started ? next.spent : 0));
+  assert(sv.ap >= put, 'notEnoughEnergy');
   if (!next.started) {
     const used = [];
     for (const [itemId, n] of Object.entries(next.needs)) {
@@ -371,7 +373,6 @@ export function build(s, { buildingId, survivorId }) {
     for (const u of used) discardCard(s, u);
     s.building[buildingId] = 0;
   }
-  const put = Math.min(sv.ap, next.ap - s.building[buildingId]);
   sv.ap -= put;
   sv.acted = true;
   s.building[buildingId] += put;

@@ -152,9 +152,8 @@ test('base upgrades: materials start a level, AP carries over, effects apply', a
   assert.equal(tryReduce(s, build('dorm', 'corwin-daly')).error, 'missingMaterials');
   let w; [s, w] = giveCard(s, 'wood', 'stockpile'); [s, w] = giveCard(s, 'wood', 'stockpile');
   s = patch(s, (x) => { x.survivors['corwin-daly'].ap = 12; x.survivors['agnes-pell'].ap = 50; });
-  s = reduce(s, build('dorm', 'corwin-daly'));
-  assert.deepEqual([nextLevel(s, 'dorm').spent, s.survivors['corwin-daly'].ap], [12, 0], 'wood paid, 12 AP in');
-  assert.ok(!s.stockpile.some((u) => s.cards[u] === 'wood'));
+  assert.equal(tryReduce(s, build('dorm', 'corwin-daly')).error, 'notEnoughEnergy', 'a shift needs its full AP from one survivor');
+  s = patch(s, (x) => { x.base.dorm = 0; x.building = { dorm: 12 }; for (const u of x.stockpile) if (x.cards[u] === 'wood') x.cards[u] = 'bedpan'; });
   s = reduce(s, build('dorm', 'agnes-pell'));
   assert.equal(s.base.dorm, 1);
   assert.equal(s.survivors['agnes-pell'].ap, 42, 'only the 8 AP that were left');
@@ -176,7 +175,7 @@ test('snow crawler: 4 stages built like upgrades; finishing it wins; seasons get
   let { s } = turn({ 'corwin-daly': 'colony' }, 100, { scenarioId: 'crawler' });
   let u;
   for (const id of ['scrap', 'scrap', 'scrap', 'wood', 'wood']) [s, u] = giveCard(s, id, 'stockpile');
-  s = reduce(s, build('crawler', 'corwin-daly'));
+  for (let i = 0; i < 5; i++) s = reduce(s, build('crawler', 'corwin-daly')); // 100 AP in shifts of 20
   assert.equal(scenarioProgress(s), 1, 'frame done');
   s = patch(s, (x) => { x.survivors['corwin-daly'].ap = 100; });
   assert.equal(tryReduce(s, build('crawler', 'corwin-daly')).error, 'missingMaterials', 'the engine needs 2 engine parts');

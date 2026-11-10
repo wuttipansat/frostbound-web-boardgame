@@ -621,4 +621,5 @@ export default {
   'pack.far': '{name} is at {place} and cannot reach it', 'act.contributeWhy': 'Give to the crisis: a matching item counts +1, any other −1. Reach the number before dusk.',
   'cross.youChose': 'You chose',
   'cross.who': 'Happens to {name}',
+  'build.shift': '{n} per tap', 'hud.siegeWho': 'Will be bitten: {list} HP (healthiest first)', 'hud.siegeFood': 'Nobody home: lose {n} food',
 };
