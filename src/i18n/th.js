@@ -569,7 +569,7 @@ export default {
   'itemShort.zombiesHere': 'ซอมบี้ {n} ตัว',
   'act.pickPlace': 'ยิงไปที่สถานที่ไหน?',
   'act.playShort': 'ใช้',
-  'act.contributeShort': 'วิกฤต',
+  'act.contributeShort': 'บริจาคให้วิกฤต',
   'act.depositShort': 'ภารกิจ',
   'loc.moveShort': 'ย้ายมาที่นี่',
   'loc.fuelShort': 'เชื้อเพลิง',
@@ -600,4 +600,7 @@ export default {
   'pack.awayStock': 'อยู่ที่ฐาน — ใช้ไม่ได้จากที่นี่', 'pack.awayPack': 'ของคนอื่น — ดูได้อย่างเดียว', 'pack.empty': 'ยังไม่มีของ',
   'confirm.end.outside': '{name} ยังอยู่ที่{place} — จะนอนข้างนอกและตื่นมาเหนื่อย',
   'toast.found': 'ได้ของ: {items}', 'toast.foundNone': 'ค้นแล้วไม่เจออะไร',
+  'loc.cardsShort': 'ของที่เหลือ', 'loc.forecastShort': 'ซอมบี้คืนนี้', 'build.working': 'กำลังสร้าง',
+  'pack.far': '{name} อยู่ที่{place} หยิบไม่ถึง', 'act.contributeWhy': 'บริจาคให้วิกฤต: ของชนิดที่ตรงนับ +1 ชนิดอื่น −1 ครบตามจำนวนก่อนค่ำจึงผ่าน',
+  'cross.youChose': 'คุณเลือก',
 };

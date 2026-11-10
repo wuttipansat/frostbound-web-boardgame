@@ -299,3 +299,12 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - Pins carry the place name; the "today" card stays on screen with labels; the view button is fixed top-right; the end-day dialog names survivors who would sleep outside; a search says what it found.
 - `ui-audit.cjs` removed (stale selectors); `hud-layout.cjs` checks the action bar and the "today" card.
 - Left for UI-7: draft screen cut-off, opening sequence (tutorial + crossroads + tip at once), default phone zoom, upgrade costs on the colony card, night summary layout. Phones do not show day/night in the top bar (no room).
+
+### UI-7 — first minute and readability (done)
+- Draft on phones is a 2-column grid (no sideways cut-off); the title stays on screen.
+- The day tip waits until dialogs are closed and is skipped while the tutorial runs; tips stay 7 s. Messages sit under the top bar on phones.
+- Suggestions fade after 6 s and the same one shows once a day.
+- Place card: every number has a word; upgrades and recipes are rows with level, effect and cost (`เศษเหล็ก 1/3`, green when enough).
+- Card sheet: says when the selected survivor cannot reach the card, lists why a target is blocked, "บริจาคให้วิกฤต" with a one-line rule.
+- Night report: one boxed line per event, the continue button is always visible. Crossroads result shows only the chosen option.
+- Phone camera fits the whole island with its pins. Not done: skipping the day-1 crossroads during the tutorial (needs a core change).

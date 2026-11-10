@@ -1885,3 +1885,43 @@ body.radial-open #toasts { bottom: 250px; }
   body.hand-full .hand-fan { max-width: 100%; min-width: 0; }
 }
 @media (max-width: 760px) { #topbar > .stat-block.round small.time { display: none !important; } } /* no room: the day number stays */
+
+/* ================================================================ UI-7: first minute and readability */
+/* place card: every number has a word; upgrades and recipes are rows with level, effect, cost */
+#locpanel .stats.inline { gap: 6px 8px; }
+#locpanel .stats.inline .stat { display: inline-grid; grid-template-columns: auto auto; column-gap: 4px; align-items: center; padding: 4px 8px; border-radius: 8px; background: rgba(255,255,255,.06); }
+#locpanel .stats.inline .stat small { grid-column: 1 / -1; font-size: 11px; opacity: .75; white-space: nowrap; }
+.bld-list { display: flex; flex-direction: column; gap: 6px; }
+.bld-row { display: grid; grid-template-columns: 1fr; gap: 2px; text-align: left; padding: 8px 10px; min-height: 44px; border-radius: 8px; border: 1px solid rgba(242,179,61,.55); background: #1d2838; color: #e8edf5; font: inherit; cursor: pointer; }
+.bld-row b { font-size: 14px; } .bld-row b em { font-style: normal; font-weight: 600; opacity: .7; }
+.bld-row small { font-size: 12px; opacity: .8; }
+.bld-row .cost { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 12px; }
+.bld-row .need.ok { color: #8fd694; } .bld-row .need.miss { color: #ffab9f; }
+.bld-row.off { border-color: rgba(255,255,255,.18); background: rgba(255,255,255,.04); cursor: default; }
+#locpanel { max-height: min(70vh, calc(100vh - var(--top-h) - 24px)) !important; overflow: auto; }
+@media (min-width: 761px) { #locpanel { width: 320px !important; } }
+/* card sheet */
+.cd-where small.away { color: #ffcf7a; }
+.cd-why { display: block; margin-top: 6px; font-size: 12px; opacity: .8; }
+/* crossroads result: the chosen option only */
+.dialog.cross-result .choice.chosen { display: flex; flex-direction: column; gap: 2px; }
+.dialog.cross-result .choice.chosen small { font-size: 12px; opacity: .7; }
+/* night report: lines scroll, the button stays */
+.dialog.colony { display: flex; flex-direction: column; }
+.dialog.colony .colony-rows { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.dialog.colony .colony-rows .step { display: flex; align-items: flex-start; gap: 8px; margin: 6px 0; padding: 6px 8px; border-radius: 6px; background: rgba(255,255,255,.04); }
+.dialog.colony .colony-rows .step .icon { flex: none; margin-top: 2px; }
+.dialog.colony .colony-next { flex: none; margin-top: 10px; position: sticky; bottom: 0; }
+@media (max-width: 760px) {
+  /* draft: a grid, nothing cut off sideways */
+  .sv-pick-row { flex-wrap: wrap !important; overflow: visible !important; justify-content: center !important; padding: 8px 0 !important; gap: 10px !important; scroll-snap-type: none !important; }
+  .sv-pick { flex: 0 0 calc(50% - 5px) !important; width: auto !important; min-width: 0; padding: 8px 6px 10px !important; }
+  .sv-pick .svp-art { height: 96px !important; }
+  .draft-actions { background: linear-gradient(transparent, #0b111c 30%); padding-top: 14px; }
+}
+@media (max-width: 760px) {
+  .backdrop.draft-screen { justify-content: flex-start !important; align-items: stretch !important; }
+  .backdrop.draft-screen > * { flex: none; }
+  /* messages sit under the top bar, clear of the bottom sheets */
+  #toasts { top: calc(var(--top-h) + 62px) !important; bottom: auto !important; max-width: calc(100vw - 24px); }
+}

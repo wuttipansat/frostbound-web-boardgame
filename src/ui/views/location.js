@@ -30,12 +30,12 @@ export function renderLocationPanel(el, ctx) {
 
   // One inline row: icon + number; the labels are tooltips.
   const stats = h('div', { class: 'stats inline' },
-    h('span', { class: 'stat warm', tip: t('loc.survivors'), tabindex: '0' }, icon('person'), h('b', {}, `${here.length}/${def.survivorSlots ?? '∞'}`)),
-    h('span', { class: 'stat danger', tip: `${t('loc.zombies')} — ${t('tip.zombies', { n: loc.zombies })}`, tabindex: '0' }, icon('skull'), h('b', {}, `${loc.zombies}/${def.zombieSlots}`)),
-    h('span', { class: 'stat', tip: t('loc.barricades'), tabindex: '0' }, icon('barricade'), h('b', {}, loc.barricades)),
-    loc.deck ? h('span', { class: 'stat', tip: t('loc.cards'), tabindex: '0' }, icon('search'), h('b', {}, loc.deck.deckCount ?? loc.deckCount ?? loc.deck.length)) : null,
+    h('span', { class: 'stat warm', tip: t('loc.survivors'), tabindex: '0' }, icon('person'), h('b', {}, `${here.length}/${def.survivorSlots ?? '∞'}`), h('small', {}, t('loc.survivors'))),
+    h('span', { class: 'stat danger', tip: `${t('loc.zombies')} — ${t('tip.zombies', { n: loc.zombies })}`, tabindex: '0' }, icon('skull'), h('b', {}, `${loc.zombies}/${def.zombieSlots}`), h('small', {}, t('loc.zombies'))),
+    h('span', { class: 'stat', tip: t('loc.barricades'), tabindex: '0' }, icon('barricade'), h('b', {}, loc.barricades), h('small', {}, t('loc.barricades'))),
+    loc.deck ? h('span', { class: 'stat', tip: t('loc.cards'), tabindex: '0' }, icon('search'), h('b', {}, loc.deck.deckCount ?? loc.deckCount ?? loc.deck.length), h('small', {}, t('loc.cardsShort'))) : null,
     // Step 23: threat forecast — zombies this place gets if the round ended now.
-    spawnForecast(s)[id] ? h('span', { class: 'stat danger forecast', tip: t('loc.forecast', { n: spawnForecast(s)[id] }), tabindex: '0' }, icon('crisis'), h('b', {}, `+${spawnForecast(s)[id]}`)) : null);
+    spawnForecast(s)[id] ? h('span', { class: 'stat danger forecast', tip: t('loc.forecast', { n: spawnForecast(s)[id] }), tabindex: '0' }, icon('crisis'), h('b', {}, `+${spawnForecast(s)[id]}`), h('small', {}, t('loc.forecastShort'))) : null);
 
   const people = h('div', { class: 'here' },
     here.length ? h('div', { class: 'chips' }, here.map((sv) => h('button', {
@@ -65,25 +65,33 @@ export function renderLocationPanel(el, ctx) {
       if (id === 'colony') {
         // Base upgrades: level, next level's cost and progress; buttons for the selected survivor at home.
         actions.push(h('div', { class: 'act-box build' }, h('h4', {}, t('act.build')),
-          h('div', { class: 'picker-row' }, (s.scenario.id === 'crawler' ? ['crawler', ...BUILDING_IDS] : BUILDING_IDS).map((bid) => {
+          h('div', { class: 'bld-list' }, (s.scenario.id === 'crawler' ? ['crawler', ...BUILDING_IDS] : BUILDING_IDS).map((bid) => {
             const nx = nextLevel(s, bid);
             const r = sel?.location === 'colony' ? check(s, act.build(bid, sel.id)) : { ok: false, error: 'mustBeInColony' };
-            const cost = nx ? (nx.started ? `${nx.spent}/${nx.ap} AP` : `${Object.entries(nx.needs).map(([i, n]) => `${n}× ${c('items', i, 'name')}`).join(' + ')} + ${nx.ap} AP`) : t('build.max');
+            // UI-7: a row per upgrade — level, what it does, what it costs and what is still missing.
+            const max = bid === 'crawler' ? 4 : 3;
+            const parts = nx && !nx.started ? Object.entries(nx.needs).map(([i, n]) => {
+              const have = Math.min(n, s.stockpile.filter((u) => s.cards[u] === i).length);
+              return h('span', { class: `need${have >= n ? ' ok' : ' miss'}` }, `${c('items', i, 'name')} ${have}/${n}`);
+            }) : [];
             return h('button', {
-              class: `btn small-act${r.ok ? '' : ' off'}`,
-              tip: `${t(`bld.${bid}`)} ${s.base[bid]}/${bid === 'crawler' ? 4 : 3} — ${t(`bld.${bid}.fx`)} · ${cost}${r.ok ? '' : ` · ${t(`err.${r.error}`)}`}`,
+              class: `bld-row${r.ok ? '' : ' off'}`, 'aria-disabled': r.ok ? null : 'true', dataset: { bld: bid },
+              tip: r.ok ? null : t(`err.${r.error}`),
               onclick: (ev) => (r.ok ? ctx.dispatch(r.action) : flashTip(ev.currentTarget)),
-            }, `${t(`bld.${bid}`)} ${s.base[bid]}${nx?.started ? ' …' : ''}`);
+            },
+            h('b', {}, t(`bld.${bid}`), h('em', {}, ` ${s.base[bid]}/${max}`)),
+            h('small', { class: 'fx' }, t(`bld.${bid}.fx`)),
+            h('span', { class: 'cost' }, !nx ? t('build.max') : nx.started ? `${t('build.working')} ${nx.spent}/${nx.ap} AP` : [...parts, h('span', { class: 'need' }, `${nx.ap} AP`)]));
           }))));
       }
       if (id === 'colony' && sel?.location === 'colony') {
         const crafts = Object.entries(RECIPES).map(([rid, r]) => ({ rid, r, ...check(s, act.craft(rid, sel.id)) }));
         actions.push(h('div', { class: 'act-box craft' }, h('h4', {}, t('act.craft')),
-          h('div', { class: 'picker-row' }, crafts.map((x) => h('button', {
-            class: `btn small-act${x.ok ? '' : ' off'}`,
+          h('div', { class: 'bld-list' }, crafts.map((x) => h('button', {
+            class: `bld-row${x.ok ? '' : ' off'}`,
             tip: `${Object.entries(x.r.needs).map(([i, n]) => `${n}× ${c('items', i, 'name')}`).join(' + ')} + ${x.r.ap} AP${x.ok ? '' : ` · ${t(`err.${x.error}`)}`}`,
             onclick: (ev) => (x.ok ? ctx.dispatch(x.action) : flashTip(ev.currentTarget)),
-          }, c('items', x.r.makes, 'name'))))));
+          }, h('b', {}, c('items', x.r.makes, 'name')), h('small', {}, `${Object.entries(x.r.needs).map(([i, n]) => `${c('items', i, 'name')} ${Math.min(n, s.stockpile.filter((u) => s.cards[u] === i).length)}/${n}`).join(' · ')} · ${x.r.ap} AP`))))));
       }
     }
   }

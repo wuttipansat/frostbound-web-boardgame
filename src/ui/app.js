@@ -145,7 +145,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
     sound.play(soundForLog(e));
     if (e.k === 'crisisResolved' && state.reports.colony) ui.queue.push({ type: 'colony', report: structuredClone(state.reports.colony), morale: null, day: e.r });
     // What was chosen and what it did (the choice buttons only show the words).
-    if (e.k === 'roundStart' && e.day <= 3 && ui.hints !== false) toast(t(`tut.day${e.day}`), 'tip');
+    if (e.k === 'roundStart' && e.day <= 3 && ui.hints !== false) ui.pendingTip = t(`tut.day${e.day}`); // UI-7: shown once nothing else is up
     if (e.k === 'crossroadsChoice') ui.queue.push({ type: 'cross', cardId: e.cardId, choice: e.choice });
     if (TOAST_KEYS.has(e.k) && e.k !== 'crisisResolved') {
       const text = formatLog(e, state);
@@ -166,7 +166,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
   }
 
   function toast(text, kind = '', { survivorId = null } = {}) {
-    toasts.push({ text, kind, ttl: 3.6, face: survivorId && art ? art.portrait(survivorId, 's', { cls: kind === 'bad' ? 'toast-face' : 'toast-face' }) : null });
+    toasts.push({ text, kind, ttl: kind === 'tip' ? 7 : 3.6, face: survivorId && art ? art.portrait(survivorId, 's', { cls: kind === 'bad' ? 'toast-face' : 'toast-face' }) : null });
     if (toasts.length > 4) toasts.shift();
     toastLayer(dom.toasts, toasts);
   }
@@ -315,6 +315,10 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
       colonyShowing: ui.queue[0]?.type === 'colony',
     });
     renderTutorial(dom.tutorial, x, ui.tutStep, tutVisible);
+    if (ui.pendingTip && state?.phase === PHASES.TURN && !key && !tutVisible && !ui.queue.length) {
+      if (ui.tutStep >= DONE) toast(ui.pendingTip, 'tip');
+      ui.pendingTip = null;
+    }
     dom.onRender?.(state);
   }
 

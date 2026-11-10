@@ -40,11 +40,17 @@ function cardDetail(ctx, shown, uid) {
     picker = h('div', { class: 'picker', 'data-target-picker': '' },
       h('h4', {}, t('act.pickTarget')),
       h('div', { class: 'picker-row round-row' }, cardTargets(s, uid).map((tg) => roundTarget(art, tg.survivorId, tg.ok,
-        `${survivorDef(tg.survivorId).name} — ${tg.ok ? t(...itemShort(item)) : t(`err.${tg.error}`)}`, () => go(tg.action)))));
+        `${survivorDef(tg.survivorId).name} — ${tg.ok ? t(...itemShort(item)) : t(`err.${tg.error}`)}`, () => go(tg.action)))),
+      cardTargets(s, uid).filter((tg) => !tg.ok).map((tg) => h('small', { class: 'cd-why' }, `${survivorDef(tg.survivorId).name.split(' ')[0]}: ${t(`err.${tg.error}`)}`)));
   }
   const gives = giveTargets(s, uid);
   const holder = holderOf(s, uid);
-  const where = h('p', { class: 'cd-where' }, holder === 'stockpile' ? t('pack.stockpile') : holder ? t('pack.carried', { name: survivorDef(holder).name, place: c('locations', s.survivors[holder].location, 'name') }) : '');
+  // UI-7: say where the card is, and when the selected survivor cannot reach it from where they stand.
+  const actor = ctx.ui.selSurvivor && s.survivors[ctx.ui.selSurvivor]?.alive ? s.survivors[ctx.ui.selSurvivor] : null;
+  const far = actor && ((holder === 'stockpile' && actor.location !== 'colony') || (holder && holder !== 'stockpile' && s.survivors[holder].location !== actor.location));
+  const where = h('p', { class: 'cd-where' }, holder === 'stockpile' ? t('pack.stockpile') : holder ? t('pack.carried', { name: survivorDef(holder).name, place: c('locations', s.survivors[holder].location, 'name') }) : '',
+    far ? h('small', { class: 'away' }, ` — ${t('pack.far', { name: survivorDef(actor.id).name.split(' ')[0], place: c('locations', actor.location, 'name') })}`) : null);
+
   const giveRow = gives.length ? h('div', { class: 'picker' }, h('h4', {}, t('act.give')),
     h('div', { class: 'picker-row' }, gives.map((g) => h('button', { class: 'btn small-act', onclick: () => go(g.action, 'play') },
       g.survivorId ? survivorDef(g.survivorId).name : t('pack.toStockpile'))))) : null;
@@ -66,7 +72,8 @@ function cardDetail(ctx, shown, uid) {
       class: `btn small-act${o.id === 'play' || o.id === 'equip' ? ' primary' : ''}${o.ok ? '' : ' off'}`, 'aria-disabled': o.ok ? null : 'true',
       tip: o.ok ? t(`act.${o.id}`) : `${t(`act.${o.id}`)} — ${t(`err.${o.error}`)}`,
       onclick: (ev) => (o.ok ? go(o.action, o.id) : flashTip(ev.currentTarget)),
-    }, icon(CARD_ACTION_ICON[o.id] ?? 'check'), h('span', {}, t(`act.${o.id}Short`))))));
+    }, icon(CARD_ACTION_ICON[o.id] ?? 'check'), h('span', {}, t(`act.${o.id}Short`))))),
+    opts.some((o) => o.id === 'contribute') ? h('small', { class: 'cd-why' }, t('act.contributeWhy')) : null);
 }
 
 /** Put the sheet next to the card it belongs to (phones use a low bottom sheet instead). */

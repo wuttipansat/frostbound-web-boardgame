@@ -123,7 +123,7 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
       else { tex.repeat.set(1, ta / aspect); tex.offset.set(0, 1 - ta / aspect); }
     }
     // On narrow (portrait) screens, keep the whole board width visible.
-    const viewH = aspect < 1.1 ? (VIEW_HEIGHT * 1.25) / Math.max(aspect, 0.42) : VIEW_HEIGHT;
+    const viewH = aspect < 1.1 ? (VIEW_HEIGHT * 1.34) / Math.max(aspect, 0.42) : VIEW_HEIGHT;
     camera.left = (-viewH * aspect) / 2;
     camera.right = (viewH * aspect) / 2;
     camera.top = viewH / 2;

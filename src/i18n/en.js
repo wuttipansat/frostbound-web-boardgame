@@ -586,7 +586,7 @@ export default {
   'itemShort.zombiesHere': '{n} zombies',
   'act.pickPlace': 'Shoot into which location?',
   'act.playShort': 'Use',
-  'act.contributeShort': 'Crisis',
+  'act.contributeShort': 'Give to crisis',
   'act.depositShort': 'Goal',
   'loc.moveShort': 'Move here',
   'loc.fuelShort': 'Fuel',
@@ -617,4 +617,7 @@ export default {
   'pack.awayStock': 'At the colony — not usable from here', 'pack.awayPack': "Someone else's — view only", 'pack.empty': 'Nothing yet',
   'confirm.end.outside': '{name} is still at {place} — will sleep outside and wake up tired',
   'toast.found': 'Found: {items}', 'toast.foundNone': 'Searched, found nothing',
+  'loc.cardsShort': 'items left', 'loc.forecastShort': 'zombies tonight', 'build.working': 'Building',
+  'pack.far': '{name} is at {place} and cannot reach it', 'act.contributeWhy': 'Give to the crisis: a matching item counts +1, any other −1. Reach the number before dusk.',
+  'cross.youChose': 'You chose',
 };

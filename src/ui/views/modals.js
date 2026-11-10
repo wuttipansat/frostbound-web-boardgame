@@ -199,10 +199,9 @@ export function crossResultModal(ctx, q) {
   return dialog('cross-result',
     h('small', { class: 'kicker' }, t('cross.title')),
     h('h2', {}, c('crossroads', card.id, 'title')),
-    h('div', { class: 'choices' }, card.choices.map((ch, i) => h('div', { class: `choice${i === q.choice ? ' chosen' : ' other'}` },
-      h('b', {}, crossChoice(card.id, i)),
-      h('small', {}, effectArt(ctx, ch.effects), describeEffects(ch.effects))))),
-    h('p', { class: 'outcome' }, icon('check'), ` ${describeEffects(effects)}`),
+    h('div', { class: 'choices' }, h('div', { class: 'choice chosen' },
+      h('small', {}, t('cross.youChose')), h('b', {}, crossChoice(card.id, q.choice)))),
+    h('p', { class: 'outcome' }, effectArt(ctx, effects), icon('check'), ` ${describeEffects(effects)}`),
     h('div', { class: 'row end' }, h('button', { class: 'btn primary', onclick: ctx.dismissQueue }, t('colony.continue'))));
 }
 
@@ -276,12 +275,12 @@ export function colonyModal(ctx, item) {
     ? h('div', { class: 'chips reveal', style: next() }, spawns.map(([loc, n], i) => h('span', { class: 'chip danger' }, ctx.art.zombie(i % 5, 's', { alt: '' }), `${c('locations', loc, 'name')} +${n}`)))
     : h('p', { class: 'muted reveal', style: next() }, t('colony.noSpawns')));
   if (item.morale != null) rows.push(h('p', { class: 'step reveal', style: next() }, icon('morale'), ` ${t('colony.morale', { n: item.morale })}`));
-  rows.push(h('button', { class: 'btn primary wide reveal', style: next(), onclick: ctx.dismissQueue }, t('colony.continue')));
   return dialog('colony',
     h('small', { class: 'kicker' }, t('colony.title', { n: r.day })),
     h('h2', { class: 'with-art' }, ctx.art.item(TYPE_REP[def.item], 's', { alt: '' }), c('crises', def.id, 'name')),
     h('p', { class: 'muted small' }, c('crises', def.id, 'text')),
-    rows);
+    h('div', { class: 'colony-rows' }, rows),
+    h('button', { class: 'btn primary wide colony-next', onclick: ctx.dismissQueue }, t('colony.continue')));
 }
 
 export function gameOverModal(ctx) {
