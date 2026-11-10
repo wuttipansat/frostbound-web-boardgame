@@ -320,6 +320,7 @@ export function confirmEndModal(ctx) {
   return dialog('confirm-end',
     h('h2', {}, t('confirm.end.title')),
     h('p', {}, t('confirm.end.energy', { n: me.survivors.reduce((a, id) => a + (ctx.state.survivors[id]?.alive ? ctx.state.survivors[id].ap : 0), 0) })),
+    (() => { const out = me.survivors.filter((id) => ctx.state.survivors[id]?.alive && ctx.state.survivors[id].location !== 'colony'); return out.length ? h('div', { class: 'warn-box outside' }, out.map((id) => h('p', {}, ctx.art.portrait(id, 's', { alt: '' }), ' ', t('confirm.end.outside', { name: survivorDef(id).name, place: c('locations', ctx.state.survivors[id].location, 'name') })))) : null; })(),
     // Step 18: what is still unsafe this round, before the colony phase.
     (() => { const bad = checklistView(ctx.state, { onlyBad: true }); return bad ? h('div', { class: 'warn-box' }, h('small', {}, t('check.warn')), bad) : null; })(),
     h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: ctx.ui.skipEndConfirm, onchange: (ev) => { ctx.ui.skipEndConfirm = ev.target.checked; } }), ` ${t('confirm.end.skip')}`),

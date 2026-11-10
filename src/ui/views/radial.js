@@ -1,13 +1,14 @@
-// UI-4: tap a place → small round icons float in an arc above it. Walk there, or act there, with one tap.
+// UI-6: tap a place → an action bar slides up from the bottom edge. Walk there, or act there, with one tap.
+// (It replaced the UI-4 ring, which moved with the camera and covered the buildings.)
 // The selected survivor decides what shows: elsewhere → walk (and drive, with fuel); here → that place's actions.
 import { h, mount } from '../dom.js';
 import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
 import { flashTip } from '../tooltip.js';
-import { actionCost, leaveDamage, searchSpawnChance, survivorDef } from '../../core/selectors.js';
-import { survivorOptions, moveOption, actingSurvivors } from '../options.js';
+import { actionCost, leaveDamage, searchSpawnChance, survivorDef, aliveSurvivors } from '../../core/selectors.js';
+import { survivorOptions, moveOption, actingSurvivors, lureTargets } from '../options.js';
 
-const ICON = { walk: 'move', drive: 'exposure', attack: 'attack', search: 'search', barricade: 'barricade', lure: 'lure', ability: 'heal', nap: 'hourglass', guard: 'door', unguard: 'door', build: 'goal', info: 'log' };
+const ICON = { walk: 'move', drive: 'fuel', attack: 'attack', search: 'search', barricade: 'barricade', lure: 'lure', ability: 'heal', nap: 'hourglass', guard: 'door', unguard: 'door', build: 'goal', info: 'log' };
 const COLONY_ONLY = ['nap', 'guard', 'unguard'];
 
 /** The survivor the ring acts for: the selected one, else the first who can still act, else the first alive. */
@@ -26,21 +27,21 @@ export function ringItems(state, ui, at, ctx = {}) {
   if (sv.location !== at) {
     const walk = moveOption(state, svId, at, false);
     const hurt = leaveDamage(state, svId);
-    items.push({ id: 'walk', ...walk, cost: actionCost(state, svId, 'move', at), risk: hurt ? `−${hurt}` : null, label: t('ring.walk', { place: c('locations', at, 'name') }), move: true });
+    items.push({ id: 'walk', ...walk, cost: actionCost(state, svId, 'move', at), risk: hurt ? `−${hurt}` : null, label: t('bar.walk'), move: true });
     const drive = moveOption(state, svId, at, true);
-    if (drive.fuel && drive.ok) items.push({ id: 'drive', ...drive, cost: actionCost(state, svId, 'move', at), label: t('scene.fuel'), move: true });
+    if (drive.fuel && drive.ok) items.push({ id: 'drive', ...drive, cost: actionCost(state, svId, 'move', at), label: t('bar.drive'), move: true });
   } else {
     for (const o of survivorOptions(state, svId)) {
       if (COLONY_ONLY.includes(o.id) && at !== 'colony') continue;
       if (o.id === 'search' && at === 'colony') continue;
-      if (o.id === 'lure' && !state.locations[at].zombies) continue;
+      if ((o.id === 'lure' || o.id === 'attack') && !state.locations[at].zombies) continue; // nothing to hit or lure
       const risk = o.id === 'attack' && o.fight ? (o.fight.gun ? `${Math.round(o.fight.spawn * 100)}%` : (o.fight.hp ? `−${o.fight.hp}` : null))
         : o.id === 'search' && o.ok ? `${Math.round(searchSpawnChance(state, at) * 100)}%` : null;
-      const item = { ...o, risk, label: t(`act.${o.id}`) };
+      const item = { ...o, risk, label: t(`bar.${o.id}`) };
       if (o.id === 'lure') item.fn = () => ctx.set?.({ picking: { type: 'lure', survivorId: svId } });
       items.push(item);
     }
-    if (at === 'colony') items.push({ id: 'build', ok: true, label: t('act.build'), fn: () => ctx.set?.({ locInfo: true }) });
+    if (at === 'colony') items.push({ id: 'build', ok: true, label: t('bar.build'), fn: () => ctx.set?.({ locInfo: true }) });
   }
   items.push(info);
   return items;
@@ -49,43 +50,61 @@ export function ringItems(state, ui, at, ctx = {}) {
 export function renderRadial(el, ctx) {
   const { state: s, ui } = ctx;
   const at = s && ui.selLoc;
-  const open = !!(at && s.phase !== 'draft' && s.phase !== 'gameOver' && !ui.locInfo && !ui.picking && !ctx.watching && !ui.modal && !ui.queue?.length);
+  const open = !!(at && s.phase !== 'draft' && s.phase !== 'gameOver' && !ui.locInfo && !ctx.watching && !ui.modal && !ui.queue?.length);
   el.classList.toggle('hidden', !open);
   document.body.classList.toggle('radial-open', open);
   if (!open) { mount(el); el.dataset.at = ''; el.dataset.key = ''; return; }
   el.dataset.at = at;
-  const items = ringItems(s, ui, at, ctx);
   const svId = ringSurvivor(s, ui);
-  // Re-build only when something on it changed, so the open animation plays once.
-  const key = [at, svId, svId ? s.survivors[svId].ap : 0, ...items.map((it) => `${it.id}:${it.ok}:${it.cost ?? ''}:${it.risk ?? ''}`)].join('|');
+  const luring = ui.picking?.type === 'lure' && ui.picking.survivorId === svId;
+  const items = luring ? [] : ringItems(s, ui, at, ctx).filter((it) => it.id !== 'info');
+  const lures = luring ? lureTargets(s, svId) : [];
+  const loc = s.locations[at];
+  const people = aliveSurvivors(s).filter((v) => v.location === at).length;
+  // Re-build only when something on it changed, so the slide-in plays once.
+  const key = [at, svId, luring, loc.zombies, people, ...aliveSurvivors(s).map((v) => `${v.id}:${v.ap}`), ...items.map((it) => `${it.id}:${it.ok}:${it.cost ?? ''}:${it.risk ?? ''}`), ...lures.map((l) => `${l.to}:${l.ok}`)].join('|');
   if (el.dataset.key === key) return;
   el.dataset.key = key;
-  const n = items.length;
-  const R = Math.max(62, Math.round((54 * (n + 1)) / Math.PI)); // about 54px between icon centres
-  el.style.setProperty('--r', `${R}px`);
-  mount(el,
-    svId ? h('span', { class: 'rd-who', 'aria-hidden': 'true' }, ctx.art.portrait(svId, 's', { alt: '' }), h('b', {}, `${s.survivors[svId].ap}`)) : null,
-    items.map((it, i) => {
-      // An arc over the top: from about 200° to 340°.
-      const ang = Math.PI + ((i + 1) * Math.PI) / (n + 1);
-      const x = Math.round(Math.cos(ang) * R);
-      const y = Math.round(Math.sin(ang) * R * 0.85);
-      const tip = [it.label, it.cost != null ? t('act.cost', { n: it.cost, have: svId ? s.survivors[svId].ap : 0 }) : null, !it.ok ? t(`err.${it.error}`) : null].filter(Boolean).join(' · ');
-      return h('button', {
-        class: `rd-btn${it.ok ? '' : ' off'}${it.move ? ' move' : ''}`, dataset: { act: it.id },
-        style: { '--x': `${x}px`, '--y': `${y}px`, '--i': i },
-        tip, 'aria-label': tip, 'aria-disabled': it.ok ? null : 'true',
-        onclick: (ev) => {
-          ev.stopPropagation();
-          if (!it.ok) return flashTip(ev.currentTarget);
-          if (it.fn) return it.fn();
-          if (ctx.dispatch(it.action) && svId) ctx.set({ selSurvivor: svId });
-          return undefined;
-        },
+  const ap = svId ? s.survivors[svId].ap : 0;
+  const off = (ev, it) => { ev.stopPropagation(); if (!it.ok) { flashTip(ev.currentTarget); return true; } return false; };
+  const button = (it) => {
+    const meta = [it.cost ? `AP ${it.cost}` : null, it.risk ? (it.risk.endsWith('%') ? t('bar.risk', { n: it.risk }) : `${it.risk} HP`) : null].filter(Boolean);
+    const tip = [it.label, it.cost != null ? t('act.cost', { n: it.cost, have: ap }) : null, !it.ok ? t(`err.${it.error}`) : null].filter(Boolean).join(' · ');
+    return h('button', {
+      class: `rd-btn${it.ok ? '' : ' off'}${it.move ? ' move' : ''}`, dataset: { act: it.id },
+      tip: it.ok ? null : tip, 'aria-label': tip, 'aria-disabled': it.ok ? null : 'true',
+      onclick: (ev) => {
+        if (off(ev, it)) return undefined;
+        if (it.fn) return it.fn();
+        if (ctx.dispatch(it.action) && svId) ctx.set({ selSurvivor: svId });
+        return undefined;
       },
-      icon(ICON[it.id] ?? 'ability'),
-      it.cost ? h('span', { class: 'rd-cost', 'aria-hidden': 'true' }, String(it.cost)) : null,
-      it.risk ? h('span', { class: 'rd-risk', 'aria-hidden': 'true' }, it.risk) : null);
-    }));
+    },
+    icon(ICON[it.id] ?? 'ability'),
+    h('span', { class: 'rd-label' }, it.label),
+    meta.length ? h('span', { class: `rd-meta${it.risk ? ' risky' : ''}` }, meta.join(' · ')) : null);
+  };
+  mount(el,
+    h('div', { class: 'ab-head' },
+      h('div', { class: 'ab-title' },
+        h('b', {}, luring ? t('loc.lurePick') : c('locations', at, 'name')),
+        h('span', { class: 'ab-counts' },
+          h('span', { class: loc.zombies ? 'z' : '' }, icon('skull'), String(loc.zombies)),
+          h('span', {}, icon('person'), String(people)))),
+      h('button', { class: 'ab-icon', dataset: { act: 'info' }, 'aria-label': t('ring.info'), tip: t('ring.info'), onclick: (ev) => { ev.stopPropagation(); ctx.set({ locInfo: true, picking: null }); } }, h('b', {}, 'i')),
+      h('button', { class: 'ab-icon ab-close', 'aria-label': t('settings.close'), onclick: (ev) => { ev.stopPropagation(); ctx.set({ picking: null }); ctx.selectLocation(null); } }, icon('close'))),
+    // Who acts: tap a face to switch.
+    s.phase === 'turn' ? h('div', { class: 'ab-who', role: 'group' }, aliveSurvivors(s).map((v) => h('button', {
+      class: `ab-face${v.id === svId ? ' on' : ''}`, 'aria-pressed': v.id === svId ? 'true' : 'false', 'aria-label': survivorDef(v.id).name,
+      onclick: (ev) => { ev.stopPropagation(); ctx.set({ selSurvivor: v.id, picking: null }); },
+    }, ctx.art.portrait(v.id, 's', { alt: '' }), h('span', {}, icon('exposure'), String(v.ap)),
+    v.id === svId ? h('small', {}, v.location === at ? t('bar.here') : c('locations', v.location, 'name')) : null))) : null,
+    h('div', { class: 'ab-row' }, luring
+      ? [...lures.map((tg) => h('button', {
+        class: `rd-btn${tg.ok ? '' : ' off'}`, dataset: { act: 'lure-to', to: tg.to }, tip: tg.ok ? null : t(`err.${tg.error}`), 'aria-disabled': tg.ok ? null : 'true',
+        onclick: (ev) => { if (off(ev, tg)) return; if (ctx.dispatch(tg.action)) ctx.set({ picking: null }); },
+      }, icon('lure'), h('span', { class: 'rd-label' }, c('locations', tg.to, 'name')))),
+      h('button', { class: 'rd-btn', dataset: { act: 'cancel' }, onclick: (ev) => { ev.stopPropagation(); ctx.set({ picking: null }); } }, icon('close'), h('span', { class: 'rd-label' }, t('act.cancel')))]
+      : items.length ? items.map(button) : h('p', { class: 'ab-empty' }, t('bar.none'))));
   el.setAttribute('aria-label', svId ? t('ring.for', { name: survivorDef(svId).name, place: c('locations', at, 'name') }) : c('locations', at, 'name'));
 }

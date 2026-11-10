@@ -3,7 +3,8 @@
 import { createGame } from '../core/state.js';
 import { tryReduce } from '../core/reducer.js';
 import { PHASES } from '../core/constants.js';
-import { t, setLang, getLang } from '../i18n/index.js';
+import { t, c, setLang, getLang } from '../i18n/index.js';
+import { itemOf } from '../core/selectors.js';
 import { formatLog } from '../i18n/format.js';
 import { sound, soundForLog } from '../audio/sound.js';
 import { mount } from './dom.js';
@@ -123,7 +124,13 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
       return false;
     }
     const prevLog = state.log;
+    const packBefore = action.survivorId ? state.survivors[action.survivorId]?.pack ?? [] : [];
     state = res.state;
+    // UI-6: say what a search found.
+    if (action.type === 'SEARCH') {
+      const got = (state.survivors[action.survivorId]?.pack ?? []).filter((u) => !packBefore.includes(u)).map((u) => c('items', itemOf(state, u)?.id, 'name'));
+      toast(got.length ? t('toast.found', { items: got.join(', ') }) : t('toast.foundNone'), got.length ? 'good' : '');
+    }
     const added = newLogEntries(prevLog, state.log);
     for (const e of added) onLogEntry(e);
     present(added);

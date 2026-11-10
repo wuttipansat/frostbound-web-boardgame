@@ -291,3 +291,11 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - **UI-5 items:** folded into one round button with the item count. Open: tabs for the stockpile and each backpack;
   using a card folds the list again.
 - e2e: smoke walks and searches through the ring; hud-layout checks the ring at all 7 places on desktop, tablet and phone.
+
+### UI-6 — one place per piece of info (done)
+- The ring of round icons is gone: tapping a place opens an **action bar** on the bottom edge (place name, zombies / people, who acts, labelled buttons with "AP 17 · เสี่ยง 25%"). Attack and lure only show when zombies are there; lure targets are picked in the same bar. The camera pans (never zooms) when the place would sit under the bar.
+- Survivor faces: one HP bar (green / yellow / red), AP under the face, wounds as a small red count. The energy chip, the floating day chip and the bottom ⋯ menu are removed (sound moved to the top ⋯ menu).
+- Items: the button counts what the selected survivor can use now (stockpile at the colony, own pack `x/3` elsewhere). The open list has a header ("เป้ของ Juno · 1/3" / "คลังที่ฐาน · 4 ชิ้น") and tags lists that cannot be used from here. On phones it is a bottom sheet with full-size cards; cards without art show their type icon.
+- Pins carry the place name; the "today" card stays on screen with labels; the view button is fixed top-right; the end-day dialog names survivors who would sleep outside; a search says what it found.
+- `ui-audit.cjs` removed (stale selectors); `hud-layout.cjs` checks the action bar and the "today" card.
+- Left for UI-7: draft screen cut-off, opening sequence (tutorial + crossroads + tip at once), default phone zoom, upgrade costs on the colony card, night summary layout. Phones do not show day/night in the top bar (no room).

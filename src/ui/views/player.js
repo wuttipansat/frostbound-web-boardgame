@@ -9,6 +9,7 @@ import {
   cardOptions, endTurnOption, cardNeeds, cardTargets, giveTargets, allItems, shouldConfirmEndTurn, cardUsable, actingSurvivors,
 } from '../options.js';
 import * as act from '../../core/actions.js';
+import { RULES } from '../../core/constants.js';
 import { itemPlay, itemShort } from '../itemText.js';
 import { isPermanent } from '../../content/items.js';
 
@@ -113,11 +114,7 @@ export function renderPlayerPanel(refs, ctx) {
   }) : '';
   const tip = `${t('panel.energyTip', { name: hero ? survivorDef(hero.id).name : '', n: e, max, wake: night?.ap ?? 0, sleep: t(`sleep.${night?.kind ?? 'bed'}`) })}\n${costs}`;
   const gear = gearOf(s, gearSv);
-  mount(refs.chips,
-    h('div', { class: 'energy', role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': String(max), 'aria-valuenow': String(e), 'aria-label': tip, tip },
-      icon('exposure', 'en-ico'),
-      h('span', { class: 'en-bar' }, h('i', { style: { width: `${Math.round((Math.min(e, max) / Math.max(1, max)) * 100)}%` } })),
-      h('b', { class: 'en-num' }, `${e}`), h('small', {}, `/${max}`)));
+  mount(refs.chips); // UI-6: AP lives on each face now
   // The survivor's round face, with the worn gear (weapon / armor / book) beside it.
   mount(refs.survivors, aliveSurvivors(s).map((sv) => survivorToken(ctx, sv, { canAct: acting.has(sv.id), color: '#f2b33d' })),
     h('div', { class: 'gear', role: 'group', 'aria-label': t('panel.gear') }, ['weapon', 'armor', 'book', 'tool'].map((slot) => {
@@ -129,17 +126,20 @@ export function renderPlayerPanel(refs, ctx) {
 
   // ---- hand: a floating pile or a fan
   // UI-5: one list at a time — the colony stockpile, or one survivor's backpack (tabs while open).
+  // UI-6: the list that opens first is what the selected survivor can use right now —
+  // the stockpile at the colony, their own backpack anywhere else.
   const all = allItems(s);
-  const tabs = ['stockpile', ...s.team.survivors.filter((id) => s.survivors[id]?.alive && s.survivors[id].pack?.length)];
-  const tab = tabs.includes(ui.handTab) ? ui.handTab : (s.stockpile.length || tabs.length === 1 ? 'stockpile' : tabs[1]);
+  const home = hero && hero.location !== 'colony' ? hero.id : 'stockpile';
+  const tabs = ['stockpile', ...s.team.survivors.filter((id) => s.survivors[id]?.alive && (id === home || s.survivors[id].pack?.length))];
+  const tab = ui.handTabFor === (hero?.id ?? null) && tabs.includes(ui.handTab) ? ui.handTab : home;
   const hand = all.filter((u) => (tab === 'stockpile' ? s.stockpile.includes(u) : s.survivors[tab]?.pack?.includes(u)));
   // Phones: an open ring or place card takes the room, so the hand folds into its button.
   const phoneLoc = window.innerWidth <= 760 && !!ui.selLoc;
   // A card picked by other means (keyboard, tutorial, a test) opens the fan while its sheet is up.
   const picked = !!(ui.selCard && hand.includes(ui.selCard));
   const compact = (ui.handCompact || phoneLoc) && !picked;
-  document.body.classList.toggle('hand-full', !compact && hand.length > 0);
-  renderHand(refs.hand, { ...ctx, handTabs: tabs, handTab: tab }, shown, hand, { isActor, compact, phoneLoc });
+  document.body.classList.toggle('hand-full', !compact);
+  renderHand(refs.hand, { ...ctx, handTabs: tabs, handTab: tab, handHome: home, heroId: hero?.id ?? null }, shown, hand, { isActor, compact, phoneLoc });
 
   // ---- actions: End turn, everything else behind the round "more" button
   const end = isActor ? endTurnOption(s) : null;
@@ -147,24 +147,12 @@ export function renderPlayerPanel(refs, ctx) {
     if (shouldConfirmEndTurn(s, { skip: ui.skipEndConfirm })) ctx.set({ modal: 'confirmEnd' });
     else ctx.dispatch(act.endTurn());
   };
-  const menu = [
-    // Quick rules are also here (on phones the top bar has no room for the ? button).
-    // Step 21: mute right where you are (also in settings; the choice is saved).
-    h('button', { class: `menu-item sound-item${ctx.ui.sound ? ' on' : ''}`, role: 'menuitemcheckbox', 'aria-checked': ctx.ui.sound ? 'true' : 'false', onclick: () => ctx.setSound(!ctx.ui.sound) }, icon(ctx.ui.sound ? 'sound' : 'mute'), h('span', {}, `${t('settings.sound')}: ${t(ctx.ui.sound ? 'settings.on' : 'settings.off')}`)),
-    h('button', { class: 'menu-item rules-item', role: 'menuitem', onclick: () => ctx.set({ modal: 'rules', moreOpen: false }) }, icon('log'), h('span', {}, t('hud.rules'))),
-  ].filter(Boolean);
   mount(refs.actions,
-    menu.length ? h('button', {
-      class: `icon-btn round more${ui.moreOpen ? ' on' : ''}`, tip: t('panel.more'), 'aria-label': t('panel.more'),
-      'aria-haspopup': 'menu', 'aria-expanded': ui.moreOpen ? 'true' : 'false',
-      onclick: (ev) => { ev.stopPropagation(); ctx.set({ moreOpen: !ui.moreOpen }); },
-    }, icon('more')) : null,
     isActor ? h('button', {
       class: `btn primary end-turn${end.ok ? '' : ' off'}`, 'aria-disabled': end.ok ? null : 'true',
       tip: end.ok ? null : t(`err.${end.error}`),
       onclick: (ev) => (end.ok ? endTurn() : flashTip(ev.currentTarget)),
-    }, t('panel.endDay')) : null,
-    ui.moreOpen && menu.length ? h('div', { class: 'more-menu panel', role: 'menu', onclick: (ev) => ev.stopPropagation() }, menu) : null);
+    }, t('panel.endDay')) : null);
 }
 
 // ---------------------------------------------------------------- step 14: floating hand
@@ -186,13 +174,16 @@ function slots(container) {
   return { fan, ctl: container.querySelector(':scope > .hand-ctl'), sheet: container.querySelector(':scope > .hand-sheet') };
 }
 
+// UI-6: a card without a picture shows its type's icon instead of an empty frame.
+const TYPE_ICON = { weapon: 'attack', armor: 'barricade', food: 'food', medicine: 'heal', consumable: 'heal', fuel: 'fuel', tools: 'settings', gadget: 'star', book: 'log', junk: 'goal', material: 'goal' };
+
 function renderHand(container, ctx, shown, hand, { isActor, compact, phoneLoc }) {
   handCtx = ctx;
   const { ui } = ctx;
   const { fan, ctl, sheet } = slots(container);
   const n = hand.length;
   const mode = compact ? 'pile' : 'fan';
-  container.classList.toggle('empty', !allItems(ctx.state).length);
+  container.classList.toggle('empty', false);
   fan.classList.toggle('pile', compact);
   fan.classList.toggle('fanned', !compact);
   fan.style.setProperty('--n', String(Math.max(1, n)));
@@ -229,25 +220,31 @@ function renderHand(container, ctx, shown, hand, { isActor, compact, phoneLoc })
     }
   });
 
-  const count = h('span', { class: 'count' }, String(n));
-  const total = allItems(ctx.state).length;
   const s = ctx.state;
+  const sizeOf = (id) => (id === 'stockpile' ? s.stockpile.length : s.survivors[id].pack.length);
+  const countOf = (id) => (id === 'stockpile' ? String(sizeOf(id)) : `${sizeOf(id)}/${RULES.PACK}`);
+  const home = ctx.handHome;
+  const usable = ctx.handTab === home;
+  const head = compact ? null : h('div', { class: 'hand-head' },
+    h('b', {}, ctx.handTab === 'stockpile' ? t('pack.headStock', { n: sizeOf('stockpile') }) : t('pack.headPack', { name: survivorDef(ctx.handTab).name.split(' ')[0], n: countOf(ctx.handTab) })),
+    usable ? null : h('small', { class: 'away' }, t(ctx.handTab === 'stockpile' ? 'pack.awayStock' : 'pack.awayPack')),
+    !n ? h('small', {}, t('pack.empty')) : null);
   const tabRow = !compact && ctx.handTabs.length > 1 ? h('div', { class: 'hand-tabs', role: 'tablist' }, ctx.handTabs.map((id) => h('button', {
     class: `hand-tab${id === ctx.handTab ? ' on' : ''}`, role: 'tab', 'aria-selected': id === ctx.handTab ? 'true' : 'false',
-    onclick: (ev) => { ev.stopPropagation(); ctx.set({ handTab: id, selCard: null }); },
-  }, id === 'stockpile' ? t('pack.toStockpile') : survivorDef(id).name.split(' ')[0],
-  h('small', {}, String(id === 'stockpile' ? s.stockpile.length : s.survivors[id].pack.length))))) : null;
+    onclick: (ev) => { ev.stopPropagation(); ctx.set({ handTab: id, handTabFor: ctx.heroId, selCard: null }); },
+  }, id === 'stockpile' ? t('pack.tabStock') : survivorDef(id).name.split(' ')[0],
+  h('small', {}, countOf(id))))) : null;
   mount(ctl,
-    tabRow,
-    !total ? null : compact
+    head, tabRow,
+    compact
       ? h('button', {
-        class: 'pile-btn', 'aria-label': `${t('panel.handExpand')} (${n})`, tip: t('panel.handExpand'), 'aria-expanded': 'false',
-        onclick: () => { if (phoneLoc) ctx.selectLocation(null); ctx.setHandCompact(false); },
-      }, icon('hand'), h('span', { class: 'count' }, String(total)))
+        class: 'pile-btn', 'aria-label': `${t(home === 'stockpile' ? 'pack.tabStock' : 'pack.myPack')} (${countOf(home)})`, tip: t(home === 'stockpile' ? 'pack.tabStock' : 'pack.myPack'), 'aria-expanded': 'false',
+        onclick: () => { if (phoneLoc) ctx.selectLocation(null); ctx.set({ handTab: home, handTabFor: ctx.heroId }); ctx.setHandCompact(false); },
+      }, icon('hand'), h('span', { class: 'count' }, countOf(home)))
       : h('button', {
         class: 'icon-btn round hand-toggle', 'aria-label': t('panel.handCompact'), tip: t('panel.handCompact'), 'aria-expanded': 'true',
         onclick: () => { ctx.set({ selCard: null }); ctx.setHandCompact(true); },
-      }, icon('hand'), count));
+      }, icon('close')));
 
   const sel = isActor && !compact && hand.includes(ui.selCard) ? ui.selCard : null;
   mount(sheet, sel ? cardDetail(ctx, shown, sel) : null);
@@ -295,7 +292,7 @@ function updateCard(el, ctx, shown, uid, { isActor, compact }) {
         h('span', { class: 'ic-type' }, t(`item.${item.type}`)),
         h('span', { class: 'ic-tier', 'aria-label': t(`tier.${item.tier}`) }, Array.from({ length: item.tier }, () => h('i')))),
       h('span', { class: 'iname' }, c('items', item.id, 'name')),
-      h('span', { class: 'ic-art' }, art.item(item.id, 's', { alt: '' })),
+      h('span', { class: 'ic-art' }, art.item(item.id, 's', { alt: '' }), icon(TYPE_ICON[item.type] ?? 'goal', 'ic-type-ico')),
       h('span', { class: 'ishort' }, t(...itemShort(item))),
       h('span', { class: 'ic-foot' }, isPermanent(item) ? icon('lock') : null, cardFooter(item, used)),
       used ? h('span', { class: 'spent-mark', 'aria-hidden': 'true' }, icon('check')) : null].filter(Boolean));
@@ -345,11 +342,11 @@ function survivorToken(ctx, sv, { canAct = false, color = '#888' } = {}) {
     onclick: () => ctx.selectSurvivor(selected ? null : sv.id),
   },
   art.portrait(sv.id, 's', { alt: '', cls: 'tok-face' }),
-  h('span', { class: 'tok-hp', 'aria-hidden': 'true' }, Array.from({ length: limit }, (_, i) => h('i', { class: i < left ? 'on' : '' }))),
+  sv.wounds ? h('span', { class: 'tok-wound', 'aria-hidden': 'true' }, String(sv.wounds)) : null,
   sv.frostbite ? h('span', { class: 'tok-frost', 'aria-hidden': 'true' }, icon('snowflake')) : null,
   canAct ? h('span', { class: 'tok-ready', 'aria-hidden': 'true' }) : null,
-  h('span', { class: 'tok-ap', 'aria-hidden': 'true' }, `${sv.ap}`),
-  h('span', { class: 'tok-hpbar', 'aria-hidden': 'true' }, h('i', { style: { width: `${sv.hp ?? 100}%` } })),
+  h('span', { class: 'tok-ap', 'aria-hidden': 'true' }, icon('exposure'), `${sv.ap}`),
+  h('span', { class: `tok-hpbar ${(sv.hp ?? 100) > 60 ? 'ok' : (sv.hp ?? 100) >= 30 ? 'mid' : 'low'}`, 'aria-hidden': 'true' }, h('i', { style: { width: `${sv.hp ?? 100}%` } })),
   h('span', { class: 'tok-card', 'aria-hidden': 'true' },
     h('b', {}, d.name),
     h('small', {}, `${c('survivors', sv.id, 'occupation')} · ${where}`),

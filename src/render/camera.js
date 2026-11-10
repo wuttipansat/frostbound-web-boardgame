@@ -65,7 +65,7 @@ export function createCameraRig(stage, { board, pieces }) {
       if (next && lastPoint && next.distanceTo(lastPoint) < 3 && !returning) { lastPoint = next; return; }
       lastPoint = next;
       goal = next;
-      goalZoom = closeZoom();
+      goalZoom = ev.kind === 'over' ? closeZoom() : null; // UI-6: pan only, the player's zoom stays
     },
     /** Back to the player's own view. */
     home() {

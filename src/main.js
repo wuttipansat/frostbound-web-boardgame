@@ -111,6 +111,7 @@ function refreshLabels(state) {
     el.classList.toggle('overrun', isOverrun(state, id));
     el.classList.toggle('ours', people > 0);
     el.classList.toggle('active', app?.ui.selLoc === id);
+    { const nm = document.createElement('span'); nm.className = 'pn'; nm.textContent = c('locations', id, 'name'); el.append(nm); }
     if (z) { const b = document.createElement('span'); b.className = 'pz'; b.append(icon('skull'), String(z)); el.append(b); }
     if (people) { const b = document.createElement('span'); b.className = 'pp'; b.append(icon('person'), String(people)); el.append(b); }
     if (!z && !people) el.classList.add('quiet');
@@ -228,7 +229,7 @@ updateWinter(null);
   bar.id = 'view-ctl';
   const btn = (ico, label, fn) => { const b = document.createElement('button'); b.className = 'btn round view-btn'; b.setAttribute('aria-label', label); b.setAttribute('tip', label); b.append(icon(ico)); b.onclick = fn; bar.append(b); };
   // UI-1: the camera moves freely; one small button brings the usual view back.
-  btn('move', tr('view.reset'), () => stage.view.reset());
+  btn('target', tr('view.reset'), () => stage.view.reset());
   document.body.append(bar);
   window.addEventListener('keydown', (ev) => {
     if (ev.target.closest?.('input, textarea')) return;
@@ -268,17 +269,17 @@ stage.onFrame((_t, dt) => {
     p.el.style.top = `${((1 - v.y) / 2) * ch}px`;
   }
 });
-/** UI-4: put the ring over its place (every frame, and right after each render so it never shows at 0,0). */
+/** UI-6: the action bar is fixed to the bottom edge; if the tapped place would sit under it, pan (no zoom) to it. */
+let barFor = null;
 function placeRing() {
+  const at = app?.ui.selLoc ?? null;
+  if (at === barFor) return;
+  barFor = at;
   const rd = document.getElementById('radial');
-  const rat = rd?.dataset.at;
-  if (!rd || !rat || rd.classList.contains('hidden')) return;
-  const { clientWidth: w, clientHeight: h } = stage.renderer.domElement;
-  const barBottom = document.getElementById('topbar').getBoundingClientRect().bottom;
-  const R = parseFloat(rd.style.getPropertyValue('--r')) || 60;
-  v.copy(board.layout[rat].center).setY(3).project(stage.camera);
-  rd.style.left = `${Math.min(w - R - 30, Math.max(R + 30, ((v.x + 1) / 2) * w))}px`;
-  rd.style.top = `${Math.max(barBottom + R * 0.85 + 30, Math.min(h - 110, ((1 - v.y) / 2) * h))}px`; // never under the top bar
+  if (!at || !rd || rd.classList.contains('hidden')) return;
+  const { clientHeight: h } = stage.renderer.domElement;
+  v.copy(board.layout[at].center).project(stage.camera);
+  if (((1 - v.y) / 2) * h > h - rd.offsetHeight - 70) rig.focus({ kind: 'select', at });
 }
 const PANELS = ['topbar', 'pp-left', 'pp-hand', 'pp-actions', 'locpanel', 'log', 'pp-survivors'].map((id) => document.getElementById(id));
 stage.onFrame(() => {
@@ -314,8 +315,6 @@ stage.onFrame(() => {
     nameTag.style.top = `${Math.max(((1 - v.y) / 2) * h, barBottom + 30)}px`;
   }
   for (const id of LOCATION_IDS) labels[id].classList.toggle('named', id === named);
-  // UI-4: the ring of round icons floats over the tapped place (kept on screen, clear of the top bar).
-  placeRing();
   // The "who goes there" picker floats by the location's survivor pads.
   const mp = $('move-pick');
   const at = app?.ui.movePick;

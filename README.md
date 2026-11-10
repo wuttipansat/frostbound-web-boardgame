@@ -59,7 +59,7 @@ src/
   audio/sound.js        procedural WebAudio
   main.js               boots stage/board/pieces, board picking, labels, and the UI controller
 tests/                  node:test suites
-scripts/e2e/            Playwright checks (smoke, ui-audit, hud-layout, new-game, perf)
+scripts/e2e/            Playwright checks (smoke, hud-layout, new-game, perf)
 ```
 
 The UI only *reads* state through selectors and only *changes* it by dispatching actions to `reduce`,

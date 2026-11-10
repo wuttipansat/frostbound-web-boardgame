@@ -610,4 +610,11 @@ export default {
   'hud.team': 'Team',
   'tip.team': 'Survivors in your team (at most {max}). Survivor cards and some events bring newcomers.',
   'eff.recruit': 'A newcomer joins the team',
+  'bar.walk': 'Walk', 'bar.drive': 'Drive', 'bar.attack': 'Attack', 'bar.search': 'Search', 'bar.barricade': 'Barricade', 'bar.lure': 'Lure',
+  'bar.nap': 'Nap', 'bar.guard': 'Guard', 'bar.unguard': 'Stand down', 'bar.build': 'Upgrade', 'bar.ability': 'Skill', 'bar.here': 'here',
+  'bar.risk': 'risk {n}', 'bar.none': 'Nothing to do here right now',
+  'pack.tabStock': 'Colony stockpile', 'pack.myPack': 'Backpack', 'pack.headStock': 'Colony stockpile · {n}', 'pack.headPack': "{name}'s pack · {n}",
+  'pack.awayStock': 'At the colony — not usable from here', 'pack.awayPack': "Someone else's — view only", 'pack.empty': 'Nothing yet',
+  'confirm.end.outside': '{name} is still at {place} — will sleep outside and wake up tired',
+  'toast.found': 'Found: {items}', 'toast.foundNone': 'Searched, found nothing',
 };

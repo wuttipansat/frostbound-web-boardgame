@@ -30,7 +30,7 @@ export function renderTopbar(el, ctx) {
   // Calendar: day n / 40, the time of day, and how much of the winter has passed.
   const round = block(`round calendar${lastRound ? ' critical' : ''}`, t('tip.day'), 'round', t('hud.day'),
     counter('round', s.day, { text: (v) => `${v}/${s.scenario.days}` }),
-    h('small', { class: `time t-${s.time ?? 'day'}` }, t(`time.${s.time ?? 'day'}`), isStorm(s) ? ` · ${t('hud.storm')}` : '', ` · ${t(`hud.season.${season(s)}`)}`),
+    h('small', { class: `time t-${s.time ?? 'day'}` }, t(`time.${s.time ?? 'day'}`), h('span', { class: 'extra' }, isStorm(s) ? ` · ${t('hud.storm')}` : '', ` · ${t(`hud.season.${season(s)}`)}`)),
     h('div', { class: 'mini-bar' }, h('i', { style: { width: `${Math.round((s.day / s.scenario.days) * 100)}%` } })));
   const food = block(`food${s.food < need ? ' critical' : ''}`, t('tip.food'), 'food', t('hud.food'), counter('food', s.food),
     h('small', {}, t('hud.foodNeed', { n: need })),
@@ -60,7 +60,7 @@ export function renderTopbar(el, ctx) {
     counter('goal', scenarioProgress(s), { text: (v) => `${v}/${scenarioTarget(s)}` }));
 
   // UI-2: one row — morale, day, food, and an ⓘ button; everything else sits in the "today" card.
-  const alert = sf.hits > 0 || (crisis && crisisScore(s) < crisisRequirement(s));
+  const alert = sf.hits > 0; // UI-6: red only when someone gets bitten tonight
   const infoBtn = h('button', {
     class: `icon-btn info-btn${alert ? ' alert' : ''}${ui.infoOpen ? ' on' : ''}`, tip: t('hud.today'), 'aria-label': t('hud.today'),
     'aria-expanded': ui.infoOpen ? 'true' : 'false',
@@ -84,6 +84,7 @@ export function renderTopbar(el, ctx) {
     el.append(h('div', { class: 'popover top-menu panel', role: 'menu', onclick: (ev) => ev.stopPropagation() },
       item(t('hud.rules'), h('b', {}, '?'), () => ctx.set({ modal: 'rules' })),
       item(t('hud.log'), icon('log'), () => ctx.set({ logOpen: !ui.logOpen })),
+      item(`${t('settings.sound')}: ${t(ui.sound ? 'settings.on' : 'settings.off')}`, icon(ui.sound ? 'sound' : 'mute'), () => ctx.setSound(!ui.sound)),
       item(t('hud.settings'), icon('settings'), () => ctx.set({ modal: 'settings' }))));
   }
 

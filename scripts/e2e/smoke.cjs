@@ -44,7 +44,7 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
     if (await page.locator('button.choice:not([disabled])').count()) { await click('button.choice:not([disabled])'); counts.choice++; continue; }
     // The first-game tutorial bubble can sit over the board: play on without it (the tutorial has its own e2e).
     if (await page.locator('#tutorial .tut-bubble').count()) { await page.evaluate(() => window.__frostbound.app.tutorialEvent('skip')); continue; }
-    // Moving (UI-4): tap a place's pin, then the walk icon in its ring; then one tap on an action there.
+    // Moving (UI-4): tap a place's pin, then Walk in the action bar; then one tap on an action there.
     if (!counts.move && await page.locator('#pp-actions .btn.end-turn').count()) {
       const target = await page.evaluate(() => {
         const s = window.__frostbound.app.state; const a = window.__frostbound.app;
@@ -56,7 +56,7 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
         await click(`#labels .loc-label[data-loc="${target}"]`);
         await page.waitForTimeout(250);
         const sv = await page.evaluate(() => window.__frostbound.app.ui.selSurvivor);
-        if (!(await page.locator('#radial .rd-btn[data-act="walk"]').count())) errors.push('no walk icon in the ring');
+        if (!(await page.locator('#radial .rd-btn[data-act="walk"]').count())) errors.push('no walk button in the action bar');
         else {
           await click('#radial .rd-btn[data-act="walk"]');
           await page.waitForTimeout(400);
@@ -86,6 +86,11 @@ const VP = device === 'phone' ? { width: 390, height: 844, isMobile: true, hasTo
       await click('#pp-hand .hand-fan.fanned .item-card'); await page.waitForTimeout(300);
       if (!(await page.locator('.card-detail').count())) errors.push('clicking a fanned card opened no sheet');
       await click('.card-detail .close'); counts.sheet = 1; continue;
+    }
+    // UI-6: on phones an open item sheet or action bar covers the end-day button; close it first.
+    if (await page.locator('#pp-actions .btn.end-turn').count() && !(await page.locator('#pp-actions .btn.end-turn').isVisible())) {
+      if (await page.locator('#pp-hand .hand-toggle').count()) await click('#pp-hand .hand-toggle'); else await page.evaluate(() => window.__frostbound.app.selectLocation(null));
+      await page.waitForTimeout(200); continue;
     }
     const end = page.locator('#pp-actions .btn.end-turn:not(.off)');
     if (await end.count()) { await click('#pp-actions .btn.end-turn:not(.off)'); counts.endTurn++; await page.waitForTimeout(250); continue; }

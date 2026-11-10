@@ -83,7 +83,7 @@ function boxes() {
       }
       if (out) await p.screenshot({ path: `${out}/after-${name}-${state}.jpg`, type: 'jpeg', quality: 82 });
     }
-    // UI-4: every place opens a ring of round icons that stays on screen and clear of the top bar and the end button.
+    // UI-6: every place opens the action bar.
     const ring = await p.evaluate(() => {
       const a = window.__frostbound.app; const out = [];
       a.set({ handCompact: true, locInfo: false });
@@ -94,12 +94,22 @@ function boxes() {
       return out;
     });
     await p.waitForTimeout(1500); // the ring's open animation (slow under software rendering)
-    for (const [id, n] of ring) if (!n) problems.push(`${name}: no ring icons at ${id}`);
+    for (const [id, n] of ring) if (!n) problems.push(`${name}: no action bar buttons at ${id}`);
+    // UI-6: the action bar sits on the bottom edge, inside the screen; the "today" card too.
     const ringBox = await p.evaluate(() => {
       const top = document.getElementById('topbar').getBoundingClientRect().bottom;
-      return [...document.querySelectorAll('#radial .rd-btn')].map((e) => e.getBoundingClientRect()).filter((r) => r.top < top || r.left < 0 || r.right > innerWidth).length;
+      const r = document.getElementById('radial').getBoundingClientRect();
+      const bad = [];
+      if (r.top < top || r.left < 0 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) bad.push('action bar off screen');
+      if (document.querySelector('#radial .ab-close').getBoundingClientRect().right > innerWidth) bad.push('close button off screen');
+      for (const sel of ['.sv-token', '#pp-actions .btn', '#pp-hand .pile-btn']) if ([...document.querySelectorAll(sel)].some((e) => e.getClientRects().length)) bad.push(`${sel} shows under the action bar`);
+      const a = window.__frostbound.app; a.selectLocation(null); a.set({ infoOpen: true });
+      const ip = document.querySelector('.info-pop')?.getBoundingClientRect();
+      if (!ip || ip.left < 0 || ip.right > innerWidth + 1) bad.push('today card off screen');
+      a.set({ infoOpen: false });
+      return bad;
     });
-    if (ringBox) problems.push(`${name}: ${ringBox} ring icons under the top bar or off screen`);
+    for (const x of ringBox) problems.push(`${name}: ${x}`);
     if (errors.length) problems.push(`${name}: page errors ${errors.join(' | ')}`);
     await p.close();
   }

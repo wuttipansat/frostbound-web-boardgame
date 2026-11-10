@@ -18,7 +18,7 @@ const ACTION_ICON = { attack: 'attack', search: 'search', barricade: 'barricade'
 export function renderLocationPanel(el, ctx) {
   const { state: s, ui, art } = ctx;
   // UI-4: the place's card floats only when asked for (ⓘ / build / craft in the ring), or while picking a lure target.
-  const id = ui.selLoc && (ui.locInfo || ui.picking?.type === 'lure') ? ui.selLoc : null;
+  const id = ui.selLoc && ui.locInfo ? ui.selLoc : null; // UI-6: lure targets are picked in the action bar
   el.classList.toggle('hidden', !id);
   document.body.classList.toggle('loc-open', !!id);
   if (!id) return;

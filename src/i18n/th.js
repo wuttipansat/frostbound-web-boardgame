@@ -593,4 +593,11 @@ export default {
   'hud.team': 'ทีม',
   'tip.team': 'ผู้รอดชีวิตในทีม (สูงสุด {max} คน) การ์ดผู้รอดชีวิตและเหตุการณ์บางอย่างจะพาคนใหม่มา',
   'eff.recruit': 'มีคนใหม่เข้าร่วมทีม',
+  'bar.walk': 'เดินไป', 'bar.drive': 'ขับรถไป', 'bar.attack': 'โจมตี', 'bar.search': 'ค้นหา', 'bar.barricade': 'กีดขวาง', 'bar.lure': 'ล่อซอมบี้',
+  'bar.nap': 'งีบ', 'bar.guard': 'เข้าเวร', 'bar.unguard': 'เลิกเวร', 'bar.build': 'อัปเกรด', 'bar.ability': 'ทักษะ', 'bar.here': 'อยู่ที่นี่',
+  'bar.risk': 'เสี่ยง {n}', 'bar.none': 'ตอนนี้ทำอะไรที่นี่ไม่ได้',
+  'pack.tabStock': 'คลังที่ฐาน', 'pack.myPack': 'เป้', 'pack.headStock': 'คลังที่ฐาน · {n} ชิ้น', 'pack.headPack': 'เป้ของ {name} · {n}',
+  'pack.awayStock': 'อยู่ที่ฐาน — ใช้ไม่ได้จากที่นี่', 'pack.awayPack': 'ของคนอื่น — ดูได้อย่างเดียว', 'pack.empty': 'ยังไม่มีของ',
+  'confirm.end.outside': '{name} ยังอยู่ที่{place} — จะนอนข้างนอกและตื่นมาเหนื่อย',
+  'toast.found': 'ได้ของ: {items}', 'toast.foundNone': 'ค้นแล้วไม่เจออะไร',
 };
