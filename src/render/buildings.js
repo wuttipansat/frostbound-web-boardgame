@@ -3,6 +3,7 @@
 // Units: voxels (rendered at 0.5 world units each).
 import { VoxelModel, hash3 } from './voxel.js';
 import { P } from './palette.js';
+import * as city from './city.js';
 
 const W = P.window;
 
@@ -290,13 +291,14 @@ export function rock() {
   return m;
 }
 
+// UI-13 part C: the city-style models (src/render/city.js) replace the earlier cabins.
 export const LOCATION_BUILDERS = {
-  police: policeStation,
-  grocery: groceryStore,
-  school,
-  hospital,
-  library,
-  gas: gasStation,
+  police: city.policeStation,
+  grocery: city.groceryStore,
+  school: city.school,
+  hospital: city.hospital,
+  library: city.library,
+  gas: city.gasStation,
 };
 
 // ---------------------------------------------------------------- HD (2×) versions
@@ -306,12 +308,11 @@ import { detailBuilding, applyPatterns, lumpySnow, shadeHex } from './detail.js'
 const SEED = { police: 1, grocery: 2, school: 3, hospital: 4, library: 5, gas: 6, colony: 7 };
 
 /** HD location models: built at 2× resolution with frames, icicles, patterns and bevels. Render at half the voxel size. */
-export const LOCATION_BUILDERS_HD = Object.fromEntries(Object.entries(LOCATION_BUILDERS).map(([id, build]) => [
-  id, () => detailBuilding(build().upscale(2), { seed: SEED[id] }),
-]));
+// UI-13: city models are authored at full resolution already (no upscale / detail pass).
+export const LOCATION_BUILDERS_HD = Object.fromEntries(Object.entries(LOCATION_BUILDERS).map(([id, build]) => [id, () => build()]));
 
 export function colonyHD(radius = 18) {
-  return detailBuilding(colony(radius).upscale(2), { seed: SEED.colony, bevel: 0.3 });
+  return city.colony(Math.round(radius * 1.67)); // full-resolution city colony (wall at the old palisade radius)
 }
 
 /**

@@ -69,10 +69,10 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   controls.update();
 
   // Lights: cold moon + sky fill. Warm point lights live on the board.
-  const hemi = new THREE.HemisphereLight(0x8fb0e8, 0x1c2640, 1.1);
+  const hemi = new THREE.HemisphereLight(0x9fb8e8, 0x2a3450, 1.35);
   scene.add(hemi);
   const moon = new THREE.DirectionalLight(0xb8d0ff, 1.6);
-  moon.position.set(-40, 70, -25);
+  moon.position.set(-25, 70, 45); // UI-13: light the façades the camera sees (+z), long shadows to the back
   moon.castShadow = true;
   moon.shadow.mapSize.set(q.shadowMapSize, q.shadowMapSize);
   // Tight to the plateau (radius 46) to keep shadow texels dense.

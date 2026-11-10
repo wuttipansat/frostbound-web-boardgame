@@ -340,3 +340,10 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - Streets: packed snow with dark asphalt ruts, slush, half-buried dashes, sidewalk tiles and kerbs.
 - Props (src/render/props.js, instanced): wrecked cars (3 variants, one with headlights), street lamps, snow-capped container stacks.
 - Left for parts C–D: new place buildings (neon signs, roof props, ruins), characters in winter clothes, voxel item icons, fog along the slab edge, day/night tint.
+
+### UI-13 part C — city buildings (done, take 2)
+- The first pass (upscaled boxes) looked flat; redone at full voxel resolution in `src/render/city.js`, using the user's reference image for style only (own models).
+- Layout is now a 3×3 grid of city blocks with straight streets (colony in the middle, two filler blocks: a fenced parking lot and a container yard). Every building's front faces a side the camera sees.
+- Buildings: hollow concrete shells with floor ledges, framed windows (lit / dark / broken / boarded), shopfronts with shutters and awnings, balconies, drainpipes, wall and roof AC units, stair huts, water tanks, moss, graffiti, neon signs with one dead letter (POLICE, MART, SCHOOL, ER + red cross, BOOKS, GAS). Library has a collapsed corner; colony is a container-wall fort with barricaded gates.
+- Streets are ploughed asphalt with a centre dash and snow banks; moonlight moved to light the visible façades.
+- Tests updated for the grid layout and full-resolution models.

@@ -120,11 +120,10 @@ export function buildTerrainHD({ radius, distRoad, distPlot }) {
     let top;
     if (roadD < 2.2) {
       // Snow-packed street: two dark asphalt ruts, grey slush between, a few half-buried dashes.
-      top = P.snowShade;
-      if (Math.abs(roadD - 1.0) < 0.3) top = P.asphalt;
-      else if (roadD < 0.3 && (Math.floor((wx + wz) * 0.7) % 3 === 0)) top = 0xe9edf2; // dash
-      else if (roadD < 0.7) top = P.slush;
-      if (hash3(x, 5, z) < 0.04) top = shadeHex(top, 0.85);
+      // Ploughed asphalt with a white centre dash; snow banked along the edges.
+      top = roadD < 1.7 ? P.asphalt : P.snowShade;
+      if (roadD < 0.25 && Math.floor(Math.abs(wx + wz) * 0.6) % 3 === 0) top = 0xe9edf2; // dash
+      if (roadD < 1.7 && hash3(x, 5, z) < 0.07) top = P.slush; // packed snow patches
       h = 0;
     } else if (roadD < 3.6) {
       // Sidewalk tiles under snow: a faint grid shows through, a kerb at the road side.

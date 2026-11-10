@@ -18,20 +18,17 @@ import { OUTSIDE_LOCATIONS } from '../src/core/constants.js';
 const tris = (g) => (g ? g.index.count / 3 : 0);
 const count = (m, pred) => [...m.voxels.values()].filter(pred).length;
 
-test('HD buildings: same footprint as before, more detail (frames, sills, icicles), budgeted triangles', () => {
+test('city buildings (UI-13): full-resolution models that fit a block, with lit windows and a budget', () => {
   for (const id of OUTSIDE_LOCATIONS) {
-    const lo = LOCATION_BUILDERS[id]();
     const hd = LOCATION_BUILDERS_HD[id]();
-    assert.ok(hd.voxels.size > lo.voxels.size * 4, `${id}: much more voxel detail`);
     const g = hd.buildGeometries({ size: BOARD.buildingScale / 2, jitter: 0 });
     const bb = g.lit.boundingBox;
     const extent = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z);
-    assert.ok(extent < 16, `${id} still fits its plot (${extent.toFixed(1)})`);
+    assert.ok(extent < BOARD.block - 4, `${id} fits its block (${extent.toFixed(1)})`);
     assert.ok(tris(g.glow) > 0, `${id} keeps its lit windows/signs`);
-    assert.ok(tris(g.lit) < 25000, `${id} triangle budget (${tris(g.lit)})`);
-    assert.ok(count(hd, (v) => v.color === DETAIL_COLORS.FRAME) > 0, `${id} has window frames`);
+    assert.ok(tris(g.lit) < 40000, `${id} triangle budget (${tris(g.lit)})`);
   }
-  assert.ok(count(colonyHD(), (v) => v.color === DETAIL_COLORS.ICE || v.color === DETAIL_COLORS.ICE_TIP) > 0, 'colony has icicles');
+  assert.ok(tris(colonyHD().buildGeometries({ size: BOARD.buildingScale / 2, jitter: 0 }).glow) > 0, 'colony fire and torches glow');
 });
 
 test('HD trees and rocks come in three shapes each and stay cheap enough to instance', () => {

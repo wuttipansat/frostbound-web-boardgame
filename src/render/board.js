@@ -8,10 +8,17 @@ import {
 } from './buildings.js';
 import { buildTerrainHD } from './terrain.js';
 import { carModel, lampModel, containerModel } from './props.js';
+import { parkingLot, containerYard } from './city.js';
 import { LOCATIONS } from '../content/locations.js';
 import { OUTSIDE_LOCATIONS } from '../core/constants.js';
 
+// Block of each place on the 3×3 grid (x, z), colony at (0, 0); FILLER blocks hold props only.
+const BLOCKS = { police: [0, -1], grocery: [1, -1], school: [1, 0], hospital: [0, 1], library: [-1, 0], gas: [-1, -1] };
+export const FILLER = { parking: [1, 1], containers: [-1, 1] };
+
 export const BOARD = {
+  block: 26,          // UI-13: distance between block centres (world)
+  street: 13,         // streets run at ±street on both axes
   radius: 46,         // plateau radius (world units)
   locationRadius: 27, // distance of location centres from the colony
   colonyRadius: 9,    // palisade radius (world units)
@@ -22,10 +29,14 @@ export const BOARD = {
 /** Board-space layout for every location (positions, facing, slot anchors). */
 export function computeLayout() {
   const layout = {};
+  // UI-13: a 3×3 grid of city blocks, the colony in the middle. Two blocks are filler (parking, containers).
   OUTSIDE_LOCATIONS.forEach((id, i) => {
-    const theta = (-90 + 60 * i + 30) * (Math.PI / 180);
-    const c = new THREE.Vector3(Math.cos(theta) * BOARD.locationRadius, 0, Math.sin(theta) * BOARD.locationRadius);
-    const toColony = c.clone().negate().normalize();
+    const [bx, bz] = BLOCKS[id];
+    const theta = Math.atan2(bz, bx);
+    const c = new THREE.Vector3(bx * BOARD.block, 0, bz * BOARD.block);
+    // Fronts face a side the camera sees (+x or +z), towards the colony where possible.
+    const toColony = Math.abs(bx) >= Math.abs(bz) && bx < 0 ? new THREE.Vector3(1, 0, 0)
+      : bz < 0 ? new THREE.Vector3(0, 0, 1) : bx > 0 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0);
     const side = new THREE.Vector3(-toColony.z, 0, toColony.x);
     const at = (forward, lateral) => c.clone().addScaledVector(toColony, forward).addScaledVector(side, lateral);
     const nSurv = LOCATIONS[id].survivorSlots;
@@ -71,13 +82,14 @@ function distToSegment(px, pz, a, b) {
 }
 
 function computeRoads(layout) {
+  // UI-13: a straight street grid — two streets each way across the slab, plus a short road from each colony gate.
+  const E = BOARD.radius - 4; const S = BOARD.street;
   const roads = [];
-  for (const id of OUTSIDE_LOCATIONS) {
-    const L = layout[id];
-    const dir = L.center.clone().normalize();
-    roads.push([dir.clone().multiplyScalar(BOARD.ringRoad), L.center.clone().addScaledVector(dir, -5)]);
+  for (const k of [-S, S]) {
+    roads.push([new THREE.Vector3(k, 0, -E), new THREE.Vector3(k, 0, E)]);
+    roads.push([new THREE.Vector3(-E, 0, k), new THREE.Vector3(E, 0, k)]);
   }
-  for (const g of layout.colony.gates) roads.push([g.clone(), g.clone().normalize().multiplyScalar(BOARD.ringRoad)]);
+  for (const g of layout.colony.gates) roads.push([g.clone(), g.clone().normalize().multiplyScalar(S)]);
   return roads;
 }
 
@@ -85,7 +97,7 @@ function distances(layout, roads) {
   const tmp = new THREE.Vector3();
   return {
     distRoad: (x, z) => {
-      let d = Math.abs(Math.hypot(x, z) - BOARD.ringRoad);
+      let d = Infinity;
       for (const [a, b] of roads) d = Math.min(d, distToSegment(x, z, a, b));
       return d;
     },
@@ -100,8 +112,9 @@ function distances(layout, roads) {
 
 /** Is a spot clear of roads, plots and the colony (for trees and rocks)? */
 function isFreeForDecoration(x, z, layout, roads) {
-  const r = Math.hypot(x, z);
-  if (r > BOARD.radius - 3 || r < BOARD.ringRoad + 3) return false;
+  const r = Math.max(Math.abs(x), Math.abs(z));
+  if (r > BOARD.radius - 5 || r < BOARD.colonyRadius + 3) return false;
+  for (const [fx, fz] of Object.values(FILLER)) if (Math.max(Math.abs(x - fx * BOARD.block), Math.abs(z - fz * BOARD.block)) < 10) return false;
   for (const id of OUTSIDE_LOCATIONS) if (layout[id].center.distanceTo(new THREE.Vector3(x, 0, z)) < 13) return false;
   for (const [a, b] of roads) if (distToSegment(x, z, a, b) < 3.5) return false;
   return true;
@@ -128,9 +141,8 @@ function scatter(layout, roads, count, seed, minGap = 2.4) {
   let i = 0;
   while (pts.length < count && i < count * 40) {
     i++;
-    const a = hash3(i, seed, 11) * Math.PI * 2;
-    const r = BOARD.ringRoad + 3 + Math.sqrt(hash3(i, seed, 13)) * (BOARD.radius - BOARD.ringRoad - 6);
-    const x = Math.cos(a) * r; const z = Math.sin(a) * r;
+    const x = (hash3(i, seed, 11) * 2 - 1) * (BOARD.radius - 5);
+    const z = (hash3(i, seed, 13) * 2 - 1) * (BOARD.radius - 5);
     if (!isFreeForDecoration(x, z, layout, roads)) continue;
     if (pts.some((p) => Math.hypot(p.x - x, p.z - z) < minGap)) continue;
     pts.push({ x, z, r: hash3(i, seed, 17), s: hash3(i, seed, 19) });
@@ -233,7 +245,7 @@ export function createBoard() {
   // Step 9: no slot pedestals any more; each place has one floating sign (see main.js labels).
 
   // Forest + rocks (instanced)
-  const trees = scatter(layout, roads, 90, 3);
+  const trees = scatter(layout, roads, 34, 3, 3); // UI-13: a city — a few trees in the gaps
   // 3 silhouettes, one instanced mesh each, size varied by scale (fewer draw calls than one mesh per shape × size).
   const tmp = new THREE.Object3D();
   const groups = 3;
@@ -281,6 +293,13 @@ export function createBoard() {
     const yards = [[], [], []];
     lots.forEach((p, i) => { tmp.position.set(p.x, 0, p.z); tmp.rotation.set(0, Math.round(p.r * 4) * Math.PI / 2, 0); tmp.updateMatrix(); yards[i % 3].push(tmp.matrix.clone()); });
     yards.forEach((list, k) => { if (list.length) root.add(instanced(containerModel(k, 1 + (k % 2)), 0.2, list, { cacheKey: `container-${k}`, jitter: 0 })); });
+  }
+
+  // UI-13: the two filler blocks.
+  for (const [name, [fx, fz]] of Object.entries(FILLER)) {
+    const g = (name === 'parking' ? parkingLot() : containerYard()).build({ size: bScale, jitter: 0, cacheKey: `filler-${name}` });
+    g.position.set(fx * BOARD.block, 0, fz * BOARD.block);
+    root.add(g);
   }
 
   // The slab's soft shadow on the backdrop.

@@ -42,12 +42,12 @@ test('snowCap adds a layer on exposed tops but not on glowing voxels', () => {
 
 test('every location model builds, has glowing details and fits its plot', () => {
   for (const id of OUTSIDE_LOCATIONS) {
-    const { lit, glow } = LOCATION_BUILDERS[id]().buildGeometries({ size: BOARD.buildingScale });
+    const { lit, glow } = LOCATION_BUILDERS[id]().buildGeometries({ size: BOARD.buildingScale / 2 });
     assert.ok(tris(lit) > 500, `${id} has geometry`);
     assert.ok(tris(glow) > 0, `${id} has warm/emissive details`);
     const bb = lit.boundingBox;
     const extent = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z);
-    assert.ok(extent < 16, `${id} footprint ${extent.toFixed(1)} fits between roads`);
+    assert.ok(extent < BOARD.block - 4, `${id} footprint ${extent.toFixed(1)} fits between streets`);
   }
   assert.ok(tris(colony().buildGeometries({ size: 0.5 }).glow) > 0, 'campfire + torches glow');
   assert.ok(tris(pineTree(2).buildGeometries().lit) > 0);
@@ -60,9 +60,9 @@ test('layout has slot anchors matching the rules', () => {
     const L = layout[id];
     assert.equal(L.survivorSlots.length, LOCATIONS[id].survivorSlots);
     assert.equal(L.zombieSlots.length, LOCATIONS[id].zombieSlots);
-    assert.ok(Math.abs(L.center.length() - BOARD.locationRadius) < 1e-6);
-    // Slots sit between the building and the colony.
-    for (const p of [...L.survivorSlots, ...L.zombieSlots]) assert.ok(p.length() < L.center.length());
+    // UI-13: each place sits on a block of the 3×3 grid; its slots stay on that block.
+    assert.ok(Math.abs(L.center.x) % BOARD.block === 0 && Math.abs(L.center.z) % BOARD.block === 0);
+    for (const p of [...L.survivorSlots, ...L.zombieSlots]) assert.ok(Math.max(Math.abs(p.x - L.center.x), Math.abs(p.z - L.center.z)) < BOARD.block / 2 + 1);
   }
   assert.equal(layout.colony.zombieSlots.length, LOCATIONS.colony.zombieSlots);
   assert.equal(layout.colony.gates.length, LOCATIONS.colony.entrances);
