@@ -221,3 +221,22 @@ test('railway corridor: places and pieces in the rail row keep its middle chunks
     }
   }
 });
+
+test('railway never runs through a place, also after a new game replaces the start board', async () => {
+  const { createBoard, railLine, CHUNK: CH } = await import('../src/render/board.js');
+  const board = createBoard(); // built for the default start map first
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    const s = createGame({ seed, players: 1 }); // a new game: the same start blocks, its own look
+    board.setMap(JSON.parse(JSON.stringify(s.map)), { snap: true });
+    const rail = railLine(s.map);
+    for (const [id, L] of Object.entries(board.layout)) {
+      if (!L.plan) continue;
+      const g = board.locationGroups[id]; if (!g) continue;
+      const box = new (await import('three')).Box3().setFromObject(g);
+      const lo = rail.axis === 'x' ? box.min.z : box.min.x; const hi = rail.axis === 'x' ? box.max.z : box.max.x;
+      const across = rail.axis === 'x' ? [box.min.x, box.max.x] : [box.min.z, box.max.z];
+      const inRow = Math.abs((rail.axis === 'x' ? L.plan.c.z : L.plan.c.x) - rail.c) < 1;
+      if (inRow) assert.ok(hi < rail.c - 1.4 || lo > rail.c + 1.4, `seed ${seed}: ${id} clear of the track (${lo.toFixed(1)}..${hi.toFixed(1)} vs ${rail.c.toFixed(1)}; ${across.map((v) => v.toFixed(0))})`);
+    }
+  }
+});

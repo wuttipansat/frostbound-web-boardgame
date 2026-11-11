@@ -1147,7 +1147,8 @@ export function createBoard({ progressive = false } = {}) {
     setMap(next, { snap = false } = {}) {
       // A different city (new game, loaded save): start over.
       // MAP-2 A: blocks never change, so any difference means another city (new game / load): start over.
-      if (Object.entries(cells).some(([k, c]) => c.sig !== JSON.stringify(next.blocks[k] ?? null))) {
+      // MAP-3 E: another game's look (rail line, districts) also means another city: the layout must follow it.
+      if (Object.entries(cells).some(([k, c]) => c.sig !== JSON.stringify(next.blocks[k] ?? null)) || (map && (map.look ?? 0) !== (next.look ?? 0))) {
         for (const c of [...Object.values(cells), ...batches]) { root.remove(c.group); }
         for (const k of Object.keys(cells)) delete cells[k];
         batches.length = 0;
