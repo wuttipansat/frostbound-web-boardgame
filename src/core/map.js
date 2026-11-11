@@ -196,7 +196,8 @@ export function growMap(s, makePlace) {
   const fits = (t, k) => tierOk(t) && (PLACE_RULES[t]?.zones.includes(zoneOf(...parse(k), look)) ?? true);
   while (missing.length && nPlaces) {
     const free = byDist.filter((k) => !placesAt.has(k));
-    const k = free.find((b) => fits(missing[0], b)) ?? free[0];
+    // (an original keeps the nearest block: the run depends on its parts; a fitting one only on a near tie)
+    const k = free.find((b) => fits(missing[0], b) && dist.get(b) <= dist.get(free[0]) + 1) ?? free[0];
     if (!k) break;
     placesAt.add(k); m.blocks[k] = { kind: 'place', placeId: makePlace(missing[0], k), type: missing.shift() }; nPlaces--;
   }
