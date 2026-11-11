@@ -61,8 +61,11 @@ test('layout has slot anchors matching the rules', () => {
     assert.equal(L.survivorSlots.length, LOCATIONS[id].survivorSlots);
     assert.equal(L.zombieSlots.length, LOCATIONS[id].zombieSlots);
     // UI-13: each place sits on a block of the 3×3 grid; its slots stay on that block.
-    assert.ok(Math.abs(L.center.x) % BOARD.block === 0 && Math.abs(L.center.z) % BOARD.block === 0);
-    for (const p of [...L.survivorSlots, ...L.zombieSlots]) assert.ok(Math.max(Math.abs(p.x - L.center.x), Math.abs(p.z - L.center.z)) < BOARD.block / 2 + 1);
+    // MAP-1b: the place covers 1–4 of its block's 3×3 chunks.
+    const c = L.plan.c;
+    assert.ok(Math.abs(c.x) % BOARD.block === 0 && Math.abs(c.z) % BOARD.block === 0);
+    assert.ok(L.plan.covered.length >= 1 && L.plan.covered.length <= 4);
+    for (const p of [...L.survivorSlots, ...L.zombieSlots, L.center]) assert.ok(Math.max(Math.abs(p.x - c.x), Math.abs(p.z - c.z)) < BOARD.block / 2 + 1);
   }
   assert.equal(layout.colony.zombieSlots.length, LOCATIONS.colony.zombieSlots);
   assert.equal(layout.colony.gates.length, LOCATIONS.colony.entrances);

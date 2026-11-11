@@ -28,25 +28,50 @@ const parse = (k) => k.split(',').map(Number);
 /** World position of a street corner (cx,cz = top-left corner of block cx,cz). */
 const cornerPos = (cx, cz) => [(cx - 0.5) * BOARD.block, (cz - 0.5) * BOARD.block];
 
-function placeLayout(id, type, bx, bz, roads) {
+// MAP-1b: a block is 3×3 chunks inside its sidewalks; a place takes 1–4 of them at the street side, the rest
+// hold small buildings and props. Chunk size = (block − 2 × sidewalk) / 3.
+export const CHUNK = (BOARD.block - 2 * 3.4) / 3;
+const EDGE = 1.5 * CHUNK; // from the block centre to the inner edge of the sidewalk
+// Chunks a place covers: [wide, deep] (default 2×2); narrow, tall buildings take one column.
+const FOOT = { church: [1, 2], apartment: [1, 2] };
+
+/** Where a place sits in its block: front direction, footprint (in chunks), centre and the chunks it covers. */
+export function placePlan(id, type, bx, bz, roads) {
   const c = new THREE.Vector3(bx * BOARD.block, 0, bz * BOARD.block);
   const fronts = { z: `${bx},${bz + 1},h`, x: `${bx + 1},${bz},v`, '-z': `${bx},${bz},h`, '-x': `${bx},${bz},v` };
   const pick = START_FRONT[id] ?? ['z', 'x', '-z', '-x'].find((f) => roads.has(fronts[f])) ?? 'z';
   const toFront = { z: [0, 1], x: [1, 0], '-z': [0, -1], '-x': [-1, 0] }[pick];
   const fwd = new THREE.Vector3(toFront[0], 0, toFront[1]);
   const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
+  let [fw, fd] = FOOT[type] ?? [2, 2];
+  if (/-\d+$/.test(id) && fw === 2 && hash3(bx, 41, bz) < 0.35) fd = 1; // some repeats are a smaller branch
+  const col = Math.floor(hash3(bx, 43, bz) * (4 - fw)); // first lateral column (0..2)
+  const lat = (col + fw / 2 - 1.5) * CHUNK;
+  const fwdC = EDGE - fd * CHUNK / 2;
+  const covered = [];
+  for (let i = 0; i < fd; i++) for (let j = col; j < col + fw; j++) covered.push(`${i},${j}`); // i: row from the front
   const at = (forward, lateral) => c.clone().addScaledVector(fwd, forward).addScaledVector(side, lateral);
+  return { c, fwd, side, fw, fd, lat, center: at(fwdC, lat), covered, at };
+}
+
+/** World centre of chunk (row i from the front, column j) of a block. */
+export const chunkCenter = (plan, i, j) => plan.at((1 - i) * CHUNK, (j - 1) * CHUNK);
+
+function placeLayout(id, type, bx, bz, roads) {
+  const plan = placePlan(id, type, bx, bz, roads);
+  const { at, lat } = plan;
   const nSurv = LOCATIONS[type]?.survivorSlots ?? 3;
   return {
     id,
     theta: Math.atan2(bz, bx),
-    center: c,
-    facing: Math.atan2(fwd.x, fwd.z),
-    label: at(-1, 0).setY(10),
-    // Zombies crowd the entrance; survivors stand on pads on the road side.
-    zombieSlots: [[8, -1.6], [8, 0], [8, 1.6], [6.4, -0.8], [6.4, 0.8], [6.4, 2.4]].map(([f, l]) => at(f, l)),
-    survivorSlots: Array.from({ length: nSurv }, (_, k) => at(11, (k - (nSurv - 1) / 2) * 2.1)),
-    hitRadius: 8.5,
+    center: plan.center,
+    facing: Math.atan2(plan.fwd.x, plan.fwd.z),
+    plan,
+    label: plan.center.clone().setY(8),
+    // Zombies crowd the entrance on the forecourt; survivors stand on the sidewalk in front.
+    zombieSlots: [[EDGE - 0.6, -1.6], [EDGE - 0.6, 0], [EDGE - 0.6, 1.6], [EDGE - 1.7, -0.8], [EDGE - 1.7, 0.8], [EDGE - 1.7, 2.4]].map(([f, l]) => at(f, lat + l)),
+    survivorSlots: Array.from({ length: nSurv }, (_, k) => at(EDGE + 1.6, lat + (k - (nSurv - 1) / 2) * 1.9)),
+    hitRadius: Math.max(plan.fw, plan.fd) * CHUNK / 2 + 1,
   };
 }
 
@@ -175,14 +200,15 @@ export function createBoard() {
     const [bx, bz] = parse(key);
     const cx = bx * B; const cz = bz * B;
     const near = streets.filter(([a, b]) => Math.min(a.x, b.x) < cx + half + 4 && Math.max(a.x, b.x) > cx - half - 4 && Math.min(a.z, b.z) < cz + half + 4 && Math.max(a.z, b.z) > cz - half - 4);
-    const plots = Object.values(layout).filter((L) => Math.abs(L.center.x - cx) <= B && Math.abs(L.center.z - cz) <= B);
+    const plots = Object.values(layout).filter((L) => { const p = L.plan?.c ?? L.center; return Math.abs(p.x - cx) <= B && Math.abs(p.z - cz) <= B; });
     const geo = buildTerrainHD({
       center: [cx, cz], half, edgeDist: edgeDist(bx, bz),
       clip: (x, z) => cellOf(x, z) === key,
       distRoad: (x, z) => { let d = Infinity; for (const [a, b] of near) d = Math.min(d, distToSegment(x, z, a, b)); return d; },
       distPlot: (x, z) => {
         let d = Infinity;
-        for (const L of plots) d = Math.min(d, Math.hypot(x - L.center.x, z - L.center.z) - (L.id === 'colony' ? BOARD.colonyRadius + 2 : 9));
+        // A place's whole block is built up (flat); the colony keeps its round clearing.
+        for (const L of plots) d = Math.min(d, L.plan ? Math.max(Math.abs(x - L.plan.c.x), Math.abs(z - L.plan.c.z)) - EDGE : Math.hypot(x, z) - (BOARD.colonyRadius + 2));
         return d;
       },
     });
@@ -230,6 +256,9 @@ export function createBoard() {
       const L = layout[b.placeId];
       const type = b.type ?? b.placeId;
       model = (LOCATION_BUILDERS_HD[type] ?? LOCATION_BUILDERS_HD.grocery)().build({ size: bScale, jitter, cacheKey: `place-${type}` });
+      // Fit the building into its chunks (models are centred on x/z, front = +z).
+      const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+      model.scale.setScalar(Math.min(1, (L.plan.fw * CHUNK - 0.3) / size.x, (L.plan.fd * CHUNK - 0.3) / size.z));
       model.position.copy(L.center);
       model.rotation.y = L.facing;
       model.name = b.placeId;
@@ -254,9 +283,32 @@ export function createBoard() {
       if (b.kind === 'colony') return Math.hypot(x, z) > BOARD.colonyRadius + 3;
       return Math.max(Math.abs(x - Math.round(x / B) * B), Math.abs(z - Math.round(z / B) * B)) > (b.kind === 'place' ? 9.5 : 9);
     };
+    const houses = Array.from({ length: city.SMALL_VARIANTS }, () => []);
+    const put = (list, p, rotY, scale = 1) => { tmp.position.copy(p); tmp.rotation.set(0, rotY, 0); tmp.scale.setScalar(scale); tmp.updateMatrix(); list.push(tmp.matrix.clone()); };
     for (const key of keys) {
       const b = map.blocks[key];
       const [bx, bz] = parse(key);
+      if (b.kind === 'place') {
+        // MAP-1b: the chunks the place leaves free hold small buildings, trees, parked cars or a container stack.
+        const plan = layout[b.placeId].plan;
+        for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+          if (plan.covered.includes(`${i},${j}`)) continue;
+          const p = chunkCenter(plan, i, j);
+          const r = hash3(bx * 3 + j, 61 + i, bz * 3 + i);
+          const r2 = hash3(bx * 5 + i, 67, bz * 5 + j);
+          // Front-row buildings face the street; others any way.
+          const face = i === 0 ? Math.atan2(plan.fwd.x, plan.fwd.z) : Math.floor(r2 * 4) * (Math.PI / 2);
+          if (r < 0.58) put(houses[Math.floor(r2 * city.SMALL_VARIANTS)], p, face, city.SMALL_SCALE);
+          else if (r < 0.78) {
+            for (let k = 0; k < 3; k++) {
+              const q = p.clone().add(new THREE.Vector3((hash3(k, bx, j) - 0.5) * 4, 0, (hash3(k, bz, i) - 0.5) * 4));
+              put(trees[Math.floor(hash3(k, i, j) * 3)], q, k, 0.7 + hash3(j, k, i) * 0.5);
+            }
+          } else if (r < 0.9) put(cars[Math.floor(r2 * 3)], p.clone().addScaledVector(plan.side, -1.2), face + Math.PI / 2);
+          else put(yards[Math.floor(r2 * 3)], p, face);
+        }
+        continue;
+      }
       const spots = [];
       for (let i = 0; i < 40 && spots.length < 7; i++) {
         const x = bx * B + (hash3(i, bx * 7 + 3, bz * 13 + 11) * 2 - 1) * (half - 2);
@@ -288,6 +340,7 @@ export function createBoard() {
       }
     });
     trees.forEach((list, k) => { if (list.length) group.add(instanced(treeModelHD(k, 1), 0.25, list, { cacheKey: `tree-${k}`, jitter: 0 })); });
+    houses.forEach((list, v) => { if (list.length) group.add(instanced(city.smallBuilding(v), BOARD.buildingScale / 2, list, { cacheKey: `small-${v}`, jitter: 0 })); });
     rocks.forEach((list, k) => { if (list.length) group.add(instanced(rockModelHD(k), 0.25, list, { cacheKey: `rock-${k}`, jitter: 0 })); });
     cars.forEach((list, v) => { if (list.length) group.add(instanced(carModel(v), 0.15, list, { cacheKey: `car-${v}`, jitter: 0 })); });
     if (lamps.length) group.add(instanced(lampModel(), 0.15, lamps, { cacheKey: 'lamp', jitter: 0, castShadow: false }));

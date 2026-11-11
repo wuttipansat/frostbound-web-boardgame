@@ -516,3 +516,19 @@ export function railYard() {
   m.box(44, 1, 22, 1, 14, 1, C.metalDark); m.box(43, 13, 22, 3, 3, 1, 0x15191e); m.set(44, 14, 23, C.neonRed, true);
   return m.snowCap(P.snow, 0.75, 1);
 }
+
+// ---------------------------------------------------------------- MAP-1b: small buildings that fill a block's free chunks
+
+export const SMALL_VARIANTS = 8;
+export const SMALL_SCALE = 0.8; // instance scale (× 0.3 world units per voxel): matches the places shrunk into their chunks
+const SMALL_WALLS = [C.sage, C.cream, C.grey, C.brick, C.ochre, 0x8fa3b8, 0xb9a48a, 0x9b8b9e];
+
+/** A small, closed-up building (not a place you can enter): 1–4 floors, sized to one chunk. */
+export function smallBuilding(v = 0) {
+  const m = new VoxelModel();
+  const w = 16 + (v % 3) * 2; const d = 14 + (v % 2) * 3;
+  const floors = 1 + ((v * 3) % 4);
+  block(m, { x0: -Math.floor(w / 2), z0: -Math.floor(d / 2), w, d, floors, wall: SMALL_WALLS[v % SMALL_WALLS.length], seed: 50 + v, shop: floors <= 2 && v % 2 === 0 });
+  if (v % 4 === 1) graffiti(m, -Math.floor(w / 2) + 2, 2, Math.ceil(d / 2), v);
+  return dust(m);
+}

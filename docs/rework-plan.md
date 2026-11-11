@@ -363,3 +363,8 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - Board: built from the map, one group per block (terrain piece, building / filler model) plus one instanced prop group per growth; old blocks next to new ones get fresh terrain. New blocks rise in order outward from the colony. The usual camera view fits the outline and the zoom-out limit follows it. Five new building models and four new filler blocks in `src/render/city.js`.
 - Bot: reads a map as soon as it is home and weighs the walk when choosing where to go. Balance crawler normal (30 games): 27% (unchanged).
 - Left for items 8–13: chunk-level pop-in with bounce and snow puff, pan-only camera with clamping, culling and merging for big cities, screenshots at stage 4.
+
+### MAP-1b — places in chunks (done)
+- A block's area inside its sidewalks is 3×3 chunks (~6.4 world each). A place covers 2×2 chunks (church and apartment block 1×2; some repeat places such as `grocery-2` are a smaller 2×1 branch) on its street side; its model is scaled to fit (about 0.6–0.85×).
+- The free chunks of a place's block hold small closed-up buildings (8 variants, 1–4 floors, `city.smallBuilding`), a cluster of trees, a parked car or a container stack. All are instanced per growth.
+- A place block is flat ground; survivor pads sit on the sidewalk in front of the place, zombies on its forecourt.
