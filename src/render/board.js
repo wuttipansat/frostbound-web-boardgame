@@ -6,7 +6,7 @@ import { VoxelModel, hash3, MATERIALS, geometriesFor, groupOf, packedBounds } fr
 import { P } from './palette.js';
 import { LOCATION_BUILDERS_HD, colonyHD, treeModelHD, rockModelHD } from './buildings.js';
 import { buildTerrainHD, ROAD } from './terrain.js';
-import { carModel, lampModel, containerModel, clutterModel, CLUTTER_KINDS, crossingModel, wagonModel, shelterModel, FURNITURE, furnitureModel, trafficLightModel, streetSignModel, powerPoleModel, vehicleModel, checkpointModel, burntCarModel, tentModel, statueModel } from './props.js';
+import { carModel, lampModel, containerModel, clutterModel, CLUTTER_KINDS, crossingModel, wagonModel, bufferStopModel, FURNITURE, furnitureModel, trafficLightModel, streetSignModel, powerPoleModel, vehicleModel, checkpointModel, burntCarModel, tentModel, statueModel } from './props.js';
 import { markingQuads, lampSpots, railQuads, streetRuns } from './streets.js';
 import { blockSlab, GROUND } from './ground.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -81,8 +81,20 @@ const edgesOf = (bx, bz) => [chunksOf(bx) * CHUNK / 2, chunksOf(bz) * CHUNK / 2]
 // Chunks a place covers: [wide, deep] (default 2×2); narrow, tall buildings take one column.
 const FOOT = { church: [1, 2] };
 
+/**
+ * MAP-3 E: the railway runs through the middle chunk row of one block row (or column) next to the colony's, across
+ * the whole city: { axis: 'x' | 'z' (direction of the track), r (that row / column), c (world line) }.
+ */
+export function railLine(m) {
+  const look = m?.look ?? 0;
+  const axis = hash3(look, 3, 1) < 0.5 ? 'x' : 'z';
+  const r = hash3(look, 5, 2) < 0.5 ? 1 : -1;
+  return { axis, r, c: blockPos(r), look };
+}
+const RAIL_CLEAR = 2.2; // half the corridor kept clear of buildings and props
+
 /** Where a place sits in its block: front direction, footprint (in chunks), centre and the chunks it covers. */
-export function placePlan(id, type, bx, bz, roads, foot = null, front = null) {
+export function placePlan(id, type, bx, bz, roads, foot = null, front = null, rail = null) {
   const c = new THREE.Vector3(blockPos(bx), GROUND, blockPos(bz)); // MAP-3 D: blocks are raised slabs
   const fronts = { z: `${bx},${bz + 1},h`, x: `${bx + 1},${bz},v`, '-z': `${bx},${bz},h`, '-x': `${bx},${bz},v` };
   // MAP-1d: the block's stored front (older maps: work it out from the streets).
@@ -96,21 +108,29 @@ export function placePlan(id, type, bx, bz, roads, foot = null, front = null) {
   const alongX = toFront[0] !== 0;
   const rows = chunksOf(alongX ? bx : bz); const cols = chunksOf(alongX ? bz : bx);
   const edge = rows * CHUNK / 2; // block centre → front sidewalk
+  // MAP-3 E: in the rail row the middle chunk row (across the track) stays free: places shrink to one row / column.
+  let railCut = null;
+  if (rail && (rail.axis === 'x' ? bz : bx) === rail.r) {
+    const trackAlongRows = (rail.axis === 'x') === alongX; // track runs along the plan's rows (cuts a column)
+    if (trackAlongRows) { railCut = { col: Math.floor(cols / 2) }; fw = Math.min(fw, Math.floor(cols / 2)); }
+    else { railCut = { row: 1 }; fd = 1; }
+  }
   // MAP-3 E: a gas station takes a corner of its block (the canopy meets two streets); others any column.
-  const col = type === 'gas' ? (hash3(bx, 43, bz) < 0.5 ? 0 : cols - fw) : Math.floor(hash3(bx, 43, bz) * (cols + 1 - fw)); // first lateral column
+  let col = type === 'gas' ? (hash3(bx, 43, bz) < 0.5 ? 0 : cols - fw) : Math.floor(hash3(bx, 43, bz) * (cols + 1 - fw)); // first lateral column
+  if (railCut?.col !== undefined && col <= railCut.col && col + fw > railCut.col) col = hash3(bx, 45, bz) < 0.5 ? 0 : railCut.col + 1;
   const lat = (col + fw / 2 - cols / 2) * CHUNK;
   const fwdC = edge - fd * CHUNK / 2;
   const covered = [];
   for (let i = 0; i < fd; i++) for (let j = col; j < col + fw; j++) covered.push(`${i},${j}`); // i: row from the front
   const at = (forward, lateral) => c.clone().addScaledVector(fwd, forward).addScaledVector(side, lateral);
-  return { c, fwd, side, fw, fd, lat, rows, cols, edge, center: at(fwdC, lat), covered, at };
+  return { c, fwd, side, fw, fd, lat, rows, cols, edge, center: at(fwdC, lat), covered, at, railCut };
 }
 
 /** World centre of chunk (row i from the front, column j) of a block. */
 export const chunkCenter = (plan, i, j) => plan.at(plan.edge - (i + 0.5) * CHUNK, (j + 0.5 - plan.cols / 2) * CHUNK);
 
-function placeLayout(id, type, bx, bz, roads, front) {
-  const plan = placePlan(id, type, bx, bz, roads, null, front);
+function placeLayout(id, type, bx, bz, roads, front, rail) {
+  const plan = placePlan(id, type, bx, bz, roads, null, front, rail);
   const { at, lat, edge: EDGE } = plan;
   const nSurv = LOCATIONS[type]?.survivorSlots ?? 3;
   return {
@@ -151,9 +171,10 @@ function colonyLayout() {
 /** Board-space layout for every place on a map (positions, facing, slot anchors). */
 export function computeLayout(map = LEGACY_MAP, into = {}) {
   const roads = new Set(map.roads);
+  const rail = railLine(map);
   for (const [k, b] of Object.entries(map.blocks)) {
     if (b.kind !== 'place' || into[b.placeId]) continue;
-    into[b.placeId] = placeLayout(b.placeId, b.type ?? b.placeId, ...parse(k), roads, b.front);
+    into[b.placeId] = placeLayout(b.placeId, b.type ?? b.placeId, ...parse(k), roads, b.front, rail);
   }
   into.colony ??= colonyLayout();
   return into;
@@ -213,7 +234,8 @@ export function blockPieces(b, bx, bz, plan, recipe = RECIPES[b.kind] ?? RECIPES
   const last = cols.length ? Math.min(Math.min(...cols), plan.cols - 3) : plan.cols - 3;
   const w0 = first + Math.floor(h(1) * (last - first + 1));
   const win = [];
-  for (let i = 0; i < 2; i++) for (let j = w0; j < w0 + 3; j++) if (!plan.covered.includes(`${i},${j}`)) win.push([i, j]);
+  const onRail = (i, j) => plan.railCut && (plan.railCut.row === i || plan.railCut.col === j);
+  for (let i = 0; i < 2; i++) for (let j = w0; j < w0 + 3; j++) if (!plan.covered.includes(`${i},${j}`) && !onRail(i, j)) win.push([i, j]);
   win.sort((a, c) => a[0] - c[0] || hash3(bx + a[1], 75, bz) - hash3(bx + c[1], 75, bz)); // front row first
   const built = plan.covered.length; // chunks already taken by the place / centrepiece
   let n;
@@ -230,7 +252,7 @@ export function blockPieces(b, bx, bz, plan, recipe = RECIPES[b.kind] ?? RECIPES
   // Open chunks: one bench or one tree in some of them.
   for (let i = 0; i < plan.rows; i++) for (let j = 0; j < plan.cols; j++) {
     const k = `${i},${j}`;
-    if (used.has(k) || plan.covered.includes(k)) continue;
+    if (used.has(k) || plan.covered.includes(k) || onRail(i, j)) continue;
     const r = hash3(bx * 11 + j, 79 + i, bz * 11 + i);
     if (r < 0.14) out.push([i, j, 'bench']);
     else if (r < (b.kind === 'park' ? 0.6 : 0.3)) out.push([i, j, 'tree']);
@@ -539,6 +561,7 @@ export function createBoard({ progressive = false } = {}) {
     const group = new THREE.Group(); group.name = 'props';
     const trees = [[], [], []]; const rocks = [[], [], []]; const cars = [[], [], [], []]; const yards = [[], [], []];
     const lampsAt = lampSpots(streets.filter(([, , seg]) => seg !== 'gate'));
+    const railRow = railLine(map);
     const free = (x, z, b) => {
       for (const [a, c] of streets) if (distToSegment(x, z, a, c) < ROAD.walk) return false;
       if (b.kind === 'colony') return Math.hypot(x, z) > BOARD.colonyRadius + 3;
@@ -556,7 +579,7 @@ export function createBoard({ progressive = false } = {}) {
         // MAP-1b/c: a block is 3×3 chunks. A place (or a decoration block's centrepiece) takes some on the street
         // side; the rest hold small buildings, shops, trees, cars, container stacks, ruins or clutter.
         const cp = CENTERPIECE[b.kind];
-        const plan = b.kind === 'place' ? layout[b.placeId].plan : placePlan(`${b.kind}@`, b.kind, bx, bz, roadSet, cp ? [cp[1], cp[2]] : [0, 0], b.front);
+        const plan = b.kind === 'place' ? layout[b.placeId].plan : placePlan(`${b.kind}@`, b.kind, bx, bz, roadSet, cp ? [cp[1], cp[2]] : [0, 0], b.front, railLine(map));
         const district = districtOf(bx, bz, map.look);
         const recipe = b.kind === 'park' ? RECIPES.park : DISTRICT_RECIPES[district] ?? RECIPES[b.kind] ?? RECIPES.place;
         const face0 = Math.atan2(plan.fwd.x, plan.fwd.z);
@@ -626,6 +649,7 @@ export function createBoard({ progressive = false } = {}) {
           tmp.position.copy(at(0.15 + h(12 + k) * 0.7, (k ? -1 : 1) * (ROAD.walk - 0.9))).setY(GROUND);
           // Lamps win: clutter steps along the sidewalk, out of a lamp's way.
           for (let n = 0; n < 4 && lampsAt.some((l) => Math.hypot(l.x - tmp.position.x, l.z - tmp.position.z) < 1.6); n++) tmp.position.addScaledVector(dir, 1.7);
+          if (Math.abs((railRow.axis === 'x' ? tmp.position.z : tmp.position.x) - railRow.c) < RAIL_CLEAR + 0.6) continue; // not on the track
           tmp.rotation.set(0, h(14 + k) * 6, 0); tmp.scale.setScalar(1); tmp.updateMatrix();
           clutter[Math.floor(h(16 + k) * (CLUTTER_KINDS - 1))].push(tmp.matrix.clone());
         }
@@ -658,7 +682,7 @@ export function createBoard({ progressive = false } = {}) {
     const segs = streets.filter(([, , seg]) => seg !== 'gate');
     const ground = (x, z) => { const bx = gridOf(x); const bz = gridOf(z); return has(bx, bz) && edgeDist(bx, bz)(x, z) >= 3; };
     const rail = railOf(map);
-    const q = markingQuads(segs, ground, 0.03, rail.pieces.length ? rail : null);
+    const q = markingQuads(segs, ground, 0.03);
     if (q.index.length) {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(q.position, 3));
@@ -668,7 +692,8 @@ export function createBoard({ progressive = false } = {}) {
       const m = new THREE.Mesh(g, MARK_MAT); m.receiveShadow = true; m.name = 'markings';
       decor.add(m);
     }
-    const spots = lampSpots(segs, ground);
+    const posts = railCrossings(rail);
+    const spots = lampSpots(segs, ground).filter((l) => !posts.some((p) => Math.hypot(p.x - l.x, p.z - l.z) < 2.5) && Math.abs((rail.axis === 'x' ? l.z : l.x) - rail.c) > RAIL_CLEAR + 0.6);
     const lit = []; const dead = []; const poolList = [];
     flickers = [];
     for (const l of spots) {
@@ -688,15 +713,16 @@ export function createBoard({ progressive = false } = {}) {
       pools.renderOrder = 1; pools.name = 'lamp-pools';
       decor.add(pools);
     }
-    buildRailway(rail, segs);
+    buildRailway(rail);
     buildFurniture(rail, segs, ground, spots);
     trackGlow(decor);
   }
 
   // ---------------------------------------------------------------- MAP-3 E2: street furniture, power lines, the evacuation route
   // Everything here is merged into one lit mesh + one glow mesh for the whole city (2 draw calls).
-  function buildFurniture(rail, segs, ground, lamps) {
+  function buildFurniture(rail, segs, ground0, lamps) {
     const lit = []; const glow = [];
+    const ground = (x, z) => ground0(x, z) && Math.abs((rail.axis === 'x' ? z : x) - rail.c) > RAIL_CLEAR + 0.6; // nothing on the track
     const _q = new THREE.Quaternion(); const _e = new THREE.Euler();
     const add = (key, make, size, x, y, z, yaw, tilt = 0, tiltAxis = 'x') => {
       const g = geometriesFor(key, { size, jitter: 0 }, make);
@@ -775,8 +801,9 @@ export function createBoard({ progressive = false } = {}) {
     }
     // The evacuation route: the street on the other axis beside the colony, cars abandoned nose to tail in the
     // outbound lane, a bus, a jack-knifed truck, and an army checkpoint near the colony.
-    const eAxis = rail.axis === 'x' ? 'z' : 'x';
-    const eC = blockPos(1 - rail.ci) - blockHalf(1 - rail.ci);
+    const eAxis = rail.axis;
+    const eLine = rail.r > 0 ? 0 : 1; // the colony-row edge away from the railway
+    const eC = blockPos(eLine) - blockHalf(eLine);
     const eRuns = runs.filter((r) => r.axis === eAxis && Math.abs(r.c - eC) < 0.01);
     let truck = false; let bus = false;
     eRuns.forEach((r) => {
@@ -867,25 +894,41 @@ export function createBoard({ progressive = false } = {}) {
   }
 
   // ---------------------------------------------------------------- MAP-3 E: the railway
-  /** The railway: one seeded grid line next to the colony row, both ways across the city: { axis, c, ci, pieces }. */
+  /** The railway through the rail row: pieces [t0, t1, kind, y0] where there is ground (slab, crossing or back lane). */
   function railOf(m) {
-    const look = m.look ?? 0;
-    const axis = hash3(look, 3, 1) < 0.5 ? 'x' : 'z';
-    const ci = hash3(look, 5, 2) < 0.5 ? 0 : 1; // the line on one side of the colony's row / column
-    const c = blockPos(ci) - blockHalf(ci);
-    const roads = new Set(m.roads);
+    const rail = railLine(m);
     const pieces = [];
-    const along = Object.keys(m.blocks).map((k) => parse(k)[axis === 'x' ? 0 : 1]);
+    const along = Object.keys(m.blocks).map((k) => parse(k)[rail.axis === 'x' ? 0 : 1]);
+    const inRow = (b) => (rail.axis === 'x' ? has(b, rail.r) : has(rail.r, b));
+    const roads = new Set(m.roads);
     for (let b = Math.min(...along); b <= Math.max(...along); b++) {
-      const sideA = axis === 'x' ? has(b, ci - 1) : has(ci - 1, b); const sideB = axis === 'x' ? has(b, ci) : has(ci, b);
-      if (!sideA || !sideB) continue; // only where there is ground on both sides
-      const road = roads.has(axis === 'x' ? `${b},${ci},h` : `${ci},${b},v`);
-      pieces.push([blockPos(b) - blockHalf(b), blockPos(b) + blockHalf(b), road]);
+      if (!inRow(b)) continue;
+      const h = blockHalf(b) - ROAD.half; // slab half length along the track
+      pieces.push([blockPos(b) - h, blockPos(b) + h, 'slab', GROUND]);
+      if (inRow(b + 1)) { // the street (or back lane) between this block and the next
+        const line = blockPos(b) + blockHalf(b);
+        const road = roads.has(rail.axis === 'x' ? `${b + 1},${rail.r},v` : `${rail.r},${b + 1},h`);
+        pieces.push([line - ROAD.half, line + ROAD.half, road ? 'road' : 'lane', 0]);
+      }
     }
-    return { axis, c, ci, pieces, look };
+    return { ...rail, pieces };
+  }
+  /** Level crossings: where a street crosses the track, two warning posts (one each side, on the right). */
+  function railCrossings(rail) {
+    const out = [];
+    for (const [t0, t1, kind] of rail.pieces ?? []) {
+      if (kind !== 'road') continue;
+      const line = (t0 + t1) / 2;
+      [-1, 1].forEach((s, i) => {
+        const along = rail.axis === 'x' ? [line + s * (ROAD.kerb + 0.4), rail.c + s * 3.2] : [rail.c + s * 3.2, line + s * (ROAD.kerb + 0.4)];
+        const d = rail.axis === 'x' ? [-s, 0] : [0, -s]; // the arm reaches over the street
+        out.push({ x: along[0], z: along[1], dx: d[0], dz: d[1], up: hash3(Math.round(line), i, rail.look) < 0.25 });
+      });
+    }
+    return out;
   }
   const placeOnRail = (rail, t, lat, yaw = 0) => (rail.axis === 'x' ? [t, rail.c + lat, yaw] : [rail.c + lat, t, yaw + Math.PI / 2]);
-  function buildRailway(rail, segs) {
+  function buildRailway(rail) {
     if (!rail.pieces.length) return;
     const q = railQuads(rail, rail.pieces);
     const g = new THREE.BufferGeometry();
@@ -893,59 +936,44 @@ export function createBoard({ progressive = false } = {}) {
     g.setIndex(new THREE.BufferAttribute(q.index, 1));
     const mesh = new THREE.Mesh(g, MATERIALS.lit); mesh.receiveShadow = true; mesh.name = 'railway';
     decor.add(mesh);
-    // Level crossings: where a street crosses the line, a post with a crossbuck, lamps and an arm on each side.
-    const { nodes } = streetRuns(segs);
-    const onLine = (n) => (rail.axis === 'x' ? Math.abs(n.z - rail.c) < 0.01 : Math.abs(n.x - rail.c) < 0.01);
-    const inRail = (t) => rail.pieces.some(([a, b]) => t >= a - 0.01 && t <= b + 0.01);
-    const cross = nodes.filter((n) => onLine(n) && inRail(rail.axis === 'x' ? n.x : n.z) && [...n.dirs].some((d) => d[1] !== rail.axis));
+    // Warning posts with crossbucks, red lamps (one dead) and arms, at every level crossing.
     const posts = { down: [], up: [] };
-    const off = (up) => { const { min, max } = crossingModel(up).bounds(); return ((min[0] + max[0]) / 2) * 0.1; }; // pole → model centre
-    cross.forEach((n, i) => {
-      for (const s of [-1, 1]) {
-        const up = hash3(i, s + 3, rail.look) < 0.25;
-        const across = rail.axis === 'x' ? [0, s] : [s, 0];           // along the cross street, away from the rails
-        const right = rail.axis === 'x' ? [s, 0] : [0, -s];           // the sidewalk on the approach's right
-        const px = n.x + across[0] * (ROAD.walk + 1.2) + right[0] * (ROAD.kerb + 0.4);
-        const pz = n.z + across[1] * (ROAD.walk + 1.2) + right[1] * (ROAD.kerb + 0.4);
-        const dx = -right[0]; const dz = -right[1];                   // the arm reaches over the road
-        const o = off(up);
-        tmp.position.set(px + dx * o, GROUND, pz + dz * o); tmp.rotation.set(0, Math.atan2(-dz, dx), 0); tmp.scale.setScalar(1); tmp.updateMatrix();
-        posts[up ? 'up' : 'down'].push(tmp.matrix.clone());
-      }
-    });
-    for (const k of ['down', 'up']) if (posts[k].length) decor.add(tagLod(instanced(() => crossingModel(k === 'up'), 0.1, posts[k], { cacheKey: `crossing-${k}`, jitter: 0, castShadow: false }), 'near'));
-    // Stretches between crossings: a stranded freight train on one, a small station on another.
-    const cuts = cross.map((n) => (rail.axis === 'x' ? n.x : n.z)).sort((a, b) => a - b);
-    const stretches = [];
-    for (const [a, b] of rail.pieces) {
-      let lo = a;
-      for (const cpos of [...cuts.filter((t) => t > a && t < b), b]) { const s0 = lo + (lo === a && !cuts.includes(a) ? 0.5 : 8); const s1 = cpos - (cpos === b && !cuts.includes(b) ? 0.5 : 8); if (s1 - s0 > 9) stretches.push([s0, s1]); lo = cpos; }
+    const off = (up) => { const { min, max } = crossingModel(up).bounds(); return ((min[0] + max[0]) / 2) * 0.1; };
+    for (const p of railCrossings(rail)) {
+      const o = off(p.up);
+      tmp.position.set(p.x + p.dx * o, GROUND, p.z + p.dz * o); tmp.rotation.set(0, Math.atan2(-p.dz, p.dx), 0); tmp.scale.setScalar(1); tmp.updateMatrix();
+      posts[p.up ? 'up' : 'down'].push(tmp.matrix.clone());
     }
-    if (!stretches.length) return;
-    const pick = Math.floor(hash3(rail.look, 7, 3) * stretches.length);
-    const [s0, s1] = stretches[pick];
+    for (const k of ['down', 'up']) if (posts[k].length) decor.add(tagLod(instanced(() => crossingModel(k === 'up'), 0.1, posts[k], { cacheKey: `crossing-${k}`, jitter: 0, castShadow: false }), 'near'));
+    // A derailed freight train on the longest open stretch of slab: wagons on the track, the last two overturned
+    // beside it on their sides; a warning sign and a buffer stop where the line ends at the city's edge.
+    const slabs = rail.pieces.filter((p) => p[2] === 'slab').sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]) || a[0] - b[0]);
     const kinds = ['box', 'tank', 'hopper'];
     const wagons = { box: [], tank: [], hopper: [] };
-    const n = Math.max(1, Math.min(4, Math.floor((s1 - s0) / 12.6)));
+    const blocksOnRow = rail.pieces.filter((p) => p[2] === 'slab');
+    const pick = blocksOnRow[Math.floor(hash3(rail.look, 7, 3) * blocksOnRow.length)] ?? slabs[0];
+    const [s0, s1] = pick;
+    const n = Math.max(1, Math.min(3, Math.floor((s1 - s0 - 1) / 12.6)));
     for (let k = 0; k < n; k++) {
       const kind = kinds[Math.floor(hash3(k, rail.look, 9) * 3)];
-      const t = s0 + 6.3 + k * 12.6;
-      const tipped = k === n - 1 && n > 1;
-      // The last wagon has come off the rails: skewed across the track, one end in the next lane.
-      const [x, z, yaw] = placeOnRail(rail, t, tipped ? 0.7 : 0);
-      tmp.position.set(x, 0.12, z);
-      tmp.rotation.set(0, yaw + (tipped ? 0.2 : 0), tipped ? 0.06 : 0, 'YXZ'); tmp.scale.setScalar(1); tmp.updateMatrix();
+      const t = s0 + 0.8 + 6.3 + k * 12.6;
+      const over = k >= n - 1 && n > 1;
+      const [x, z, yaw] = placeOnRail(rail, t, over ? 1.7 : 0);
+      tmp.position.set(x, GROUND + (over ? 1.35 : 0.16), z);
+      // Overturned: rolled onto its side (about the track direction), slightly skewed.
+      tmp.rotation.set(over ? -Math.PI / 2 : 0, yaw + (over ? 0.12 : 0), 0, 'YXZ'); tmp.scale.setScalar(1); tmp.updateMatrix();
       wagons[kind].push(tmp.matrix.clone());
     }
     for (const k of kinds) if (wagons[k].length) decor.add(instanced(() => wagonModel(k, rail.look % 5), 0.3, wagons[k], { cacheKey: `wagon-${k}-${rail.look % 5}`, jitter: 0 }));
-    if (stretches.length > 1) {
-      const [h0, h1] = stretches[(pick + 1) % stretches.length];
-      const side = hash3(rail.look, 11, 5) < 0.5 ? -1 : 1;
-      const [x, z, yaw] = placeOnRail(rail, (h0 + h1) / 2, side * (ROAD.half - 0.7), side > 0 ? Math.PI : 0); // the platform edge faces the rails
-      tmp.position.set(x, 0, z); tmp.rotation.set(0, yaw, 0); tmp.scale.setScalar(1); tmp.updateMatrix();
-      decor.add(instanced(shelterModel, 0.1, [tmp.matrix.clone()], { cacheKey: 'shelter', jitter: 0 }));
-    }
+    // Buffer stops at both ends of the line, with a warning sign.
+    const ends = [rail.pieces[0][0] + 0.6, rail.pieces[rail.pieces.length - 1][1] - 0.6];
+    ends.forEach((t, i) => {
+      const [x, z, yaw] = placeOnRail(rail, t, 0, i ? Math.PI : 0);
+      tmp.position.set(x, GROUND, z); tmp.rotation.set(0, yaw, 0); tmp.scale.setScalar(1); tmp.updateMatrix();
+      decor.add(instanced(bufferStopModel, 0.1, [tmp.matrix.clone()], { cacheKey: `buffer-${i}`, jitter: 0 }));
+    });
   }
+
 
   // The slab's soft shadow on the backdrop (follows the city's outline).
   const shadow = (() => {

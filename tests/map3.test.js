@@ -206,3 +206,18 @@ test('places belong to the street (part E): gas stations take a block corner; ev
     }
   }
 });
+
+test('railway corridor: places and pieces in the rail row keep its middle chunks free', async () => {
+  const { railLine } = await import('../src/render/board.js');
+  for (const s of cities()) {
+    const rail = railLine(s.map); const roads = new Set(s.map.roads); const layout = computeLayout(s.map);
+    for (const [k, b] of Object.entries(s.map.blocks)) {
+      const [bx, bz] = k.split(',').map(Number);
+      if ((rail.axis === 'x' ? bz : bx) !== rail.r || b.kind === 'colony') continue;
+      const plan = b.kind === 'place' ? layout[b.placeId].plan : placePlan(`${b.kind}@`, b.kind, bx, bz, roads, [1, 1], b.front, rail);
+      assert.ok(plan.railCut, `${k} knows the track`);
+      const used = [...plan.covered, ...blockPieces(b, bx, bz, plan).map(([i, j]) => `${i},${j}`)];
+      for (const c of used) { const [i, j] = c.split(',').map(Number); assert.ok(plan.railCut.row !== i && plan.railCut.col !== j, `${k}: ${c} on the track`); }
+    }
+  }
+});

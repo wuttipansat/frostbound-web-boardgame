@@ -246,3 +246,13 @@ export function statueModel() {
   m.box(-1, 11, -1, 3, 8, 3, 0x5f7f6a); m.box(-3, 16, -1, 7, 2, 2, 0x5f7f6a); m.box(0, 19, 0, 2, 3, 2, 0x5f7f6a); m.box(3, 18, 0, 1, 5, 1, 0x5f7f6a);
   return m.snowCap(P.snow, 1, 2);
 }
+
+/** A buffer stop at the end of the line (0.1 world per voxel, facing +x): a steel frame, a red-white board, a lamp. */
+export function bufferStopModel() {
+  const m = new VoxelModel();
+  for (const z of [-8, 7]) { m.box(-4, 0, z, 1, 10, 1, 0x3a3f46); for (let k = 0; k < 8; k++) m.set(-4 + k, k, z, 0x3a3f46); }
+  m.box(-5, 6, -9, 2, 4, 18, 0x2a2d31);
+  for (let z = -9; z < 9; z++) for (let y = 7; y < 10; y++) m.set(-3, y, z, Math.floor((z + 9) / 3) % 2 ? 0xc0392b : 0xf0f0ea);
+  m.box(-4, 10, -1, 1, 6, 1, 0x3a3f46); m.box(-4, 16, -2, 1, 3, 3, 0xff3a2a, true);
+  return m.snowCap(P.snow, 1, 2);
+}
