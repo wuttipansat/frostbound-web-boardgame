@@ -178,3 +178,12 @@ test('railway (part E): one straight seeded line, continuous across blocks, the 
   assert.ok(axisX ? Math.abs((a.min.z + a.max.z) - (b.min.z + b.max.z)) < 0.01 : Math.abs((a.min.x + a.max.x) - (b.min.x + b.max.x)) < 0.01, 'same line after growth');
   assert.ok(axisX ? b.max.x - b.min.x >= a.max.x - a.min.x : b.max.z - b.min.z >= a.max.z - a.min.z, 'it grows with the city');
 });
+
+test('districts (part E): stable per game, all three kinds appear in a grown city', async () => {
+  const { districtOf } = await import('../src/render/board.js');
+  const s = cities()[1];
+  const kinds = new Set(Object.keys(s.map.blocks).map((k) => districtOf(...k.split(',').map(Number), s.map.look)));
+  for (const d of ['downtown', 'residential', 'industrial']) assert.ok(kinds.has(d), d);
+  assert.equal(districtOf(2, 1, 9), districtOf(2, 1, 9));
+  assert.ok(typeof s.map.look === 'number');
+});

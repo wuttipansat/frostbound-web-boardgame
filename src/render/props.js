@@ -120,3 +120,95 @@ export function shelterModel() {
   m.box(-6, 14, -6, 12, 6, 1, 0x1d3557); m.box(-5, 16, -5, 10, 2, 1, 0xe8e8e2); // name board
   return m.snowCap(P.snow, 1, 3);
 }
+
+// ---------------------------------------------------------------- MAP-3 E2: street furniture (fine grid, 0.1 world per voxel)
+
+/** Kinds of small sidewalk furniture. */
+export const FURNITURE = ['hydrant', 'bin', 'postbox', 'newsbox', 'phone', 'busstop'];
+
+/** One piece of street furniture; front (+z) faces the road. */
+export function furnitureModel(kind) {
+  const m = new VoxelModel();
+  switch (kind) {
+    case 'hydrant': m.box(-1, 0, -1, 3, 1, 3, 0x8e2a22); m.box(-1, 1, -1, 3, 5, 3, 0xc0392b); m.box(-2, 3, 0, 5, 1, 1, 0xc0392b); m.box(0, 6, 0, 1, 1, 1, 0xe0c060); break;
+    case 'bin': m.box(-2, 0, -2, 4, 6, 4, 0x2f5a3f); m.box(-2, 6, -2, 4, 1, 4, 0x24452f); m.box(-1, 4, 2, 2, 1, 1, 0x1c1f24); break;
+    case 'postbox': m.box(-2, 0, -2, 4, 1, 4, 0x1d2f55); m.box(-2, 1, -1, 4, 8, 3, 0x2b4a8c); m.box(-1, 6, 2, 2, 1, 1, 0x1c1f24); m.box(-2, 9, -1, 4, 1, 3, 0x1d2f55); break;
+    case 'newsbox': m.box(-2, 0, -1, 4, 6, 3, 0xd8b03a); m.box(-1, 3, 2, 2, 2, 1, 0x9fb4c8); break;
+    case 'phone':
+      for (const [x, z] of [[-3, -3], [2, -3], [-3, 2], [2, 2]]) m.box(x, 0, z, 1, 20, 1, 0xa83228);
+      m.box(-3, 20, -3, 6, 2, 6, 0xa83228); m.box(-2, 17, 2, 4, 2, 1, 0xf0e6c8, true);
+      for (let y = 2; y < 16; y++) for (let k = -2; k < 2; k++) { if (y % 4) { m.set(k, y, -3, 0x9fb4c8); m.set(-3, y, k, 0x9fb4c8); m.set(2, y, k, 0x9fb4c8); } }
+      m.box(-1, 8, -2, 2, 3, 1, 0x1c1f24); break;
+    case 'busstop':
+      for (const x of [-10, 9]) m.box(x, 0, -2, 1, 17, 1, 0x2a2f36);
+      m.box(-11, 17, -3, 22, 1, 6, 0x3a4652);
+      for (let x = -9; x < 9; x++) for (let y = 3; y < 16; y++) if (x % 6) m.set(x, y, -2, 0xa9c4d8);
+      m.box(-6, 3, -1, 12, 1, 3, 0x6b5a48); m.box(-6, 0, 0, 1, 3, 1, 0x2a2f36); m.box(5, 0, 0, 1, 3, 1, 0x2a2f36);
+      m.box(12, 0, 1, 1, 22, 1, 0x2a2f36); m.box(11, 18, 1, 4, 4, 1, 0x2b6cb0); m.set(12, 19, 2, 0xf0f0ea); break;
+    default:
+  }
+  return m.snowCap(P.snow, 1, 2);
+}
+
+/** A traffic light on a pole with an arm over the road (+x): state 'red' | 'amber' | 'dead'. */
+export function trafficLightModel(state = 'red') {
+  const m = new VoxelModel();
+  m.box(-1, 0, -1, 3, 1, 3, 0x2a2f36); m.box(0, 1, 0, 1, 34, 1, 0x3a4048); m.box(1, 33, 0, 16, 1, 1, 0x3a4048);
+  m.box(14, 25, -1, 3, 8, 3, 0x1c1f24);
+  const lamp = (y, on, c) => m.box(15, y, 2, 1, 2, 1, on ? c : 0x2a2a2a, on);
+  lamp(30, state === 'red', 0xff3a2a); lamp(28, state === 'amber', 0xffb02a); lamp(26, false, 0x3aff7a);
+  m.box(-1, 14, 1, 3, 4, 1, 0xe8e8e2); // push-button box
+  return m.snowCap(P.snow, 1, 2);
+}
+
+/** A street name sign: pole with two crossed green plates. */
+export function streetSignModel() {
+  const m = new VoxelModel();
+  m.box(0, 0, 0, 1, 26, 1, 0x3a4048);
+  m.box(-6, 24, 1, 13, 2, 1, 0x1f6b45); m.box(1, 21, -6, 1, 2, 13, 0x1f6b45);
+  for (let k = -5; k < 6; k += 2) m.set(k, 25, 2, 0xf0f0ea);
+  return m.snowCap(P.snow, 1, 2);
+}
+
+/** A wooden power pole (7 world high) with a cross arm and insulators along x. */
+export function powerPoleModel() {
+  const m = new VoxelModel();
+  m.box(0, 0, 0, 1, 70, 1, 0x5e4129);
+  m.box(-10, 64, 0, 21, 1, 1, 0x4a3420);
+  for (const x of [-9, 0, 9]) m.set(x, 65, 0, 0x8fb4c8);
+  m.box(-1, 52, -1, 3, 3, 3, 0x6c7580); // transformer
+  return m.snowCap(P.snow, 1, 2);
+}
+
+/** Evacuation-route vehicles (0.15 world per voxel, length along x): a bus, a truck cab and its trailer. */
+export function vehicleModel(kind = 'bus', v = 0) {
+  const m = new VoxelModel();
+  const wheels = (x0, x1, z) => { for (const x of [x0, x1]) { m.box(x, 0, -z, 3, 3, 1, 0x15171a); m.box(x, 0, z - 1, 3, 3, 1, 0x15171a); } };
+  if (kind === 'bus') {
+    const c = v % 2 ? 0xd8b03a : 0x2f6b8f;
+    m.box(-28, 2, -8, 56, 14, 16, c); m.box(-28, 16, -8, 56, 1, 16, 0xdde3e8);
+    for (let x = -25; x < 24; x += 6) { m.box(x, 9, 8, 4, 5, 1, 0x2c3b4c); m.box(x, 9, -9, 4, 5, 1, 0x2c3b4c); }
+    m.box(27, 7, -6, 1, 8, 12, 0x2c3b4c); m.box(27, 4, -6, 1, 2, 2, 0xfff1c2); m.box(27, 4, 4, 1, 2, 2, 0xfff1c2);
+    wheels(-20, 16, 8);
+  } else if (kind === 'cab') {
+    m.box(-8, 2, -7, 16, 12, 14, 0x9a2f28); m.box(5, 8, -6, 3, 4, 12, 0x2c3b4c); m.box(-8, 14, -6, 4, 4, 12, 0x9a2f28);
+    m.box(8, 3, -6, 1, 4, 12, 0x8e979f); wheels(-6, 3, 7);
+  } else { // trailer
+    m.box(-30, 3, -8, 60, 16, 16, 0xd9d6cc); m.box(-30, 3, -8, 60, 1, 16, 0x6c7580);
+    for (let x = -26; x < 26; x += 9) m.box(x, 8, 8, 6, 4, 1, 0xa83228);
+    wheels(-26, -18, 8); m.box(20, 0, -6, 1, 3, 12, 0x6c7580);
+  }
+  return m.snowCap(P.snow, 1, 3);
+}
+
+/** An abandoned army checkpoint (0.1 world per voxel, along x): sandbag walls, a striped barrier, a tent. */
+export function checkpointModel() {
+  const m = new VoxelModel();
+  const bags = (x0, z0, len, alongX) => { for (let t = 0; t < len; t++) for (let y = 0; y < 5; y++) { const x = alongX ? x0 + t : x0; const z = alongX ? z0 : z0 + t; m.set(x, y, z, (t + y) % 3 ? 0xb8a47a : 0xa8946a); m.set(x + (alongX ? 0 : 1), y, z + (alongX ? 1 : 0), 0xb8a47a); } };
+  bags(-30, -12, 14, true); bags(-30, -12, 10, false); bags(16, 10, 14, true); bags(29, 2, 10, false);
+  m.box(-2, 0, -12, 2, 10, 2, 0x2a2f36);
+  for (let k = 0; k < 24; k++) m.set(0 + k, 9, -11, Math.floor(k / 3) % 2 ? 0xc0392b : 0xf0f0ea);
+  for (let y = 0; y < 12; y++) m.box(-12 + Math.floor(y / 2), y, 2, 22 - y, 1, 14, y % 4 ? 0x5d6b3a : 0x4b5730); // tent
+  m.box(-1, 0, 15, 4, 8, 1, 0x2a2622);
+  return m.snowCap(P.snow, 1, 2);
+}
