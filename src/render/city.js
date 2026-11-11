@@ -221,11 +221,15 @@ export function policeStation() {
   m.box(14, 8, d, 12, 1, 3, C.trim); // entrance canopy
   neon(m, 'POLICE', 20, 12, d, C.neonBlue, 3);
   m.box(6, 21, 10, 3, 2, 3, 0xff3b3b, true); m.box(9, 21, 10, 3, 2, 3, 0x3b7bff, true); // light bar on the roof
-  // Cruiser at the kerb.
-  m.box(26, 1, d + 4, 12, 3, 6, P.white); m.box(29, 4, d + 4, 6, 2, 6, 0x1d2840);
-  m.box(31, 6, d + 6, 2, 1, 2, 0xff3b3b, true);
-  for (const [x, z] of [[27, d + 3], [35, d + 3], [27, d + 9], [35, d + 9]]) m.box(x, 0, z, 2, 2, 1, 0x15171a);
-  for (let x = 2; x < 12; x += 3) m.box(x, 1, d + 6, 2, 3, 1, (x / 3) % 2 ? 0xe8b830 : C.trim); // barriers
+  // MAP-3 group 2: bars on the ground-floor windows, a flag on a pole, a radio mast, sandbags by the door,
+  // a fenced holding yard with razor wire at the side, notices on the wall. (Cruisers and barriers stand at the kerb.)
+  for (let x = 2; x < w - 2; x++) if ((x - 2) % 6 < 3) for (let y = 3; y < 8; y++) if (x % 2 === 0) m.set(x, y, d, C.metalDark);
+  m.box(w - 4, 1, d + 4, 1, 22, 1, C.metal); m.box(w - 3, 18, d + 4, 6, 4, 1, 0x2b4a8c); m.box(w - 3, 20, d + 4, 6, 1, 1, C.trim);
+  m.box(4, 22, 4, 1, 16, 1, C.metalDark); for (let y = 26; y < 38; y += 4) m.box(3, y, 4, 3, 1, 1, C.metalDark); m.set(4, 38, 4, C.neonRed, true);
+  for (const x of [12, 26]) { for (let k = 0; k < 4; k++) m.box(x, 1 + k, d + 1, 3, 1, 3, (k % 2) ? 0xb8a47a : 0xa8946a); }
+  for (let z = 2; z < d - 2; z++) { m.set(-3, 1 + (z % 2), z, C.metalDark); if (z % 3 === 0) m.box(-3, 1, z, 1, 6, 1, C.metal); m.set(-3, 6, z, 0x9aa0a6); }
+  m.box(-3, 1, 1, 1, 6, 1, C.metal); m.box(-9, 1, 1, 7, 1, 1, C.metalDark);
+  for (const x of [6, 30]) m.box(x, 4, d, 3, 4, 1, 0xe8e2d0); m.set(7, 5, d, 0x1c1f24); m.set(31, 6, d, 0xc0392b);
   return dust(m);
 }
 
@@ -270,6 +274,16 @@ export function school() {
   m.box(37, 1, d + 5, 1, 9, 1, C.metal); m.box(35, 10, d + 5, 4, 3, 1, C.paint);
   m.box(6, 1, d + 5, 6, 1, 2, C.board); m.box(6, 2, d + 6, 6, 2, 1, C.board);
   graffiti(m, 30, 2, d, 7);
+  // MAP-3 group 2: a small bell tower with a clock over the entrance, a flag, entrance steps, a painted court
+  // in the yard (lines under the snow), a slide and swings.
+  const H = 3 * FH + 1;
+  m.box(18, H, 8, 10, 10, 8, C.ochreDark); m.box(17, H + 10, 7, 12, 1, 10, C.roofDark); m.box(19, H + 11, 9, 8, 3, 6, C.roofDark);
+  m.box(20, H + 4, 16, 6, 5, 1, 0xf0ede4); m.box(22, H + 6, 17, 2, 1, 1, 0x1c1f24); m.box(23, H + 5, 17, 1, 3, 1, 0x1c1f24);
+  m.box(2, H, d - 3, 1, 12, 1, C.metal); m.box(3, H + 8, d - 3, 5, 3, 1, C.red); m.box(3, H + 9, d - 3, 5, 1, 1, P.white);
+  for (let k = 0; k < 3; k++) m.box(18 - k, 1, d + k, 10 + 2 * k, 1, 1, C.trim);
+  for (let x = 24; x < 40; x++) { m.set(x, 0, d + 3, C.paint); m.set(x, 0, d + 9, C.paint); } for (let z = d + 3; z <= d + 9; z++) { m.set(24, 0, z, C.paint); m.set(39, 0, z, C.paint); m.set(31, 0, z, C.paint); }
+  m.box(2, 1, d + 2, 1, 6, 1, C.red); for (let k = 0; k < 6; k++) m.set(3 + k, 6 - k, d + 2, C.red); m.box(2, 1, d + 2, 2, 1, 2, C.metal); // slide
+  for (const x of [12, 17]) m.box(x, 1, d + 3, 1, 7, 1, C.metalDark); m.box(12, 8, d + 3, 6, 1, 1, C.metalDark); m.box(14, 3, d + 3, 2, 1, 1, C.board);
   return dust(m);
 }
 
@@ -283,9 +297,17 @@ export function hospital() {
   neon(m, 'ER', -6, 12, 27, C.neonRed, -1);
   // Red cross on the façade.
   m.box(15, 34, d, 4, 12, 1, C.neonRed, true); m.box(11, 38, d, 12, 4, 1, C.neonRed, true);
-  // Ambulance in the bay.
-  m.box(-12, 1, d + 4, 12, 7, 6, P.white); m.box(-12, 8, d + 4, 3, 1, 6, 0xff3b3b, true);
-  m.box(-8, 3, d + 4, 7, 2, 1, C.red); m.box(-8, 3, d + 9, 7, 2, 1, C.red);
+  // MAP-3 group 2: a canopy over the ER bay on posts, a rooftop helipad (H in a ring), triage tents with red
+  // crosses, oxygen tanks and a generator by the ER, a ramp to the main door. (Ambulances park at the kerb.)
+  m.box(-13, 8, 28, 14, 1, 7, C.trim); for (const x of [-13, 0]) m.box(x, 1, 34, 1, 7, 1, C.metalDark);
+  m.box(-12, 9, 28, 12, 1, 1, C.red);
+  const top = 5 * FH + 1;
+  for (let x = 4; x < 30; x++) for (let z = 4; z < 24; z++) { const r = Math.hypot(x - 17, z - 14); if (r < 9.5) m.set(x, top, z, r > 8.3 ? 0xd8b03a : 0x4b525a); }
+  for (const [x, z, ww, dd] of [[13, 10, 2, 9], [20, 10, 2, 9], [15, 14, 5, 1]]) m.box(x, top, z, ww, 1, dd, C.trim);
+  for (const [x, z] of [[-14, 38], [-6, 38]]) { for (let y = 0; y < 5; y++) m.box(x - 3 + Math.floor(y / 2), 1 + y, z, 7 - 2 * Math.floor(y / 2), 1, 6, 0xe9e4d8); m.box(x, 3, z + 6, 1, 3, 1, C.red); m.box(x - 1, 4, z + 6, 3, 1, 1, C.red); }
+  for (let k = 0; k < 4; k++) m.box(-15 + k * 2, 1, 22, 1, 5, 1, k % 2 ? 0x2f6b4a : 0xe8e8e2);
+  m.box(-15, 1, 16, 4, 3, 4, 0xc9a227); m.box(-15, 4, 16, 4, 1, 4, 0x2a2d31);
+  for (let k = 0; k < 6; k++) m.box(10 + k, 1, d + 1 + k, 1, 1, 1, C.trim); m.box(15, 1, d + 1, 1, 2, 6, C.metal); // ramp
   return dust(m);
 }
 
@@ -297,7 +319,11 @@ export function library() {
   for (let x = 3; x < w - 2; x += 7) m.box(x, 1, d, 3, 19, 3, C.trim);
   m.box(0, 20, d, w, 2, 4, C.creamDark);
   m.box(2, 1, d + 3, w - 4, 1, 3, C.greyDark);
+  for (let k = 0; k < 3; k++) m.box(4 + k * 2, 2 + k, d + 5 - k, w - 8 - k * 4, 1, 1, C.trim); // wide steps
+  for (let k = 0; k < 7; k++) m.box(k * 3, 22 + k, d, w - k * 6, 1, 3, k === 6 ? C.creamDark : C.trim); // pediment
   neon(m, 'BOOKS', 20, 23, d + 3, C.neonWarm, 4);
+  m.box(w - 3, 1, d + 6, 3, 4, 2, 0x2b4a8c); m.box(w - 3, 4, d + 7, 3, 1, 1, 0x1c1f24); // book drop
+  for (const x of [9, 30]) { m.box(x, 11, d + 3, 2, 7, 1, C.red); m.box(x, 13, d + 3, 2, 1, 1, C.neonWarm); } // banners
   // Collapsed back corner: floors open to the sky, rubble spilling out.
   m.clearBox(22, 12, 0, 18, 22, 13);
   m.box(22, FH, 0, 18, 1, 13, C.roofDark);

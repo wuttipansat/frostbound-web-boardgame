@@ -103,7 +103,7 @@ export function placePlan(id, type, bx, bz, roads, foot = null, front = null, ra
   const fwd = new THREE.Vector3(toFront[0], 0, toFront[1]);
   const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
   let [fw, fd] = foot ?? FOOT[type] ?? [2, 2];
-  if (/-\d+$/.test(id) && fw === 2 && hash3(bx, 41, bz) < 0.35) fd = 1; // some repeats are a smaller branch
+  // (MAP audit: repeats used to be squeezed into one chunk row and read as tiny copies; now full size.)
   // Rows run back from the front street, columns along it (3 each, 5 in the colony's row / column).
   const alongX = toFront[0] !== 0;
   const rows = chunksOf(alongX ? bx : bz); const cols = chunksOf(alongX ? bz : bx);
