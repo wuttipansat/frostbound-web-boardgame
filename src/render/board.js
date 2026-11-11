@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { VoxelModel, hash3, MATERIALS, geometriesFor, groupOf, packedBounds } from './voxel.js';
 import { P } from './palette.js';
 import { LOCATION_BUILDERS_HD, colonyHD, treeModelHD, rockModelHD } from './buildings.js';
-import { buildTerrainHD } from './terrain.js';
+import { buildTerrainHD, ROAD } from './terrain.js';
 import { carModel, lampModel, containerModel, clutterModel, CLUTTER_KINDS } from './props.js';
 import * as city from './city.js';
 import { downsample } from './detail.js';
@@ -13,8 +13,7 @@ import { LOCATIONS } from '../content/locations.js';
 import { START_MAP, LEGACY_MAP } from '../core/map.js';
 
 export const BOARD = {
-  block: 26,          // UI-13: distance between block centres (world)
-  street: 13,         // streets run on the block edges (±13 around the colony)
+  block: 30,          // MAP-3: block pitch (world): a 3-chunk block + one street (two lanes + sidewalks)
   radius: 46,         // stage-1 slab half size (world units)
   locationRadius: 27,
   colonyRadius: 9,    // palisade radius (world units)
@@ -39,19 +38,32 @@ const CENTERPIECE = { parking: ['parking', 2, 2], plaza: ['fountain', 1, 1], par
 const START_FRONT = { police: 'z', grocery: 'z', school: 'z', hospital: 'x', library: 'x', gas: 'x' };
 
 const parse = (k) => k.split(',').map(Number);
-/** World position of a street corner (cx,cz = top-left corner of block cx,cz). */
-const cornerPos = (cx, cz) => [(cx - 0.5) * BOARD.block, (cz - 0.5) * BOARD.block];
 
-// MAP-1b: a block is 3×3 chunks inside its sidewalks; a place takes 1–4 of them at the street side, the rest
-// hold small buildings and props. Chunk size = (block − 2 × sidewalk) / 3.
-export const CHUNK = (BOARD.block - 2 * 3.4) / 3;
-const EDGE = 1.5 * CHUNK; // from the block centre to the inner edge of the sidewalk
+// MAP-1b / MAP-3: a block is 3×3 chunks inside its sidewalks; a place takes some of them at the street side, the
+// rest hold small buildings and props. Chunk size = (pitch − one street with its sidewalks) / 3.
+export const CHUNK = (BOARD.block - 2 * ROAD.walk) / 3;
+// MAP-3: the colony's row and column are 5 chunks wide (the colony plot is 5×5), every other one 3; street lines
+// stay straight, so a block in the colony's row is 5×3. Grid → world: x = sign(bx)·(|bx|·pitch + CHUNK).
+/** Chunks along one axis of grid row / column b. */
+export const chunksOf = (b) => (b === 0 ? 5 : 3);
+/** World centre of grid row / column b. */
+export const blockPos = (b) => (b === 0 ? 0 : Math.sign(b) * (Math.abs(b) * BOARD.block + CHUNK));
+/** Half the block size (street centre line to street centre line) along one axis. */
+export const blockHalf = (b) => chunksOf(b) * CHUNK / 2 + ROAD.walk;
+/** Grid row / column of a world coordinate. */
+export const gridOf = (x) => (Math.abs(x) <= blockHalf(0) ? 0 : Math.sign(x) * Math.round((Math.abs(x) - CHUNK) / BOARD.block));
+/** World position of a street line (the low edge of grid row / column c). */
+const lineOf = (c) => blockPos(c) - blockHalf(c);
+/** World position of a street corner (cx,cz = top-left corner of block cx,cz). */
+const cornerPos = (cx, cz) => [lineOf(cx), lineOf(cz)];
+/** From a block centre to the inner edge of its sidewalk, along x and z. */
+const edgesOf = (bx, bz) => [chunksOf(bx) * CHUNK / 2, chunksOf(bz) * CHUNK / 2];
 // Chunks a place covers: [wide, deep] (default 2×2); narrow, tall buildings take one column.
 const FOOT = { church: [1, 2] };
 
 /** Where a place sits in its block: front direction, footprint (in chunks), centre and the chunks it covers. */
 export function placePlan(id, type, bx, bz, roads, foot = null, front = null) {
-  const c = new THREE.Vector3(bx * BOARD.block, 0, bz * BOARD.block);
+  const c = new THREE.Vector3(blockPos(bx), 0, blockPos(bz));
   const fronts = { z: `${bx},${bz + 1},h`, x: `${bx + 1},${bz},v`, '-z': `${bx},${bz},h`, '-x': `${bx},${bz},v` };
   // MAP-1d: the block's stored front (older maps: work it out from the streets).
   const pick = front ?? START_FRONT[id] ?? ['z', 'x', '-z', '-x'].find((f) => roads.has(fronts[f])) ?? 'z';
@@ -60,21 +72,25 @@ export function placePlan(id, type, bx, bz, roads, foot = null, front = null) {
   const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
   let [fw, fd] = foot ?? FOOT[type] ?? [2, 2];
   if (/-\d+$/.test(id) && fw === 2 && hash3(bx, 41, bz) < 0.35) fd = 1; // some repeats are a smaller branch
-  const col = Math.floor(hash3(bx, 43, bz) * (4 - fw)); // first lateral column (0..2)
-  const lat = (col + fw / 2 - 1.5) * CHUNK;
-  const fwdC = EDGE - fd * CHUNK / 2;
+  // Rows run back from the front street, columns along it (3 each, 5 in the colony's row / column).
+  const alongX = toFront[0] !== 0;
+  const rows = chunksOf(alongX ? bx : bz); const cols = chunksOf(alongX ? bz : bx);
+  const edge = rows * CHUNK / 2; // block centre → front sidewalk
+  const col = Math.floor(hash3(bx, 43, bz) * (cols + 1 - fw)); // first lateral column
+  const lat = (col + fw / 2 - cols / 2) * CHUNK;
+  const fwdC = edge - fd * CHUNK / 2;
   const covered = [];
   for (let i = 0; i < fd; i++) for (let j = col; j < col + fw; j++) covered.push(`${i},${j}`); // i: row from the front
   const at = (forward, lateral) => c.clone().addScaledVector(fwd, forward).addScaledVector(side, lateral);
-  return { c, fwd, side, fw, fd, lat, center: at(fwdC, lat), covered, at };
+  return { c, fwd, side, fw, fd, lat, rows, cols, edge, center: at(fwdC, lat), covered, at };
 }
 
 /** World centre of chunk (row i from the front, column j) of a block. */
-export const chunkCenter = (plan, i, j) => plan.at((1 - i) * CHUNK, (j - 1) * CHUNK);
+export const chunkCenter = (plan, i, j) => plan.at(plan.edge - (i + 0.5) * CHUNK, (j + 0.5 - plan.cols / 2) * CHUNK);
 
 function placeLayout(id, type, bx, bz, roads, front) {
   const plan = placePlan(id, type, bx, bz, roads, null, front);
-  const { at, lat } = plan;
+  const { at, lat, edge: EDGE } = plan;
   const nSurv = LOCATIONS[type]?.survivorSlots ?? 3;
   return {
     id,
@@ -139,7 +155,7 @@ function streetSegments(roadKeys, layout) {
     const [x1, z1] = d === 'h' ? cornerPos(+cx + 1, +cz) : cornerPos(+cx, +cz + 1);
     out.push([new THREE.Vector3(x0, 0, z0), new THREE.Vector3(x1, 0, z1), seg]);
   }
-  for (const g of layout.colony.gates) out.push([g.clone(), g.clone().normalize().multiplyScalar(BOARD.street), 'gate']);
+  for (const g of layout.colony.gates) out.push([g.clone(), g.clone().normalize().multiplyScalar(blockHalf(0)), 'gate']);
   return out;
 }
 
@@ -190,7 +206,7 @@ export function createBoard({ progressive = false } = {}) {
   const layout = computeLayout(START_MAP);
   // HD models are authored at 2× resolution, so each voxel is half the size.
   const bScale = BOARD.buildingScale / 2;
-  const B = BOARD.block; const half = B / 2;
+  const B = BOARD.block;
   const jitter = 0; // city models carry their texture in their colours
 
   let map = null;     // the map currently drawn
@@ -265,7 +281,7 @@ export function createBoard({ progressive = false } = {}) {
     for (let L = 0; L < 3; L++) g.add(lazyLod(L, () => instanced(() => city.lod(L, key, make), LOD_SIZE[L], list, { cacheKey: `lod${L}-${key}`, jitter: 0, castShadow: L < 2 })));
     return g;
   };
-  const cellOf = (x, z) => `${Math.round(x / B)},${Math.round(z / B)}`;
+  const cellOf = (x, z) => `${gridOf(x)},${gridOf(z)}`;
   const has = (bx, bz) => !!map?.blocks[`${bx},${bz}`];
 
   /** Distance from a point to the slab rim: Chebyshev distance to the nearest missing neighbour block. */
@@ -275,7 +291,7 @@ export function createBoard({ progressive = false } = {}) {
     return (x, z) => {
       let d = Infinity;
       for (const [gx, gz] of gaps) {
-        const ex = Math.max(0, Math.abs(x - gx * B) - half); const ez = Math.max(0, Math.abs(z - gz * B) - half);
+        const ex = Math.max(0, Math.abs(x - blockPos(gx)) - blockHalf(gx)); const ez = Math.max(0, Math.abs(z - blockPos(gz)) - blockHalf(gz));
         d = Math.min(d, Math.max(ex, ez));
       }
       return d;
@@ -283,12 +299,12 @@ export function createBoard({ progressive = false } = {}) {
   };
   const terrainFor = (key, cell = 0.5) => {
     const [bx, bz] = parse(key);
-    const cx = bx * B; const cz = bz * B;
-    const near = streets.filter(([a, b]) => Math.min(a.x, b.x) < cx + half + 4 && Math.max(a.x, b.x) > cx - half - 4 && Math.min(a.z, b.z) < cz + half + 4 && Math.max(a.z, b.z) > cz - half - 4);
+    const cx = blockPos(bx); const cz = blockPos(bz); const hx = blockHalf(bx); const hz = blockHalf(bz);
+    const near = streets.filter(([a, b]) => Math.min(a.x, b.x) < cx + hx + 4 && Math.max(a.x, b.x) > cx - hx - 4 && Math.min(a.z, b.z) < cz + hz + 4 && Math.max(a.z, b.z) > cz - hz - 4);
     // MAP-1c: built-up blocks are flat and paved; parks and the rail yard keep their snowdrifts.
     const blocksNear = [];
-    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const b = map.blocks[`${bx + dx},${bz + dz}`]; if (b) blocksNear.push([(bx + dx) * B, (bz + dz) * B, b.kind]); }
-    const paved = (x, z) => blocksNear.some(([px, pz, k]) => k !== 'colony' && k !== 'park' && k !== 'rail' && Math.max(Math.abs(x - px), Math.abs(z - pz)) < EDGE + 0.4);
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const b = map.blocks[`${bx + dx},${bz + dz}`]; if (b) blocksNear.push([blockPos(bx + dx), blockPos(bz + dz), b.kind, ...edgesOf(bx + dx, bz + dz)]); }
+    const paved = (x, z) => blocksNear.some(([px, pz, k, ex, ez]) => k !== 'colony' && k !== 'park' && k !== 'rail' && Math.abs(x - px) < ex + 0.4 && Math.abs(z - pz) < ez + 0.4);
     // Zebra crossings next to street junctions (3+ streets meet).
     const deg = new Map();
     for (const [a, b2, seg] of near) if (seg !== 'gate') for (const p of [a, b2]) { const k = `${p.x},${p.z}`; deg.set(k, (deg.get(k) ?? 0) + 1); }
@@ -296,17 +312,17 @@ export function createBoard({ progressive = false } = {}) {
     const crossing = (x, z) => junctions.some(([jx, jz]) => {
       const ax = Math.abs(x - jx); const az = Math.abs(z - jz);
       const along = Math.max(ax, az); const across = Math.min(ax, az);
-      return along > 2.6 && along < 4.2 && across < 1.6 && Math.floor(across * 2.5 + 10) % 2 === 0;
+      return along > ROAD.walk + 0.4 && along < ROAD.walk + 2.2 && across < ROAD.half - 0.3 && Math.floor(across * 2.5 + 10) % 2 === 0;
     });
     const geo = buildTerrainHD({
-      center: [cx, cz], half, edgeDist: edgeDist(bx, bz), paved, crossing, cell,
+      center: [cx, cz], half: Math.max(hx, hz), edgeDist: edgeDist(bx, bz), paved, crossing, cell,
       clip: (x, z) => cellOf(x, z) === key,
       distRoad: (x, z) => { let d = Infinity; for (const [a, b] of near) d = Math.min(d, distToSegment(x, z, a, b)); return d; },
       distPlot: (x, z) => {
         let d = Infinity;
-        for (const [px, pz, k] of blocksNear) {
+        for (const [px, pz, k, ex, ez] of blocksNear) {
           if (k === 'colony') d = Math.min(d, Math.hypot(x - px, z - pz) - (BOARD.colonyRadius + 2));
-          else if (k !== 'park' && k !== 'rail') d = Math.min(d, Math.max(Math.abs(x - px), Math.abs(z - pz)) - EDGE);
+          else if (k !== 'park' && k !== 'rail') d = Math.min(d, Math.max(Math.abs(x - px) - ex, Math.abs(z - pz) - ez));
         }
         return d;
       },
@@ -367,7 +383,7 @@ export function createBoard({ progressive = false } = {}) {
       addPick(L);
     } else if (FILLER_MODELS[b.kind]) {
       model = lodModel(`filler-${b.kind}`, FILLER_MODELS[b.kind]);
-      model.position.set(bx * B, 0, bz * B);
+      model.position.set(blockPos(bx), 0, blockPos(bz));
       model.rotation.y = Math.floor(hash3(bx, 7, bz) * 2) * Math.PI;
     }
     if (model) { g.add(model); trackGlow(model); }
@@ -380,9 +396,10 @@ export function createBoard({ progressive = false } = {}) {
     const group = new THREE.Group(); group.name = 'props';
     const trees = [[], [], []]; const rocks = [[], [], []]; const cars = [[], [], [], []]; const lamps = []; const yards = [[], [], []];
     const free = (x, z, b) => {
-      for (const [a, c] of streets) if (distToSegment(x, z, a, c) < 3.6) return false;
+      for (const [a, c] of streets) if (distToSegment(x, z, a, c) < ROAD.walk) return false;
       if (b.kind === 'colony') return Math.hypot(x, z) > BOARD.colonyRadius + 3;
-      return Math.max(Math.abs(x - Math.round(x / B) * B), Math.abs(z - Math.round(z / B) * B)) > (b.kind === 'place' ? 9.5 : 9);
+      const gx = gridOf(x); const gz = gridOf(z); const [ex, ez] = edgesOf(gx, gz);
+      return Math.abs(x - blockPos(gx)) > ex - 0.5 || Math.abs(z - blockPos(gz)) > ez - 0.5;
     };
     const houses = Array.from({ length: city.SMALL_VARIANTS }, () => []);
     const put = (list, p, rotY, scale = 1) => { tmp.position.copy(p); tmp.rotation.set(0, rotY, 0); tmp.scale.setScalar(scale); tmp.updateMatrix(); list.push(tmp.matrix.clone()); };
@@ -402,7 +419,7 @@ export function createBoard({ progressive = false } = {}) {
           const at = plan.center.clone();
           if (cp[0] === 'ruinBig') put(ruins[1], at, face0, PLACE_SCALE); else put(pieces[cp[0]], at, face0, PLACE_SCALE);
         }
-        for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+        for (let i = 0; i < plan.rows; i++) for (let j = 0; j < plan.cols; j++) {
           if (plan.covered.includes(`${i},${j}`)) continue;
           const p = chunkCenter(plan, i, j);
           const r2 = hash3(bx * 5 + i, 67, bz * 5 + j);
@@ -431,8 +448,8 @@ export function createBoard({ progressive = false } = {}) {
       }
       const spots = [];
       for (let i = 0; i < 40 && spots.length < 7; i++) {
-        const x = bx * B + (hash3(i, bx * 7 + 3, bz * 13 + 11) * 2 - 1) * (half - 2);
-        const z = bz * B + (hash3(i, bx * 7 + 5, bz * 13 + 17) * 2 - 1) * (half - 2);
+        const x = blockPos(bx) + (hash3(i, bx * 7 + 3, bz * 13 + 11) * 2 - 1) * (blockHalf(bx) - 2);
+        const z = blockPos(bz) + (hash3(i, bx * 7 + 5, bz * 13 + 17) * 2 - 1) * (blockHalf(bz) - 2);
         if (edgeDist(bx, bz)(x, z) < 4 || !free(x, z, b) || spots.some((p) => Math.hypot(p[0] - x, p[1] - z) < 3)) continue;
         spots.push([x, z]);
       }
@@ -450,17 +467,17 @@ export function createBoard({ progressive = false } = {}) {
       const at = (t, lat) => a.clone().addScaledVector(dir, len * t).addScaledVector(side, lat);
       const h = (k) => hash3(i, k, seg.length * 3 + (seg.charCodeAt(0) ?? 0));
       if (len > 6 && h(2) < 0.6) {
-        tmp.position.copy(at(0.3 + h(3) * 0.4, (h(4) < 0.5 ? -1 : 1) * 1.3));
+        tmp.position.copy(at(0.3 + h(3) * 0.4, (h(4) < 0.5 ? -1 : 1) * ROAD.half / 2));
         tmp.rotation.set(0, Math.atan2(dir.x, dir.z) - Math.PI / 2 + (h(5) - 0.5) * 0.6, 0); tmp.scale.setScalar(1); tmp.updateMatrix();
         cars[Math.floor(h(6) * 4)].push(tmp.matrix.clone());
       }
       if (len > 8) { // lamps on both sides, staggered
-        for (const [t, lat] of [[0.3, 3.0], [0.7, -3.0]]) {
+        for (const [t, lat] of [[0.3, ROAD.kerb + 0.5], [0.7, -ROAD.kerb - 0.5]]) {
           tmp.position.copy(at(t, lat)); tmp.rotation.set(0, Math.atan2(side.x * Math.sign(lat), side.z * Math.sign(lat)) - Math.PI / 2, 0); tmp.scale.setScalar(1); tmp.updateMatrix();
           lamps.push(tmp.matrix.clone());
         }
         for (let k = 0; k < 2; k++) if (h(10 + k) < 0.7) { // cones, crates, barrels, bags, barriers on the sidewalk
-          tmp.position.copy(at(0.15 + h(12 + k) * 0.7, (k ? -1 : 1) * 2.8)); tmp.rotation.set(0, h(14 + k) * 6, 0); tmp.updateMatrix();
+          tmp.position.copy(at(0.15 + h(12 + k) * 0.7, (k ? -1 : 1) * (ROAD.walk - 0.9))); tmp.rotation.set(0, h(14 + k) * 6, 0); tmp.updateMatrix();
           clutter[Math.floor(h(16 + k) * (CLUTTER_KINDS - 1))].push(tmp.matrix.clone());
         }
       }
@@ -682,13 +699,14 @@ export function createBoard({ progressive = false } = {}) {
         c.terrain.add(lazyLod('near', () => terrainFor(k), true), lazyLod('far', () => terrainFor(k, 1), true));
       }
       fresh.sort((a, b) => Math.hypot(...parse(a)) - Math.hypot(...parse(b)));
-      const inner = fresh.length ? Math.max(0, Math.hypot(...parse(fresh[0])) - 1) * B : 0;
-      const outer = fresh.length ? (Math.hypot(...parse(fresh[fresh.length - 1])) + 1) * B : 1;
+      const dist = (k) => { const [x, z] = parse(k); return Math.hypot(blockPos(x), blockPos(z)); };
+      const inner = fresh.length ? Math.max(0, dist(fresh[0]) - B) : 0;
+      const outer = fresh.length ? dist(fresh[fresh.length - 1]) + B : 1;
       const spread = 2.2 / Math.max(1, outer - inner);
       fresh.forEach((k, i) => {
         cells[k] = buildBlock(k, map.blocks[k]);
         cells[k].sig = JSON.stringify(map.blocks[k]);
-        if (!snap) startPop(cells[k], Math.max(0, (Math.hypot(...parse(k)) * B - inner) * spread)); // outward from the colony, a growth ≤ ~3 s
+        if (!snap) startPop(cells[k], Math.max(0, (dist(k) - inner) * spread)); // outward from the colony, a growth ≤ ~3 s
       });
       if (fresh.length || newStreets.length) {
         // MAP-2 D: one instanced set per growth for every chunk piece and street prop (few draw calls); each
@@ -700,9 +718,11 @@ export function createBoard({ progressive = false } = {}) {
         if (!snap) startPop(batch, 0, (pos) => 0.3 + Math.min(2.4, (Math.hypot(pos.x, pos.z) - inner) * spread));
       }
       const xs = Object.keys(map.blocks).map((k) => parse(k)[0]); const zs = Object.keys(map.blocks).map((k) => parse(k)[1]);
-      const bounds = { minX: Math.min(...xs), maxX: Math.max(...xs), minZ: Math.min(...zs), maxZ: Math.max(...zs), block: B, snap };
-      shadow.scale.set((bounds.maxX - bounds.minX + 2.4) * B, (bounds.maxZ - bounds.minZ + 2.4) * B, 1);
-      shadow.position.set((bounds.minX + bounds.maxX) / 2 * B + 4, -16, (bounds.minZ + bounds.maxZ) / 2 * B + 6);
+      // World extents of the open blocks (street centre lines around them).
+      const lo = (v) => blockPos(v) - blockHalf(v); const hi = (v) => blockPos(v) + blockHalf(v);
+      const bounds = { x0: lo(Math.min(...xs)), x1: hi(Math.max(...xs)), z0: lo(Math.min(...zs)), z1: hi(Math.max(...zs)), block: B, snap };
+      shadow.scale.set(bounds.x1 - bounds.x0 + 1.4 * B, bounds.z1 - bounds.z0 + 1.4 * B, 1);
+      shadow.position.set((bounds.x0 + bounds.x1) / 2 + 4, -16, (bounds.z0 + bounds.z1) / 2 + 6);
       deferring = false;
       api.onBounds?.(bounds);
     },

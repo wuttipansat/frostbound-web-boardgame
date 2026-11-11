@@ -193,11 +193,10 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   };
   // The starting view, for the "back to the usual view" button.
   const homeView = { pos: camera.position.clone(), target: controls.target.clone(), zoom: 1.05 };
-  /** UI-13: fit the usual view to the open part of the city (grid cells minX..maxX, minZ..maxZ). */
-  view.fit = ({ minX, maxX, minZ, maxZ, block }, { snap = false } = {}) => {
+  /** UI-13: fit the usual view to the open part of the city (world extents x0..x1, z0..z1). */
+  view.fit = ({ x0, x1, z0, z1, block }, { snap = false } = {}) => {
     // Work in the camera's ground axes (u = across the screen, v = up the screen) so the open blocks sit centred.
-    const h = block / 2;
-    const xs = [minX * block - h, (maxX + 1) * block - h]; const zs = [minZ * block - h, (maxZ + 1) * block - h];
+    const xs = [x0, x1]; const zs = [z0, z1];
     const us = []; const vs = [];
     for (const x of xs) for (const z of zs) { us.push((x - z) / Math.SQRT2); vs.push((x + z) / Math.SQRT2); }
     const u = (Math.min(...us) + Math.max(...us)) / 2; const v = (Math.min(...vs) + Math.max(...vs)) / 2;
@@ -209,7 +208,7 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
     const portrait = camera.right - camera.left < camera.top - camera.bottom; // narrow screens: leave more margin
     homeView.zoom = Math.min(controls.maxZoom, 1.05 * (full / Math.max(need, full * 0.45)) * (portrait ? 0.82 : 1));
     controls.minZoom = Math.min(0.75, homeView.zoom * 0.8); // MAP-1: a bigger city can be zoomed out further
-    Object.assign(panBox, { minX: (minX - 1) * block, maxX: (maxX + 1) * block, minZ: (minZ - 1) * block, maxZ: (maxZ + 1) * block });
+    Object.assign(panBox, { minX: x0 - block, maxX: x1 + block, minZ: z0 - block, maxZ: z1 + block });
     if (snap) view.reset();
     else { view.goalTarget = homeView.target.clone(); view.goalZoom = homeView.zoom; }
   };

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { VoxelModel } from '../src/render/voxel.js';
 import { LOCATION_BUILDERS, colony, pineTree } from '../src/render/buildings.js';
-import { computeLayout, BOARD } from '../src/render/board.js';
+import { computeLayout, BOARD, blockPos, gridOf } from '../src/render/board.js';
 import { LOCATIONS } from '../src/content/locations.js';
 import { OUTSIDE_LOCATIONS } from '../src/core/constants.js';
 
@@ -63,9 +63,9 @@ test('layout has slot anchors matching the rules', () => {
     // UI-13: each place sits on a block of the 3×3 grid; its slots stay on that block.
     // MAP-1b: the place covers 1–4 of its block's 3×3 chunks.
     const c = L.plan.c;
-    assert.ok(Math.abs(c.x) % BOARD.block === 0 && Math.abs(c.z) % BOARD.block === 0);
+    assert.ok(c.x === blockPos(gridOf(c.x)) && c.z === blockPos(gridOf(c.z)));
     assert.ok(L.plan.covered.length >= 1 && L.plan.covered.length <= 4);
-    for (const p of [...L.survivorSlots, ...L.zombieSlots, L.center]) assert.ok(Math.max(Math.abs(p.x - c.x), Math.abs(p.z - c.z)) < BOARD.block / 2 + 1);
+    for (const p of [...L.survivorSlots, ...L.zombieSlots, L.center]) assert.ok(gridOf(p.x) === gridOf(c.x) && gridOf(p.z) === gridOf(c.z));
   }
   assert.equal(layout.colony.zombieSlots.length, LOCATIONS.colony.zombieSlots);
   assert.equal(layout.colony.gates.length, LOCATIONS.colony.entrances);

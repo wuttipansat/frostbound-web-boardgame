@@ -89,6 +89,9 @@ export function heightmapGeometry({ n, cell, column, side, bottom = -12, aoStren
   return g;
 }
 
+// MAP-3: two-lane streets. From a street's centre line: asphalt to ROAD.half, kerb to ROAD.kerb, sidewalk to ROAD.walk.
+export const ROAD = { half: 3, kerb: 3.3, walk: 5.5 };
+
 /**
  * The FROSTBOUND plateau at 2× resolution.
  * env: { radius, distRoad(x,z) -> distance to nearest road (world), distPlot(x,z) -> distance to building plots }
@@ -115,24 +118,23 @@ export function buildTerrainHD({ radius, distRoad, distPlot, clip = null, center
     if (clip && !clip(wx, wz)) return null; // UI-13: one block of the city at a time
     const roadD = distRoad(wx, wz);
     const plotD = distPlot(wx, wz);
-    const flat = Math.min(roadD - 1.5, plotD);
+    const flat = Math.min(roadD - ROAD.half, plotD);
     const noise = Math.sin(wx * 0.21) * Math.cos(wz * 0.17) + Math.sin((wx + wz) * 0.09) * 0.8 + hash3(x, 1, z) * 0.18;
     let h = 0;
     if (flat > 2) h = Math.max(0, Math.round((noise + 0.4) * 2 * Math.min(1, (flat - 2) / 3)));
     if (rim < 6) h = Math.max(h, Math.floor(hash3(Math.floor(x / 2), 3, Math.floor(z / 2)) * 3));
     let top;
-    if (roadD < 2.2) {
-      // Snow-packed street: two dark asphalt ruts, grey slush between, a few half-buried dashes.
-      // Ploughed asphalt with a white centre dash; snow banked along the edges.
-      top = roadD < 1.7 ? P.asphalt : P.snowShade;
+    if (roadD < ROAD.half) {
+      // Ploughed two-lane asphalt with a white centre dash.
+      top = P.asphalt;
       if (roadD < 0.25 && Math.floor(Math.abs(wx + wz) * 0.6) % 3 === 0) top = 0xe9edf2; // dash
-      if (crossing && roadD < 1.7 && crossing(wx, wz)) top = 0xe9edf2; // zebra crossing
-      if (roadD < 1.7 && hash3(x, 5, z) < 0.07) top = P.slush; // packed snow patches
+      if (crossing && crossing(wx, wz)) top = 0xe9edf2; // zebra crossing
+      else if (hash3(x, 5, z) < 0.05) top = P.slush; // packed snow patches
       h = 0;
-    } else if (roadD < 3.6) {
+    } else if (roadD < ROAD.walk) {
       // Sidewalk tiles under snow: a faint grid shows through, a kerb at the road side.
       top = (x % 4 === 0 || z % 4 === 0) && bayer(x, 1, z) < 0.5 ? P.paving : P.snow;
-      if (roadD < 2.6) top = P.kerb;
+      if (roadD < ROAD.kerb) top = P.kerb;
       h = 0;
     } else if (paved && paved(wx, wz)) {
       // MAP-1c: square paving tiles with grout lines, grass in the cracks, a few missing tiles, drifted snow.
