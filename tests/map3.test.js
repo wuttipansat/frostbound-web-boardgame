@@ -187,3 +187,22 @@ test('districts (part E): stable per game, all three kinds appear in a grown cit
   assert.equal(districtOf(2, 1, 9), districtOf(2, 1, 9));
   assert.ok(typeof s.map.look === 'number');
 });
+
+test('places belong to the street (part E): gas stations take a block corner; every place faces a street', () => {
+  for (const s of cities()) {
+    const roads = new Set(s.map.roads);
+    const layout = computeLayout(s.map);
+    for (const [k, b] of Object.entries(s.map.blocks)) {
+      if (b.kind !== 'place') continue;
+      const [bx, bz] = k.split(',').map(Number);
+      const plan = layout[b.placeId].plan;
+      if ((b.type ?? b.placeId) === 'gas') {
+        const cols = plan.covered.map((c) => +c.split(',')[1]);
+        assert.ok(Math.min(...cols) === 0 || Math.max(...cols) === plan.cols - 1, `${k} gas on a corner`);
+      }
+      const f = plan.fwd;
+      const key = f.z > 0.5 ? `${bx},${bz + 1},h` : f.z < -0.5 ? `${bx},${bz},h` : f.x > 0.5 ? `${bx + 1},${bz},v` : `${bx},${bz},v`;
+      assert.ok(roads.has(key), `${b.placeId} faces a street`);
+    }
+  }
+});

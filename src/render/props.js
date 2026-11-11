@@ -190,6 +190,15 @@ export function vehicleModel(kind = 'bus', v = 0) {
     for (let x = -25; x < 24; x += 6) { m.box(x, 9, 8, 4, 5, 1, 0x2c3b4c); m.box(x, 9, -9, 4, 5, 1, 0x2c3b4c); }
     m.box(27, 7, -6, 1, 8, 12, 0x2c3b4c); m.box(27, 4, -6, 1, 2, 2, 0xfff1c2); m.box(27, 4, 4, 1, 2, 2, 0xfff1c2);
     wheels(-20, 16, 8);
+  } else if (kind === 'ambulance' || kind === 'police') {
+    const amb = kind === 'ambulance';
+    const len = amb ? 30 : 24;
+    m.box(-len / 2, 2, -6, len, amb ? 12 : 6, 12, amb ? 0xeceae4 : 0x1c1f24);
+    if (!amb) { m.box(-6, 8, -5, 12, 4, 10, 0x1c1f24); m.box(-6, 2, -6, 12, 4, 1, 0xeceae4); m.box(-6, 2, 5, 12, 4, 1, 0xeceae4); m.box(-5, 9, -6, 10, 2, 1, 0x2c3b4c); m.box(-5, 9, 5, 10, 2, 1, 0x2c3b4c); }
+    else { m.box(-len / 2, 6, -7, len, 2, 1, 0xc0392b); m.box(-len / 2, 6, 6, len, 2, 1, 0xc0392b); m.box(6, 8, -6, 8, 4, 1, 0x2c3b4c); m.box(-4, 9, 6, 3, 1, 1, 0xc0392b); m.box(-3, 8, 6, 1, 3, 1, 0xc0392b); }
+    const top = amb ? 14 : 12;
+    m.box(-3, top, -3, 6, 1, 6, 0x3a3f46); m.box(-3, top + 1, -3, 3, 1, 6, 0x5a2222); m.box(0, top + 1, -3, 3, 1, 6, 0x22305a); // dead light bar
+    wheels(-len / 2 + 3, len / 2 - 6, 6);
   } else if (kind === 'cab') {
     m.box(-8, 2, -7, 16, 12, 14, 0x9a2f28); m.box(5, 8, -6, 3, 4, 12, 0x2c3b4c); m.box(-8, 14, -6, 4, 4, 12, 0x9a2f28);
     m.box(8, 3, -6, 1, 4, 12, 0x8e979f); wheels(-6, 3, 7);
@@ -210,5 +219,30 @@ export function checkpointModel() {
   for (let k = 0; k < 24; k++) m.set(0 + k, 9, -11, Math.floor(k / 3) % 2 ? 0xc0392b : 0xf0f0ea);
   for (let y = 0; y < 12; y++) m.box(-12 + Math.floor(y / 2), y, 2, 22 - y, 1, 14, y % 4 ? 0x5d6b3a : 0x4b5730); // tent
   m.box(-1, 0, 15, 4, 8, 1, 0x2a2622);
+  return m.snowCap(P.snow, 1, 2);
+}
+
+/** A burnt-out car: a car model scorched black and rust, no glass or lights. */
+export function burntCarModel(v = 0) {
+  const tones = [0x1c1a19, 0x2a2420, 0x4a2a1e, 0x332c28];
+  return carModel(v).recolor((p) => (p.color === P.snow ? undefined : tones[(p.x * 7 + p.y * 3 + p.z) & 3])).recolor((p) => { p.glow = false; return undefined; });
+}
+
+/** A ragged tent (0.1 world per voxel) and a cold fire pit beside it. */
+export function tentModel(v = 0) {
+  const m = new VoxelModel();
+  const c = [0x3f6f8f, 0x8f5a3f, 0x5d6b3a][v % 3];
+  for (let y = 0; y < 9; y++) m.box(-9 + y, y, -6, 18 - 2 * y, 1, 12, y % 3 ? c : (c & 0xfefefe) >> 1);
+  m.box(-1, 0, 6, 3, 6, 1, 0x1c1f24);
+  for (let a = 0; a < 8; a++) m.set(Math.round(Math.cos(a) * 3) + 14, 0, Math.round(Math.sin(a) * 3), 0x6c7580);
+  m.box(13, 0, -1, 3, 1, 3, 0x2a2622);
+  return m.snowCap(P.snow, 1, 2);
+}
+
+/** A statue on a plinth (0.1 world per voxel). */
+export function statueModel() {
+  const m = new VoxelModel();
+  m.box(-5, 0, -5, 11, 2, 11, 0x9aa0a6); m.box(-3, 2, -3, 7, 9, 7, 0xb6bcc2);
+  m.box(-1, 11, -1, 3, 8, 3, 0x5f7f6a); m.box(-3, 16, -1, 7, 2, 2, 0x5f7f6a); m.box(0, 19, 0, 2, 3, 2, 0x5f7f6a); m.box(3, 18, 0, 1, 5, 1, 0x5f7f6a);
   return m.snowCap(P.snow, 1, 2);
 }

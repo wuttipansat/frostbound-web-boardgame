@@ -6,7 +6,7 @@ import { VoxelModel, hash3, MATERIALS, geometriesFor, groupOf, packedBounds } fr
 import { P } from './palette.js';
 import { LOCATION_BUILDERS_HD, colonyHD, treeModelHD, rockModelHD } from './buildings.js';
 import { buildTerrainHD, ROAD } from './terrain.js';
-import { carModel, lampModel, containerModel, clutterModel, CLUTTER_KINDS, crossingModel, wagonModel, shelterModel, FURNITURE, furnitureModel, trafficLightModel, streetSignModel, powerPoleModel, vehicleModel, checkpointModel } from './props.js';
+import { carModel, lampModel, containerModel, clutterModel, CLUTTER_KINDS, crossingModel, wagonModel, shelterModel, FURNITURE, furnitureModel, trafficLightModel, streetSignModel, powerPoleModel, vehicleModel, checkpointModel, burntCarModel, tentModel, statueModel } from './props.js';
 import { markingQuads, lampSpots, railQuads, streetRuns } from './streets.js';
 import { blockSlab, GROUND } from './ground.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -93,7 +93,8 @@ export function placePlan(id, type, bx, bz, roads, foot = null, front = null) {
   const alongX = toFront[0] !== 0;
   const rows = chunksOf(alongX ? bx : bz); const cols = chunksOf(alongX ? bz : bx);
   const edge = rows * CHUNK / 2; // block centre → front sidewalk
-  const col = Math.floor(hash3(bx, 43, bz) * (cols + 1 - fw)); // first lateral column
+  // MAP-3 E: a gas station takes a corner of its block (the canopy meets two streets); others any column.
+  const col = type === 'gas' ? (hash3(bx, 43, bz) < 0.5 ? 0 : cols - fw) : Math.floor(hash3(bx, 43, bz) * (cols + 1 - fw)); // first lateral column
   const lat = (col + fw / 2 - cols / 2) * CHUNK;
   const fwdC = edge - fd * CHUNK / 2;
   const covered = [];
@@ -800,6 +801,57 @@ export function createBoard({ progressive = false } = {}) {
       const t = Math.min(r.t1 - ROAD.walk - 3, Math.max(r.t0 + ROAD.walk + 3, 14));
       const [x, z] = r.axis === 'x' ? [t, r.c + ROAD.half / 2] : [r.c + ROAD.half / 2, t];
       if (ground(x, z)) add('checkpoint', checkpointModel, 0.1, x, 0.03, z, r.axis === 'x' ? 0 : Math.PI / 2);
+    }
+    // Places belong to their street: driveways across the sidewalk, vehicles parked at the kerb, a few signs of use.
+    const apron = () => { const m = new VoxelModel(); m.box(-15, 0, -12, 30, 1, 25, (x, _y, z) => (Math.abs(x) === 15 || Math.abs(z) === 12 ? 0x8d949e : 0x2b2e33)); return m; };
+    const front = (L, along, out) => { const p = L.plan; return p.c.clone().addScaledVector(p.fwd, p.edge + out).addScaledVector(p.side, p.lat + along); };
+    const yawAlong = (L) => Math.atan2(L.plan.side.x, L.plan.side.z) - Math.PI / 2; // vehicle length (local x) along the street
+    for (const L of Object.values(layout)) {
+      if (!L.plan) continue;
+      const type = map.blocks[Object.keys(map.blocks).find((k) => map.blocks[k].placeId === L.id)]?.type ?? L.id;
+      const half = (L.plan.fw * CHUNK) / 2;
+      const yawF = Math.atan2(L.plan.fwd.x, L.plan.fwd.z);
+      const kerbLane = (ROAD.walk - ROAD.half) + 1.2; // from the building line out to the parking lane
+      const park = (key, make, along, i = 0) => { const p = front(L, along, kerbLane); add(key, make, 0.15, p.x, 0.05, p.z, yawAlong(L) + i * 0.04); };
+      if (type === 'gas' || type === 'grocery' || type === 'hospital') {
+        for (const a of type === 'gas' ? [-half + 2, half - 2] : [half - 2.2]) { const p = front(L, a, 1.25); add('apron', apron, 0.1, p.x, GROUND - 0.06, p.z, yawF); }
+      }
+      if (type === 'hospital') { park('veh-ambulance', () => vehicleModel('ambulance'), half - 2.2); park('veh-ambulance', () => vehicleModel('ambulance'), -half + 3, 1); }
+      if (type === 'police') {
+        park('veh-police', () => vehicleModel('police'), -half + 2.5); park('veh-police', () => vehicleModel('police'), half - 2.5, 1);
+        for (const a of [-2, 0, 2]) { const p = front(L, a, 1.6); add('clutter-4', () => clutterModel(4), 0.12, p.x, GROUND, p.z, yawF + Math.PI / 2); }
+      }
+      if (type === 'school') park(`veh-bus-1`, () => vehicleModel('bus', 1), 0);
+      if (type === 'library') { const p = front(L, half - 1.5, 1.3); add('statue', statueModel, 0.1, p.x, GROUND, p.z, yawF); }
+    }
+    // Small stories, 1–2 per stage, away from place entrances, gates and the evacuation route.
+    const entrances = Object.values(layout).flatMap((L) => (L.plan ? [front(L, 0, 1)] : L.gates ?? []));
+    const clear = (x, z) => ground(x, z) && !entrances.some((e) => Math.hypot(e.x - x, e.z - z) < 7);
+    const ringOfT = (r, t) => { const [x, z] = r.axis === 'x' ? [t, r.c] : [r.c, t]; return Math.max(Math.abs(gridOf(x)), Math.abs(gridOf(z))); };
+    for (let st = 1; st <= (map.stage ?? 1); st++) {
+      for (let k = 0; k < 2; k++) {
+        const h = hash3(st, k, rail.look + 31);
+        if (k === 1 && h < 0.5) continue; // the second story only half the time
+        const pool = runs.filter((r) => !(r.axis === eAxis && Math.abs(r.c - eC) < 0.01) && !(r.axis === rail.axis && Math.abs(r.c - rail.c) < 0.01));
+        if (!pool.length) break;
+        const r = pool[Math.floor(hash3(st, k, rail.look + 37) * pool.length)];
+        const t = r.t0 + ROAD.walk + 4 + hash3(st, k, 41) * Math.max(0, r.t1 - r.t0 - 2 * ROAD.walk - 8);
+        if (ringOfT(r, t) !== st && st > 1) continue;
+        const at = (lat) => (r.axis === 'x' ? [t, r.c + lat] : [r.c + lat, t]);
+        const yaw = r.axis === 'x' ? 0 : Math.PI / 2;
+        const kind = Math.floor(hash3(st, k, rail.look + 43) * 4);
+        if (kind === 0) { // a fallen pine across the lane, a gap cut through it
+          const [x, z] = at(-0.8); if (!clear(x, z)) continue;
+          add('tree-1', () => treeModelHD(1, 1), 0.25, x, 0.3, z, yaw, Math.PI / 2 - 0.05, 'z');
+        } else if (kind === 1) { // a burnt-out car
+          const [x, z] = at(1.4); if (!clear(x, z)) continue;
+          const v = Math.floor(h * 4); add(`car-burnt-${v}`, () => burntCarModel(v), 0.15, x, 0, z, yaw + 0.4);
+        } else if (kind === 2) { // a tent camp on the sidewalk by a blank wall
+          for (const [i, d] of [[0, -2.5], [1, 1.5]]) { const [x, z] = r.axis === 'x' ? [t + d, r.c + (ROAD.walk - 1.2)] : [r.c + (ROAD.walk - 1.2), t + d]; if (clear(x, z)) add(`tent-${i}`, () => tentModel(i), 0.1, x, GROUND, z, yaw + i * 0.3); }
+        } else { // spilt goods from a looted shop
+          for (let i = 0; i < 5; i++) { const [x, z] = r.axis === 'x' ? [t + (i - 2) * 0.9, r.c + ROAD.walk - 1 - hash3(i, st, 47)] : [r.c + ROAD.walk - 1 - hash3(i, st, 47), t + (i - 2) * 0.9]; if (clear(x, z)) { const c = [1, 2, 3][i % 3]; add(`clutter-${c}`, () => clutterModel(c), 0.12, x, GROUND, z, i * 1.3); } }
+        }
+      }
     }
     const merge = (list, mat, name) => {
       if (!list.length) return;

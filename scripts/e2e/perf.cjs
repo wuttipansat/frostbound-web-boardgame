@@ -9,7 +9,7 @@ const { chromium } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
 const zlib = require('node:zlib');
-const BUDGET = { entry: 130, three: 135, initial: 300 }; // KB gzip
+const BUDGET = { entry: 136, three: 135, initial: 305 }; // KB gzip (MAP-3 E: +~6 KB of scenery models: railway, furniture, vehicles)
 (async () => {
   const problems = [];
   const dir = 'dist/assets';
@@ -105,7 +105,7 @@ const BUDGET = { entry: 130, three: 135, initial: 300 }; // KB gzip
     // Budgets (triangles drawn incl. the shadow pass): stage 1 ≤ 0.8 M, any stage ≤ 1.0 M; draw calls guard against regressions.
     for (const c of report.city) {
       if (c.tris > (c.stage === 1 ? 0.8e6 : 1.0e6)) problems.push(`stage ${c.stage}: ${c.tris} triangles`);
-      if (c.calls > 260) problems.push(`stage ${c.stage}: ${c.calls} draw calls`);
+      if (c.calls > 270) problems.push(`stage ${c.stage}: ${c.calls} draw calls`); // regression guard (MAP-3 E adds railway, furniture, wires)
     }
     if (report.city.at(-1).stage < 4) problems.push('city did not grow to stage 4');
     await ctx.close();
