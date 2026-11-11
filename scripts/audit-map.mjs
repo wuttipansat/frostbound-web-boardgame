@@ -20,7 +20,7 @@ const { growCity } = await import('../src/core/rules/city.js');
 
 const SEEDS = +(process.argv[2] ?? 6); const STAGES = +(process.argv[3] ?? 4);
 const RAIL_KINDS = /^(crossing|wagon|buffer)/;
-const NO_CLASH = /^(apron|wires|tree)/;            // ground decals and tree clusters may touch others
+const NO_CLASH = /^(apron|wires|tree|drift|birch|stump)/;            // ground decals and tree clusters may touch others
 const issues = [];
 const note = (type, seed, stage, what, at) => issues.push({ type, seed, stage, what, at: at.map((v) => +v.toFixed(1)) });
 
@@ -51,7 +51,7 @@ function audit(board, map, seed, stage) {
     { // MAP-6: nothing stands on the river ice but its bridge parapets
       const rv = riverLine(map); const ac = rv.axis === 'x' ? [it.box.min.z, it.box.max.z] : [it.box.min.x, it.box.max.x];
       const al = rv.axis === 'x' ? c.x : c.z; const here = has(...(rv.axis === 'x' ? [gridOf(al), rv.r] : [rv.r, gridOf(al)]));
-      if (here && !/^parapet/.test(it.kind) && ac[0] < rv.c + 2.2 && ac[1] > rv.c - 2.2) note('on the river', seed, stage, it.kind, at);
+      if (here && !/^(parapet|lamp-bridge|boat|fishing)/.test(it.kind) && ac[0] < rv.c + 2.2 && ac[1] > rv.c - 2.2) note('on the river', seed, stage, it.kind, at);
     }
   }
   for (const it of items) {

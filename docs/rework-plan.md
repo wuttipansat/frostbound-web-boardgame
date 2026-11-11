@@ -501,3 +501,14 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - Clusters: school + playground, hospital + pharmacy, police + impound lot, church + graveyard, gas station / motel + diner; industrial yards get a water tower or a power substation.
 - Audit: props and places outside their zone / tier, and anything on the river ice, are findings (0 over 6 seeds × 4–5 stages).
 - Pack: new places (and the farmhouse) reuse the authored model up close (no refined copy); one landmark tower and three tall-block variants; pack 3.01 MB gzip (limit raised to 3.2 MB).
+
+### MAP-7 — a more beautiful town and outskirts (done)
+- Outskirts: open chunks are land — tree clumps (big pines in the middle, young pines, bare birches and stumps round the rim, now and then a fallen trunk), small fields (stubble rows, post-and-rail fences with a gap or a broken rail, hay bales, a tractor under a tarp, a lean-to with firewood), one frozen pond per block (dark ice, reeds, a rowing boat), drifts.
+- Cottages stand in fenced gardens with a gate, a trodden path to the road and a dog house; one in four is abandoned (boarded windows, a sagged roof with a hole, snow on the porch, a broken fence, no path, no smoke or power drop).
+- Drifts are smooth, low, wobbly half domes (no voxel stair lines).
+- Town: suburban and downtown front rows touch side by side; downtown corner buildings stand taller; every small building has one ground-floor detail (a dark bracket sign, a bicycle, crates) and flat roofs get a water tank or an aerial and a dish; walls take a district tone (cool downtown, warm residential, rusty industrial) with a small difference per building (instance colours); snowed-over cars parked along town kerbs; kerb snow heaps on most downtown streets.
+- Light and depth: a light haze (fog 0.0021); the skyline stands just beyond the city's far edge (within 30° of the far side toward the town), slightly lighter cards and a few lit windows, hidden while the view is turned so it would stand in front.
+- River: darker ice with white banks and pressure ridges, a boat frozen in or a fishing hole with a stool; a dark lamp post at each bridge.
+- Rim: a lumpy snow lip with icicles along every edge where the city ends; roots in the outskirts' soil band; post-and-rail fences running to the edge; striped barriers where roads end at the edge.
+- Graveyard: crosses, rounded and leaning stones, graves under snow, iron railings with a gate, a bare tree.
+- Budgets (raised for MAP-7): stage 1 ≤ 1.3 M, any stage ≤ 1.6 M triangles, ≤ 320 draw calls, pack ≤ 3.4 MB. Measured: stage 1 0.55 M, stage 4 0.63 M, ≤ 291 draw calls, pack 3.08 MB. Battery saver hides the details (kerb cars, fields and ponds, birches and stumps, rim lip and icicles, rim fences and barriers).

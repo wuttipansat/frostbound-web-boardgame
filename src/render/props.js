@@ -298,6 +298,7 @@ export function fenceModel(kind = 'picket') {
   const m = new VoxelModel();
   for (let x = -30; x < 30; x++) {
     if (kind === 'picket') { if (x % 2 === 0) m.box(x, 0, 0, 1, 7, 1, 0xe8e4d8); m.set(x, 2, -1, 0xd8d2c2); m.set(x, 5, -1, 0xd8d2c2); }
+    else if (kind === 'rail') { if (x % 8 === 0) m.box(x, 0, 0, 1, 8, 1, 0x5a4030); if (x % 23 !== 5) { m.set(x, 3, 0, 0x7a5a3a); m.set(x, 6, 0, 0x7a5a3a); } } // MAP-7: post-and-rail, a broken rail
     else { if (x % 6 === 0) m.box(x, 0, 0, 1, 12, 1, 0x6c7580); for (let y = 1; y < 11; y++) if ((x + y) % 2 === 0) m.set(x, y, 0, 0x9aa3ad); m.set(x, 11, 0, 0x6c7580); if (x % 3 === 0) m.set(x, 12, 0, 0x8e979f); }
   }
   return m.snowCap(P.snow, 1, 2);
@@ -401,4 +402,44 @@ export function bridgeParapetModel() {
   for (let x = -28; x < 28; x += 7) m.box(x, 3, -1, 2, 6, 3, 0x9aa3ad);
   m.box(-28, 9, -1, 56, 2, 3, 0xb0b8c0);
   return m.snowCap(P.snow, 1, 2);
+}
+
+// ---------------------------------------------------------------- MAP-7: outskirts, river and rim details
+
+/** A bare birch (0.25 world per voxel): a white trunk with dark marks, thin bare branches, snow on the forks. */
+export function birchModel(v = 0) {
+  const m = new VoxelModel(); const h = 14 + v * 3;
+  for (let y = 0; y < h; y++) m.set(0, y, 0, hash3(y, v, 1) < 0.25 ? 0x2a2a2a : 0xe8e6e0);
+  for (let k = 0; k < 6; k++) {
+    const y = 6 + k * 2 + (k % 2); const dx = [1, -1, 0, 0, 1, -1][k]; const dz = [0, 0, 1, -1, 1, -1][k];
+    for (let s = 1; s <= 3 - (k >> 2); s++) m.set(dx * s, y + s, dz * s, 0x8a8278);
+    m.set(dx * 3, y + 4, dz * 3, P.snow);
+  }
+  m.set(0, h, 0, P.snow);
+  return m;
+}
+/** A stump (0.25 world per voxel), snow on top. */
+export function stumpModel() { const m = new VoxelModel(); m.box(-1, 0, -1, 3, 2, 3, 0x6a4a30); m.box(0, 2, 0, 1, 1, 1, 0xb08a5a); return m.snowCap(P.snow, 1, 1); }
+/** A striped road barrier where a road ends at the edge of the world (0.1 world per voxel). */
+export function barrierModel() {
+  const m = new VoxelModel();
+  for (const x of [-22, 21]) m.box(x, 0, -1, 2, 10, 2, 0x4b525a);
+  for (let x = -24; x < 24; x++) m.box(x, 8, -1, 1, 3, 1, Math.floor((x + 24) / 6) % 2 ? 0xe8e8e0 : 0xc0392b);
+  m.box(-6, 11, -1, 12, 4, 1, 0xd8b03a); for (let x = -4; x < 4; x += 2) m.set(x, 13, -2, 0x1c1f24);
+  return m.snowCap(P.snow, 1, 2);
+}
+/** A fishing hole on the river ice: a dark round hole, a stool, a bucket and a rod (0.1 world per voxel). */
+export function fishingModel() {
+  const m = new VoxelModel();
+  for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) if (x * x + z * z <= 9) m.set(x, 0, z, x * x + z * z <= 4 ? 0x1c2a36 : 0xd7e4ee);
+  m.box(5, 0, -1, 3, 4, 3, 0x6a4a30); m.box(4, 4, -2, 5, 1, 5, 0x6a4a30); m.box(-8, 0, 2, 3, 4, 3, 0x2b4170);
+  for (let k = 0; k < 8; k++) m.set(4 - k, 5 + Math.floor(k / 2), 0, 0x3a3f46);
+  return m;
+}
+/** A rowing boat frozen into the river ice, tilted (0.1 world per voxel). */
+export function boatModel() {
+  const m = new VoxelModel();
+  for (let x = -12; x < 12; x++) { const w = Math.round(4 * Math.sqrt(1 - (x / 12) ** 2)); m.box(x, 0, -w, 1, 4, 2 * w + 1, 0x7a4a2a); if (w > 1) m.clearBox(x, 1, -w + 1, 1, 3, 2 * w - 1); }
+  for (const x of [-4, 3]) m.box(x, 2, -3, 1, 1, 7, 0x5a3a24);
+  return m.snowCap(P.snow, 0.8, 1);
 }

@@ -24,7 +24,7 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   const scene = new THREE.Scene();
   // UI-13: a plain dark backdrop (the diorama floats over it) instead of the night sky.
   scene.background = new THREE.Color(P.backdrop);
-  scene.fog = new THREE.FogExp2(P.backdrop, 0.0015); // less fog: the whole town stays readable
+  scene.fog = new THREE.FogExp2(P.backdrop, 0.0021); // MAP-7: a light haze that thickens with distance (depth in the overview)
 
   // Isometric-ish orthographic camera.
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 400);

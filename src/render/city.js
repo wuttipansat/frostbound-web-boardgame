@@ -798,21 +798,51 @@ export function smallBuilding(v = 0) {
     for (let k = 0; k <= Math.floor(d / 2); k++) m.box(x0 - 1, H + 1 + k, z0 - 1 + k, w + 2, 1, d + 2 - 2 * k, k % 2 ? C.roofDark : C.roof);
     m.box(x0 + 3, H + 2, z0 + 3, 2, Math.floor(d / 2) + 2, 2, C.brick);
   }
+  // MAP-7: one ground-floor detail per front, and rooftop clutter on flat roofs.
+  const fz = z0 + d;
+  if (shop) { m.box(x0 + w - 2, FH + 1, fz, 1, 1, 3, C.metalDark); m.box(x0 + w - 2, FH - 4, fz + 2, 1, 5, 4, 0x2a2d31); m.box(x0 + w - 2, FH - 3, fz + 3, 1, 3, 2, 0x4a3a3c); } // a dark bracket sign
+  else if (v % 4 === 1) { for (const bx0 of [x0 + 1, x0 + 5]) { m.box(bx0, 1, fz, 3, 1, 1, 0x1c1f24); m.box(bx0, 3, fz, 3, 1, 1, 0x1c1f24); m.box(bx0, 2, fz, 1, 1, 1, 0x1c1f24); m.box(bx0 + 2, 2, fz, 1, 1, 1, 0x1c1f24); } m.box(x0 + 2, 3, fz, 5, 1, 1, 0xa63a2e); m.box(x0 + 3, 4, fz, 1, 1, 1, 0x1c1f24); } // a bicycle against the wall
+  else { m.box(x0 + 1, 1, fz, 3, 3, 3, 0xa07a4a); m.box(x0 + 2, 4, fz + 1, 2, 2, 2, 0x8a6a44); } // crates by the door
+  if (v % 4 !== 3) {
+    if (v % 3 === 0) { for (const [dx, dz] of [[0, 0], [3, 0], [0, 3], [3, 3]]) m.box(x0 + 3 + dx, H + 1, z0 + 3 + dz, 1, 4, 1, C.metalDark); m.box(x0 + 2, H + 5, z0 + 2, 6, 5, 6, 0x7a5a3a); for (let k = 0; k < 3; k++) m.box(x0 + 3 + k, H + 10 + k, z0 + 3 + k, 4 - 2 * k, 1, 4 - 2 * k, C.roofDark); } // a water tank on legs
+    else if (v % 3 === 2) { m.box(x0 + w - 3, H + 1, z0 + 3, 1, 10, 1, C.metalDark); m.box(x0 + w - 5, H + 9, z0 + 3, 5, 1, 1, C.metalDark); m.box(x0 + 3, H + 2, z0 + d - 4, 3, 3, 1, 0xd8d2c2); } // an aerial and a dish
+  }
   return dust(m);
 }
 
 // ---------------------------------------------------------------- MAP-6: the outskirts
 
-export const COTTAGE_VARIANTS = 4;
-/** An outskirts cottage on one chunk: one floor and an attic under a steep roof, a porch, a chimney, a woodpile, a mailbox. */
+export const COTTAGE_VARIANTS = 6; // MAP-7: 4 lived-in, 2 abandoned
+const PACKED = 0xccd3db; const RAIL_WOOD = 0x7a5a3a;
+/** A post-and-rail fence line (posts every 4, two rails), optionally with a gap. */
+function railFence(m, x0, z0, len, alongX, gap = null, lean = -1) {
+  for (let u = 0; u < len; u++) {
+    if (gap && u >= gap[0] && u < gap[1]) continue;
+    const x = alongX ? x0 + u : x0; const z = alongX ? z0 : z0 + u;
+    if (u % 4 === 0) m.box(x, 1, z, 1, 5, 1, 0x5a4030);
+    if (u === lean) continue; // a broken rail
+    m.set(x, 3, z, RAIL_WOOD); m.set(x, 5, z, RAIL_WOOD);
+  }
+}
+/**
+ * An outskirts cottage in its garden (one chunk): one floor and an attic under a steep roof, a porch, a chimney, a
+ * woodpile, a mailbox, a post-and-rail garden fence, a trodden path to the road, a dog house. v 4–5: abandoned
+ * (boarded windows, a sagging roof, a snow-filled porch, a broken fence, no path).
+ */
 export function cottage(v = 0) {
   const m = new VoxelModel();
   const w = 14; const d = 11; const x0 = -7; const z0 = -7;
-  const wall = [0x9b7b5a, C.cream, 0x8fa3b8, C.sage][v % 4];
-  const roof = [C.roofDark, 0x6a3a2e, C.roof, 0x4b525a][v % 4];
+  const dead = v >= 4;
+  const wall = [0x9b7b5a, C.cream, 0x8fa3b8, C.sage, 0x8a7a66, 0x9a9488][v];
+  const roof = [C.roofDark, 0x6a3a2e, C.roof, 0x4b525a, 0x5a5650, 0x6a3a2e][v];
+  for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) m.set(x, 0, z, !dead && Math.abs(x - (x0 + (v % 2 ? 4 : w - 5))) <= 1 && z > z0 + d + 2 ? PACKED : P.snow); // the garden and the path
   const H = block(m, { x0, z0, w, d, floors: 1, wall, seed: 140 + v });
   m.clearBox(x0, H + 1, z0, w, 3, d);
-  for (let k = 0; k <= Math.floor(d / 2) + 1; k++) m.box(x0 - 1, H + 1 + k, z0 - 2 + k, w + 2, 1, d + 4 - 2 * k, k % 2 ? roof : C.roofDark);
+  for (let k = 0; k <= Math.floor(d / 2) + 1; k++) {
+    const sag = dead && k > 1 && k < 5 ? 1 : 0; // the ridge has sagged
+    m.box(x0 - 1, H + 1 + k - sag, z0 - 2 + k, w + 2, 1, d + 4 - 2 * k, k % 2 ? roof : C.roofDark);
+  }
+  if (dead) m.clearBox(x0 + 3, H + 4, z0 + 2, 3, 3, 3); // a hole in the roof
   for (const x of [x0, x0 + w - 1]) for (let k = 0; k < Math.floor(d / 2); k++) m.box(x, H + 1 + k, z0 + k, 1, 1, d - 2 * k, wall); // gable ends
   m.box(x0 + w - 4, H + 2, z0 + 2, 2, Math.floor(d / 2) + 3, 2, C.brick); // chimney
   const dx = x0 + (v % 2 ? 3 : w - 6); const fz = z0 + d - 1;
@@ -820,9 +850,41 @@ export function cottage(v = 0) {
   m.box(x0 + 1, 1, z0 + d, w - 2, 1, 3, 0x7a5a3a); // porch
   for (const x of [x0 + 1, x0 + w - 2]) m.box(x, 2, z0 + d + 2, 1, 6, 1, 0x7a5a3a);
   m.box(x0, 8, z0 + d, w, 1, 4, C.roofDark);
-  m.box(x0 - 3, 1, z0 + 1, 2, 3, 7, (x, y, z) => ((z + y) % 2 ? 0x7a5532 : 0xa07a4a)); // woodpile by the wall
+  if (dead) {
+    m.box(x0 + 2, 2, z0 + d, w - 4, 2, 2, P.snow); // snow drifted onto the porch
+    for (let x = x0 + 2; x < x0 + w - 2; x += 5) m.box(x, 3, z0 + d, 3, 4, 1, C.board); // boards over the windows
+  } else {
+    m.box(x0 - 3, 1, z0 + 1, 2, 3, 7, (x, y, z) => ((z + y) % 2 ? 0x7a5532 : 0xa07a4a)); // woodpile by the wall
+    m.box(x0 + w - 1, 1, z0 - 4, 4, 3, 3, 0x7a4a2a); m.box(x0 + w - 1, 4, z0 - 4, 4, 1, 3, C.roofDark); m.set(x0 + w, 2, z0 - 2, 0x1c1f24); // dog house
+  }
   m.box(x0 + w + 1, 1, z0 + d + 4, 1, 4, 1, 0x5a4a3a); m.box(x0 + w, 5, z0 + d + 4, 3, 2, 2, v % 2 ? 0x2b4170 : 0x3a3f46); // mailbox
+  const gapX = (v % 2 ? 4 : w - 5) + x0 + 10; // the gate opens on the path
+  railFence(m, -11, 10, 22, true, dead ? null : [gapX - 1, gapX + 2], dead ? 9 : -1);
+  railFence(m, -11, -11, 21, false, null, dead ? 6 : -1); railFence(m, 10, -11, 21, false);
   return dust(m);
+}
+
+/** MAP-7 fields (one chunk): v0 fence rows and hay bales; v1 a tractor under a tarp; v2 a lean-to with firewood. */
+export function fieldPiece(v = 0) {
+  const m = new VoxelModel();
+  for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) m.set(x, 0, z, (z + 12) % 5 === 0 && hash3(x >> 2, v, z) < 0.5 ? 0xb8b08a : P.snow); // stubble rows
+  railFence(m, -11, -11, 22, true, [9, 12], 15); railFence(m, -11, -11, 22, false, null, v === 0 ? 10 : -1);
+  if (v === 0) for (const [x, z] of [[-4, -2], [3, 3], [6, -5]]) { m.box(x, 1, z, 4, 3, 3, 0xd8b03a); m.box(x, 2, z, 4, 1, 3, 0xb8902a); }
+  if (v === 1) { m.box(-3, 1, -1, 9, 3, 5, 0xa63a2e); m.box(3, 4, -1, 3, 4, 5, 0xa63a2e); for (const x of [-3, 4]) m.box(x, 0, -2, 3, 3, 7, 0x1c1f24); m.box(-4, 4, -2, 11, 2, 7, 0x2f5a6a); } // tractor + tarp
+  if (v === 2) { m.box(-6, 1, -6, 1, 9, 1, 0x5a4030); m.box(5, 1, -6, 1, 9, 1, 0x5a4030); m.box(-7, 9, -8, 14, 1, 6, C.roofDark); for (let y = 1; y < 6; y++) m.box(-5, y, -7, 10, 1, 3, (x) => ((x + y) % 2 ? 0x7a5532 : 0xa07a4a)); }
+  return dust(m);
+}
+
+/** MAP-7: a frozen pond (one chunk): dark ice with lighter cracks, reeds at the edge, a rowing boat frozen in. */
+export function pondPiece() {
+  const m = new VoxelModel();
+  for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) {
+    const r = (x / 10) ** 2 + (z / 8) ** 2 + (hash3(x >> 1, 3, z >> 1) - 0.5) * 0.25;
+    m.set(x, 0, z, r < 1 ? (hash3(x, 5, z) < 0.06 ? 0xd7e4ee : r < 0.5 ? 0x6f8a9c : 0x87a2b4) : P.snow);
+    if (r > 0.95 && r < 1.15 && hash3(x, 7, z) < 0.3) m.box(x, 1, z, 1, 3 + Math.floor(hash3(x, 9, z) * 3), 1, 0xb8a46a); // reeds
+  }
+  m.box(2, 1, 1, 6, 2, 3, 0x7a4a2a); m.box(3, 2, 1, 4, 1, 3, 0x3a2a1a);
+  return m.snowCap(P.snow, 0.6, 2);
 }
 
 // ---------------------------------------------------------------- MAP-1c: decoration pieces sized to chunks
@@ -1143,11 +1205,17 @@ export function impound() {
 /** A graveyard beside a church: rows of stones and a picket fence. */
 export function graveyard() {
   const m = new VoxelModel(); pad(m, -11, -11, 22, 22, 163);
-  for (let x = -11; x < 11; x += 2) { m.box(x, 1, -11, 1, 4, 1, 0xe8e4d8); m.box(x, 1, 10, 1, 4, 1, 0xe8e4d8); }
+  for (let x = -11; x < 11; x++) for (const z of [-11, 10]) { if (x % 3 === 0) m.box(x, 1, z, 1, 6, 1, 0x2a2d31); m.set(x, 5, z, 0x2a2d31); if (x % 3 === 1) m.set(x, 6, z, 0x2a2d31); } // iron railings
+  m.clearBox(-2, 1, 10, 4, 6, 1); m.box(-3, 1, 10, 1, 8, 1, 0x2a2d31); m.box(2, 1, 10, 1, 8, 1, 0x2a2d31); m.box(-2, 7, 10, 4, 1, 1, 0x2a2d31); // the gate
   for (let r = 0; r < 3; r++) for (let k = 0; k < 4; k++) {
-    const x = -8 + k * 5; const z = -7 + r * 6; const h = 3 + Math.floor(hash3(r, k, 3) * 3);
-    if (hash3(r, k, 5) < 0.3) { m.box(x, 1, z, 1, h + 2, 1, 0x8a8f86); m.box(x - 1, h, z, 3, 1, 1, 0x8a8f86); } else m.box(x - 1, 1, z, 3, h, 1, 0x9a9c9e);
+    const x = -8 + k * 5; const z = -7 + r * 6; const kind = Math.floor(hash3(r, k, 5) * 3); const h = 3 + Math.floor(hash3(r, k, 3) * 3);
+    const stone = hash3(r, k, 7) < 0.5 ? 0x8a8f86 : 0xa8aaa4; const lean = hash3(r, k, 9) < 0.25 ? 1 : 0;
+    if (kind === 0) { m.box(x, 1, z, 1, h + 2, 1, stone); m.box(x - 1, h, z, 3, 1, 1, stone); } // a cross
+    else if (kind === 1) { m.box(x - 1, 1, z, 3, h, 1, stone); m.remove(x - 1, h, z); m.remove(x + 1, h, z); } // a rounded top
+    else { m.box(x - 1, 1, z, 3, h - 1, 1, stone); m.box(x - 1 + lean, h - 1, z - lean, 3, 1, 1, stone); } // a leaning slab
+    m.box(x - 1, 0, z + 1, 3, 1, 3, 0xd8dde2); // the grave under snow
   }
+  m.box(8, 1, -9, 1, 12, 1, 0x4a3a2c); for (const [dx, y, dz] of [[1, 8, 0], [-1, 10, 1], [2, 11, -1], [0, 12, 1]]) m.box(8 + Math.min(0, dx), y, -9 + Math.min(0, dz), Math.abs(dx) + 1, 1, Math.abs(dz) + 1, 0x4a3a2c); // a bare tree
   return dust(m);
 }
 /** A roadside diner beside a gas station or motel: a long low box, a counter window, a DINER sign with dead letters. */

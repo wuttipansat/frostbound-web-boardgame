@@ -6,7 +6,7 @@ import { VoxelModel, hash3, MATERIALS, geometriesFor, groupOf, packedBounds } fr
 import { P } from './palette.js';
 import { LOCATION_BUILDERS_HD, colonyHD, treeModelHD, rockModelHD } from './buildings.js';
 import { buildTerrainHD, ROAD } from './terrain.js';
-import { bridgeParapetModel, snowHeapModel, sandbagModel, driftModel, woodpileModel, scrapHeapModel, cratesModel, carModel, lampModel, containerModel, clutterModel, CLUTTER_KINDS, crossingModel, wagonModel, bufferStopModel, shelterModel, stopSignModel, directionSignModel, safeZoneModel, fenceModel, campModel, laundryModel, crowModel, bulbModel, FURNITURE, furnitureModel, trafficLightModel, streetSignModel, powerPoleModel, vehicleModel, checkpointModel, burntCarModel, tentModel, statueModel } from './props.js';
+import { birchModel, stumpModel, barrierModel, fishingModel, boatModel, bridgeParapetModel, snowHeapModel, sandbagModel, driftModel, woodpileModel, scrapHeapModel, cratesModel, carModel, lampModel, containerModel, clutterModel, CLUTTER_KINDS, crossingModel, wagonModel, bufferStopModel, shelterModel, stopSignModel, directionSignModel, safeZoneModel, fenceModel, campModel, laundryModel, crowModel, bulbModel, FURNITURE, furnitureModel, trafficLightModel, streetSignModel, powerPoleModel, vehicleModel, checkpointModel, burntCarModel, tentModel, statueModel } from './props.js';
 import { markingQuads, lampSpots, railQuads, streetRuns, rampQuads } from './streets.js';
 import { blockSlab, GROUND } from './ground.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -322,6 +322,14 @@ export function blockPieces(b, bx, bz, plan, recipe = null, district = null) {
     const k = `${i},${j}`;
     if (used.has(k) || plan.covered.includes(k) || onRail(i, j)) continue;
     const r = hash3(bx * 11 + j, 79 + i, bz * 11 + i);
+    // MAP-7: the outskirts are land: woods in clumps, small fields, a frozen pond, drifts.
+    if (district === 'outskirts') {
+      if (r < 0.3) out.push([i, j, 'clump', 1]);
+      else if (r < 0.48) out.push([i, j, 'field', 1]);
+      else if (r < 0.56 && !out.some((o) => o[2] === 'pond')) out.push([i, j, 'pond', 1]);
+      else if (r < 0.8) out.push([i, j, 'drift', 1]);
+      continue;
+    }
     // MAP-6: benches only in parks and squares; the outskirts are wooded.
     const square = (b.kind === 'park' || b.kind === 'plaza') && district !== 'outskirts';
     if (square && r < 0.14) out.push([i, j, 'bench', 1]);
@@ -341,6 +349,7 @@ function instanced(make, scale, transforms, { castShadow = true, cacheKey = null
     if (!geo) continue;
     const im = new THREE.InstancedMesh(geo, mat, transforms.length);
     transforms.forEach((t, i) => im.setMatrixAt(i, t));
+    if (transforms.tints && mat === MATERIALS.lit) transforms.forEach((_, i) => im.setColorAt(i, transforms.tints[i] ?? WHITE)); // MAP-7: district colours
     im.userData.base = transforms; // MAP-2 C: pop-in animates from these
     im.userData.kind = cacheKey ?? 'prop'; // MAP audit: what this is
     im.castShadow = castShadow && mat === MATERIALS.lit;
@@ -358,6 +367,28 @@ function pickBy(list, r) {
 
 /** A soft glowing ring texture for hover/selection halos. */
 const POOL_GEO = new THREE.PlaneGeometry(1, 1);
+const WHITE = new THREE.Color(1, 1, 1);
+// MAP-7: walls take a district tone (instance colour), each building a little different from its neighbours.
+const DISTRICT_TINT = { downtown: [0.94, 0.96, 1.0], residential: [1.04, 0.99, 0.93], industrial: [1.04, 0.94, 0.87], outskirts: [1.02, 0.99, 0.95] };
+export function tintOf(district, x, z) {
+  const t = DISTRICT_TINT[district]; if (!t) return null;
+  const j = (k) => 1 + (hash3(Math.round(x * 3), k, Math.round(z * 3)) - 0.5) * 0.12;
+  return new THREE.Color(t[0] * j(1), t[1] * j(2), t[2] * j(3));
+}
+/** MAP-7: smooth snow drifts (a flattened, wobbly half dome): no voxel stair lines. */
+const DRIFT_GEOS = [0, 1].map((v) => {
+  const g = new THREE.SphereGeometry(1, 18, 5, 0, Math.PI * 2, 0, Math.PI / 2);
+  const p = g.attributes.position; const col = [];
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i); const y = p.getY(i); const z = p.getZ(i);
+    const n = 1 + (hash3(Math.round(Math.atan2(z, x) * 3), v, 7) - 0.5) * 0.3 * (1 - y);
+    p.setXYZ(i, x * n, y, z * n);
+    const c = new THREE.Color(P.snow).lerp(new THREE.Color(0xc9d6e6), (1 - y) * 0.35); col.push(c.r, c.g, c.b);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.scale(2.4, 0.32 + v * 0.16, 1.4); g.computeVertexNormals(); // low and wide: a drift, not a dome
+  return g;
+});
 const WIRE_MAT = new THREE.LineBasicMaterial({ color: 0x1c1f24 });
 const AMBER_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, fog: false }); // blinking amber signals
 /** A soft warm spot of lamp light on the ground. */
@@ -658,8 +689,9 @@ export function createBoard({ progressive = false } = {}) {
       return Math.abs(x - blockPos(gx)) > ex - 0.5 || Math.abs(z - blockPos(gz)) > ez - 0.5;
     };
     const houses = Array.from({ length: city.SMALL_VARIANTS }, () => []); const cottages = Array.from({ length: city.COTTAGE_VARIANTS }, () => []);
-    const put = (list, p, rotY, scale = 1) => { tmp.position.copy(p); tmp.rotation.set(0, rotY, 0); tmp.scale.setScalar(scale); tmp.updateMatrix(); list.push(tmp.matrix.clone()); };
-    const drifts = [[], []]; const ruins = [[], []]; const pieces = { parking: [], fountain: [] }; const fences = { picket: [], chain: [] };
+    const put = (list, p, rotY, scale = 1, tint = null) => { tmp.position.copy(p); tmp.rotation.set(0, rotY, 0); tmp.scale.setScalar(scale); tmp.updateMatrix(); list.push(tmp.matrix.clone()); if (tint) (list.tints ??= [])[list.length - 1] = tint; };
+    const pushT = (list, mx, tint) => { list.push(mx); if (tint) (list.tints ??= [])[list.length - 1] = tint; };
+    const birches = [[], []]; const stumps = []; const drifts = [[], []]; const ruins = [[], []]; const pieces = { parking: [], fountain: [] }; const fences = { picket: [], chain: [] };
     const big = {}; const courts = [];
     const matrixAt = (p, rotY, scale) => { tmp.position.copy(p); tmp.rotation.set(0, rotY, 0); tmp.scale.setScalar(scale); tmp.updateMatrix(); return tmp.matrix.clone(); }; const clutter = Array.from({ length: CLUTTER_KINDS }, () => []);
     const roadSet = new Set(map.roads);
@@ -691,20 +723,23 @@ export function createBoard({ progressive = false } = {}) {
           if (EXTRA_MODELS[what]) { (big[what] ??= { make: EXTRA_MODELS[what], list: [] }).list.push(matrixAt(p, i === 0 ? face0 : face, city.SMALL_SCALE)); continue; }
           if (BIG[what]) {
             const [mk, nv] = BIG[what]; const v = Math.floor(r2 * nv);
-            (big[`${what}-${v}`] ??= { make: () => mk(v), list: [] }).list.push(matrixAt(p, face, city.SMALL_SCALE));
+            pushT((big[`${what}-${v}`] ??= { make: () => mk(v), list: [] }).list, matrixAt(p, face, city.SMALL_SCALE), tintOf(district, p.x, p.z));
             continue;
           }
-          if (what === 'rows' || (what === 'shop' && district === 'downtown' && plan.core && hash3(bx + j, 93 + i, bz) < 0.3)) {
+          const corner = i === 0 && (j === 0 || j === plan.cols - 1); // MAP-7: corner buildings stand taller
+          if (what === 'rows' || (what === 'shop' && district === 'downtown' && ((plan.core && hash3(bx + j, 93 + i, bz) < 0.3) || corner))) {
             const isRows = what === 'rows'; const v = isRows ? Math.floor(r2 * 2) : [0, 1, 3][Math.floor(r2 * 3)]; // (MAP-6: 3 tall variants keep the pack small)
-            (big[`${isRows ? 'rows' : 'tall'}-${v}`] ??= { make: () => (isRows ? city.rowHouses(v) : city.tallBuilding(v)), list: [] }).list.push(matrixAt(p, face, city.SMALL_SCALE));
+            pushT((big[`${isRows ? 'rows' : 'tall'}-${v}`] ??= { make: () => (isRows ? city.rowHouses(v) : city.tallBuilding(v)), list: [] }).list, matrixAt(p, face, city.SMALL_SCALE), tintOf(district, p.x, p.z));
             if (isRows && district === 'residential' && (i === 0 || backRow)) put(fences.picket, p.clone().addScaledVector(plan.fwd, (backRow ? -1 : 1) * (CHUNK / 2 - 0.25)), face0);
             continue;
           }
           if (what === 'alley') { if (r2 < 0.5) put(clutter[Math.floor(r2 * 8) % (CLUTTER_KINDS - 1)], p, face); continue; }
           if (what === 'camp' || what === 'laundry') { courts.push({ p, face, what }); continue; }
           if (what === 'house' && district === 'outskirts') { // MAP-6: a cottage facing the road, its garden behind
-            put(cottages[Math.floor(r2 * city.COTTAGE_VARIANTS)], p, i === 0 ? face0 : face, city.SMALL_SCALE);
-            houseSpots.push({ roof: p.clone().setY(GROUND + 3.4), cottage: true });
+            const dead = hash3(bx + j, 101, bz + i) < 0.25; // MAP-7: one in four abandoned
+            const v = dead ? 4 + Math.floor(r2 * 2) : Math.floor(r2 * 4);
+            put(cottages[v], p, i === 0 ? face0 : face, city.SMALL_SCALE, tintOf(district, p.x, p.z));
+            if (!dead) houseSpots.push({ roof: p.clone().setY(GROUND + 3.4), cottage: true });
             continue;
           }
           if (what === 'house' || what === 'shop') {
@@ -713,20 +748,34 @@ export function createBoard({ progressive = false } = {}) {
             const list = what === 'shop' && shopPool.length ? shopPool : what !== 'shop' && housePool.length ? housePool : pool;
             const v = list[Math.floor(r2 * list.length)];
             // Downtown front rows: sized to their chunk's width, side by side (no gaps); others the usual size.
-            const wide = district === 'downtown' && i === 0 ? Math.min(1.1, (CHUNK - 0.25) / ((16 + (v % 3) * 2 + 7) * 0.3)) : city.SMALL_SCALE; // + fire escape, AC, snow bank
-            put(houses[v % city.SMALL_VARIANTS], p, face, wide);
+            const wide = (district === 'downtown' || district === 'residential') && i === 0 ? Math.min(1.1, (CHUNK - 0.25) / ((16 + (v % 3) * 2 + 7) * 0.3)) : city.SMALL_SCALE; // + fire escape, AC, snow bank
+            put(houses[v % city.SMALL_VARIANTS], p, face, wide, tintOf(district, p.x, p.z));
             const floors = 2 + (v % 3); const dep = (14 + (v % 2) * 3) * 0.3 * wide;
             const toward = plan.fwd.clone(); if (i !== 0) toward.set(Math.sin(face), 0, Math.cos(face));
             houseSpots.push({ roof: p.clone().addScaledVector(toward, dep / 2 - 0.2).setY(GROUND + floors * 10 * 0.3 * wide + 0.2) });
             // Residential front yards get a picket fence along the sidewalk.
             if (district === 'residential' && i === 0) put(fences.picket, p.clone().addScaledVector(plan.fwd, CHUNK / 2 - 0.25), face0);
+          } else if (what === 'clump' || (what === 'trees' && district === 'outskirts')) {
+            // MAP-7 woods: a dense centre of big pines, a thinner rim of young ones, a birch or two, stumps, now and then a fallen trunk.
+            for (let k = 0; k < 3; k++) put(trees[Math.floor(hash3(k, i + bx, j) * 3)], p.clone().add(new THREE.Vector3((hash3(k, bx, j) - 0.5) * 1.6, 0, (hash3(k, bz, i) - 0.5) * 1.6)), k * 2.1, 0.95 + hash3(j, k, i) * 0.45);
+            for (let k = 0; k < 4; k++) {
+              const a = k * 1.57 + hash3(k, bx + i, bz) * 1.2; const q = p.clone().add(new THREE.Vector3(Math.cos(a) * 2.1, 0, Math.sin(a) * 2.1));
+              const h = hash3(k, j, bz + 3);
+              if (h < 0.35) put(birches[k % 2], q, a, 0.8 + h); else if (h < 0.55) put(stumps, q, a, 1); else put(trees[(k + j) % 3], q, a, 0.45 + h * 0.3);
+            }
+            if (!plan.railCut && hash3(bx + j, 103, bz + i) < 0.3) { // a fallen trunk, centred on the clump (it lies along -cos/sin of face0)
+              tmp.position.copy(p).add(new THREE.Vector3(0, 0.3, 0)).add(new THREE.Vector3(Math.cos(face0) * 1.8, 0, -Math.sin(face0) * 1.8)); tmp.rotation.set(0, face0, Math.PI / 2 - 0.05); tmp.scale.setScalar(0.8); tmp.updateMatrix(); trees[1].push(tmp.matrix.clone());
+            }
+          } else if (what === 'field' || what === 'pond') {
+            const v = what === 'pond' ? 0 : Math.floor(r2 * 3);
+            pushT((big[`b7-${what}-${v}`] ??= { make: () => (what === 'pond' ? city.pondPiece() : city.fieldPiece(v)), list: [] }).list, matrixAt(p, face0 + Math.floor(r2 * 4) * (Math.PI / 2), city.SMALL_SCALE), null);
           } else if (what === 'trees') {
             for (let k = 0; k < 3; k++) {
               const q = p.clone().add(new THREE.Vector3((hash3(k, bx, j) - 0.5) * 3, 0, (hash3(k, bz, i) - 0.5) * 3));
               put(trees[Math.floor(hash3(k, i, j) * 3)], q, k, 0.7 + hash3(j, k, i) * 0.5);
             }
           } else if (what === 'tree') put(trees[Math.floor(r2 * 3)], p.clone().add(new THREE.Vector3((r2 - 0.5) * 3, 0, (hash3(i, j, 5) - 0.5) * 3)), r2 * 6, 0.8 + r2 * 0.4);
-          else if (what === 'drift') put(drifts[Math.floor(r2 * 2)], p.clone().add(new THREE.Vector3((r2 - 0.5) * 1.5, 0, (hash3(i, j, 9) - 0.5) * 1.5)), r2 * 6);
+          else if (what === 'drift') put(drifts[Math.floor(r2 * 2)], p.clone().add(new THREE.Vector3((r2 - 0.5) * 1.5, 0, (hash3(i, j, 9) - 0.5) * 1.5)), r2 * 6, 0.8 + r2 * 0.25);
           else if (what === 'bench') put(clutter[CLUTTER_KINDS - 1], p.clone().addScaledVector(plan.fwd, CHUNK * 0.35), face0 + Math.PI);
           else if (what === 'car') {
             const across = new THREE.Vector3(Math.sin(face + Math.PI / 2), 0, Math.cos(face + Math.PI / 2)); // side by side
@@ -780,11 +829,19 @@ export function createBoard({ progressive = false } = {}) {
     if (pieces.parking.length) group.add(lodInstanced('parking-small', city.parkingSmall, pieces.parking));
     if (pieces.fountain.length) group.add(lodInstanced('fountain', city.fountain, pieces.fountain));
     clutter.forEach((list, k) => { if (list.length) group.add(lazyLod('near', () => instanced(() => clutterModel(k), 0.12, list, { cacheKey: `clutter-${k}`, jitter: 0, castShadow: false }))); });
-    drifts.forEach((list, k) => { if (list.length) group.add(lazyLod('near', () => instanced(() => driftModel(k), 0.2, list, { cacheKey: `drift2-${k}`, jitter: 0, castShadow: false }))); });
+    drifts.forEach((list, k) => {
+      if (!list.length) return;
+      const im = new THREE.InstancedMesh(DRIFT_GEOS[k], MATERIALS.lit, list.length);
+      list.forEach((mx, i) => im.setMatrixAt(i, mx)); im.receiveShadow = true; im.userData.kind = `drift-${k}`; im.userData.base = list;
+      group.add(im);
+    });
+    const detail = (o) => { detailNodes.push(o); return o; };
+    birches.forEach((list, k) => { if (list.length) group.add(detail(lodProp(`birch-${k}`, () => birchModel(k), 0.25, list))); });
+    if (stumps.length) group.add(detail(lazyLod('near', () => instanced(stumpModel, 0.25, stumps, { cacheKey: 'stump', jitter: 0, castShadow: false }))));
     rocks.forEach((list, k) => { if (list.length) group.add(lazyLod('near', () => instanced(() => rockModelHD(k), 0.25, list, { cacheKey: `rock-${k}`, jitter: 0 }))); });
     cars.forEach((list, v) => { if (list.length) group.add(lazyLod('near', () => instanced(() => carModel(v), 0.15, list, { cacheKey: `car4-${v}`, jitter: 0, castShadow: false }))); });
     yards.forEach((list, k) => { if (list.length) group.add(lodProp(`container-${k}`, () => containerModel(k, 1 + (k % 2)), 0.2, list)); });
-    for (const [k, { make, list }] of Object.entries(big)) group.add(lodInstanced(`b5-${k}`, make, list, false));
+    for (const [k, { make, list }] of Object.entries(big)) { const g = lodInstanced(`b5-${k}`, make, list, false); if (k.startsWith('b7-')) detail(g); group.add(g); }
     courtyards.push(...courts);
     for (const [k, list] of Object.entries(fences)) if (list.length) group.add(lazyLod('near', () => instanced(() => fenceModel(k), 0.1, list, { cacheKey: `fence-${k}`, jitter: 0, castShadow: false })));
     if (attach) root.add(group);
@@ -800,6 +857,7 @@ export function createBoard({ progressive = false } = {}) {
   const houseSpots = []; // MAP-4: roof edges of small buildings (service drops from the power lines)
   const courtyards = []; // MAP-5: courtyard spots { p, face, what }
   const crowPerches = []; const BASE_CHIMNEYS = 3; // the colony's two houses + the dorm
+  const detailNodes = []; // MAP-7: hidden in Battery saver
   root.add(decor);
   let flickers = []; let pools = null;
   function buildStreetDecor() {
@@ -891,6 +949,9 @@ export function createBoard({ progressive = false } = {}) {
     }
     buildRailway(rail);
     buildFurniture(rail, segs, ground, spots);
+    for (let i = detailNodes.length - 1; i >= 0; i--) if (!detailNodes[i].parent) detailNodes.splice(i, 1);
+    const fd = decor.getObjectByName('furniture-detail'); if (fd) detailNodes.push(fd);
+    buildRim();
     trackGlow(decor);
   }
 
@@ -898,18 +959,18 @@ export function createBoard({ progressive = false } = {}) {
   // Everything here is merged into one lit mesh + one glow mesh for the whole city (2 draw calls).
   function buildFurniture(rail, segs, ground0, lamps) {
     debugItems.length = 0;
-    const lit = []; const glow = []; const amber = [];
+    const lit = []; const glow = []; const amber = []; const litD = []; // litD: MAP-7 details (hidden in Battery saver)
     // On a block slab (not over a back lane between blocks), off the track, and clear of doors and gates.
     const onSlab = (x, z) => { const bx = gridOf(x); const bz = gridOf(z); return has(bx, bz) && Math.abs(x - blockPos(bx)) <= blockHalf(bx) - ROAD.half - 0.2 && Math.abs(z - blockPos(bz)) <= blockHalf(bz) - ROAD.half - 0.2; };
     const doors = Object.values(layout).flatMap((L) => (L.plan ? [L.plan.c.clone().addScaledVector(L.plan.fwd, L.plan.edge + 1).addScaledVector(L.plan.side, L.plan.lat)] : L.gates ?? []));
     const ground = (x, z) => ground0(x, z) && onSlab(x, z) && Math.abs((rail.axis === 'x' ? z : x) - rail.c) > RAIL_CLEAR + 2.2 && offRiver(x, z, 2.2) && !doors.some((d) => Math.hypot(d.x - x, d.z - z) < 3.5);
     const onRoadOk = (x, z) => ground0(x, z) && Math.abs((rail.axis === 'x' ? z : x) - rail.c) > RAIL_CLEAR + 0.6 && offRiver(x, z, 1.5);
     const _q = new THREE.Quaternion(); const _e = new THREE.Euler();
-    const add = (key, make, size, x, y, z, yaw, tilt = 0, tiltAxis = 'x') => {
+    const add = (key, make, size, x, y, z, yaw, tilt = 0, tiltAxis = 'x', detail = false) => {
       const g = geometriesFor(key, { size, jitter: 0 }, make);
       _e.set(tiltAxis === 'x' ? tilt : 0, yaw, tiltAxis === 'z' ? tilt : 0, 'YXZ');
       const mx = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), _q.setFromEuler(_e), new THREE.Vector3(1, 1, 1));
-      if (g.lit) lit.push(g.lit.clone().applyMatrix4(mx));
+      if (g.lit) (detail ? litD : lit).push(g.lit.clone().applyMatrix4(mx));
       if (g.glow) (key === 'tlight-amber' ? amber : glow).push(g.glow.clone().applyMatrix4(mx)); // amber lights blink on their own
       // MAP audit: remember what went into the merged mesh and where (world box).
       const box = (g.lit ?? g.glow).boundingBox.clone().applyMatrix4(mx);
@@ -1182,7 +1243,7 @@ export function createBoard({ progressive = false } = {}) {
           const lat = sgn * (ROAD.half - 0.65);
           const [x, z] = r.axis === 'x' ? [t, r.c + lat] : [r.c + lat, t];
           const [sx, sz] = r.axis === 'x' ? [t, r.c + sgn * (ROAD.walk + 2)] : [r.c + sgn * (ROAD.walk + 2), t];
-          if (!downAt(sx, sz) || hash3(Math.round(t), ri * 2 + (sgn > 0 ? 1 : 0), rail.look + 61) > 0.35) continue;
+          if (!downAt(sx, sz) || hash3(Math.round(t), ri * 2 + (sgn > 0 ? 1 : 0), rail.look + 61) > 0.6) continue;
           if (!onRoadOk(x, z) || Math.abs((rail.axis === 'x' ? z : x) - rail.c) < RAIL_CLEAR + 5 || near(x, z, nodes, 9) || taken(x, z, 1.4) || doors.some((d) => Math.hypot(d.x - x, d.z - z) < 5)) continue;
           const v = Math.floor(hash3(Math.round(t), 63, ri) * 2);
           add(`heap-${v}`, () => snowHeapModel(v), 0.1, x, 0, z, r.axis === 'x' ? 0 : Math.PI / 2);
@@ -1198,6 +1259,39 @@ export function createBoard({ progressive = false } = {}) {
         break;
       }
     });
+    // MAP-7 street life left behind: cars parked along the kerbs of town streets, snowed over.
+    runs.forEach((r, ri) => {
+      for (let k = Math.ceil((r.t0 - 3.75) / 7.5); k * 7.5 + 3.75 <= r.t1; k++) {
+        const t = k * 7.5 + 3.75;
+        for (const sgn of [1, -1]) {
+          const [x, z] = r.axis === 'x' ? [t, r.c + sgn * (ROAD.half - 0.95)] : [r.c + sgn * (ROAD.half - 0.95), t];
+          const [sx, sz] = r.axis === 'x' ? [t, r.c + sgn * (ROAD.walk + 2)] : [r.c + sgn * (ROAD.walk + 2), t];
+          const dz = districtOf(gridOf(sx), gridOf(sz), map.look);
+          if ((dz !== 'downtown' && dz !== 'residential') || hash3(Math.round(t), ri * 2 + (sgn > 0 ? 1 : 0), rail.look + 71) > 0.24) continue;
+          if (!onRoadOk(x, z) || Math.abs((rail.axis === 'x' ? z : x) - rail.c) < RAIL_CLEAR + 5 || near(x, z, nodes, 10) || taken(x, z, 1.6) || doors.some((d) => Math.hypot(d.x - x, d.z - z) < 5) || lamps.some((l) => Math.hypot(l.x - x, l.z - z) < 3.5)) continue;
+          const v = Math.floor(hash3(Math.round(t), 73, ri) * 4);
+          add(`car4-${v}`, () => carModel(v), 0.15, x, 0, z, (r.axis === 'x' ? 0 : -Math.PI / 2) + (sgn > 0 ? 0 : Math.PI), 0, 'x', true);
+        }
+      }
+    });
+    // MAP-7 rim: where the city ends, a road stops at a striped barrier; in the outskirts a field fence runs off the edge.
+    nodes.filter((n) => n.kind === 'end').forEach((n) => {
+      const d = [...n.dirs][0]; const ax = d[1]; const sg = d[0] === '+' ? 1 : -1; // the street leaves the node this way
+      const off = (k) => (ax === 'x' ? [n.x - sg * k, n.z] : [n.x, n.z - sg * k]);
+      if (ground0(...off(1))) return; // a dead end inside the city
+      for (const k of [-4.5, -6, -7.5]) { const [x, z] = off(k); if (onRoadOk(x, z) && !taken(x, z, 1.5)) { add('barrier', barrierModel, 0.1, x, 0, z, ax === 'x' ? Math.PI / 2 : 0, 0, 'x', true); break; } }
+    });
+    for (const k of Object.keys(map.blocks)) {
+      const [bx, bz] = parse(k);
+      if (districtOf(bx, bz, map.look) !== 'outskirts') continue;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (has(bx + dx, bz + dz) || hash3(bx * 3 + dx, 107, bz * 3 + dz) > 0.4) continue;
+        const rimC = dx ? blockPos(bx) + dx * (blockHalf(bx) - 3) : blockPos(bz) + dz * (blockHalf(bz) - 3);
+        const t = (dx ? blockPos(bz) : blockPos(bx)) + (hash3(bx, 109, bz) - 0.5) * 8;
+        const [x, z] = dx ? [rimC - dx * 3.1, t] : [t, rimC - dz * 3.1];
+        if (ground(x, z) && !taken(x, z, 3.2)) add('fence-rail', () => fenceModel('rail'), 0.1, x, GROUND, z, dx ? 0 : Math.PI / 2, 0, 'x', true);
+      }
+    }
     if (wires.length) {
       const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wires, 3));
       const wl = new THREE.LineSegments(wg, WIRE_MAT); wl.name = 'wires'; decor.add(tagLod(wl, 'near'));
@@ -1209,7 +1303,53 @@ export function createBoard({ progressive = false } = {}) {
       const mesh = new THREE.Mesh(geo, mat); mesh.name = name; mesh.receiveShadow = true; mesh.castShadow = mat === MATERIALS.lit;
       decor.add(mesh);
     };
-    merge(lit, MATERIALS.lit, 'furniture'); merge(glow, MATERIALS.glow, 'furniture-glow'); merge(amber, AMBER_MAT, 'amber-lights');
+    merge(lit, MATERIALS.lit, 'furniture'); merge(glow, MATERIALS.glow, 'furniture-glow'); merge(amber, AMBER_MAT, 'amber-lights'); merge(litD, MATERIALS.lit, 'furniture-detail');
+  }
+
+  // ---------------------------------------------------------------- MAP-7: the rim of the diorama
+  // Along every edge where the city ends: a lumpy snow lip over the cut and icicles hanging from it; in the outskirts
+  // roots poke out of the soil band. One merged mesh.
+  function buildRim() {
+    const pos = []; const col = []; const idx = [];
+    const box = (x0, y0, z0, x1, y1, z1, c) => {
+      const v = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]];
+      for (const f of [[0, 3, 2, 1], [4, 5, 6, 7], [0, 4, 7, 3], [1, 2, 6, 5], [3, 7, 6, 2], [0, 1, 5, 4]]) {
+        const n = pos.length / 3;
+        for (const k of f) { pos.push(...v[k]); col.push(c.r, c.g, c.b); }
+        idx.push(n, n + 1, n + 2, n, n + 2, n + 3);
+      }
+    };
+    const snow = new THREE.Color(P.snow); const ice = new THREE.Color(0xcfe2f0); const root0 = new THREE.Color(0x4a3426);
+    for (const k of Object.keys(map.blocks)) {
+      const [bx, bz] = parse(k);
+      const outskirts = districtOf(bx, bz, map.look) === 'outskirts';
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (has(bx + dx, bz + dz)) continue;
+        // The rim runs 3 inside the block boundary; at its ends it stops short of a convex corner, runs on into a
+        // straight neighbour, and reaches 3 past a concave one.
+        const lineC = dx ? blockPos(bx) + dx * (blockHalf(bx) - 3) : blockPos(bz) + dz * (blockHalf(bz) - 3);
+        const cb = dx ? bz : bx; const c0 = blockPos(cb) - blockHalf(cb); const c1 = blockPos(cb) + blockHalf(cb);
+        const endOff = (sg) => {
+          const nb = dx ? [bx, bz + sg] : [bx + sg, bz]; const dg = dx ? [bx + dx, bz + sg] : [bx + sg, bz + dz];
+          return !has(...nb) ? -3 : has(...dg) ? 3 : 0;
+        };
+        const t0 = c0 - endOff(-1); const t1 = c1 + endOff(1);
+        const P3 = (t, o, y) => (dx ? [lineC + dx * o, y, t] : [t, y, lineC + dz * o]);
+        const put = (ta, tb, oa, ob, ya, yb, c) => { const a = P3(ta, oa, ya); const b = P3(tb, ob, yb); box(Math.min(a[0], b[0]), ya, Math.min(a[2], b[2]), Math.max(a[0], b[0]), yb, Math.max(a[2], b[2]), c); };
+        for (let t = t0; t < t1 - 0.05; t += 0.7) {
+          const h = hash3(Math.round(t * 7), bx * 5 + dx, bz * 5 + dz); const te = Math.min(t1, t + 0.7);
+          put(t, te, -0.25, 0.18 + h * 0.14, GROUND - 0.12 - h * 0.1, GROUND + 0.08 + h * 0.07, snow); // the lip
+          if (h < 0.55) { const L = 0.25 + hash3(Math.round(t * 11), 5, bx + bz) * 0.9; const m0 = t + 0.2 + h * 0.3; put(m0, m0 + 0.09, 0.05, 0.14, GROUND - 0.12 - L, GROUND - 0.1, ice); put(m0 + 0.02, m0 + 0.07, 0.07, 0.12, GROUND - 0.2 - L * 1.25, GROUND - 0.12 - L, ice); }
+          if (outskirts && h > 0.86) put(t, t + 0.12, 0, 0.35 + h * 0.3, -1.9 - h * 0.4, -1.8 - h * 0.4, root0); // a root
+        }
+      }
+    }
+    if (!idx.length) return;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.setIndex(idx); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, MATERIALS.lit); m.name = 'rim'; m.receiveShadow = true; decor.add(m); detailNodes.push(m);
   }
 
   // ---------------------------------------------------------------- MAP-6: the frozen river
@@ -1224,10 +1364,14 @@ export function createBoard({ progressive = false } = {}) {
       for (const [t, l] of [[t0, l0], [t1, l0], [t1, l1], [t0, l1]]) { if (rv.axis === 'x') pos.push(t, y, rv.c + l); else pos.push(rv.c + l, y, t); col.push(c.r, c.g, c.b); }
       idx.push(...(rv.axis === 'x' ? [n, n + 2, n + 1, n, n + 3, n + 2] : [n, n + 1, n + 2, n, n + 2, n + 3]));
     };
-    const ice = new THREE.Color(0x9db6c6); const deep = new THREE.Color(0x7f9bb0); const crack = new THREE.Color(0xd7e4ee); const bank = new THREE.Color(P.snow);
+    const ice = new THREE.Color(0x7f97a8); const deep = new THREE.Color(0x5f798c); const crack = new THREE.Color(0xd7e4ee); const bank = new THREE.Color(P.snow); // MAP-7: darker ice, white banks
     const W = 2.6;
     for (const [t0, t1, kind, y0] of rv.pieces) {
       if (kind === 'road') {
+        for (const s2 of [-1, 1]) { // MAP-7: a (dark) lamp post at each bridge, its arm over the road
+          const [lx, lz] = rv.axis === 'x' ? [(t0 + t1) / 2 + s2 * (ROAD.half + 0.45), rv.c + 3.0 * s2] : [rv.c + 3.0 * s2, (t0 + t1) / 2 + s2 * (ROAD.half + 0.45)];
+          add('lamp-bridge', () => lampModel(true), 0.1, lx, GROUND, lz, rv.axis === 'x' ? (s2 > 0 ? Math.PI : 0) : (s2 > 0 ? Math.PI / 2 : -Math.PI / 2));
+        }
         for (const s2 of [-1, 1]) add('parapet', bridgeParapetModel, 0.1, ...(rv.axis === 'x' ? [(t0 + t1) / 2 + s2 * (ROAD.half + 0.45), GROUND, rv.c] : [rv.c, GROUND, (t0 + t1) / 2 + s2 * (ROAD.half + 0.45)]), rv.axis === 'x' ? Math.PI / 2 : 0); // along the street, at its kerbs
         continue;
       }
@@ -1235,6 +1379,14 @@ export function createBoard({ progressive = false } = {}) {
       quad(t0, t1, -W, W, y, ice);
       quad(t0, t1, -0.8, 0.9, y + 0.004, deep); // the channel, darker in the middle
       for (let t = t0 + 0.6; t < t1 - 1.6; t += 1.7) { const h = hash3(Math.round(t * 3), 81, rv.look); if (h < 0.5) quad(t, t + 1 + h, -1.6 + h * 2.4, -1.5 + h * 2.4, y + 0.008, crack); }
+      // MAP-7: pressure ridges across the ice; a boat frozen in, a fishing hole with a stool.
+      for (let t = t0 + 2; t < t1 - 2; t += 4.3) { const h = hash3(Math.round(t * 3), 85, rv.look); if (h < 0.45) quad(t, t + 0.35, -W + 0.4, W - 0.4 - h, y + 0.07, crack); }
+      if (kind === 'slab' && t1 - t0 > 12) {
+        const h = hash3(Math.round(t0), 87, rv.look);
+        const at = (t, l) => (rv.axis === 'x' ? [t, rv.c + l] : [rv.c + l, t]);
+        if (h < 0.35) add('boat', boatModel, 0.1, ...((p) => [p[0], y0 + 0.02, p[1]])(at(t0 + 4 + h * 6, -0.6)), rv.axis === 'x' ? 0.3 : Math.PI / 2 + 0.3, 0.08, 'z');
+        else if (h < 0.7) add('fishing', fishingModel, 0.1, ...((p) => [p[0], y0 + 0.04, p[1]])(at(t0 + 5 + h * 4, 0.5)), h * 6);
+      }
       for (const sgn of [-1, 1]) for (let t = t0; t < t1 - 0.01; t += 1.2) { const h = hash3(Math.round(t * 5), 83 + sgn, rv.look); quad(t, Math.min(t1, t + 1.2), sgn * (W - 0.1 - h * 0.5), sgn * (W + 0.5), y + 0.05 + h * 0.06, bank); }
     }
     const g = new THREE.BufferGeometry();
@@ -1340,27 +1492,40 @@ export function createBoard({ progressive = false } = {}) {
     return sh;
   })();
 
-  // MAP-6: a faint downtown skyline on the backdrop in the town direction (dark fogged cards), seen from stage 1 on.
-  const SKY_MAT = new THREE.MeshBasicMaterial({ color: 0x252e3e, fog: true });
+  // MAP-6/7: a downtown skyline beyond the city's far edge, toward the town but never between the camera and the city
+  // (it hides while the view is turned so it would stand in front). A few lit windows near the tops.
+  const SKY_MAT = new THREE.MeshBasicMaterial({ color: 0x313d52, fog: true });
+  const SKY_LIT = new THREE.MeshBasicMaterial({ color: 0xffc66b, fog: true, toneMapped: false });
   const SKY_GEO = new THREE.BoxGeometry(1, 1, 1);
-  let skyline = null;
+  const skyline = new THREE.Group(); skyline.name = 'skyline'; root.add(skyline);
+  let skyDir = new THREE.Vector3(-1, 0, -1);
   function buildSkyline() {
-    if (skyline) { root.remove(skyline); skyline.dispose(); }
+    for (const o of skyline.children) o.dispose?.();
+    skyline.clear();
     const look = map?.look ?? 0; const { dx, dz } = townOf(look);
+    // The usual camera stands at +x +z: the far side is −x −z. Keep the skyline within 80° of that side.
+    const far = Math.atan2(-1, -1); let a0 = Math.atan2(dz, dx);
+    let diff = Math.atan2(Math.sin(a0 - far), Math.cos(a0 - far));
+    diff = Math.max(-0.5, Math.min(0.5, diff)); a0 = far + diff;
+    skyDir = new THREE.Vector3(Math.cos(a0), 0, Math.sin(a0));
     let R = 0;
-    for (const k of Object.keys(map?.blocks ?? {})) { const [bx, bz] = parse(k); R = Math.max(R, Math.hypot(blockPos(bx), blockPos(bz))); }
-    const n = 36; const a0 = Math.atan2(dz, dx);
-    skyline = new THREE.InstancedMesh(SKY_GEO, SKY_MAT, n);
+    for (const k of Object.keys(map?.blocks ?? {})) { const [bx, bz] = parse(k); R = Math.max(R, Math.cos(Math.atan2(blockPos(bz), blockPos(bx)) - a0) * Math.hypot(blockPos(bx), blockPos(bz))); }
+    const n = 30; const cards = new THREE.InstancedMesh(SKY_GEO, SKY_MAT, n); const dots = new THREE.InstancedMesh(SKY_GEO, SKY_LIT, n * 2);
+    let nd = 0;
     for (let i = 0; i < n; i++) {
       const u = i / (n - 1) - 0.5; const core = 1 - Math.abs(u) * 2;
-      const a = a0 + u * 1.2; const d = R + 120 + hash3(i, 5, look) * 45;
-      const H = 12 + core * (25 + 45 * hash3(i, 7, look));
-      tmp.position.set(Math.cos(a) * d, H / 2 - 20, Math.sin(a) * d); tmp.rotation.set(0, -a, 0);
-      tmp.scale.set(5, H + 20, 7 + hash3(i, 9, look) * 12); tmp.updateMatrix();
-      skyline.setMatrixAt(i, tmp.matrix);
+      const side = u * (R + 20) * 1.5; const d = R + 10 + hash3(i, 5, look) * 14;
+      const x = Math.cos(a0) * d - Math.sin(a0) * side; const z = Math.sin(a0) * d + Math.cos(a0) * side;
+      const H = 10 + core * (14 + 34 * hash3(i, 7, look)); const W = 6 + hash3(i, 9, look) * 9;
+      tmp.position.set(x, H / 2 - 14, z); tmp.rotation.set(0, -a0, 0); tmp.scale.set(4, H + 14, W); tmp.updateMatrix(); cards.setMatrixAt(i, tmp.matrix);
+      for (let k = 0; k < 2; k++) if (hash3(i, 11 + k, look) < 0.18) {
+        tmp.position.set(x - Math.cos(a0) * 2.1, H - 3 - k * 4 - hash3(i, k, 13) * 6, z - Math.sin(a0) * 2.1 + (k - 0.5) * 2);
+        tmp.scale.set(0.5, 0.6, 0.6); tmp.updateMatrix(); dots.setMatrixAt(nd++, tmp.matrix);
+      }
     }
-    skyline.name = 'skyline'; skyline.renderOrder = -2;
-    root.add(skyline);
+    dots.count = nd;
+    cards.name = 'skyline-cards'; dots.name = 'skyline-lights';
+    skyline.add(cards, dots);
   }
 
   // Warm light sources: campfire + a lamp at each of the first six places (lights are costly; new places glow).
@@ -1521,6 +1686,17 @@ export function createBoard({ progressive = false } = {}) {
     c.group.position.y = -22 * (1 - e);
   };
 
+  let skyHooked = false;
+  let detailSaver = null; let detailCount = -1;
+  const hookSkyline = () => {
+    const scene = root.parent; if (skyHooked || !scene?.isScene) return;
+    skyHooked = true; const prev = scene.onBeforeRender;
+    scene.onBeforeRender = (r, sc, cam, ...rest) => {
+      prev?.call(scene, r, sc, cam, ...rest);
+      const v = cam.getWorldDirection(new THREE.Vector3()); v.y = 0; v.normalize();
+      skyline.visible = v.dot(skyDir) > 0.15; // only while it stands behind the city
+    };
+  };
   const api = {
     root,
     layout,
@@ -1634,6 +1810,10 @@ export function createBoard({ progressive = false } = {}) {
     stats,
     update(t) {
       const dt = Math.min(0.1, Math.max(0, t - (lastT ?? t))); lastT = t;
+      hookSkyline();
+      // MAP-7: Battery saver drops the extra details (kerb cars, fields, birches, the rim's icicles).
+      const saver = typeof document !== 'undefined' && document.body?.dataset?.gfx === 'saver';
+      if (saver !== detailSaver || detailNodes.length !== detailCount) { detailSaver = saver; detailCount = detailNodes.length; for (const o of detailNodes) o.visible = !saver; }
       for (const c of Object.values(cells)) if (c.pop) stepPop(c, dt);
       for (const c of batches) if (c.pop) stepPop(c, dt);
       for (let i = slotPops.length - 1; i >= 0; i--) { stepPop(slotPops[i], dt); if (!slotPops[i].pop) slotPops.splice(i, 1); }
