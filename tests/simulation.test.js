@@ -3,16 +3,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { simulate } from '../src/ai/simulate.js';
-import { LOCATIONS } from '../src/content/locations.js';
-import { LOCATION_IDS } from '../src/core/constants.js';
+import { locDef } from '../src/core/map.js';
 
 function checkInvariants(s) {
   assert.ok(s.morale >= 0 && s.morale <= s.maxMorale, 'morale in range');
   assert.ok(s.food >= 0, 'non-negative counters');
-  for (const id of LOCATION_IDS) {
+  for (const id of Object.keys(s.locations)) {
     const loc = s.locations[id];
     assert.ok(loc.zombies >= 0 && loc.barricades >= 0);
-    assert.ok(loc.zombies + loc.barricades <= LOCATIONS[id].zombieSlots, `${id} zombie slots`);
+    assert.ok(loc.zombies + loc.barricades <= locDef(s, id).zombieSlots, `${id} zombie slots`);
   }
   // Each card instance lives in at most one zone.
   const seen = new Set();

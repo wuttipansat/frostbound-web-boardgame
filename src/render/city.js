@@ -93,6 +93,22 @@ export function block(m, o) {
     const z = z0 + 3 + Math.floor(hash3(f, seed, 5) * (d - 8));
     m.box(x0 + w, f * FH + 2, z, 2, 2, 3, C.metal); m.set(x0 + w + 1, f * FH + 3, z + 1, C.metalDark);
   }
+  // MAP-1c: an external fire escape down the right side of tall buildings (landings + zigzag ladders).
+  if (floors >= 3 && d >= 14) {
+    const fz = z0 + d - 12;
+    for (let f = 1; f < floors; f++) {
+      const y = f * FH;
+      m.box(x0 + w, y, fz, 3, 1, 9, C.metalDark);
+      for (let z = fz; z < fz + 9; z += 2) m.set(x0 + w + 2, y + 1, z, C.metal);
+      for (let k = 0; k < FH - 1; k++) m.set(x0 + w + 1, y - 1 - k, fz + (f % 2 ? 1 + Math.floor(k * 7 / FH) : 7 - Math.floor(k * 7 / FH)), C.metal);
+    }
+  }
+  // A warning sign (skull) on some walls.
+  if (hash3(seed, 8, 8) < 0.35 && w > 14) {
+    const sx = x0 + 3 + Math.floor(hash3(seed, 9, 9) * (w - 9)); const sy = Math.min(H - 6, FH + 2);
+    m.box(sx, sy, z0 + d, 5, 5, 1, C.trim);
+    for (const [x, y] of [[1, 1], [3, 1], [2, 2], [1, 3], [2, 3], [3, 3]]) m.set(sx + x, sy + y, z0 + d, 0x15191e);
+  }
   moss(m, x0, z0, w, d, H, seed);
   roof(m, x0, z0, w, d, H, seed);
   return H;
@@ -137,6 +153,14 @@ function roof(m, x0, z0, w, d, H, seed) {
   m.box(x0 + 2, y + 7, z0 + 2, 7, 1, 6, C.roofDark);
   m.box(x0 + 4, y, z0 + 8, 3, 5, 1, C.board);
   m.box(x0 + w - 4, y, z0 + 2, 1, 6, 1, C.metalDark); // vent pipe
+  if (hash3(seed, 5, 5) < 0.5) { // satellite dish
+    const dx = x0 + 3 + Math.floor(hash3(seed, 6, 6) * (w - 8)); const dz = z0 + d - 5;
+    m.box(dx + 1, y, dz, 1, 3, 1, C.metalDark); m.box(dx, y + 3, dz - 1, 3, 3, 1, C.trim); m.set(dx + 1, y + 4, dz + 1, C.metalDark);
+  }
+  for (let i = 0; i < 4; i++) { // debris and potted plants
+    const px = x0 + 2 + Math.floor(hash3(i, seed, 11) * (w - 4)); const pz = z0 + 2 + Math.floor(hash3(i, seed, 13) * (d - 4));
+    if (hash3(i, seed, 15) < 0.5) m.box(px, y, pz, 2, 1, 1, 0x7a5a3a); else { m.set(px, y, pz, C.brick); m.set(px, y + 1, pz, C.moss); }
+  }
   if (hash3(seed, 4, 4) > 0.4 && w > 24) {
     // Water tank on legs.
     const tx = x0 + w - 12; const tz = z0 + d - 10;
@@ -195,11 +219,15 @@ export function groceryStore() {
   for (const [x, z] of [[3, d + 5], [6, d + 6], [34, d + 5]]) m.box(x, 1, z, 3, 3, 3, 0x8a5a2b); // crates
   for (const [x, z] of [[10, d + 6], [12, d + 7]]) m.box(x, 1, z, 2, 4, 2, 0x2f5fa8); // barrels
   graffiti(m, 28, 2, d, 3);
+  // A lit billboard on the roof.
+  for (const x of [4, 15]) m.box(x, 22, 6, 1, 6, 1, C.metalDark);
+  m.box(2, 28, 6, 16, 7, 1, C.trim);
+  for (let x = 3; x < 17; x++) for (let y = 29; y < 34; y++) m.set(x, y, 7, (x + y) % 5 === 0 ? C.neonWarm : y > 31 ? 0x2f5fa8 : 0xc0392b, true);
   return dust(m);
 }
 
 export function school() {
-  const m = new VoxelModel(); const w = 46; const d = 24;
+  const m = new VoxelModel(); const w = 42; const d = 24;
   pad(m, -4, -4, w + 8, d + 16, 3);
   block(m, { w, d, floors: 3, wall: C.ochre, trim: C.trim, seed: 33, balconies: false });
   m.box(19, 1, d - 1, 8, 8, 1, C.ochreDark); m.box(21, 1, d - 1, 4, 7, 1, C.board);
@@ -208,7 +236,7 @@ export function school() {
   for (let x = -3; x <= w + 2; x++) m.set(x, x % 3 ? 2 : 1, d + 10, C.metalDark);
   for (let x = -3; x <= w + 2; x += 3) m.box(x, 1, d + 10, 1, 4, 1, C.metal);
   m.clearBox(20, 1, d + 10, 6, 4, 1);
-  m.box(40, 1, d + 5, 1, 9, 1, C.metal); m.box(38, 10, d + 5, 4, 3, 1, C.paint);
+  m.box(37, 1, d + 5, 1, 9, 1, C.metal); m.box(35, 10, d + 5, 4, 3, 1, C.paint);
   m.box(6, 1, d + 5, 6, 1, 2, C.board); m.box(6, 2, d + 6, 6, 2, 1, C.board);
   graffiti(m, 30, 2, d, 7);
   return dust(m);
@@ -395,14 +423,16 @@ export function warehouse() {
 }
 
 export function motel() {
-  const m = new VoxelModel(); const w = 48; const d = 18;
+  const m = new VoxelModel(); const w = 40; const d = 18;
   pad(m, -4, -4, w + 8, d + 16, 32);
   block(m, { w, d, floors: 2, wall: C.ochre, trim: C.ochreDark, seed: 33 });
-  m.box(0, FH, d, w, 1, 4, C.trim); // walkway
-  for (let x = 0; x < w; x += 2) m.set(x, FH + 1, d + 3, C.metal);
+  m.box(0, FH, d, w, 1, 4, C.trim); // walkway on columns, with a railing
+  for (let x = 0; x < w; x += 2) { m.set(x, FH + 1, d + 3, C.metal); m.set(x + 1, FH + 2, d + 3, C.metal); }
+  for (let x = 0; x < w; x++) m.set(x, FH + 3, d + 3, C.metalDark);
+  for (let x = 1; x < w; x += 8) m.box(x, 1, d + 3, 1, FH - 1, 1, C.trim);
+  for (let x = 3; x < w - 3; x += 7) m.box(x, FH + 1, d - 1, 3, 7, 1, x % 3 ? 0x7a2f2a : C.board); // upstairs doors
   for (let x = 3; x < w - 3; x += 7) { m.clearBox(x, 1, d - 1, 3, 7, 1); m.box(x, 1, d - 1, 3, 7, 1, x % 3 ? C.board : 0x7a2f2a); }
-  m.box(w + 2, 1, d + 6, 2, 16, 2, C.metalDark); m.box(w - 4, 17, d + 6, 14, 6, 2, C.trim); // road sign
-  neon(m, 'MOTEL', w + 3, 18, d + 8, C.neonPink, 4);
+  neon(m, 'MOTEL', Math.floor(w / 2), 2 * FH + 4, d, C.neonPink, 2); // sign on the roof edge, one dead letter
   return dust(m);
 }
 
@@ -418,18 +448,19 @@ export function apartment() {
 }
 
 export function church() {
-  const m = new VoxelModel(); const w = 24; const d = 38;
-  pad(m, -4, -4, w + 8, d + 12, 36);
+  const m = new VoxelModel(); const w = 18; const d = 36;
+  pad(m, -2, -2, w + 4, d + 10, 36);
   m.walls(0, 1, 0, w, 16, d, C.cream);
   m.box(1, 16, 1, w - 2, 1, d - 2, C.roofDark);
-  for (let k = 0; k <= 12; k++) m.box(k, 17 + k, 0, w - 2 * k, 1, d, k % 3 === 0 ? C.roofDark : C.roof); // pitched roof
+  for (let k = 0; k <= 9; k++) m.box(k, 17 + k, 0, w - 2 * k, 1, d, k % 3 === 0 ? C.roofDark : C.roof); // pitched roof
   for (let z = 6; z < d - 6; z += 8) for (const x of [0, w - 1]) for (let y = 4; y < 13; y++) m.set(x, y, z, y > 10 ? C.neonWarm : C.glass, y > 10);
   // Bell tower over the door.
-  m.walls(7, 1, d - 10, 10, 40, 10, C.creamDark);
-  for (let k = 0; k < 6; k++) m.box(7 + k, 41 + k * 2, d - 10 + k, 10 - 2 * k, 2, 10 - 2 * k, C.roofDark);
-  m.box(11, 53, d - 6, 2, 6, 2, C.trim); m.box(9, 56, d - 6, 6, 1, 2, C.trim); // cross
-  m.clearBox(10, 1, d - 1, 4, 9, 1); m.box(10, 1, d - 1, 4, 9, 1, C.board);
-  m.box(10, 32, d - 1, 4, 5, 1, 0x15191e);
+  m.walls(4, 1, d - 10, 10, 40, 10, C.creamDark);
+  for (let k = 0; k < 5; k++) m.box(4 + k, 41 + k * 2, d - 10 + k, 10 - 2 * k, 2, 10 - 2 * k, C.roofDark);
+  m.box(8, 51, d - 6, 2, 6, 2, C.trim); m.box(6, 54, d - 6, 6, 1, 2, C.trim); // cross
+  m.clearBox(7, 1, d - 1, 4, 9, 1); m.box(7, 1, d - 1, 4, 9, 1, C.board);
+  m.box(7, 32, d - 1, 4, 5, 1, 0x15191e);
+  moss(m, 0, 0, w, d, 16, 36);
   return dust(m);
 }
 
@@ -531,4 +562,60 @@ export function smallBuilding(v = 0) {
   block(m, { x0: -Math.floor(w / 2), z0: -Math.floor(d / 2), w, d, floors, wall: SMALL_WALLS[v % SMALL_WALLS.length], seed: 50 + v, shop: floors <= 2 && v % 2 === 0 });
   if (v % 4 === 1) graffiti(m, -Math.floor(w / 2) + 2, 2, Math.ceil(d / 2), v);
   return dust(m);
+}
+
+// ---------------------------------------------------------------- MAP-1c: decoration pieces sized to chunks
+
+/** A fenced parking lot (2×2 chunks): painted bays, a booth, a few parked / wrecked cars. Centred. */
+export function parkingSmall() {
+  const m = new VoxelModel(); const w = 48; const d = 48; const x0 = -24; const z0 = -24;
+  for (let x = 0; x < w; x++) for (let z = 0; z < d; z++) {
+    let c = C.asphalt;
+    if ((x % 8 === 0 && (z < 14 || z > d - 15)) || z === 14 || z === d - 15) c = C.paint;
+    if (hash3(x, 3, z) < 0.12) c = P.snow;
+    m.set(x0 + x, 0, z0 + z, c);
+  }
+  for (let x = 0; x < w; x++) for (const z of [0, d - 1]) { m.set(x0 + x, 3, z0 + z, C.metal); if (x % 4 === 0) m.box(x0 + x, 1, z0 + z, 1, 4, 1, C.metalDark); else m.set(x0 + x, 1, z0 + z, C.metalDark); }
+  for (let z = 0; z < d; z++) if (z < 18 || z > 30) for (const x of [0, w - 1]) { m.set(x0 + x, 3, z0 + z, C.metal); if (z % 4 === 0) m.box(x0 + x, 1, z0 + z, 1, 4, 1, C.metalDark); }
+  const car = (x, z, c) => { m.box(x0 + x, 1, z0 + z, 6, 3, 10, c); m.box(x0 + x, 4, z0 + z + 3, 6, 2, 5, c); m.box(x0 + x, 4, z0 + z + 2, 6, 2, 1, C.glass); };
+  car(3, 2, 0xa63a2e); car(19, 2, 0x2b4170); car(27, d - 12, 0xd8b03a); car(35, d - 12, 0xe4e2da);
+  m.box(x0 + 2, 1, z0 + 20, 6, 7, 6, C.cream); m.box(x0 + 2, 8, z0 + 20, 6, 1, 6, C.roofDark); m.box(x0 + 7, 3, z0 + 21, 1, 3, 4, C.glassLit, true); // booth
+  for (let y = 0; y < 2; y++) m.box(x0 + 32, 1 + y * 7, z0 + 18, 12, 7, 6, C.cont[(y + 1) % 3]);
+  return m.snowCap(P.snow, 0.75, 1);
+}
+
+/** A small square (1 chunk): paving ring, a frozen fountain, two benches. Centred. */
+export function fountain() {
+  const m = new VoxelModel();
+  for (let x = -10; x < 10; x++) for (let z = -10; z < 10; z++) {
+    const r = Math.hypot(x + 0.5, z + 0.5);
+    m.set(x, 0, z, r < 9 ? ((x + z) % 4 === 0 ? C.tileLine : C.tile) : P.snow);
+    if (r < 5.5) m.box(x, 1, z, 1, r > 4.5 ? 2 : 1, 1, r > 4.5 ? C.trim : 0xbfe3f5);
+  }
+  m.box(-1, 1, -1, 2, 5, 2, C.trim); m.box(-2, 6, -2, 4, 1, 4, C.trim); m.set(0, 7, 0, 0xbfe3f5);
+  for (const z of [-9, 8]) { m.box(-3, 1, z, 6, 1, 1, 0x7a5a3a); m.box(-3, 2, z + (z < 0 ? 0 : 0), 6, 1, 1, 0x7a5a3a); }
+  return m.snowCap(P.snow, 0.8, 1);
+}
+
+/** A small burnt-out building (1 chunk): two broken walls, a fallen slab, rubble. Centred. */
+export function ruinSmall(v = 0) {
+  const m = new VoxelModel(); const w = 18; const d = 16; const x0 = -9; const z0 = -8;
+  pad(m, x0 - 1, z0 - 1, w + 2, d + 2, 70 + v);
+  const wall = v ? C.grey : C.cream;
+  // Broken walls: each 3-voxel stretch stops at its own height (stepped, not noisy), window holes on the way.
+  eachFace(x0, z0, w, d, (x, z, u, _o, side) => {
+    const top = 2 + Math.floor(hash3(Math.floor(u / 3), side.length + v, 71) * (side === 'back' || side === 'left' ? 16 : 9));
+    for (let y = 1; y <= top; y++) {
+      const win = u % 6 >= 2 && u % 6 <= 3 && (y % FH) >= 4 && (y % FH) <= 7;
+      if (!win) m.set(x, y, z, y === top ? C.trim : wall);
+    }
+  });
+  m.box(x0 + 1, FH, z0 + 1, Math.floor(w / 2), 1, d - 2, C.roofDark); // what is left of the first floor
+  for (let i = 0; i < 18; i++) {
+    const x = x0 + 1 + Math.floor(hash3(i, 1, v) * (w - 2)); const z = z0 + 1 + Math.floor(hash3(i, 2, v) * (d - 2));
+    m.box(x, 1, z, 2, 1 + Math.floor(hash3(i, 3, v) * 2), 2, hash3(i, 4, v) < 0.5 ? C.greyDark : C.creamDark);
+  }
+  for (let k = 0; k < 8; k++) m.set(x0 + 4 + k, 1 + k, z0 + 6, C.rust); // bent girder
+  moss(m, x0, z0, w, d, 10, 70 + v);
+  return m.snowCap(P.snow, 0.75, 1);
 }

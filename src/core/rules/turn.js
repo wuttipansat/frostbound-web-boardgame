@@ -118,7 +118,7 @@ export function search(s, { survivorId }) {
 function rollMap(s, locationId) {
   const pr = mapProgress(s);
   if (!pr) return null;
-  if (!s.map) s.map = newMap(); // old saves: the stage-1 town
+  if (!s.map) s.map = newMap(true); // old saves: the six-place town
   const k = (s.map.searchesSinceMap = pr.done + 1);
   if (k < pr.min || (k < pr.max && random(s) >= 1 / (pr.max - k + 1))) return null;
   const uid = `map${s.map.stage + 1}`;

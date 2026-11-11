@@ -16,7 +16,7 @@ function focus(s, ctx) {
 
 function resolveWhere(s, ctx, where) {
   if (where === 'here') return focus(s, ctx)?.location ?? 'colony';
-  return where;
+  return s.locations[where] ? where : 'colony'; // MAP-1c: a place not found yet
 }
 
 const EFFECTS = {

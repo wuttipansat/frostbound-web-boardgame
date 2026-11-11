@@ -7,8 +7,8 @@ import { newSurvivor } from '../src/core/rules/helpers.js';
 import { RULES } from '../src/core/constants.js';
 
 export function newGame(opts = {}) {
-  const { scenarioId = 'beacon', seed = 42 } = opts;
-  return createGame({ scenarioId, seed });
+  const { scenarioId = 'beacon', seed = 42, fullTown = true } = opts;
+  return createGame({ scenarioId, seed, fullTown }); // rule tests play on the old six-place town
 }
 
 /** A game past the draft, forced into a clean TURN phase. */

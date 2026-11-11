@@ -247,18 +247,22 @@ export function restock(s) {
   if (s.day <= 1) return;
   // MAP-1: only places within one ring past the furthest survivor (keeps a big city cheap).
   const reach = 1 + Math.max(1, ...Object.values(s.survivors).filter((v) => v.alive).map((v) => ringOf(s, v.location)));
-  for (const loc of outsideOf(s)) {
+  const near = outsideOf(s).filter((loc) => locDef(s, loc).deck && ringOf(s, loc) <= reach);
+  // MAP-1c: the town turns up at least RESTOCK_MIN items a day, even while only a few places are known.
+  const picks = near.slice();
+  for (let i = 0; near.length && picks.length < RESTOCK_MIN; i++) picks.push(near[i % near.length]);
+  picks.forEach((loc, k) => {
     const table = locDef(s, loc).deck;
-    if (!table || ringOf(s, loc) > reach) continue;
     const ids = Object.keys(table).filter((id) => !RARE_PARTS.includes(id)); // the crawler's rare parts never drift in
     const total = ids.reduce((n, id) => n + table[id], 0);
     let r = random(s) * total;
     const itemId = ids.find((id) => (r -= table[id]) < 0) ?? ids[0];
-    const uid = `r${s.day}${loc}`;
+    const uid = `r${s.day}${loc}${k >= near.length ? `.${k}` : ''}`;
     s.cards[uid] = itemId;
     s.locations[loc].deck.unshift(uid); // under the pile: found after what is already there
-  }
+  });
 }
+const RESTOCK_MIN = 6;
 
 export function spawnZombies(s) {
   // The same numbers the threat forecast shows (selectors.spawnForecast).

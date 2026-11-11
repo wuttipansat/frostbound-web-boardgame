@@ -117,4 +117,4 @@ export const PLACE_TABLE = [
   ['warehouse', 3, 0.5], ['motel', 2, 0.5], ['apartment', 3, 1], ['church', 1, 0.5], ['farmhouse', 1, 1],
 ];
 /** Blocks without a place. */
-export const FILLER_KINDS = ['plaza', 'parking', 'containers', 'park', 'ruins', 'rail'];
+export const FILLER_KINDS = ['plaza', 'parking', 'containers', 'park', 'ruins', 'rail', 'shops'];

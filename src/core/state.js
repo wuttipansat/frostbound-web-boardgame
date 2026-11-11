@@ -1,6 +1,6 @@
 // createGame(config) -> a fresh, fully JSON-serializable GameState.
-import { PHASES, LOCATION_IDS, RULES, DIFFICULTY } from './constants.js';
-import { newMap } from './map.js';
+import { PHASES, RULES, DIFFICULTY } from './constants.js';
+import { newMap, mapPlaces } from './map.js';
 import { random, normalizeSeed, shuffle } from './rng.js';
 import { assert } from './errors.js';
 import { LOCATIONS } from '../content/locations.js';
@@ -31,7 +31,7 @@ export function createGame(config = {}) {
     phase: PHASES.DRAFT,
     day: 1,
     time: 'dawn', // dawn | day | dusk | night
-    map: newMap(), // MAP-1: the city grows a stage per map found
+    map: newMap(!!config.fullTown), // MAP-1: the city grows a stage per map found (fullTown: the old six places)
     scenario: { id: scenario.id, days: config.days ?? scenario.days, deposited: 0 }, // 0 = endless winter
     morale: Math.min(10, scenario.morale + (DIFFICULTY[config.difficulty]?.morale ?? 0)),
     maxMorale: 10,
@@ -58,7 +58,7 @@ export function createGame(config = {}) {
   };
 
   // Item decks: one card instance per copy, keyed by a unique uid.
-  for (const locId of LOCATION_IDS) s.locations[locId] = stockPlace(s, locId, locId, 'c');
+  for (const locId of mapPlaces(s.map)) s.locations[locId] = stockPlace(s, locId, locId, 'c');
 
   s.crisisDeck = shuffle(s, CRISES.map((c) => c.id));
   s.crossroadsDeck = shuffle(s, CROSSROADS.map((c) => c.id));

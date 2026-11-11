@@ -8,8 +8,15 @@ const key = (x, z) => `${x},${z}`;
 const parse = (k) => k.split(',').map(Number);
 const ring = (x, z) => Math.max(Math.abs(x), Math.abs(z));
 
-// Stage 1: today's 3×3 town — fixed, so old saves can rebuild it without the rng.
+// Stage 1 (MAP-1c): the colony, the grocery and the gas station; the rest of the 3×3 is decoration. Fixed.
 const START_BLOCKS = {
+  '0,0': { kind: 'colony', placeId: 'colony' },
+  '1,-1': { kind: 'place', placeId: 'grocery' }, '-1,-1': { kind: 'place', placeId: 'gas' },
+  '0,-1': { kind: 'shops' }, '1,0': { kind: 'parking' }, '0,1': { kind: 'ruins' },
+  '-1,0': { kind: 'plaza' }, '1,1': { kind: 'containers' }, '-1,1': { kind: 'park' },
+};
+// The six-place town of older versions: old saves (no map) and rule tests.
+const LEGACY_BLOCKS = {
   '0,0': { kind: 'colony', placeId: 'colony' },
   '0,-1': { kind: 'place', placeId: 'police' }, '1,-1': { kind: 'place', placeId: 'grocery' },
   '1,0': { kind: 'place', placeId: 'school' }, '0,1': { kind: 'place', placeId: 'hospital' },
@@ -22,13 +29,18 @@ function startRoads() {
   return r;
 }
 export const START_MAP = Object.freeze({ stage: 1, blocks: START_BLOCKS, roads: startRoads(), searchesSinceMap: 0, pending: false });
+export const LEGACY_MAP = Object.freeze({ ...START_MAP, blocks: LEGACY_BLOCKS });
+/** The places that come with a map's blocks. */
+export const mapPlaces = (m) => Object.values(m.blocks).filter((b) => b.placeId).map((b) => b.placeId);
+/** The original places, in the order growth brings back the missing ones (library first: engine + heater parts). */
+export const ORIGINALS = ['library', 'hospital', 'police', 'school'];
 
-export const newMap = () => JSON.parse(JSON.stringify(START_MAP));
-/** The state's map (old saves: the stage-1 town). */
-export const mapOf = (s) => s.map ?? START_MAP;
+export const newMap = (legacy = false) => JSON.parse(JSON.stringify(legacy ? LEGACY_MAP : START_MAP));
+/** The state's map (old saves: the six-place town). */
+export const mapOf = (s) => s.map ?? LEGACY_MAP;
 
 /** Searches it takes to find the map that opens stage n+1: [min, max] (guaranteed at max). */
-export const mapRange = (stage) => [3 * stage * stage + 2, 4 * stage * stage + 4]; // 5–8, 14–20, 29–40, 50–68, …
+export const mapRange = (stage) => (stage === 1 ? [3, 5] : [3 * stage * stage + 2, 4 * stage * stage + 4]); // 3–5, 14–20, 29–40, 50–68, …
 
 // ---------------------------------------------------------------- places
 
@@ -125,7 +137,7 @@ const pickWeighted = (s, entries) => {
 
 /** Grow the map one stage: a new irregular ring of blocks, new places, new streets. Returns the new block keys. */
 export function growMap(s, makePlace) {
-  if (!s.map) s.map = newMap();
+  if (!s.map) s.map = newMap(true); // old saves: the six-place town
   const m = s.map;
   const n = m.stage + 1;
   const has = (x, z) => !!m.blocks[key(x, z)];
@@ -157,12 +169,23 @@ export function growMap(s, makePlace) {
     const out = Math.abs(x) >= Math.abs(z) ? [x + Math.sign(x), z] : [x, z + Math.sign(z)];
     if (!placed.has(key(...out))) { placed.add(key(...out)); added.push(key(...out)); }
   }
-  // 3. Kinds: about one block in three holds a place (at least two per growth).
+  // 3. Kinds (MAP-1c): 2–3 places per growth, the rest decoration. The missing originals turn up first, in the
+  //    decoration blocks closest to the colony (the map shows the old town was still standing there).
   const order = added.map((k) => [k, random(s)]).sort((a, b) => a[1] - b[1]).map(([k]) => k);
-  const nPlaces = Math.max(2, Math.round(added.length / 3));
+  let nPlaces = 2 + (random(s) < 0.5 ? 1 : 0);
+  const have = new Set(Object.values(m.blocks).map((b) => b.type ?? b.placeId));
+  const missing = ORIGINALS.filter((t) => !have.has(t));
+  const inner = Object.keys(m.blocks).filter((k) => !m.blocks[k].placeId && m.blocks[k].kind !== 'rail' && !added.includes(k))
+    .map((k) => [k, ring(...parse(k)) + random(s) * 0.5]).sort((a, b) => a[1] - b[1]).map(([k]) => k);
+  const converted = [];
+  while (nPlaces > 0 && missing.length && inner.length) {
+    const k = inner.shift(); const type = missing.shift();
+    m.blocks[k] = { kind: 'place', placeId: makePlace(type, k), type };
+    converted.push(k); nPlaces--;
+  }
   order.forEach((k, i) => {
     if (i < nPlaces) {
-      const type = pickWeighted(s, PLACE_TABLE.map(([t, w0, per]) => [t, w0 + per * (n - 2)]).filter(([, w]) => w > 0));
+      const type = missing.shift() ?? pickWeighted(s, PLACE_TABLE.map(([t, w0, per]) => [t, w0 + per * (n - 2)]).filter(([, w]) => w > 0));
       m.blocks[k] = { kind: 'place', placeId: makePlace(type, k), type };
     } else m.blocks[k] = { kind: FILLER_KINDS[Math.floor(random(s) * FILLER_KINDS.length)] };
   });

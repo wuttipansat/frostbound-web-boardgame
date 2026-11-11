@@ -11,10 +11,11 @@ import { startedGame, setSurvivors, setEnergy, patch } from './_helpers.js';
 
 const key = (k) => k.split(',').map(Number);
 
-test('map: stage 1 is the 3×3 town, every place a street away', () => {
+test('map: stage 1 is the 3×3 town with the colony, grocery and gas station; every place a street away', () => {
   const s = createGame({ seed: 1 });
   assert.equal(s.map.stage, 1);
   assert.equal(Object.keys(s.map.blocks).length, 9);
+  assert.deepEqual(Object.keys(s.locations).sort(), ['colony', 'gas', 'grocery']);
   assert.ok(allReachable(s));
   for (const id of outsideOf(s)) assert.equal(walkCost(s, 'colony', id), 16);
 });
@@ -24,9 +25,14 @@ test('map: growth keeps old blocks, stays connected, every place has a road (fuz
     const s = createGame({ seed });
     for (let n = 2; n <= 5; n++) {
       const before = JSON.stringify(s.map.blocks);
+      const placesBefore = Object.keys(s.locations).length;
       growCity(s);
+      const gained = Object.keys(s.locations).length - placesBefore;
+      assert.ok(gained >= 2 && gained <= 3, `seed ${seed} stage ${n}: ${gained} new places`);
+      if (n === 3) for (const id of ['library', 'police', 'school', 'hospital']) assert.ok(s.locations[id], `seed ${seed}: ${id} back by stage 3`);
       assert.equal(s.map.stage, n);
-      for (const [k, b] of Object.entries(JSON.parse(before))) assert.deepEqual(s.map.blocks[k], b, `seed ${seed}: block ${k} kept`);
+      // Old blocks stay; a decoration block may turn into one of the original places.
+      for (const [k, b] of Object.entries(JSON.parse(before))) assert.ok(b.placeId ? JSON.stringify(s.map.blocks[k]) === JSON.stringify(b) : s.map.blocks[k], `seed ${seed}: block ${k} kept`);
       // Connected to the colony (4-neighbour flood fill).
       const seen = new Set(['0,0']); const todo = ['0,0'];
       while (todo.length) {

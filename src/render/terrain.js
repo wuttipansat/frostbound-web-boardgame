@@ -93,7 +93,7 @@ export function heightmapGeometry({ n, cell, column, side, bottom = -12, aoStren
  * The FROSTBOUND plateau at 2× resolution.
  * env: { radius, distRoad(x,z) -> distance to nearest road (world), distPlot(x,z) -> distance to building plots }
  */
-export function buildTerrainHD({ radius, distRoad, distPlot, clip = null, center = null, half = null, edgeDist = null }) {
+export function buildTerrainHD({ radius, distRoad, distPlot, clip = null, center = null, half = null, edgeDist = null, paved = null, crossing = null }) {
   const cell = 0.5;
   // MAP-1: a block-sized piece (center + half size) instead of the whole slab; edgeDist = distance to the slab's rim.
   const ox = center ? Math.round(center[0] / cell) : 0; const oz = center ? Math.round(center[1] / cell) : 0;
@@ -127,12 +127,20 @@ export function buildTerrainHD({ radius, distRoad, distPlot, clip = null, center
       // Ploughed asphalt with a white centre dash; snow banked along the edges.
       top = roadD < 1.7 ? P.asphalt : P.snowShade;
       if (roadD < 0.25 && Math.floor(Math.abs(wx + wz) * 0.6) % 3 === 0) top = 0xe9edf2; // dash
+      if (crossing && roadD < 1.7 && crossing(wx, wz)) top = 0xe9edf2; // zebra crossing
       if (roadD < 1.7 && hash3(x, 5, z) < 0.07) top = P.slush; // packed snow patches
       h = 0;
     } else if (roadD < 3.6) {
       // Sidewalk tiles under snow: a faint grid shows through, a kerb at the road side.
       top = (x % 4 === 0 || z % 4 === 0) && bayer(x, 1, z) < 0.5 ? P.paving : P.snow;
       if (roadD < 2.6) top = P.kerb;
+      h = 0;
+    } else if (paved && paved(wx, wz)) {
+      // MAP-1c: square paving tiles with grout lines, grass in the cracks, a few missing tiles, drifted snow.
+      const tx = Math.floor(x / 3); const tz = Math.floor(z / 3);
+      const grout = x % 3 === 0 || z % 3 === 0;
+      const t = hash3(tx, 21, tz);
+      top = grout ? 0xa7b0bb : t < 0.05 ? 0x5a4a3c : t < 0.11 ? 0x6f8f4e : t > 0.78 || hash3(x, 23, z) < 0.04 ? P.snow : P.paving;
       h = 0;
     } else {
       const coarseN = hash3(Math.floor(x / 5), 9, Math.floor(z / 5));

@@ -87,7 +87,7 @@ function boxes() {
     const ring = await p.evaluate(() => {
       const a = window.__frostbound.app; const out = [];
       a.set({ handCompact: true, locInfo: false });
-      for (const id of ['colony', 'police', 'grocery', 'school', 'hospital', 'library', 'gas']) {
+      for (const id of Object.keys(a.state.locations)) {
         a.selectLocation(id);
         out.push([id, document.querySelectorAll('#radial:not(.hidden) .rd-btn, #radial:not(.hidden) .ab-empty').length]); // a place in the fog may show only its hint
       }
