@@ -8,12 +8,15 @@ export const GROUND = 0.25;          // top of every block above the street
 const KERB = 0.3;                    // kerb stone band at the slab's edge
 const GROUT = 0.06;
 const CUT = 0.8;                     // 45° corner cut
-const SIDEWALK = [0xbac1c9, 0xb1b8c1, 0xc4cad1, 0xaab1ba];
-const INNER = [0xa4abb4, 0x9ba2ab, 0xaeb4bc, 0x949ba4];
-const SNOWY = [0xeef3f8, 0xe6edf4, 0xf4f7fa, 0xdfe7ef];
-const BASE = 0x6c737d; const SNOW_BASE = 0xdde5ee;
-const KERBS = [0xd6dade, 0xc7ccd2]; const SIDE = 0x8d949e;
-const CRACK = 0x5a6069; const SNOW = 0xf1f5f9;
+// One field of large pale concrete slabs (the reference look): near-uniform tones, thin dark grout, with grass,
+// snow and dirt in patches rather than per-tile noise.
+const TILE = 2;
+const SLABS = [0xcfccbf, 0xcac7b9, 0xd4d1c5];
+const SNOWY = [0xeef3f8, 0xe6edf4, 0xf4f7fa];
+const BASE = 0x8e8b80; const SNOW_BASE = 0xdde5ee;
+const KERBS = [0xdcd9ce, 0xd2cfc3]; const SIDE = 0xa8a598;
+const CRACK = 0x7a776c; const SNOW = 0xf3f6f9;
+const GRASS = [0x5f7f3e, 0x6f8f46, 0x4f6d34]; const DIRT = [0x6b5a48, 0x7a6650];
 
 const col = new THREE.Color();
 /**
@@ -43,20 +46,20 @@ export function blockSlab({ x0, x1, z0, z1, walk = 2.2, surface = 'paved', detai
     for (let k = 0; k < steps; k++) {
       const t0 = k / steps; const t1 = (k + 1) / steps;
       const p0 = [ax + ex * t0, az + ez * t0]; const p1 = [ax + ex * t1, az + ez * t1];
-      quad([[p1[0], 0, p1[1]], [p0[0], 0, p0[1]], [p0[0], GROUND, p0[1]], [p1[0], GROUND, p1[1]]], n, detail && k % 2 ? SIDE : 0x979ea8);
+      quad([[p1[0], 0, p1[1]], [p0[0], 0, p0[1]], [p0[0], GROUND, p0[1]], [p1[0], GROUND, p1[1]]], n, detail && k % 2 ? SIDE : 0xb3b0a4);
     }
   }
   // Base (grout colour) covering the octagon: centre rectangle + 4 trapezoid-free strips (corners left as cut).
   const base = surface === 'snow' ? SNOW_BASE : BASE;
   const yb = GROUND - 0.005;
-  top(x0 + CUT, z0, x1 - CUT, z1, yb, detail ? base : INNER[0]);
-  top(x0, z0 + CUT, x0 + CUT, z1 - CUT, yb, detail ? base : INNER[0]);
-  top(x1 - CUT, z0 + CUT, x1, z1 - CUT, yb, detail ? base : INNER[0]);
+  top(x0 + CUT, z0, x1 - CUT, z1, yb, detail ? base : SLABS[0]);
+  top(x0, z0 + CUT, x0 + CUT, z1 - CUT, yb, detail ? base : SLABS[0]);
+  top(x1 - CUT, z0 + CUT, x1, z1 - CUT, yb, detail ? base : SLABS[0]);
   // The cut corners themselves (triangles as degenerate quads).
   for (const [cx, cz, sx, sz] of [[x0, z0, 1, 1], [x1, z0, -1, 1], [x0, z1, 1, -1], [x1, z1, -1, -1]]) {
     const a = [cx + sx * CUT, yb, cz]; const b = [cx, yb, cz + sz * CUT]; const c = [cx + sx * CUT, yb, cz + sz * CUT];
     const up = (sx * sz > 0);
-    quad(up ? [a, b, c, c] : [a, c, b, b], [0, 1, 0], detail ? KERBS[0] : INNER[0]);
+    quad(up ? [a, b, c, c] : [a, c, b, b], [0, 1, 0], detail ? KERBS[0] : SLABS[0]);
   }
   if (!detail) return finish(pos, nrm, cols, idx);
   // Tiles: rect clipped to a zone; skip ones in a cut corner.
@@ -68,45 +71,49 @@ export function blockSlab({ x0, x1, z0, z1, walk = 2.2, surface = 'paved', detai
     return [cx0, cz0, cx1, cz1];
   };
   const tone = (list, i, j, k) => list[Math.floor(hash3(i * 3 + sa, k, j * 3 + sb) * list.length)];
-  // Kerb stones: a band of 1-world stones round the edge.
+  // Kerb: a pale band of 2-world stones round the edge.
   const K = [[x0, z0, x1, z0 + KERB], [x0, z1 - KERB, x1, z1], [x0, z0 + KERB, x0 + KERB, z1 - KERB], [x1 - KERB, z0 + KERB, x1, z1 - KERB]];
   K.forEach((zone, s) => {
     const alongX = s < 2;
-    for (let t = Math.floor(alongX ? zone[0] : zone[1]); t < (alongX ? zone[2] : zone[3]); t++) {
-      const hex = KERBS[(t + s) & 1];
-      if (alongX) tile(t, zone[1], t + 1, zone[3], zone, hex); else tile(zone[0], t, zone[2], t + 1, zone, hex);
+    for (let t = Math.floor((alongX ? zone[0] : zone[1]) / 2) * 2; t < (alongX ? zone[2] : zone[3]); t += 2) {
+      const hex = KERBS[(t / 2 + s) & 1];
+      if (alongX) tile(t, zone[1], t + 2, zone[3], zone, hex); else tile(zone[0], t, zone[2], t + 2, zone, hex);
     }
   });
-  // Sidewalk: small 1×1 slabs in running bond, in 4 strips inside the kerb.
+  // One grid of large slabs over the whole block (aligned to world coordinates); snow inside parks / lots / colony.
   const i0 = [x0 + KERB, z0 + KERB, x1 - KERB, z1 - KERB];
   const inner = [i0[0] + walk, i0[1] + walk, i0[2] - walk, i0[3] - walk];
-  const strips = [[i0[0], i0[1], i0[2], inner[1], true], [i0[0], inner[3], i0[2], i0[3], true], [i0[0], inner[1], inner[0], inner[3], false], [inner[2], inner[1], i0[2], inner[3], false]];
-  const palette = SIDEWALK; // sidewalks stay grey paving; only the inside of a park / lot / the colony is snow
-  for (const [ax, az, bx, bz, alongX] of strips) {
-    const zone = [ax, az, bx, bz];
-    for (let r = Math.floor(alongX ? az : ax); r < (alongX ? bz : bx); r++) {
-      const off = r & 1 ? 0.5 : 0;
-      for (let c = Math.floor((alongX ? ax : az) - off); c < (alongX ? bx : bz); c++) {
-        const a = c + off;
-        const near = Math.min(Math.abs(r + 0.5 - (alongX ? inner[1] : inner[0])), Math.abs(r + 0.5 - (alongX ? inner[3] : inner[2])));
-        const snowy = hash3(r + sa, 31, c + sb) < (near < 0.8 ? 0.22 : 0.05); // snow lingers by the building line
-        const t = alongX ? tile(a, r, a + 1, r + 1, zone, snowy ? SNOW : tone(palette, r, c, 33)) : tile(r, a, r + 1, a + 1, zone, snowy ? SNOW : tone(palette, r, c, 33));
-        if (t && !snowy && hash3(c + sa, 35, r + sb) < 0.04) top(t[0] + 0.1, (t[1] + t[3]) / 2 - 0.02, t[2] - 0.15, (t[1] + t[3]) / 2 + 0.02, GROUND + 0.003, CRACK);
+  const inside = (x, z) => x > inner[0] && x < inner[2] && z > inner[1] && z < inner[3];
+  const edgeD = (x, z) => Math.min(x - i0[0], i0[2] - x, z - i0[1], i0[3] - z);
+  const cornerD = (x, z) => Math.min(Math.hypot(x - i0[0], z - i0[1]), Math.hypot(x - i0[2], z - i0[1]), Math.hypot(x - i0[0], z - i0[3]), Math.hypot(x - i0[2], z - i0[3]));
+  const bit = (cx, cz, w, d, hex, y = 0.004) => top(cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2, GROUND + y, hex);
+  for (let x = Math.floor(i0[0] / TILE) * TILE; x < i0[2]; x += TILE) {
+    for (let z = Math.floor(i0[1] / TILE) * TILE; z < i0[3]; z += TILE) {
+      const mx = x + TILE / 2; const mz = z + TILE / 2;
+      const snowField = surface === 'snow' && inside(mx, mz);
+      const t = tile(x, z, x + TILE, z + TILE, i0, tone(snowField ? SNOWY : SLABS, x, z, 33));
+      if (!t || snowField) continue;
+      const h = (k) => hash3(x * 5 + sa, k, z * 5 + sb);
+      const ed = edgeD(mx, mz); const cd = cornerD(mx, mz);
+      // Grass creeping in from the block corners and along a few edges (irregular, a few blades per slab).
+      if (cd < 3.5 || (ed < 1.5 && h(51) < 0.12)) {
+        const n = 2 + Math.floor(h(52) * 4);
+        for (let k = 0; k < n; k++) bit(t[0] + 0.3 + h(53 + k) * (t[2] - t[0] - 0.6), t[1] + 0.3 + h(60 + k) * (t[3] - t[1] - 0.6), 0.3 + h(67 + k) * 0.7, 0.3 + h(74 + k) * 0.6, GRASS[k % 3], 0.006 + k * 0.001);
       }
-    }
-  }
-  // Inside: large 2×2 slabs in a straight grid (or snow), a few cracked, one manhole cover.
-  const ip = surface === 'snow' ? SNOWY : INNER;
-  for (let x = Math.floor(inner[0] / 2) * 2; x < inner[2]; x += 2) {
-    for (let z = Math.floor(inner[1] / 2) * 2; z < inner[3]; z += 2) {
-      const t = tile(x, z, x + 2, z + 2, inner, tone(ip, x, z, 37));
-      if (t && surface !== 'snow' && hash3(x + sa, 39, z + sb) < 0.05) top(t[0] + 0.3, t[1] + 0.25, t[2] - 0.2, t[1] + 0.3, GROUND + 0.003, CRACK);
+      // Snow lying in patches along the road edge and the odd slab elsewhere.
+      if ((ed < 1.2 && h(81) < 0.3) || h(82) < 0.03) {
+        const n = 1 + Math.floor(h(83) * 3);
+        for (let k = 0; k < n; k++) bit(t[0] + 0.4 + h(84 + k) * (t[2] - t[0] - 0.8), t[1] + 0.4 + h(88 + k) * (t[3] - t[1] - 0.8), 0.4 + h(92 + k) * 0.9, 0.3 + h(96 + k) * 0.7, SNOW, 0.008 + k * 0.001);
+      }
+      // Dirt, leaves and litter specks; a few cracked slabs.
+      if (h(101) < 0.07) bit(t[0] + 0.5 + h(102) * (t[2] - t[0] - 1), t[1] + 0.5 + h(103) * (t[3] - t[1] - 1), 0.35, 0.25, DIRT[Math.floor(h(104) * 2)], 0.005);
+      if (h(105) < 0.05) top(t[0] + 0.2, (t[1] + t[3]) / 2 - 0.02, t[2] - 0.3, (t[1] + t[3]) / 2 + 0.02, GROUND + 0.003, CRACK);
     }
   }
   if (surface !== 'snow' && inner[2] - inner[0] > 3) {
     const mx = inner[0] + 1 + hash3(sa, 41, sb) * (inner[2] - inner[0] - 2.4); const mz = inner[1] + 1 + hash3(sb, 43, sa) * (inner[3] - inner[1] - 2.4);
-    top(mx, mz, mx + 1.2, mz + 1.2, GROUND + 0.004, 0x4a5058);
-    top(mx + 0.15, mz + 0.15, mx + 1.05, mz + 1.05, GROUND + 0.006, 0x5c636c);
+    top(mx, mz, mx + 1.2, mz + 1.2, GROUND + 0.004, 0x5e5c55);
+    top(mx + 0.15, mz + 0.15, mx + 1.05, mz + 1.05, GROUND + 0.006, 0x77746b);
   }
   return finish(pos, nrm, cols, idx);
 }

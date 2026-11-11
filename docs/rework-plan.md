@@ -430,6 +430,6 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - The fine level of upgraded walls (levels 1–3) is meshed at runtime (keeps the pack at 2.69 MB gzip).
 
 ### MAP-3 part D — raised city ground (done)
-- Streets stay at y = 0; every block is a slab 0.25 high (ground.js) merged into the block's terrain mesh (no extra draw calls): kerb stones with joints, corners cut at 45°, grey sidewalk slabs 1×1 in running bond with dark grout, big 2×2 slabs inside (or snow for parks, the rail yard, the colony and snowy lots), a few cracked slabs, one manhole cover per paved block, snow lingering by the building line. The far level is a plain slab.
+- Streets stay at y = 0; every block is a slab 0.25 high (ground.js) merged into the block's terrain mesh (no extra draw calls): a pale kerb band, corners cut at 45°, then one field of large 2×2 pale concrete slabs (near-uniform tones, thin dark grout) like the reference; grass creeping in at block corners and along a few edges, snow lying in patches along the road edge, dirt specks, cracked slabs, a manhole cover; parks, the rail yard, the colony and snowy lots are snow inside. The far level is a plain slab.
 - Everything on a block (places, pieces, slots, props, lamps, pools, rings, the colony) stands on GROUND; cars and markings stay on the road. The random brown / green dots and the stepped snow ridges are gone.
 - Not done: dropped kerbs at crossings, snow drifts against walls, planters / oil stains.
