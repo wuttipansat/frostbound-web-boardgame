@@ -8,15 +8,15 @@ export const GROUND = 0.25;          // top of every block above the street
 const KERB = 0.3;                    // kerb stone band at the slab's edge
 const GROUT = 0.06;
 const CUT = 0.8;                     // 45° corner cut
-// One field of large pale concrete slabs (the reference look): near-uniform tones, thin dark grout, with grass,
-// snow and dirt in patches rather than per-tile noise.
+// One field of large pale concrete slabs (the reference look), mostly buried under snow: clustered bare patches
+// show the slabs, thin dark grout and dirt specks.
 const TILE = 2;
 const SLABS = [0xcfccbf, 0xcac7b9, 0xd4d1c5];
 const SNOWY = [0xeef3f8, 0xe6edf4, 0xf4f7fa];
 const BASE = 0x8e8b80; const SNOW_BASE = 0xdde5ee;
 const KERBS = [0xdcd9ce, 0xd2cfc3]; const SIDE = 0xa8a598;
 const CRACK = 0x7a776c; const SNOW = 0xf3f6f9;
-const GRASS = [0x5f7f3e, 0x6f8f46, 0x4f6d34]; const DIRT = [0x6b5a48, 0x7a6650];
+const DIRT = [0x6b5a48, 0x7a6650];
 
 const col = new THREE.Color();
 /**
@@ -85,23 +85,24 @@ export function blockSlab({ x0, x1, z0, z1, walk = 2.2, surface = 'paved', detai
   const inner = [i0[0] + walk, i0[1] + walk, i0[2] - walk, i0[3] - walk];
   const inside = (x, z) => x > inner[0] && x < inner[2] && z > inner[1] && z < inner[3];
   const edgeD = (x, z) => Math.min(x - i0[0], i0[2] - x, z - i0[1], i0[3] - z);
-  const cornerD = (x, z) => Math.min(Math.hypot(x - i0[0], z - i0[1]), Math.hypot(x - i0[2], z - i0[1]), Math.hypot(x - i0[0], z - i0[3]), Math.hypot(x - i0[2], z - i0[3]));
   const bit = (cx, cz, w, d, hex, y = 0.004) => top(cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2, GROUND + y, hex);
   for (let x = Math.floor(i0[0] / TILE) * TILE; x < i0[2]; x += TILE) {
     for (let z = Math.floor(i0[1] / TILE) * TILE; z < i0[3]; z += TILE) {
       const mx = x + TILE / 2; const mz = z + TILE / 2;
-      const snowField = surface === 'snow' && inside(mx, mz);
-      const t = tile(x, z, x + TILE, z + TILE, i0, tone(snowField ? SNOWY : SLABS, x, z, 33));
-      if (!t || snowField) continue;
-      const h = (k) => hash3(x * 5 + sa, k, z * 5 + sb);
-      const ed = edgeD(mx, mz); const cd = cornerD(mx, mz);
-      // Grass creeping in from the block corners and along a few edges (irregular, a few blades per slab).
-      if (cd < 3.5 || (ed < 1.5 && h(51) < 0.12)) {
-        const n = 2 + Math.floor(h(52) * 4);
-        for (let k = 0; k < n; k++) bit(t[0] + 0.3 + h(53 + k) * (t[2] - t[0] - 0.6), t[1] + 0.3 + h(60 + k) * (t[3] - t[1] - 0.6), 0.3 + h(67 + k) * 0.7, 0.3 + h(74 + k) * 0.6, GRASS[k % 3], 0.006 + k * 0.001);
+      // Snow covers most of the ground: whole slabs buried (grout hidden), with clustered bare patches where a few
+      // slabs show through (more of them near the road, where people walk).
+      const cluster = hash3(Math.floor(mx / 6) + sa, 47, Math.floor(mz / 6) + sb);
+      const bare = !(surface === 'snow' && inside(mx, mz)) && cluster < (edgeD(mx, mz) < 2.5 ? 0.45 : 0.22) && hash3(x + sa, 49, z + sb) < 0.75;
+      if (!bare) {
+        const cx0 = Math.max(x, i0[0]); const cz0 = Math.max(z, i0[1]); const cx1 = Math.min(x + TILE, i0[2]); const cz1 = Math.min(z + TILE, i0[3]);
+        if (!cutAt((cx0 + cx1) / 2, (cz0 + cz1) / 2)) top(cx0, cz0, cx1, cz1, GROUND + 0.002, tone(SNOWY, x, z, 33));
+        continue;
       }
-      // Snow lying in patches along the road edge and the odd slab elsewhere.
-      if ((ed < 1.2 && h(81) < 0.3) || h(82) < 0.03) {
+      const t = tile(x, z, x + TILE, z + TILE, i0, tone(SLABS, x, z, 33));
+      if (!t) continue;
+      const h = (k) => hash3(x * 5 + sa, k, z * 5 + sb);
+      // Snow left in patches on the bare slabs.
+      if (h(81) < 0.6) {
         const n = 1 + Math.floor(h(83) * 3);
         for (let k = 0; k < n; k++) bit(t[0] + 0.4 + h(84 + k) * (t[2] - t[0] - 0.8), t[1] + 0.4 + h(88 + k) * (t[3] - t[1] - 0.8), 0.4 + h(92 + k) * 0.9, 0.3 + h(96 + k) * 0.7, SNOW, 0.008 + k * 0.001);
       }
