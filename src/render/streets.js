@@ -152,6 +152,7 @@ export function lampSpots(segments, onGround = () => true) {
 // ---------------------------------------------------------------- MAP-3 E: the railway
 const STEEL = [0.55, 0.57, 0.6]; const GROOVE = [0.09, 0.1, 0.11]; const BALLAST = [0.32, 0.3, 0.28];
 const SLEEPER = [0.26, 0.2, 0.15]; const SNOWC = [0.9, 0.93, 0.96];
+const BED = [0.42, 0.43, 0.45]; const BED_EDGE = [0.2, 0.21, 0.23]; const RAIL_TOP = [0.82, 0.84, 0.87];
 export const GAUGE = 0.72; // half the distance between the rails
 
 /**
@@ -166,7 +167,11 @@ export function railQuads(rail, pieces) {
   const side = (t0, t1, l, y0, y1, out, c) => quad([P(t0, l, y0), P(t1, l, y0), P(t1, l, y1), P(t0, l, y1)], rail.axis === 'x' ? [0, 0, out] : [out, 0, 0], c);
   for (const [t0, t1, road] of pieces) {
     if (road) {
-      for (const g of [-GAUGE, GAUGE]) { flat(t0, t1, g - 0.1, g - 0.04, 0.034, GROOVE); flat(t0, t1, g - 0.04, g + 0.04, 0.036, STEEL); }
+      // Street running: a pale concrete track bed with dark edges, bright rails and their grooves, joints every 3.
+      flat(t0, t1, -1.15, 1.15, 0.032, BED_EDGE);
+      flat(t0, t1, -1.05, 1.05, 0.034, BED);
+      for (let t = Math.ceil(t0 / 3) * 3; t < t1; t += 3) flat(t, t + 0.06, -1.05, 1.05, 0.035, BED_EDGE);
+      for (const g of [-GAUGE, GAUGE]) { flat(t0, t1, g - 0.16, g - 0.07, 0.036, GROOVE); flat(t0, t1, g - 0.07, g + 0.07, 0.038, RAIL_TOP); }
       continue;
     }
     flat(t0, t1, -1.6, 1.6, 0.03, BALLAST);

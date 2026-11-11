@@ -23,7 +23,9 @@ export const BOARD = {
   ringRoad: 12.5,
   buildingScale: 0.6, // world units per building voxel
 };
-const FILLER_MODELS = { rail: city.railYard }; // MAP-1c: other decoration blocks are built from chunks
+// MAP-3 E: the old rail-yard block (a short stretch of track) is gone: the railway now runs across the city, and
+// a 'rail' block is an industrial yard built from chunks like the other decoration blocks.
+const FILLER_MODELS = {};
 const PLACE_SCALE = 1; // MAP-3: places and small buildings fill their chunks (0.3 world units per authored voxel)
 // What fills a free chunk, by block kind: [content, weight].
 const RECIPES = {
@@ -34,6 +36,7 @@ const RECIPES = {
   plaza: [['trees', 35], ['shop', 45], ['clutter', 20]],
   park: [['trees', 80], ['clutter', 20]],
   ruins: [['ruin', 55], ['house', 20], ['rocks', 25]],
+  rail: [['yard', 60], ['car', 15], ['clutter', 25]],
 };
 // A big piece some decoration blocks put on their street side: [model key, wide, deep].
 const CENTERPIECE = { parking: ['parking', 2, 2], plaza: ['fountain', 1, 1], park: ['fountain', 1, 1], ruins: ['ruinBig', 1, 1] };
@@ -416,7 +419,7 @@ export function createBoard({ progressive = false } = {}) {
     // MAP-3 D: the raised block slab (kerb, paving or snow) merged into the same mesh (no extra draw call).
     const k = map.blocks[key];
     const lot = openBlock(k, bx, bz) && k.kind !== 'plaza' && hash3(bx, 77, bz) < 0.5;
-    const snowy = k.kind === 'park' || k.kind === 'rail' || k.kind === 'colony' || lot;
+    const snowy = k.kind === 'park' || k.kind === 'colony' || lot;
     const slab = blockSlab({ x0: cx - hx + ROAD.half, x1: cx + hx - ROAD.half, z0: cz - hz + ROAD.half, z1: cz + hz - ROAD.half, walk: ROAD.walk - ROAD.kerb, surface: snowy ? 'snow' : 'paved', detail: cell < 1, seed: [bx, bz] });
     const sg = new THREE.BufferGeometry();
     for (const a of ['position', 'normal', 'color']) sg.setAttribute(a, new THREE.BufferAttribute(slab[a], 3));
@@ -928,9 +931,10 @@ export function createBoard({ progressive = false } = {}) {
       const kind = kinds[Math.floor(hash3(k, rail.look, 9) * 3)];
       const t = s0 + 6.3 + k * 12.6;
       const tipped = k === n - 1 && n > 1;
-      const [x, z, yaw] = placeOnRail(rail, t, tipped ? -1.2 : 0); // a tipped wagon lies across the lanes (its roof towards +lateral), not on the sidewalk
-      tmp.position.set(x, tipped ? 1.3 : 0.16, z);
-      tmp.rotation.set(tipped ? Math.PI / 2 : 0, yaw, 0, 'YXZ'); tmp.scale.setScalar(1); tmp.updateMatrix();
+      // The last wagon has come off the rails: skewed across the track, one end in the next lane.
+      const [x, z, yaw] = placeOnRail(rail, t, tipped ? 0.7 : 0);
+      tmp.position.set(x, 0.12, z);
+      tmp.rotation.set(0, yaw + (tipped ? 0.2 : 0), tipped ? 0.06 : 0, 'YXZ'); tmp.scale.setScalar(1); tmp.updateMatrix();
       wagons[kind].push(tmp.matrix.clone());
     }
     for (const k of kinds) if (wagons[k].length) decor.add(instanced(() => wagonModel(k, rail.look % 5), 0.3, wagons[k], { cacheKey: `wagon-${k}-${rail.look % 5}`, jitter: 0 }));
