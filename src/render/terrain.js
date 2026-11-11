@@ -125,16 +125,20 @@ export function buildTerrainHD({ radius, distRoad, distPlot, clip = null, center
     if (rim < 6) h = Math.max(h, Math.floor(hash3(Math.floor(x / 2), 3, Math.floor(z / 2)) * 3));
     let top;
     if (roadD < ROAD.half) {
-      // Ploughed two-lane asphalt with a white centre dash.
-      top = P.asphalt;
-      if (roadD < 0.25 && Math.floor(Math.abs(wx + wz) * 0.6) % 3 === 0) top = 0xe9edf2; // dash
-      if (crossing && crossing(wx, wz)) top = 0xe9edf2; // zebra crossing
-      else if (hash3(x, 5, z) < 0.05) top = P.slush; // packed snow patches
+      // MAP-3: dark ploughed asphalt (markings are decals on top): a few cracks and patches, a little snow along the kerb.
+      const t = hash3(Math.floor(x / 3), 5, Math.floor(z / 3));
+      top = t < 0.06 ? 0x2c3038 : P.asphalt; // patches
+      if (hash3(x, 5, z) < 0.025) top = 0x1c1f25; // cracks
+      if (roadD > ROAD.half - 0.6 && hash3(x, 7, z) < 0.55) top = P.slush; // snow along the kerb
       h = 0;
     } else if (roadD < ROAD.walk) {
-      // Sidewalk tiles under snow: a faint grid shows through, a kerb at the road side.
-      top = (x % 4 === 0 || z % 4 === 0) && bayer(x, 1, z) < 0.5 ? P.paving : P.snow;
-      if (roadD < ROAD.kerb) top = P.kerb;
+      // Kerb stones (joints every metre), then square sidewalk tiles with grout; some tiles snowed over.
+      if (roadD < ROAD.kerb) top = (x + z) % 3 === 0 ? 0x8d949e : P.kerb;
+      else {
+        const grout = x % 3 === 0 || z % 3 === 0;
+        const t = hash3(Math.floor(x / 3), 13, Math.floor(z / 3));
+        top = grout ? 0x9aa3ad : t < 0.08 ? P.snow : t < 0.14 ? 0xb4bcc6 : P.paving;
+      }
       h = 0;
     } else if (paved && paved(wx, wz)) {
       // MAP-1c: square paving tiles with grout lines, grass in the cracks, a few missing tiles, drifted snow.

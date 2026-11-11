@@ -7,6 +7,7 @@ import { P } from './palette.js';
 import { LOCATION_BUILDERS_HD, colonyHD, treeModelHD, rockModelHD } from './buildings.js';
 import { buildTerrainHD, ROAD } from './terrain.js';
 import { carModel, lampModel, containerModel, clutterModel, CLUTTER_KINDS } from './props.js';
+import { markingQuads, lampSpots } from './streets.js';
 import * as city from './city.js';
 import { downsample } from './detail.js';
 import { LOCATIONS } from '../content/locations.js';
@@ -226,6 +227,21 @@ function pickBy(list, r) {
 }
 
 /** A soft glowing ring texture for hover/selection halos. */
+const POOL_GEO = new THREE.PlaneGeometry(1, 1);
+/** A soft warm spot of lamp light on the ground. */
+function poolTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+  grad.addColorStop(0.45, 'rgba(255,255,255,0.35)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+
 function haloTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = 128;
@@ -285,7 +301,7 @@ export function createBoard({ progressive = false } = {}) {
   const tagLod = (node, tag) => { node.userData.lod = tag; node.visible = lodShows(tag, lodLevel); lodNodes.push(node); realize(node); return node; };
   /** A placeholder for one level of detail; `make` builds its content on first show. */
   const lazyLod = (tag, make, eager = false) => { const g = new THREE.Group(); g.userData.make = make; g.userData.eager = eager; return tagLod(g, tag); };
-  const _w = new THREE.Vector3();
+  const _w = new THREE.Vector3(); const _c = new THREE.Color();
   function drainQueue(budgetMs = 6) {
     if (queueDirty) { queue.sort((a, b) => a.getWorldPosition(_w).lengthSq() - b.getWorldPosition(_w).lengthSq()); queueDirty = false; }
     const t0 = performance.now();
@@ -348,17 +364,8 @@ export function createBoard({ progressive = false } = {}) {
     for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const b = map.blocks[`${bx + dx},${bz + dz}`]; if (b) blocksNear.push([blockPos(bx + dx), blockPos(bz + dz), b.kind, ...edgesOf(bx + dx, bz + dz), !(openBlock(b, bx + dx, bz + dz) && b.kind !== 'plaza' && hash3(bx + dx, 77, bz + dz) < 0.5)]); }
     // Snowy empty lots (some open blocks) are not paved.
     const paved = (x, z) => blocksNear.some(([px, pz, k, ex, ez, pv]) => pv && k !== 'colony' && k !== 'park' && k !== 'rail' && Math.abs(x - px) < ex + 0.4 && Math.abs(z - pz) < ez + 0.4);
-    // Zebra crossings next to street junctions (3+ streets meet).
-    const deg = new Map();
-    for (const [a, b2, seg] of near) if (seg !== 'gate') for (const p of [a, b2]) { const k = `${p.x},${p.z}`; deg.set(k, (deg.get(k) ?? 0) + 1); }
-    const junctions = [...deg].filter(([, n]) => n >= 3).map(([k]) => k.split(',').map(Number));
-    const crossing = (x, z) => junctions.some(([jx, jz]) => {
-      const ax = Math.abs(x - jx); const az = Math.abs(z - jz);
-      const along = Math.max(ax, az); const across = Math.min(ax, az);
-      return along > ROAD.walk + 0.4 && along < ROAD.walk + 2.2 && across < ROAD.half - 0.3 && Math.floor(across * 2.5 + 10) % 2 === 0;
-    });
     const geo = buildTerrainHD({
-      center: [cx, cz], half: Math.max(hx, hz), edgeDist: edgeDist(bx, bz), paved, crossing, cell,
+      center: [cx, cz], half: Math.max(hx, hz), edgeDist: edgeDist(bx, bz), paved, cell,
       clip: (x, z) => cellOf(x, z) === key,
       distRoad: (x, z) => { let d = Infinity; for (const [a, b] of near) d = Math.min(d, distToSegment(x, z, a, b)); return d; },
       distPlot: (x, z) => {
@@ -437,7 +444,8 @@ export function createBoard({ progressive = false } = {}) {
   /** Instanced trees, rocks, cars and lamps for a set of new blocks and streets: one group per growth. */
   function buildProps(keys, newStreets, attach = true) {
     const group = new THREE.Group(); group.name = 'props';
-    const trees = [[], [], []]; const rocks = [[], [], []]; const cars = [[], [], [], []]; const lamps = []; const yards = [[], [], []];
+    const trees = [[], [], []]; const rocks = [[], [], []]; const cars = [[], [], [], []]; const yards = [[], [], []];
+    const lampsAt = lampSpots(streets.filter(([, , seg]) => seg !== 'gate'));
     const free = (x, z, b) => {
       for (const [a, c] of streets) if (distToSegment(x, z, a, c) < ROAD.walk) return false;
       if (b.kind === 'colony') return Math.hypot(x, z) > BOARD.colonyRadius + 3;
@@ -516,13 +524,12 @@ export function createBoard({ progressive = false } = {}) {
         tmp.rotation.set(0, Math.atan2(dir.x, dir.z) - Math.PI / 2 + (h(5) - 0.5) * 0.6, 0); tmp.scale.setScalar(1); tmp.updateMatrix();
         cars[Math.floor(h(6) * 4)].push(tmp.matrix.clone());
       }
-      if (len > 8) { // lamps on both sides, staggered
-        for (const [t, lat] of [[0.3, ROAD.kerb + 0.5], [0.7, -ROAD.kerb - 0.5]]) {
-          tmp.position.copy(at(t, lat)); tmp.rotation.set(0, Math.atan2(side.x * Math.sign(lat), side.z * Math.sign(lat)) - Math.PI / 2, 0); tmp.scale.setScalar(1); tmp.updateMatrix();
-          lamps.push(tmp.matrix.clone());
-        }
+      if (len > 8) {
         for (let k = 0; k < 2; k++) if (h(10 + k) < 0.35) { // cones, crates, barrels, bags, barriers on the sidewalk
-          tmp.position.copy(at(0.15 + h(12 + k) * 0.7, (k ? -1 : 1) * (ROAD.walk - 0.9))); tmp.rotation.set(0, h(14 + k) * 6, 0); tmp.updateMatrix();
+          tmp.position.copy(at(0.15 + h(12 + k) * 0.7, (k ? -1 : 1) * (ROAD.walk - 0.9)));
+          // Lamps win: clutter steps along the sidewalk, out of a lamp's way.
+          for (let n = 0; n < 4 && lampsAt.some((l) => Math.hypot(l.x - tmp.position.x, l.z - tmp.position.z) < 1.6); n++) tmp.position.addScaledVector(dir, 1.7);
+          tmp.rotation.set(0, h(14 + k) * 6, 0); tmp.scale.setScalar(1); tmp.updateMatrix();
           clutter[Math.floor(h(16 + k) * (CLUTTER_KINDS - 1))].push(tmp.matrix.clone());
         }
       }
@@ -535,10 +542,55 @@ export function createBoard({ progressive = false } = {}) {
     clutter.forEach((list, k) => { if (list.length) group.add(lazyLod('near', () => instanced(() => clutterModel(k), 0.12, list, { cacheKey: `clutter-${k}`, jitter: 0, castShadow: false }))); });
     rocks.forEach((list, k) => { if (list.length) group.add(lazyLod('near', () => instanced(() => rockModelHD(k), 0.25, list, { cacheKey: `rock-${k}`, jitter: 0 }))); });
     cars.forEach((list, v) => { if (list.length) group.add(lazyLod('near', () => instanced(() => carModel(v), 0.15, list, { cacheKey: `car4-${v}`, jitter: 0, castShadow: false }))); });
-    if (lamps.length) group.add(lazyLod('near', () => instanced(lampModel, 0.15, lamps, { cacheKey: 'lamp', jitter: 0, castShadow: false })));
     yards.forEach((list, k) => { if (list.length) group.add(lodProp(`container-${k}`, () => containerModel(k, 1 + (k % 2)), 0.2, list)); });
     if (attach) root.add(group);
     return { group, k: 0, target: 1, delay: 0 };
+  }
+
+  // ---------------------------------------------------------------- MAP-3 streets: markings, lamps, light pools
+  // Rebuilt for the whole city on every map change (a new street can turn a corner into a junction).
+  const MARK_MAT = new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const POOL_MAT = new THREE.MeshBasicMaterial({ map: poolTexture(), color: 0xffb36b, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, fog: false });
+  const decor = new THREE.Group(); decor.name = 'street-decor';
+  root.add(decor);
+  let flickers = []; let pools = null;
+  function buildStreetDecor() {
+    for (const o of decor.children) { const i = lodNodes.indexOf(o); if (i >= 0) lodNodes.splice(i, 1); }
+    decor.traverse((o) => { if (o.isMesh && o.geometry !== POOL_GEO) o.geometry.dispose?.(); });
+    decor.clear();
+    const segs = streets.filter(([, , seg]) => seg !== 'gate');
+    const q = markingQuads(segs);
+    if (q.index.length) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(q.position, 3));
+      g.setAttribute('normal', new THREE.BufferAttribute(q.normal, 3));
+      g.setAttribute('color', new THREE.BufferAttribute(q.color, 3));
+      g.setIndex(new THREE.BufferAttribute(q.index, 1));
+      const m = new THREE.Mesh(g, MARK_MAT); m.receiveShadow = true; m.name = 'markings';
+      decor.add(m);
+    }
+    const ground = (x, z) => { const bx = gridOf(x); const bz = gridOf(z); return has(bx, bz) && edgeDist(bx, bz)(x, z) >= 3; };
+    const spots = lampSpots(segs, ground);
+    const lit = []; const dead = []; const poolList = [];
+    flickers = [];
+    for (const l of spots) {
+      tmp.position.set(l.x + l.dx * 0.45, 0, l.z + l.dz * 0.45); tmp.rotation.set(0, Math.atan2(-l.dz, l.dx), 0); tmp.scale.setScalar(1); tmp.updateMatrix();
+      (l.dead ? dead : lit).push(tmp.matrix.clone());
+      if (l.dead) continue;
+      if (l.flicker) flickers.push(poolList.length);
+      tmp.position.set(l.x + l.dx * 0.85, 0.05, l.z + l.dz * 0.85); tmp.rotation.set(-Math.PI / 2, 0, 0); tmp.scale.setScalar(5); tmp.updateMatrix();
+      poolList.push(tmp.matrix.clone());
+    }
+    if (lit.length) decor.add(tagLod(instanced(() => lampModel(false), 0.1, lit, { cacheKey: 'lamp3', jitter: 0, castShadow: false }), 'near'));
+    if (dead.length) decor.add(tagLod(instanced(() => lampModel(true), 0.1, dead, { cacheKey: 'lamp3-dead', jitter: 0, castShadow: false }), 'near'));
+    pools = null;
+    if (poolList.length) {
+      pools = new THREE.InstancedMesh(POOL_GEO, POOL_MAT, poolList.length);
+      poolList.forEach((mx, i) => { pools.setMatrixAt(i, mx); pools.setColorAt(i, new THREE.Color(1, 1, 1)); });
+      pools.renderOrder = 1; pools.name = 'lamp-pools';
+      decor.add(pools);
+    }
+    trackGlow(decor);
   }
 
   // The slab's soft shadow on the backdrop (follows the city's outline).
@@ -731,6 +783,7 @@ export function createBoard({ progressive = false } = {}) {
       computeLayout(map, layout);
       streets = streetSegments(map.roads, layout);
       const newStreets = streets.filter(([, , seg]) => seg === 'gate' ? !oldRoads.size : !oldRoads.has(seg));
+      buildStreetDecor();
       // Old blocks next to new ones (or new streets) get fresh terrain: their rim is now inside the city.
       const touched = new Set();
       for (const k of fresh) { const [bx, bz] = parse(k); for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) touched.add(`${bx + dx},${bz + dz}`); }
@@ -781,6 +834,10 @@ export function createBoard({ progressive = false } = {}) {
       for (const c of Object.values(cells)) if (c.pop) stepPop(c, dt);
       for (const c of batches) if (c.pop) stepPop(c, dt);
       stepPuffs(dt);
+      if (pools && flickers.length) {
+        for (const [n, i] of flickers.entries()) { const f = Math.sin(t * 9 + n * 2.3) > 0.6 || Math.sin(t * 23 + n) > 0.93 ? 0.15 : 1; _c.setScalar(f); pools.setColorAt(i, _c); }
+        pools.instanceColor.needsUpdate = true;
+      }
       if (queue.length) drainQueue();
       for (const c of batches) {
         if (c.k === c.target) continue;

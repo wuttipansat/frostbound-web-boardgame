@@ -56,3 +56,40 @@ test('calm blocks are stable: same pieces for the same block in every growth', (
   const after = snap();
   for (const [k, v] of Object.entries(before)) assert.equal(after[k], v, `block ${k}`);
 });
+
+test('lamps: spaced on each side, never in a junction box, always on the sidewalk; markings only on asphalt', async () => {
+  const { lampSpots, markingQuads, streetRuns } = await import('../src/render/streets.js');
+  const THREE = await import('three');
+  const seg = (k) => {
+    const [cx, cz, d] = k.split(',');
+    const line = (c) => blockPos(+c) - blockHalf(+c);
+    const a = new THREE.Vector3(line(cx), 0, line(cz));
+    const b = d === 'h' ? new THREE.Vector3(line(+cx + 1), 0, line(cz)) : new THREE.Vector3(line(cx), 0, line(+cz + 1));
+    return [a, b, k];
+  };
+  const dist = (x, z, [a, b]) => {
+    const t = Math.max(0, Math.min(1, ((x - a.x) * (b.x - a.x) + (z - a.z) * (b.z - a.z)) / a.distanceToSquared(b)));
+    return Math.hypot(x - (a.x + (b.x - a.x) * t), z - (a.z + (b.z - a.z) * t));
+  };
+  for (const s of cities()) {
+    const segs = s.map.roads.map(seg);
+    const lamps = lampSpots(segs);
+    assert.ok(lamps.length > 10);
+    const { nodes } = streetRuns(segs);
+    for (const l of lamps) {
+      const d = Math.min(...segs.map((g) => dist(l.x, l.z, g)));
+      assert.ok(d > ROAD.kerb && d < ROAD.walk, `lamp on the sidewalk (${d.toFixed(2)})`);
+      assert.ok(!nodes.some((n) => n.kind === 'junction' && Math.abs(n.x - l.x) < ROAD.walk && Math.abs(n.z - l.z) < ROAD.walk && Math.hypot(n.x - l.x, n.z - l.z) < 5), 'not in a junction box');
+    }
+    for (const a of lamps) for (const b of lamps) {
+      if (a === b || a.dx !== b.dx || a.dz !== b.dz) continue; // same side = same facing
+      const sameLine = a.dx ? Math.abs(a.x - b.x) < 0.01 : Math.abs(a.z - b.z) < 0.01;
+      if (sameLine) assert.ok(Math.hypot(a.x - b.x, a.z - b.z) >= 7, 'lamps ≥ 7 apart on one side');
+    }
+    const q = markingQuads(segs);
+    for (let i = 0; i < q.position.length; i += 3) {
+      const d = Math.min(...segs.map((g) => dist(q.position[i], q.position[i + 2], g)));
+      assert.ok(d <= ROAD.half + 1e-6, 'markings stay on the asphalt');
+    }
+  }
+});

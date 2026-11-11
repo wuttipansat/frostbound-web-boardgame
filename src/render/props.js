@@ -20,14 +20,20 @@ export function carModel(v = 0) {
   return m.upscale(2).bevel(0.3, { topOnly: true, seed: v });
 }
 
-/** A street lamp: a dark pole with a warm glowing head. */
-export function lampModel() {
+/** MAP-3 street lamp, authored at the fine grid (use at 0.1 world per voxel): base, thin pole, arm over the road (+x),
+ *  hooded head with a warm lens underneath, snow on the hood and arm. `dead` = a broken lamp (no light). */
+export function lampModel(dead = false) {
   const m = new VoxelModel();
-  m.box(0, 0, 0, 1, 9, 1, 0x2a2f36);
-  m.box(0, 9, 0, 3, 1, 1, 0x2a2f36);
-  m.set(2, 8, 0, 0xffc46b, true);
-  m.set(0, 9, 0, P.snow); m.set(1, 10, 0, P.snow);
-  return m.upscale(2);
+  const iron = 0x2a2f36; const dark = 0x1d2127;
+  m.box(-1, 0, -1, 3, 1, 3, dark);            // base plate
+  m.box(0, 1, 0, 1, 2, 1, iron); m.box(-1, 1, 0, 3, 1, 1, iron); m.box(0, 1, -1, 1, 1, 3, iron); // collar
+  m.box(0, 3, 0, 1, 28, 1, iron);             // pole
+  m.box(1, 29, 0, 7, 1, 1, iron);             // arm
+  m.set(1, 28, 0, iron); m.set(2, 27, 0, iron); // brace
+  m.box(6, 27, -1, 4, 2, 3, dark);            // hood
+  m.box(7, 26, 0, 2, 1, 1, dead ? 0x3a3f46 : 0xffc46b, !dead); // lens
+  m.box(6, 29, -1, 4, 1, 3, P.snow); m.box(1, 30, 0, 5, 1, 1, P.snow); m.set(0, 31, 0, P.snow);
+  return m;
 }
 
 const CONTAINER_COLORS = [0x8e2f27, 0x24365c, 0x2f5a3f];
