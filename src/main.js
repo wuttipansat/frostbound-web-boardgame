@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { createStage } from './render/stage.js';
 import { createBoard } from './render/board.js';
+import { loadPack } from './render/pack.js';
+import { usePack } from './render/voxel.js';
 import { createPieces } from './render/pieces.js';
 import { Tweens } from './render/tween.js';
 import { createAmbientParticles } from './render/particles.js';
@@ -22,6 +24,12 @@ import { actionCost, searchSpawnChance, isOverrun } from './core/selectors.js';
 import { LOCATIONS } from './content/locations.js';
 
 const params = new URLSearchParams(location.search);
+// LOAD-1: load timing marks (ms since navigation start), read by scripts/e2e/perf.cjs.
+const loadTimes = window.__loadTimes = {};
+const mark = (k) => { loadTimes[k] = Math.round(performance.now()); };
+mark('start');
+// Baked city models (production builds; ?pack=0 meshes everything at runtime instead).
+const packing = import.meta.env.PROD && params.get('pack') !== '0' ? loadPack() : Promise.resolve(null);
 const $ = (id) => document.getElementById(id);
 
 // One graphics quality; only the pixel ratio and particle counts adapt to the device.
@@ -41,7 +49,12 @@ document.body.dataset.gfx = governor.tier;
 // Only judge fps while every frame is drawn (not while throttled behind a screen or in saver mode).
 stage.onFrameTime((dt, _ms, every) => { if (every === 1) governor.sample(dt); });
 boot(0.55);
-const board = createBoard();
+const pack = await packing;
+usePack(pack);
+mark('pack');
+loadTimes.packed = pack?.size ?? 0;
+const board = createBoard({ progressive: params.get('progressive') !== '0' });
+mark('board');
 board.onBounds = (b) => stage.view.fit(b, { snap: b.snap }); // UI-13: the usual view follows the open blocks
 stage.scene.add(board.root);
 const tweens = new Tweens();
@@ -259,6 +272,7 @@ stage.onFrame((t, dt) => {
   atmosphere.update(dt);
   footprints.update(dt);
   board.update(t);
+  if (!loadTimes.allBlocks && !board.pending) mark('allBlocks');
   pieces.update(t, dt);
   particles.update(dt, stage.renderer.getPixelRatio() * stage.camera.zoom);
   app.tick(dt);
@@ -422,5 +436,5 @@ window.__frostbound = { rig, stage, atmosphere, footprints, groundAt, ray, board
 // Step 22: the first frame is on screen — drop the loading screen. A hidden tab draws nothing and
 // pauses the ambience.
 boot(0.9);
-requestAnimationFrame(() => requestAnimationFrame(() => boot(1)));
+requestAnimationFrame(() => requestAnimationFrame(() => { mark('firstFrame'); boot(1); }));
 document.addEventListener('visibilitychange', () => sound.pause(document.hidden));

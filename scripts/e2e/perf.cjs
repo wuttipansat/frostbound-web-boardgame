@@ -39,6 +39,15 @@ const BUDGET = { entry: 130, three: 135, initial: 300 }; // KB gzip
     if (!(await p.locator('#boot').count())) problems.push('no loading screen at first paint');
     await p.waitForFunction(() => !document.getElementById('boot') || document.getElementById('boot').classList.contains('done'), null, { timeout: 30000 }).catch(() => problems.push('loading screen never went away'));
     report.loadMs = Date.now() - t0;
+    // LOAD-1: phase marks from the page (ms since navigation) and long main-thread tasks during load.
+    report.marks = await p.evaluate(() => window.__loadTimes);
+    if (!report.marks?.packed) problems.push('model pack not used');
+    await p.waitForFunction(() => window.__loadTimes?.allBlocks, null, { timeout: 30000 }).catch(() => problems.push('city never finished building'));
+    report.marks = await p.evaluate(() => window.__loadTimes);
+    report.buildSliceMs = Math.round(await p.evaluate(() => window.__frostbound.board.stats.maxSliceMs));
+    if (report.buildSliceMs > 50) problems.push(`a progressive build step took ${report.buildSliceMs} ms`);
+    const m = report.marks;
+    if (m.allBlocks - m.start > 8000) problems.push(`city took ${m.allBlocks - m.start} ms to build`);
     await p.waitForTimeout(800);
     if (!reqs.some((u) => /post-.*\.js/.test(u))) problems.push('auto/high did not load post-processing');
     report.gfx = await p.evaluate(() => document.body.dataset.gfx);

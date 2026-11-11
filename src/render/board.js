@@ -2,7 +2,7 @@
 // the middle block; places, filler blocks (parking, plaza, park, ruins, rail yard, containers), streets on
 // the block edges, instanced trees / rocks / cars / lamps, and pick targets for each place.
 import * as THREE from 'three';
-import { VoxelModel, hash3, MATERIALS } from './voxel.js';
+import { VoxelModel, hash3, MATERIALS, geometriesFor, groupOf, packedBounds } from './voxel.js';
 import { P } from './palette.js';
 import { LOCATION_BUILDERS_HD, colonyHD, treeModelHD, rockModelHD } from './buildings.js';
 import { buildTerrainHD } from './terrain.js';
@@ -145,8 +145,9 @@ function streetSegments(roadKeys, layout) {
 
 // ---------------------------------------------------------------- decorations
 
-function instanced(model, scale, transforms, { castShadow = true, cacheKey = null, jitter = 0.05 } = {}) {
-  const { lit, glow } = model.buildGeometries({ size: scale, cacheKey, jitter });
+/** make: () => VoxelModel, only called when the geometry is neither cached nor baked. */
+function instanced(make, scale, transforms, { castShadow = true, cacheKey = null, jitter = 0.05 } = {}) {
+  const { lit, glow } = cacheKey ? geometriesFor(cacheKey, { size: scale, jitter }, make) : make().buildGeometries({ size: scale, jitter });
   const group = new THREE.Group();
   for (const [geo, mat] of [[lit, MATERIALS.lit], [glow, MATERIALS.glow]]) {
     if (!geo) continue;
@@ -183,7 +184,7 @@ function haloTexture() {
 
 // ---------------------------------------------------------------- public API
 
-export function createBoard() {
+export function createBoard({ progressive = false } = {}) {
   const root = new THREE.Group();
   root.name = 'board';
   const layout = computeLayout(START_MAP);
@@ -208,24 +209,60 @@ export function createBoard() {
   const LOD_SIZE = [BOARD.buildingScale / 4, BOARD.buildingScale / 2, BOARD.buildingScale];
   // A node's tag: 0 / 1 / 2 = that level only; 'near' = levels 0–1; 'far' = level 2.
   const lodShows = (tag, level) => (tag === 'near' ? level < 2 : tag === 'far' ? level === 2 : tag === level);
-  const tagLod = (node, tag) => { node.userData.lod = tag; node.visible = lodShows(tag, lodLevel); lodNodes.push(node); return node; };
-  const lodModel = (key, make) => {
+  // LOAD-1: a level is only built (voxels + mesh) the first time it is shown, so the start builds one level, not three.
+  // LOAD-1 progressive start: while a city is first built (snap), only ground and the colony are made at once; other
+  // models wait in a queue and are made a few per frame (nearest the colony first, ≤ 6 ms a frame).
+  let deferring = false;
+  const queue = [];
+  let queueDirty = false;
+  const realize = (n) => {
+    const make = n.userData.make;
+    if (!make || !n.visible) return;
+    if (deferring && !n.userData.eager) { if (!n.userData.queued) { n.userData.queued = true; queue.push(n); queueDirty = true; } return; }
+    n.userData.make = null;
+    const content = make();
+    n.add(content);
+    trackGlow(content);
+  };
+  const tagLod = (node, tag) => { node.userData.lod = tag; node.visible = lodShows(tag, lodLevel); lodNodes.push(node); realize(node); return node; };
+  /** A placeholder for one level of detail; `make` builds its content on first show. */
+  const lazyLod = (tag, make, eager = false) => { const g = new THREE.Group(); g.userData.make = make; g.userData.eager = eager; return tagLod(g, tag); };
+  const _w = new THREE.Vector3();
+  function drainQueue(budgetMs = 6) {
+    if (queueDirty) { queue.sort((a, b) => a.getWorldPosition(_w).lengthSq() - b.getWorldPosition(_w).lengthSq()); queueDirty = false; }
+    const t0 = performance.now();
+    while (queue.length && performance.now() - t0 < budgetMs) { const n = queue.shift(); n.userData.queued = false; realize(n); }
+    stats.maxSliceMs = Math.max(stats.maxSliceMs, performance.now() - t0);
+  }
+  const stats = { maxSliceMs: 0 };
+  const lodModel = (key, make, eager = false) => {
     const g = new THREE.Group();
-    for (let L = 0; L < 3; L++) g.add(tagLod(city.lod(L, key, make).build({ size: LOD_SIZE[L], jitter: 0, cacheKey: `lod${L}-${key}` }), L));
+    for (let L = 0; L < 3; L++) g.add(lazyLod(L, () => groupOf(geometriesFor(`lod${L}-${key}`, { size: LOD_SIZE[L], jitter: 0 }, () => city.lod(L, key, make))), eager));
     return g;
   };
+  /** Model extents (x, z) over all levels, from voxel bounds (no meshing needed). */
+  const lodExtent = (key, make) => {
+    let x = 0; let z = 0;
+    for (let L = 0; L < 3; L++) {
+      const { min, max } = packedBounds(`lod${L}-${key}`, { size: LOD_SIZE[L], jitter: 0 }) ?? city.lod(L, key, make).bounds();
+      x = Math.max(x, (max[0] - min[0]) * LOD_SIZE[L]); z = Math.max(z, (max[2] - min[2]) * LOD_SIZE[L]);
+    }
+    return { x, z };
+  };
   const PROPS = new Map();
+  const propPair = (key, make) => { if (!PROPS.has(key)) { const m = make(); PROPS.set(key, [m, downsample(m)]); } return PROPS.get(key); };
   /** A prop with a near version and a half-resolution far version. */
   const lodProp = (key, make, scale, list) => {
-    if (!PROPS.has(key)) { const m = make(); PROPS.set(key, [m, downsample(m)]); }
-    const [near, far] = PROPS.get(key);
     const g = new THREE.Group();
-    g.add(tagLod(instanced(near, scale, list, { cacheKey: key, jitter: 0 }), 'near'), tagLod(instanced(far, scale * 2, list, { cacheKey: `${key}-far`, jitter: 0, castShadow: false }), 'far'));
+    g.add(
+      lazyLod('near', () => instanced(() => propPair(key, make)[0], scale, list, { cacheKey: key, jitter: 0 })),
+      lazyLod('far', () => instanced(() => propPair(key, make)[1], scale * 2, list, { cacheKey: `${key}-far`, jitter: 0, castShadow: false })),
+    );
     return g;
   };
   const lodInstanced = (key, make, list) => {
     const g = new THREE.Group();
-    for (let L = 0; L < 3; L++) g.add(tagLod(instanced(city.lod(L, key, make), LOD_SIZE[L], list, { cacheKey: `lod${L}-${key}`, jitter: 0, castShadow: L < 2 }), L));
+    for (let L = 0; L < 3; L++) g.add(lazyLod(L, () => instanced(() => city.lod(L, key, make), LOD_SIZE[L], list, { cacheKey: `lod${L}-${key}`, jitter: 0, castShadow: L < 2 })));
     return g;
   };
   const cellOf = (x, z) => `${Math.round(x / B)},${Math.round(z / B)}`;
@@ -308,19 +345,20 @@ export function createBoard() {
     const [bx, bz] = parse(key);
     const g = new THREE.Group(); g.name = `cell ${key}`;
     const terrain = new THREE.Group(); terrain.name = 'terrain-lod';
-    terrain.add(tagLod(terrainFor(key), 'near'), tagLod(terrainFor(key, 1), 'far'));
+    terrain.add(lazyLod('near', () => terrainFor(key), true), lazyLod('far', () => terrainFor(key, 1), true));
     g.add(terrain);
     let model = null;
     if (b.kind === 'colony') {
-      model = lodModel('colony', () => colonyHD(BOARD.colonyRadius * 2));
+      model = lodModel('colony', () => colonyHD(BOARD.colonyRadius * 2), true);
       model.name = 'colony';
       locationGroups.colony = model;
     } else if (b.kind === 'place') {
       const L = layout[b.placeId];
       const type = b.type ?? b.placeId;
-      model = lodModel(`place-${type}`, LOCATION_BUILDERS_HD[type] ?? LOCATION_BUILDERS_HD.grocery);
+      const make = LOCATION_BUILDERS_HD[type] ?? LOCATION_BUILDERS_HD.grocery;
+      model = lodModel(`place-${type}`, make);
       // Fit the building into its chunks (models are centred on x/z, front = +z).
-      const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+      const size = lodExtent(`place-${type}`, make);
       model.scale.setScalar(Math.min(PLACE_SCALE, (L.plan.fw * CHUNK - 0.2) / size.x, (L.plan.fd * CHUNK - 0.2) / size.z));
       model.position.copy(L.center);
       model.rotation.y = L.facing;
@@ -432,10 +470,10 @@ export function createBoard() {
     ruins.forEach((list, v) => { if (list.length) group.add(lodInstanced(`ruin-${v}`, () => city.ruinSmall(v), list)); });
     if (pieces.parking.length) group.add(lodInstanced('parking-small', city.parkingSmall, pieces.parking));
     if (pieces.fountain.length) group.add(lodInstanced('fountain', city.fountain, pieces.fountain));
-    clutter.forEach((list, k) => { if (list.length) group.add(tagLod(instanced(clutterModel(k), 0.12, list, { cacheKey: `clutter-${k}`, jitter: 0, castShadow: false }), 'near')); });
-    rocks.forEach((list, k) => { if (list.length) group.add(tagLod(instanced(rockModelHD(k), 0.25, list, { cacheKey: `rock-${k}`, jitter: 0 }), 'near')); });
-    cars.forEach((list, v) => { if (list.length) group.add(tagLod(instanced(carModel(v), 0.15, list, { cacheKey: `car4-${v}`, jitter: 0, castShadow: false }), 'near')); });
-    if (lamps.length) group.add(tagLod(instanced(lampModel(), 0.15, lamps, { cacheKey: 'lamp', jitter: 0, castShadow: false }), 'near'));
+    clutter.forEach((list, k) => { if (list.length) group.add(lazyLod('near', () => instanced(() => clutterModel(k), 0.12, list, { cacheKey: `clutter-${k}`, jitter: 0, castShadow: false }))); });
+    rocks.forEach((list, k) => { if (list.length) group.add(lazyLod('near', () => instanced(() => rockModelHD(k), 0.25, list, { cacheKey: `rock-${k}`, jitter: 0 }))); });
+    cars.forEach((list, v) => { if (list.length) group.add(lazyLod('near', () => instanced(() => carModel(v), 0.15, list, { cacheKey: `car4-${v}`, jitter: 0, castShadow: false }))); });
+    if (lamps.length) group.add(lazyLod('near', () => instanced(lampModel, 0.15, lamps, { cacheKey: 'lamp', jitter: 0, castShadow: false })));
     yards.forEach((list, k) => { if (list.length) group.add(lodProp(`container-${k}`, () => containerModel(k, 1 + (k % 2)), 0.2, list)); });
     if (attach) root.add(group);
     return { group, k: 0, target: 1, delay: 0 };
@@ -603,7 +641,7 @@ export function createBoard() {
       const level = z >= 0.8 ? 0 : z >= 0.5 ? 1 : 2;
       if (level === lodLevel) return;
       lodLevel = level;
-      for (const n of lodNodes) n.visible = lodShows(n.userData.lod, level);
+      for (const n of lodNodes) { n.visible = lodShows(n.userData.lod, level); realize(n); }
     },
     /** MAP-1: draw the game's map. New blocks rise into place (staggered outward); the first call snaps.
      *  Calls onBounds with the city's outline. */
@@ -620,9 +658,11 @@ export function createBoard() {
         for (const id of Object.keys(locationGroups)) delete locationGroups[id];
         glowMats.length = 0;
         lodNodes.length = 0;
+        queue.length = 0;
         map = null;
         snap = true;
       }
+      deferring = progressive && snap;
       const fresh = Object.keys(next.blocks).filter((k) => !cells[k]);
       const oldRoads = new Set(map?.roads ?? []);
       map = next;
@@ -636,9 +676,10 @@ export function createBoard() {
       for (const k of touched) {
         const c = cells[k];
         if (!c) continue;
-        for (const t of c.terrain.children) t.geometry.dispose();
+        c.terrain.traverse((t) => t.geometry?.dispose());
+        for (const t of c.terrain.children) { const i = lodNodes.indexOf(t); if (i >= 0) lodNodes.splice(i, 1); }
         c.terrain.clear();
-        c.terrain.add(tagLod(terrainFor(k), 'near'), tagLod(terrainFor(k, 1), 'far'));
+        c.terrain.add(lazyLod('near', () => terrainFor(k), true), lazyLod('far', () => terrainFor(k, 1), true));
       }
       fresh.sort((a, b) => Math.hypot(...parse(a)) - Math.hypot(...parse(b)));
       const inner = fresh.length ? Math.max(0, Math.hypot(...parse(fresh[0])) - 1) * B : 0;
@@ -662,13 +703,20 @@ export function createBoard() {
       const bounds = { minX: Math.min(...xs), maxX: Math.max(...xs), minZ: Math.min(...zs), maxZ: Math.max(...zs), block: B, snap };
       shadow.scale.set((bounds.maxX - bounds.minX + 2.4) * B, (bounds.maxZ - bounds.minZ + 2.4) * B, 1);
       shadow.position.set((bounds.minX + bounds.maxX) / 2 * B + 4, -16, (bounds.minZ + bounds.maxZ) / 2 * B + 6);
+      deferring = false;
       api.onBounds?.(bounds);
     },
+    /** LOAD-1: models still waiting to be made (progressive start). */
+    get pending() { return queue.length; },
+    /** Make every waiting model now (tests, screenshots). */
+    flush() { while (queue.length) drainQueue(1e9); },
+    stats,
     update(t) {
       const dt = Math.min(0.1, Math.max(0, t - (lastT ?? t))); lastT = t;
       for (const c of Object.values(cells)) if (c.pop) stepPop(c, dt);
       for (const c of batches) if (c.pop) stepPop(c, dt);
       stepPuffs(dt);
+      if (queue.length) drainQueue();
       for (const c of batches) {
         if (c.k === c.target) continue;
         if (c.delay > 0) { c.delay -= dt; continue; }
