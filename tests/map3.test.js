@@ -162,3 +162,19 @@ test('raised ground (part D): blocks stand on GROUND, roads at 0', async () => {
   const ys = marks.geometry.attributes.position.array.filter((_, i) => i % 3 === 1);
   assert.ok(Math.max(...ys) < 0.1, 'markings on the road');
 });
+
+test('railway (part E): one straight seeded line, continuous across blocks, the same after growth', async () => {
+  const { createBoard } = await import('../src/render/board.js');
+  const s = createGame({ seed: 5, players: 1 });
+  const board = createBoard();
+  board.setMap(s.map, { snap: true });
+  const read = () => { const g = board.root.getObjectByName('railway').geometry; g.computeBoundingBox(); return g.boundingBox; };
+  const a = read();
+  const flat = Math.min(a.max.x - a.min.x, a.max.z - a.min.z);
+  assert.ok(flat < 3.5, 'a straight line (one ballast width across)');
+  growCity(s); board.setMap(JSON.parse(JSON.stringify(s.map)));
+  const b = read();
+  const axisX = a.max.x - a.min.x > a.max.z - a.min.z;
+  assert.ok(axisX ? Math.abs((a.min.z + a.max.z) - (b.min.z + b.max.z)) < 0.01 : Math.abs((a.min.x + a.max.x) - (b.min.x + b.max.x)) < 0.01, 'same line after growth');
+  assert.ok(axisX ? b.max.x - b.min.x >= a.max.x - a.min.x : b.max.z - b.min.z >= a.max.z - a.min.z, 'it grows with the city');
+});

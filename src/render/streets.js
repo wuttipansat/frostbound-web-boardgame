@@ -48,7 +48,7 @@ export function streetRuns(segments) {
 
 /** Flat quads for every marking: { position, normal, color, index } (one mesh for the whole city).
  *  onGround(x, z) says whether there is street surface at a spot. */
-export function markingQuads(segments, onGround = () => true, y = 0.03) {
+export function markingQuads(segments, onGround = () => true, y = 0.03, rail = null) {
   const { runs } = streetRuns(segments);
   const pos = []; const col = [];
   // A rectangle in run space: along t0..t1, lateral l0..l1.
@@ -76,7 +76,9 @@ export function markingQuads(segments, onGround = () => true, y = 0.03) {
         rect(r, t, Math.min(s1, t + 3), side * e - LINE_W / 2, side * e + LINE_W / 2, shade(k, side, 9));
       }
     }
-    // Centre dashes anchored to world coordinates.
+    // Centre dashes anchored to world coordinates (none where rails run down the street).
+    const railHere = rail && rail.axis === r.axis && Math.abs(rail.c - r.c) < 0.01;
+    if (!railHere)
     for (let k = Math.ceil(d0 / (2 * DASH)); k * 2 * DASH + DASH <= d1; k++) {
       if (hash3(k, 7, Math.round(r.c * 10)) < 0.06) continue;
       rect(r, k * 2 * DASH, k * 2 * DASH + DASH, -LINE_W / 2, LINE_W / 2, shade(k, 3, Math.round(r.c)));
@@ -145,4 +147,44 @@ export function lampSpots(segments, onGround = () => true) {
     for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) keep(n.x + sx * LAMP_IN, n.z + sz * LAMP_IN, -sx * Math.SQRT1_2, -sz * Math.SQRT1_2);
   }
   return out;
+}
+
+// ---------------------------------------------------------------- MAP-3 E: the railway
+const STEEL = [0.55, 0.57, 0.6]; const GROOVE = [0.09, 0.1, 0.11]; const BALLAST = [0.32, 0.3, 0.28];
+const SLEEPER = [0.26, 0.2, 0.15]; const SNOWC = [0.9, 0.93, 0.96];
+export const GAUGE = 0.72; // half the distance between the rails
+
+/**
+ * The railway along one grid line ({ axis: 'x' | 'z', c }): pieces [t0, t1, road] along it. On a street the rails are
+ * set into the asphalt; elsewhere they sit on sleepers in a ballast bed. Returns flat-ish quads like markingQuads.
+ */
+export function railQuads(rail, pieces) {
+  const pos = []; const col = []; const nrm = [];
+  const P = (t, l, y) => (rail.axis === 'x' ? [t, y, rail.c + l] : [rail.c + l, y, t]);
+  const quad = (pts, n, c) => { for (const p of pts) { pos.push(...p); nrm.push(...n); col.push(...c); } };
+  const flat = (t0, t1, l0, l1, y, c) => quad([P(t0, l0, y), P(t1, l0, y), P(t1, l1, y), P(t0, l1, y)], [0, 1, 0], c);
+  const side = (t0, t1, l, y0, y1, out, c) => quad([P(t0, l, y0), P(t1, l, y0), P(t1, l, y1), P(t0, l, y1)], rail.axis === 'x' ? [0, 0, out] : [out, 0, 0], c);
+  for (const [t0, t1, road] of pieces) {
+    if (road) {
+      for (const g of [-GAUGE, GAUGE]) { flat(t0, t1, g - 0.1, g - 0.04, 0.034, GROOVE); flat(t0, t1, g - 0.04, g + 0.04, 0.036, STEEL); }
+      continue;
+    }
+    flat(t0, t1, -1.6, 1.6, 0.03, BALLAST);
+    for (let t = Math.ceil(t0 / 0.65) * 0.65; t + 0.3 <= t1; t += 0.65) {
+      const k = Math.round(t * 10);
+      flat(t, t + 0.3, -1.3, 1.3, 0.07, hash3(k, 3, Math.round(rail.c)) < 0.3 ? SNOWC : SLEEPER);
+    }
+    for (const g of [-GAUGE, GAUGE]) { flat(t0, t1, g - 0.05, g + 0.05, 0.16, STEEL); side(t0, t1, g - 0.05, 0.07, 0.16, -1, GROOVE); side(t0, t1, g + 0.05, 0.07, 0.16, 1, GROOVE); }
+  }
+  const nq = pos.length / 12;
+  const index = new Uint32Array(nq * 6);
+  for (let q = 0; q < nq; q++) {
+    const o = q * 12;
+    const a = [pos[o + 3] - pos[o], pos[o + 4] - pos[o + 1], pos[o + 5] - pos[o + 2]]; const b = [pos[o + 6] - pos[o], pos[o + 7] - pos[o + 1], pos[o + 8] - pos[o + 2]];
+    const cr = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    const n = [nrm[o], nrm[o + 1], nrm[o + 2]];
+    const up = cr[0] * n[0] + cr[1] * n[1] + cr[2] * n[2] > 0;
+    index.set(up ? [q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3] : [q * 4, q * 4 + 2, q * 4 + 1, q * 4, q * 4 + 3, q * 4 + 2], q * 6);
+  }
+  return { position: new Float32Array(pos), normal: new Float32Array(nrm), color: new Float32Array(col), index };
 }

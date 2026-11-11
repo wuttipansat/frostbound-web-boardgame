@@ -31,7 +31,7 @@ export function createGame(config = {}) {
     phase: PHASES.DRAFT,
     day: 1,
     time: 'dawn', // dawn | day | dusk | night
-    map: newMap(!!config.fullTown), // MAP-1: the city grows a stage per map found (fullTown: the old six places)
+    map: { ...newMap(!!config.fullTown), look: normalizeSeed(config.seed) }, // MAP-1: the city grows a stage per map found (fullTown: the old six places); look seeds its scenery (MAP-3 E)
     scenario: { id: scenario.id, days: config.days ?? scenario.days, deposited: 0 }, // 0 = endless winter
     morale: Math.min(10, scenario.morale + (DIFFICULTY[config.difficulty]?.morale ?? 0)),
     maxMorale: 10,

@@ -118,7 +118,7 @@ export function buildTerrainHD({ radius, distRoad, distPlot, clip = null, center
     if (clip && !clip(wx, wz)) return null; // UI-13: one block of the city at a time
     const roadD = distRoad(wx, wz);
     // MAP-3 D: the road surface only; everything inside the kerb line is the raised block slab (ground.js) on top.
-    let top = 0x6c737d;
+    let top = P.snow; // MAP-3 E: lines between blocks without a street are snowed-over back lanes
     const h = 0;
     if (roadD < ROAD.half + 0.25) {
       // Dark ploughed asphalt (markings are decals on top): a few cracks and patches, a little snow along the kerb.

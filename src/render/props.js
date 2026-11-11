@@ -68,3 +68,55 @@ export function clutterModel(k = 0) {
   return m.upscale(2);
 }
 export const CLUTTER_KINDS = 6;
+
+// ---------------------------------------------------------------- MAP-3 E: railway pieces
+
+/** A level-crossing post (fine grid, 0.1 world per voxel): crossbuck, two red lamps (one dead), a striped arm.
+ *  The arm lies along +x over the road when down; up = raised. */
+export function crossingModel(up = false) {
+  const m = new VoxelModel();
+  m.box(-1, 0, -1, 3, 1, 3, 0x2a2d31); m.box(0, 1, 0, 1, 30, 1, 0xe8e8e2);
+  for (let k = -5; k <= 5; k++) { m.set(k, 26 + k, 0, Math.abs(k) % 3 ? 0xe8e8e2 : 0xc0392b); m.set(k, 26 - k, 0, Math.abs(k) % 3 ? 0xe8e8e2 : 0xc0392b); }
+  m.box(-3, 18, 1, 2, 2, 1, 0xff3a2a, true); m.box(2, 18, 1, 2, 2, 1, 0x3a1a18);
+  m.box(-1, 6, 1, 3, 4, 2, 0x2a2d31);
+  for (let k = 0; k < 28; k++) { const c = Math.floor(k / 4) % 2 ? 0xc0392b : 0xf0f0ea; if (up) m.set(0, 10 + k, 2, c); else m.set(1 + k, 8, 2, c); }
+  return m.snowCap(P.snow, 1, 2);
+}
+
+/** A goods wagon (0.3 world per voxel, length 40 along x): 'box' = a container on a flatcar, 'tank', 'hopper'. */
+export function wagonModel(kind = 'box', v = 0) {
+  const m = new VoxelModel();
+  const L = 40; const x0 = -20;
+  m.box(x0, 2, -4, L, 2, 9, 0x2a2d31);                         // underframe
+  for (const bx of [x0 + 4, x0 + L - 10]) { m.box(bx, 0, -4, 6, 3, 1, 0x1c1f24); m.box(bx, 0, 4, 6, 3, 1, 0x1c1f24); } // bogies
+  for (const ex of [x0 - 1, x0 + L]) m.box(ex, 2, -1, 1, 1, 3, 0x3a3f46); // couplers
+  const tones = [0x8e3a2c, 0x2b3a5c, 0x5d6b3a, 0x2f6b6b, 0xb8682f];
+  if (kind === 'tank') {
+    for (let x = x0 + 1; x < x0 + L - 1; x++) for (let y = 0; y < 8; y++) for (let z = -4; z <= 4; z++) if ((y - 3.5) ** 2 + z * z <= 17) m.set(x, 4 + y, z, x % 9 === 0 ? 0x1c1f24 : 0x3a3f46);
+    m.box(-1, 12, -1, 3, 1, 3, 0x2a2d31);
+  } else if (kind === 'hopper') {
+    for (let y = 0; y < 8; y++) m.walls(x0 + 2 + Math.floor(y / 3), 4 + y, -4, L - 4 - 2 * Math.floor(y / 3), 1, 9, y % 3 ? tones[(v + 2) % 5] : 0x4a3a2c);
+    m.box(x0 + 5, 11, -3, L - 10, 1, 7, 0x2a2622); // coal under the snow
+  } else {
+    // A container on the flatcar (same detailed container as the colony walls, rotated along x).
+    for (let t = 0; t < L - 2; t++) for (let k = 0; k < 9; k++) for (let y = 0; y < 9; y++) {
+      const side = k === 0 || k === 8; const end = t === 0 || t === L - 3; const cap = y === 0 || y === 8;
+      const c = tones[v % 5];
+      m.set(x0 + 1 + t, 4 + y, -4 + k, end && side && cap ? 0x1c1f24 : cap ? 0x3a3a3a : side ? (t % 2 ? c : (c & 0xfefefe) >> 1) : c);
+    }
+    for (let t = 6; t < L - 8; t++) if (hash3(t, v, 3) < 0.5) m.set(x0 + 1 + t, 9, 5, 0xd9d2bf); // faded stencil
+  }
+  return m.snowCap(P.snow, 1, 3);
+}
+
+/** A small station shelter (0.1 world per voxel): platform slab, posts, a roof, a bench and a name board. */
+export function shelterModel() {
+  const m = new VoxelModel();
+  m.box(-40, 0, -6, 80, 3, 13, 0x9aa0a6);                                   // platform
+  for (let x = -40; x < 40; x++) m.set(x, 3, 6, x % 2 ? 0xd8b03a : 0x2a2d31);   // yellow edge line
+  for (const x of [-20, 20]) for (const z of [-5, 4]) m.box(x, 3, z, 1, 22, 1, 0x2a2f36);
+  m.box(-24, 25, -6, 49, 2, 12, 0x3a4652);
+  m.box(-8, 3, -4, 16, 4, 3, P.wood); m.box(-8, 7, -5, 16, 4, 1, P.wood);       // bench
+  m.box(-6, 14, -6, 12, 6, 1, 0x1d3557); m.box(-5, 16, -5, 10, 2, 1, 0xe8e8e2); // name board
+  return m.snowCap(P.snow, 1, 3);
+}
