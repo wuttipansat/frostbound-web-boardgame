@@ -172,7 +172,35 @@ export function survivorModel(def) {
   if (has('bag')) { m.box(7 + W, 3, 2, 1, 3, 4, st.pack); for (let i = 0; i < 5; i++) m.set(2 + i, 4 + i, 6, 0x3a3a3a); }
   if (has('rifle')) for (let i = 0; i < 11; i++) m.set(1 + Math.floor(i / 2), 3 + i, 1, i > 8 ? 0x2a2a2a : 0x5a3a22);
   if (has('broom')) { m.box(6, 1, 1, 1, 14, 1, P.woodLight); m.box(5, 13, 0, 3, 3, 1, 0xd9c27a); }
+  winterWear(m, def.id, { top, hy, W, skin, coat, has, st });
   return m;
+}
+
+// MAP-2 E: everyone dresses for the endless winter — a knit beanie (or hood), a scarf, gloves, fur-trimmed
+// boots and a padded parka collar. Colours come from the survivor's id, so each keeps a look.
+const KNIT = [0xc0392b, 0x2f5fa8, 0xe0b23a, 0x3f7a4a, 0x8a4a8e, 0xe4e2da, 0x2a2f36, 0xd8743a];
+function winterWear(m, id, { top, hy, W, skin, coat, has, st }) {
+  let h = 0; for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const knit = KNIT[h % KNIT.length]; const knit2 = KNIT[(h >> 3) % KNIT.length];
+  const fur = 0xe9e1cf;
+  // Hands in gloves.
+  for (const x of [0 - W, 7 + W]) if (!has('gloves')) m.box(x, 4, 3, 1, 1, 2, 0x2b2f36);
+  // Fur cuffs on the boots.
+  for (const x of [2, 4]) m.box(x, 1, 3, 2, 1, 2, fur);
+  // Padded collar of the parka.
+  m.box(1 - W, top, 1, 6 + 2 * W, 1, 1, shade(coat, 0.85)); m.box(1 - W, top, 6, 1, 1, 1, fur); m.box(6 + W, top, 6, 1, 1, 1, fur);
+  // Scarf (if they had none): round the neck, one end down the chest.
+  if (!has('scarf')) { m.box(2, top, 6, 4, 1, 1, knit2); m.box(4, top - 3, 6, 1, 3, 1, knit2); }
+  // Head: a hood for those with goggles / masks, else a beanie with a fold and a pom-pom.
+  if (has('goggles') || has('mask')) {
+    m.box(0, hy, 0, 8, 7, 1, coat); m.box(0, hy, 0, 1, 7, 7, coat); m.box(7, hy, 0, 1, 7, 7, coat); m.box(0, hy + 6, 0, 8, 1, 7, coat);
+    for (let x = 0; x < 8; x++) m.set(x, hy + 6, 7, fur); m.box(0, hy, 7, 1, 6, 1, fur); m.box(7, hy, 7, 1, 6, 1, fur);
+  } else {
+    m.box(1, hy + 5, 1, 6, 1, 6, (x, _y, z) => (z === 6 || z === 1 || x === 1 || x === 6 ? shade(knit, 0.8) : knit)); // fold
+    m.box(1, hy + 6, 1, 6, 1, 6, knit); m.box(2, hy + 7, 2, 4, 1, 4, knit);
+    m.set(3, hy + 8, 3, fur); m.set(4, hy + 8, 3, fur); m.set(3, hy + 8, 4, fur); m.set(4, hy + 8, 4, fur); // pom-pom
+  }
+  void skin; void st;
 }
 
 /** A hunched, greenish zombie. variant 0..2 changes the rags. */
@@ -194,6 +222,10 @@ export function zombieModel(variant = 0) {
       return torn ? skin(x, yy, z) : rags;
     });
   }
+  // MAP-2 E: what is left of a winter coat — a torn hood or a frayed scarf, a few puffer stripes.
+  if (variant % 2 === 0) { m.box(1, 12, 3, 6, 1, 6, (x, _y, z) => (hash3(x, z, variant) > 0.3 ? 0x4a4f5a : null)); m.box(1, 10, 3, 1, 3, 5, 0x4a4f5a); m.box(6, 10, 3, 1, 3, 5, 0x4a4f5a); }
+  else { m.box(1, 9, 5, 6, 1, 3, 0x7a2f2a); m.box(5, 6, 8, 1, 3, 1, 0x7a2f2a); }
+  for (let y = 5; y <= 9; y += 2) m.box(1, y, 2 + Math.floor((y - 4) / 2), 1, 1, 4, shade(rags, 1.2));
   // Arms reaching forward at chest height.
   for (const x of [0, 7]) {
     m.box(x, 8, 4, 1, 2, 5, rags);

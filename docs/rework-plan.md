@@ -398,3 +398,8 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - Levels of detail by zoom: zoom ≥ 0.8 fine (2×) models, 0.5–0.8 the authored ones, below 0.5 half-resolution copies, coarser ground (1 world per cell), half-resolution trees and containers, and no cars, lamps, rocks or clutter.
 - Instanced bounds are recomputed after pop-in so culling is right; pins of places off screen are hidden and skip layout reads.
 - Stage 4 (69 blocks) whole-city view: ~0.84 M triangles drawn (was 7.4 M before the levels of detail), perf.cjs ok.
+
+### MAP-2 part E — winter clothes, item pictures, help (done)
+- Survivors wear a knit beanie with a pom-pom (a fur-trimmed hood for those with goggles or a mask), a scarf, gloves, fur boot cuffs and a padded parka collar; colours come from each survivor's id. Zombies have a torn hood or a frayed scarf and puffer stripes. Portraits are unchanged.
+- Item tiles without a picture of their own show a small voxel model of the item's type (can, med kit, bandage, jerry can, hammer, planks, bat, vest, book, flashlight, junk, figure, map), rendered once by the art studio and cached; a PNG in public/items/ still wins.
+- Help: a rules card for maps and the growing city (th + en); the day-2 tip no longer mentions naps. Test: help / tutorial text has no day limit, naps, scouting or fog.

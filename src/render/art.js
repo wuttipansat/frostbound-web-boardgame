@@ -3,6 +3,7 @@
 import { survivorModel, survivorModelHD, zombieModelV, zombieModelHD } from './characters.js';
 import { SURVIVORS_BY_ID } from '../content/survivors.js';
 import { ITEMS } from '../content/items.js';
+import { itemTypeModel } from './itemModels.js';
 
 export const ART_SIZES = { s: 64, l: 160 };
 
@@ -37,7 +38,7 @@ function probeItem(defId) {
   const probe = new Image();
   probe.onload = () => {
     itemArt.set(defId, 'ok');
-    for (const el of document.querySelectorAll(`img.art-item.blank[data-item="${defId}"]`)) { el.src = itemUrl(defId); el.classList.remove('blank'); }
+    for (const el of document.querySelectorAll(`img.art-item.blank[data-item="${defId}"]`)) { delete el.dataset.art; el.src = itemUrl(defId); el.classList.remove('blank'); }
   };
   probe.onerror = () => itemArt.set(defId, 'missing');
   probe.src = itemUrl(defId);
@@ -153,6 +154,7 @@ export function createArtStudio({ quality }) {
   function modelFor(kind, id) {
     if (kind === 'survivor') return survivorModelHD(SURVIVORS_BY_ID[id]);
     if (kind === 'zombie') return zombieModelHD(Number(id));
+    if (kind === 'item') return itemTypeModel(id).upscale(2); // MAP-2 E: one voxel model per item type
     throw new Error(`no model for ${kind}`);
   }
 
@@ -291,9 +293,13 @@ export function createArtStudio({ quality }) {
       el.alt = alt;
       el.decoding = 'async';
       el.dataset.item = defId;
-      if (itemArt.get(defId) === 'ok') el.src = itemUrl(defId);
-      else { el.classList.add('blank'); el.src = blankFrame(ITEMS[defId]?.type); probeItem(defId); }
-      return el;
+      if (itemArt.get(defId) === 'ok') { el.src = itemUrl(defId); return el; }
+      // No picture of its own (yet): the voxel model of its type, rendered once and cached.
+      const gen = img({ kind: 'item', id: ITEMS[defId]?.type ?? 'junk', size }, { cls: `sprite blank ${cls}`, alt });
+      gen.dataset.item = defId;
+      if (!gen.src) gen.src = blankFrame(ITEMS[defId]?.type);
+      probeItem(defId);
+      return gen;
     },
     /** Warm the cache in the background (e.g. small portraits for the current players). */
     prefetch(specs) { for (const s of specs) cache.get({ tier, size: 's', ...s }); },

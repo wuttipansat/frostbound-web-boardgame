@@ -1847,7 +1847,7 @@ body.radial-open #toasts { bottom: 250px; }
 .hand-head small { font-size: 12px; opacity: .75; } .hand-head small.away { color: #ffcf7a; opacity: 1; }
 .ic-art { position: relative; }
 .ic-art .ic-type-ico { display: none; position: absolute; inset: 0; margin: auto; width: 30px; height: 30px; color: var(--type, #cfd6e0); }
-.ic-art img.blank { opacity: 0; } .ic-art img.blank + .ic-type-ico { display: block; }
+.ic-art img.blank.pending { opacity: 0; } .ic-art img.blank.pending + .ic-type-ico { display: block; } /* MAP-2 E: the voxel picture of the item type shows once rendered */
 #pp-hand .pile-btn .count { white-space: nowrap; }
 @media (max-width: 760px) {
   #topbar .icon-btn { width: 44px !important; height: 44px !important; }

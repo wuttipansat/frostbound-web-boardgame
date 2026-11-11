@@ -133,3 +133,12 @@ test('upscale, bevel and the geometry cache', () => {
   assert.equal(a, b);
   assert.equal(geometryCacheSize(), 1);
 });
+
+test('every item type has a small voxel model for its tile picture', async () => {
+  const { itemTypeModel, ITEM_MODEL_TYPES } = await import('../src/render/itemModels.js');
+  const { ITEM_TYPES } = await import('../src/core/constants.js');
+  for (const t of ITEM_TYPES) {
+    assert.ok(ITEM_MODEL_TYPES.includes(t), `${t} has a model`);
+    assert.ok(itemTypeModel(t).voxels.size > 10, `${t} model has voxels`);
+  }
+});
