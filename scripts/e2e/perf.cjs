@@ -82,6 +82,34 @@ const BUDGET = { entry: 130, three: 135, initial: 300 }; // KB gzip
     if (passing && every < 4) problems.push(`covered screen still draws every ${every} frame(s)`);
     await ctx.close();
   }
+  // 4. MAP-3: a growing city on a phone: triangles and draw calls of the usual view, stage 1 → 4.
+  {
+    const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const p = await ctx.newPage();
+    p.on('pageerror', (e) => problems.push(`city: ${e.message}`));
+    await p.goto('http://localhost:4173/?snow=0&play=1&seed=21&tutorial=off');
+    await p.waitForFunction(() => window.__frostbound?.board && !window.__frostbound.board.pending, null, { timeout: 60000 });
+    const cards = p.locator('.draft-screen .sv-pick');
+    if (await cards.count()) { await cards.nth(0).click(); await cards.nth(1).click(); await p.locator('.draft-screen .btn.primary').first().click().catch(() => {}); }
+    await p.waitForTimeout(1000);
+    const look = () => p.evaluate(() => {
+      const f = window.__frostbound; f.board.flush(); f.stage.view.reset(); f.stage.step(0.016); f.stage.step(0.016);
+      const i = f.stage.renderer.info.render; return { stage: f.app.state.map.stage, calls: i.calls, tris: i.triangles };
+    });
+    report.city = [await look()];
+    for (let k = 0; k < 3; k++) {
+      await p.evaluate(() => { const f = window.__frostbound; const s = structuredClone(f.app.state); const uid = `map-perf${s.map.stage}`; s.cards[uid] = 'city-map-piece'; s.stockpile.push(uid); s.phase = 'turn'; s.pendingCrossroads = null; f.app.loadState(s); f.app.dispatch?.({ type: 'PLAY_CARD', cardUid: uid }); });
+      await p.waitForTimeout(3500);
+      report.city.push(await look());
+    }
+    // Budgets (triangles drawn incl. the shadow pass): stage 1 ≤ 0.8 M, any stage ≤ 1.0 M; draw calls guard against regressions.
+    for (const c of report.city) {
+      if (c.tris > (c.stage === 1 ? 0.8e6 : 1.0e6)) problems.push(`stage ${c.stage}: ${c.tris} triangles`);
+      if (c.calls > 260) problems.push(`stage ${c.stage}: ${c.calls} draw calls`);
+    }
+    if (report.city.at(-1).stage < 4) problems.push('city did not grow to stage 4');
+    await ctx.close();
+  }
   await b.close();
   console.log(JSON.stringify(report));
   console.log(problems.length ? `PROBLEMS:\n${problems.join('\n')}` : 'perf: ok, 0 problems');

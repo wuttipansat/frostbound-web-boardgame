@@ -809,7 +809,7 @@ export function createBoard({ progressive = false } = {}) {
     setSelected(id) { selected = id; },
     /** MAP-2 D: the camera zoom picks the level of detail of city models. */
     setZoom(z) {
-      const level = z >= 0.8 ? 0 : z >= 0.5 ? 1 : 2;
+      const level = z >= 0.8 ? 0 : z >= 0.56 ? 1 : 2; // MAP-3: a stage-4 overview (zoom ~0.5) uses the light level
       if (level === lodLevel) return;
       lodLevel = level;
       for (const n of lodNodes) { n.visible = lodShows(n.userData.lod, level); realize(n); }
