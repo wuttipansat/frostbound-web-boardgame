@@ -65,7 +65,9 @@ test('baked pack round trip gives the same geometry as runtime meshing', () => {
 test('the baked pack stays small (when built)', () => {
   const f = `public/${PACK_FILE}`;
   if (!fs.existsSync(f)) return;
-  assert.ok(fs.statSync(f).size <= 3e6, `pack ${fs.statSync(f).size} bytes`);
+  const gz = Buffer.from(fs.readFileSync(f, 'utf8'), 'base64');
+  assert.ok(gz.length <= 3e6, `pack ${gz.length} bytes gzip`);
+  assert.ok(decodePack(zlib.gunzipSync(gz)).size > 50, 'pack decodes');
 });
 
 test('progressive board: colony and ground first, the rest made in small steps, same result', async () => {

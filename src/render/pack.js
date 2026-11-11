@@ -1,8 +1,9 @@
 // LOAD-1: the baked model pack. scripts/bake-models.mjs writes it at build time (quad records per model build);
 // the game fetches it once at start, so models it covers need no voxels and no meshing.
-// Layout: Uint32 header length | header JSON | padding to 4 | Int16 quad data.
+// Layout: Uint32 header length | header JSON | padding to 4 | Int16 quad data; the file is that, gzipped, as base64
+// text (hosts that only serve web types, e.g. artifacts, accept .txt).
 
-export const PACK_FILE = 'models.bin';
+export const PACK_FILE = 'models-pack.txt';
 
 /** entries: Map ck -> { lit, glow (Int16Array|null), palette { rgb, glow }, off, min, max } -> bytes */
 export function encodePack(entries) {
@@ -44,7 +45,10 @@ export async function loadPack(url = PACK_FILE) {
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
-    let buf = new Uint8Array(await res.arrayBuffer());
+    const b64 = (await res.text()).trim();
+    const bin = atob(b64);
+    let buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
     if (buf[0] === 0x1f && buf[1] === 0x8b) {
       if (typeof DecompressionStream === 'undefined') return null;
       buf = new Uint8Array(await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
