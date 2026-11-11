@@ -159,6 +159,48 @@ function streetSegments(roadKeys, layout) {
   return out;
 }
 
+/** MAP-3: a decoration block with nothing built on it (a square, a lawn, an empty lot): about a quarter of them. */
+export const openBlock = (b, bx, bz) => RECIPES[b.kind] && b.kind !== 'place' && hash3(bx, 71, bz) < 0.25;
+
+/**
+ * MAP-3 calmer blocks: the chunks of a block that get something, as [row, column, what]. Built things (the place or
+ * centrepiece and 1–2 pieces) stay inside one 3×2 window at the front; other chunks are open, now and then with one
+ * bench or one tree. Seeded by the block, so a block never changes.
+ */
+export function blockPieces(b, bx, bz, plan, recipe = RECIPES[b.kind] ?? RECIPES.place) {
+  const out = [];
+  const h = (k) => hash3(bx * 7 + k, 73, bz * 7 - k);
+  const cols = plan.covered.map((c) => +c.split(',')[1]);
+  // The window's first column: it must hold every column the place / centrepiece covers.
+  const first = cols.length ? Math.max(0, Math.max(...cols) - 2) : 0;
+  const last = cols.length ? Math.min(Math.min(...cols), plan.cols - 3) : plan.cols - 3;
+  const w0 = first + Math.floor(h(1) * (last - first + 1));
+  const win = [];
+  for (let i = 0; i < 2; i++) for (let j = w0; j < w0 + 3; j++) if (!plan.covered.includes(`${i},${j}`)) win.push([i, j]);
+  win.sort((a, c) => a[0] - c[0] || hash3(bx + a[1], 75, bz) - hash3(bx + c[1], 75, bz)); // front row first
+  const built = plan.covered.length; // chunks already taken by the place / centrepiece
+  let n;
+  if (b.kind === 'place') n = built >= 4 ? (h(2) < 0.75 ? 1 : 2) : 2;
+  else if (openBlock(b, bx, bz)) n = 0;
+  else n = built ? 1 : 2; // 1–2 pieces, counting the centrepiece
+  n = Math.min(n, 6 - built, win.length);
+  const used = new Set();
+  for (let k = 0; k < n; k++) {
+    const [i, j] = win[k];
+    out.push([i, j, pickBy(recipe, hash3(bx * 3 + j, 61 + i, bz * 3 + i))]);
+    used.add(`${i},${j}`);
+  }
+  // Open chunks: one bench or one tree in some of them.
+  for (let i = 0; i < plan.rows; i++) for (let j = 0; j < plan.cols; j++) {
+    const k = `${i},${j}`;
+    if (used.has(k) || plan.covered.includes(k)) continue;
+    const r = hash3(bx * 11 + j, 79 + i, bz * 11 + i);
+    if (r < 0.14) out.push([i, j, 'bench']);
+    else if (r < (b.kind === 'park' ? 0.6 : 0.3)) out.push([i, j, 'tree']);
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- decorations
 
 /** make: () => VoxelModel, only called when the geometry is neither cached nor baked. */
@@ -303,8 +345,9 @@ export function createBoard({ progressive = false } = {}) {
     const near = streets.filter(([a, b]) => Math.min(a.x, b.x) < cx + hx + 4 && Math.max(a.x, b.x) > cx - hx - 4 && Math.min(a.z, b.z) < cz + hz + 4 && Math.max(a.z, b.z) > cz - hz - 4);
     // MAP-1c: built-up blocks are flat and paved; parks and the rail yard keep their snowdrifts.
     const blocksNear = [];
-    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const b = map.blocks[`${bx + dx},${bz + dz}`]; if (b) blocksNear.push([blockPos(bx + dx), blockPos(bz + dz), b.kind, ...edgesOf(bx + dx, bz + dz)]); }
-    const paved = (x, z) => blocksNear.some(([px, pz, k, ex, ez]) => k !== 'colony' && k !== 'park' && k !== 'rail' && Math.abs(x - px) < ex + 0.4 && Math.abs(z - pz) < ez + 0.4);
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const b = map.blocks[`${bx + dx},${bz + dz}`]; if (b) blocksNear.push([blockPos(bx + dx), blockPos(bz + dz), b.kind, ...edgesOf(bx + dx, bz + dz), !(openBlock(b, bx + dx, bz + dz) && b.kind !== 'plaza' && hash3(bx + dx, 77, bz + dz) < 0.5)]); }
+    // Snowy empty lots (some open blocks) are not paved.
+    const paved = (x, z) => blocksNear.some(([px, pz, k, ex, ez, pv]) => pv && k !== 'colony' && k !== 'park' && k !== 'rail' && Math.abs(x - px) < ex + 0.4 && Math.abs(z - pz) < ez + 0.4);
     // Zebra crossings next to street junctions (3+ streets meet).
     const deg = new Map();
     for (const [a, b2, seg] of near) if (seg !== 'gate') for (const p of [a, b2]) { const k = `${p.x},${p.z}`; deg.set(k, (deg.get(k) ?? 0) + 1); }
@@ -419,11 +462,11 @@ export function createBoard({ progressive = false } = {}) {
           const at = plan.center.clone();
           if (cp[0] === 'ruinBig') put(ruins[1], at, face0, PLACE_SCALE); else put(pieces[cp[0]], at, face0, PLACE_SCALE);
         }
-        for (let i = 0; i < plan.rows; i++) for (let j = 0; j < plan.cols; j++) {
-          if (plan.covered.includes(`${i},${j}`)) continue;
+        // MAP-3 calmer blocks: everything built (place / centrepiece + pieces) fits in a 3×2 window at the street side;
+        // the other chunks stay open (paving or snow, now and then one bench or one tree).
+        for (const [i, j, what] of blockPieces(b, bx, bz, plan, recipe)) {
           const p = chunkCenter(plan, i, j);
           const r2 = hash3(bx * 5 + i, 67, bz * 5 + j);
-          const what = pickBy(recipe, hash3(bx * 3 + j, 61 + i, bz * 3 + i));
           // Front-row buildings face the street; others any way.
           const face = i === 0 ? face0 : Math.floor(r2 * 4) * (Math.PI / 2);
           if (what === 'house' || what === 'shop') {
@@ -434,7 +477,9 @@ export function createBoard({ progressive = false } = {}) {
               const q = p.clone().add(new THREE.Vector3((hash3(k, bx, j) - 0.5) * 4, 0, (hash3(k, bz, i) - 0.5) * 4));
               put(trees[Math.floor(hash3(k, i, j) * 3)], q, k, 0.7 + hash3(j, k, i) * 0.5);
             }
-          } else if (what === 'car') {
+          } else if (what === 'tree') put(trees[Math.floor(r2 * 3)], p.clone().add(new THREE.Vector3((r2 - 0.5) * 3, 0, (hash3(i, j, 5) - 0.5) * 3)), r2 * 6, 0.8 + r2 * 0.4);
+          else if (what === 'bench') put(clutter[CLUTTER_KINDS - 1], p.clone().addScaledVector(plan.fwd, CHUNK * 0.35), face0 + Math.PI);
+          else if (what === 'car') {
             put(cars[Math.floor(r2 * 4)], p.clone().addScaledVector(plan.side, -1.3), face + Math.PI / 2);
             put(cars[Math.floor(hash3(i, j, bx) * 4)], p.clone().addScaledVector(plan.side, 1.3), face + Math.PI / 2);
           } else if (what === 'yard') {
@@ -442,7 +487,7 @@ export function createBoard({ progressive = false } = {}) {
             put(yards[Math.floor(hash3(j, i, bz) * 3)], p.clone().addScaledVector(plan.fwd, 1.4), face);
           } else if (what === 'ruin') put(ruins[Math.floor(r2 * 2)], p, face, PLACE_SCALE);
           else if (what === 'rocks') { for (let k = 0; k < 2; k++) put(rocks[k], p.clone().add(new THREE.Vector3((k - 0.5) * 3, 0, (r2 - 0.5) * 3)), r2 * 6, 0.9); }
-          else for (let k = 0; k < 3; k++) put(clutter[Math.floor(hash3(k, i + bx, j + bz) * CLUTTER_KINDS)], p.clone().add(new THREE.Vector3((hash3(k, 3, j) - 0.5) * 4, 0, (hash3(k, 5, i) - 0.5) * 4)), hash3(k, i, j) * 6);
+          else for (let k = 0; k < 2; k++) put(clutter[Math.floor(hash3(k, i + bx, j + bz) * (CLUTTER_KINDS - 1))], p.clone().add(new THREE.Vector3((hash3(k, 3, j) - 0.5) * 4, 0, (hash3(k, 5, i) - 0.5) * 4)), hash3(k, i, j) * 6);
         }
         continue;
       }
@@ -476,7 +521,7 @@ export function createBoard({ progressive = false } = {}) {
           tmp.position.copy(at(t, lat)); tmp.rotation.set(0, Math.atan2(side.x * Math.sign(lat), side.z * Math.sign(lat)) - Math.PI / 2, 0); tmp.scale.setScalar(1); tmp.updateMatrix();
           lamps.push(tmp.matrix.clone());
         }
-        for (let k = 0; k < 2; k++) if (h(10 + k) < 0.7) { // cones, crates, barrels, bags, barriers on the sidewalk
+        for (let k = 0; k < 2; k++) if (h(10 + k) < 0.35) { // cones, crates, barrels, bags, barriers on the sidewalk
           tmp.position.copy(at(0.15 + h(12 + k) * 0.7, (k ? -1 : 1) * (ROAD.walk - 0.9))); tmp.rotation.set(0, h(14 + k) * 6, 0); tmp.updateMatrix();
           clutter[Math.floor(h(16 + k) * (CLUTTER_KINDS - 1))].push(tmp.matrix.clone());
         }

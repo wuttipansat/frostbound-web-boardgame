@@ -16,7 +16,7 @@ export function carModel(v = 0) {
   m.set(6, 2, -2, 0xfff1c2, v % 2 === 1); m.set(6, 2, 2, 0xfff1c2, v % 2 === 1); // headlights (one car still has them on)
   m.set(-5, 2, -2, P.red); m.set(-5, 2, 2, P.red);
   if (v === 2) m.box(0, 5, 0, 2, 1, 1, 0x1c1f24);  // taxi sign
-  m.snowCap(P.snow, 0.95);
+  m.snowCap(P.snow, 1);
   return m.upscale(2).bevel(0.3, { topOnly: true, seed: v });
 }
 
@@ -41,7 +41,7 @@ export function containerModel(v = 0, stack = 1) {
     for (let x = -6; x <= 6; x += 2) { m.set(x, y + 2, -3, c); m.set(x, y + 2, 3, c); } // ribs
     m.box(7, y + 1, -1, 1, 3, 3, 0x1c1f24); // doors
   }
-  m.snowCap(P.snow, 0.95);
+  m.snowCap(P.snow, 1);
   // Drift against one side.
   for (let x = -6; x <= 6; x++) if (hash3(x, v, 3) < 0.7) m.set(x, 0, -3, P.snow);
   return m.upscale(2);
@@ -58,7 +58,7 @@ export function clutterModel(k = 0) {
   else if (k === 3) { for (const [x, z, h] of [[-1, 0, 2], [1, 0, 3], [0, 1, 2]]) m.box(x, 0, z, 2, h, 2, 0x22262c); }
   else if (k === 4) { m.box(-3, 0, 0, 7, 1, 2, 0xa3adb8); m.box(-3, 1, 0, 7, 2, 1, 0xa3adb8); m.box(-2, 2, 0, 2, 1, 1, 0xe6e6e0); m.box(1, 2, 0, 2, 1, 1, 0xc0392b); }
   else { m.box(-3, 1, 0, 7, 1, 2, 0x7a5a3a); m.box(-3, 2, 1, 7, 2, 1, 0x7a5a3a); m.set(-3, 0, 0, 0x2a2f36); m.set(3, 0, 0, 0x2a2f36); }
-  m.snowCap(P.snow, 0.9);
+  m.snowCap(P.snow, 1);
   return m.upscale(2);
 }
 export const CLUTTER_KINDS = 6;

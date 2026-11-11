@@ -189,7 +189,7 @@ function graffiti(m, x, y, z, seed) {
   for (let i = 0; i < 9; i++) for (let j = 0; j < 3; j++) if (hash3(i, j, seed) < 0.55) m.set(x + i, y + j, z, cols[(i + seed) % 4]);
 }
 
-function dust(m) { return m.snowCap(P.snow, 0.7, 2); }
+function dust(m) { return m.snowCap(P.snow, 1, 2); }
 
 // ---------------------------------------------------------------- the six places
 
@@ -360,7 +360,7 @@ export function colony(R = 30) {
   for (const [dx, dz] of [[0, 0], [5, 0], [0, 5], [5, 5]]) m.box(wx + dx, 1, wz + dz, 1, 16, 1, P.woodDark);
   m.box(wx - 1, 17, wz - 1, 8, 1, 8, P.wood); m.walls(wx - 1, 18, wz - 1, 8, 2, 8, P.woodLight); m.set(wx + 2, 20, wz + 2, P.fire, true);
   for (const [x, z] of [[8, -6], [10, -6], [8, -4]]) m.box(x, 1, z, 2, 2, 2, 0x8a5a2b);
-  return m.snowCap(P.snow, 0.8, 2);
+  return m.snowCap(P.snow, 1, 2);
 }
 
 /** Filler block: a fenced parking lot with painted bays and a couple of wrecks. */
@@ -378,7 +378,7 @@ export function parkingLot() {
   car(10, 2, 0xa63a2e); car(28, 2, 0x2b4170); car(19, d - 13, 0xd8b03a); car(37, d - 13, 0xe4e2da);
   // A container stack in the corner.
   for (let y = 0; y < 2; y++) m.box(42, 1 + y * 8, 18, 12, 8, 7, C.cont[y]);
-  return m.snowCap(P.snow, 0.75, 1);
+  return m.snowCap(P.snow, 1, 1);
 }
 
 /** Filler block: stacked shipping containers, crates and barrels. */
@@ -400,7 +400,7 @@ export function containerYard() {
   }
   for (const [x, z] of [[2, 40], [5, 42], [50, 2]]) m.box(x, 1, z, 3, 3, 3, 0x8a5a2b);
   for (const [x, z] of [[30, 40], [33, 41]]) m.box(x, 1, z, 2, 4, 2, 0x2f5fa8);
-  return m.snowCap(P.snow, 0.75, 1);
+  return m.snowCap(P.snow, 1, 1);
 }
 
 // ---------------------------------------------------------------- MAP-1: places found as the city grows
@@ -499,7 +499,7 @@ export function plaza() {
     m.box(x, 1, z, 7, 1, 2, 0x7a5a3a); m.box(x, 2, z + (r ? 0 : 1), 7, 2, 1, 0x7a5a3a);
   }
   for (const [x, z] of [[4, 4], [50, 4], [4, 42], [50, 42]]) { m.box(x, 1, z, 1, 9, 1, 0x4b3a2c); m.box(x - 2, 7, z, 5, 1, 1, 0x4b3a2c); m.box(x, 8, z - 2, 1, 1, 5, 0x4b3a2c); }
-  return m.snowCap(P.snow, 0.8, 1);
+  return m.snowCap(P.snow, 1, 1);
 }
 
 /** A snowed-in park: pines, a frozen pond, a playground frame. */
@@ -516,7 +516,7 @@ export function park() {
   for (const x of [16, 26]) m.box(x, 1, 40, 1, 8, 1, C.metal);
   m.box(16, 8, 40, 11, 1, 1, C.metal);
   m.box(19, 2, 40, 1, 6, 1, C.metalDark); m.box(23, 2, 40, 1, 6, 1, C.metalDark);
-  return m.snowCap(P.snow, 0.8, 1);
+  return m.snowCap(P.snow, 1, 1);
 }
 
 /** A collapsed building: broken walls, rubble, a bent girder. */
@@ -532,7 +532,7 @@ export function ruins() {
     m.box(x, 1, z, 2, 1 + Math.floor(hash3(i, 3, 9) * 3), 2, hash3(i, 4, 9) < 0.5 ? C.greyDark : C.grey);
   }
   for (let k = 0; k < 14; k++) m.set(40 + Math.floor(k / 3), 1 + k, 20, C.rust);
-  return m.snowCap(P.snow, 0.75, 1);
+  return m.snowCap(P.snow, 1, 1);
 }
 
 /** A rail yard: two tracks, a boxcar, a signal. */
@@ -546,7 +546,7 @@ export function railYard() {
   m.box(10, 3, 29, 24, 9, 7, C.cont[0]); m.box(10, 12, 29, 24, 1, 7, C.roofDark);
   m.clearBox(20, 4, 35, 4, 7, 1);
   m.box(44, 1, 22, 1, 14, 1, C.metalDark); m.box(43, 13, 22, 3, 3, 1, 0x15191e); m.set(44, 14, 23, C.neonRed, true);
-  return m.snowCap(P.snow, 0.75, 1);
+  return m.snowCap(P.snow, 1, 1);
 }
 
 // ---------------------------------------------------------------- MAP-1b: small buildings that fill a block's free chunks
@@ -582,7 +582,7 @@ export function parkingSmall() {
   car(3, 2, 0xa63a2e); car(19, 2, 0x2b4170); car(27, d - 12, 0xd8b03a); car(35, d - 12, 0xe4e2da);
   m.box(x0 + 2, 1, z0 + 20, 6, 7, 6, C.cream); m.box(x0 + 2, 8, z0 + 20, 6, 1, 6, C.roofDark); m.box(x0 + 7, 3, z0 + 21, 1, 3, 4, C.glassLit, true); // booth
   for (let y = 0; y < 2; y++) m.box(x0 + 32, 1 + y * 7, z0 + 18, 12, 7, 6, C.cont[(y + 1) % 3]);
-  return m.snowCap(P.snow, 0.75, 1);
+  return m.snowCap(P.snow, 1, 1);
 }
 
 /** A small square (1 chunk): paving ring, a frozen fountain, two benches. Centred. */
@@ -595,7 +595,7 @@ export function fountain() {
   }
   m.box(-1, 1, -1, 2, 5, 2, C.trim); m.box(-2, 6, -2, 4, 1, 4, C.trim); m.set(0, 7, 0, 0xbfe3f5);
   for (const z of [-9, 8]) { m.box(-3, 1, z, 6, 1, 1, 0x7a5a3a); m.box(-3, 2, z + (z < 0 ? 0 : 0), 6, 1, 1, 0x7a5a3a); }
-  return m.snowCap(P.snow, 0.8, 1);
+  return m.snowCap(P.snow, 1, 1);
 }
 
 /** A small burnt-out building (1 chunk): two broken walls, a fallen slab, rubble. Centred. */
@@ -618,7 +618,7 @@ export function ruinSmall(v = 0) {
   }
   for (let k = 0; k < 8; k++) m.set(x0 + 4 + k, 1 + k, z0 + 6, C.rust); // bent girder
   moss(m, x0, z0, w, d, 10, 70 + v);
-  return m.snowCap(P.snow, 0.75, 1);
+  return m.snowCap(P.snow, 1, 1);
 }
 
 // ---------------------------------------------------------------- MAP-2 B: 2× city models
