@@ -214,8 +214,8 @@ const DISTRICT_RECIPES = {
   residential: [['house', 55], ['trees', 22], ['car', 15], ['clutter', 8]],
   industrial: [['yard', 50], ['ruin', 15], ['car', 15], ['house', 10], ['clutter', 10]],
 };
-// Small building variants by district (city.smallBuilding: floors = 1 + (3v mod 4); even v have shopfronts).
-const DISTRICT_SMALL = { downtown: [2, 6, 1, 5], residential: [0, 3, 4, 7], industrial: [3, 7, 4] };
+// Small building variants by district (city.smallBuilding: floors = 2 + v mod 3; even v with ≤ 3 floors have shopfronts).
+const DISTRICT_SMALL = { downtown: [2, 4, 5, 7, 1], residential: [0, 3, 6, 1], industrial: [3, 6, 0] };
 
 /** MAP-3: a decoration block with nothing built on it (a square, a lawn, an empty lot): about a quarter of them. */
 export const openBlock = (b, bx, bz) => RECIPES[b.kind] && b.kind !== 'place' && hash3(bx, 71, bz) < 0.25;
@@ -949,7 +949,7 @@ export function createBoard({ progressive = false } = {}) {
     // beside it on their sides; a warning sign and a buffer stop where the line ends at the city's edge.
     const slabs = rail.pieces.filter((p) => p[2] === 'slab').sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]) || a[0] - b[0]);
     const kinds = ['box', 'tank', 'hopper'];
-    const wagons = { box: [], tank: [], hopper: [] };
+    const wagons = { box: [], tank: [], hopper: [] }; const lying = [];
     const blocksOnRow = rail.pieces.filter((p) => p[2] === 'slab');
     const pick = blocksOnRow[Math.floor(hash3(rail.look, 7, 3) * blocksOnRow.length)] ?? slabs[0];
     const [s0, s1] = pick;
@@ -958,13 +958,14 @@ export function createBoard({ progressive = false } = {}) {
       const kind = kinds[Math.floor(hash3(k, rail.look, 9) * 3)];
       const t = s0 + 0.8 + 6.3 + k * 12.6;
       const over = k >= n - 1 && n > 1;
-      const [x, z, yaw] = placeOnRail(rail, t, over ? 1.7 : 0);
-      tmp.position.set(x, GROUND + (over ? 1.35 : 0.16), z);
-      // Overturned: rolled onto its side (about the track direction), slightly skewed.
-      tmp.rotation.set(over ? -Math.PI / 2 : 0, yaw + (over ? 0.12 : 0), 0, 'YXZ'); tmp.scale.setScalar(1); tmp.updateMatrix();
-      wagons[kind].push(tmp.matrix.clone());
+      // The last wagon lies on its side beside the track (a model built lying down), slightly skewed.
+      const [x, z, yaw] = placeOnRail(rail, t, over ? 0.6 : 0);
+      tmp.position.set(x, GROUND + (over ? 0 : 0.16), z);
+      tmp.rotation.set(0, yaw + (over ? 0.08 : 0), 0); tmp.scale.setScalar(1); tmp.updateMatrix();
+      if (over) lying.push([kind, tmp.matrix.clone()]); else wagons[kind].push(tmp.matrix.clone());
     }
     for (const k of kinds) if (wagons[k].length) decor.add(instanced(() => wagonModel(k, rail.look % 5), 0.3, wagons[k], { cacheKey: `wagon-${k}-${rail.look % 5}`, jitter: 0 }));
+    for (const [k, mx] of lying) decor.add(instanced(() => wagonModel(k, rail.look % 5, true), 0.3, [mx], { cacheKey: `wagon-lying-${k}-${rail.look % 5}`, jitter: 0 }));
     // Buffer stops at both ends of the line, with a warning sign.
     const ends = [rail.pieces[0][0] + 0.6, rail.pieces[rail.pieces.length - 1][1] - 0.6];
     ends.forEach((t, i) => {

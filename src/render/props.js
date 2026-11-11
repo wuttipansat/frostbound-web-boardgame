@@ -2,6 +2,7 @@
 // Small voxel models (built once, instanced). Every one gets a rounded snow cap.
 import { VoxelModel, hash3 } from './voxel.js';
 import { P } from './palette.js';
+import { containerBox, CONTAINER_TONES } from './city.js';
 
 const CAR_COLORS = [0x8e2b2b, 0x2f5fa8, 0xd8b03a, 0xe4e2da];
 /** A car under snow (variant 0..3: red sedan, blue hatch with headlights on, yellow taxi, white van with headlights on). */
@@ -36,21 +37,18 @@ export function lampModel(dead = false) {
   return m;
 }
 
-const CONTAINER_COLORS = [0x8e2f27, 0x24365c, 0x2f5a3f];
 /** A shipping container (ribbed sides); `stack` = how many on top of each other. */
 export function containerModel(v = 0, stack = 1) {
+  // MAP-3: the same detailed container as the colony walls (corrugation, castings, door bars, stencil, rust), stacked
+  // a little untidily, with snow flat on top and a drift along one side.
   const m = new VoxelModel();
   for (let k = 0; k < stack; k++) {
-    const c = CONTAINER_COLORS[(v + k) % 3];
-    const y = k * 5;
-    m.box(-6, y, -2, 13, 5, 5, c);
-    for (let x = -6; x <= 6; x += 2) { m.set(x, y + 2, -3, c); m.set(x, y + 2, 3, c); } // ribs
-    m.box(7, y + 1, -1, 1, 3, 3, 0x1c1f24); // doors
+    const off = k ? 1 + Math.floor(hash3(v, k, 5) * 3) : 0;
+    containerBox(m, -13 + off, 1 + k * 8, -4 + (k ? (v % 2 ? 1 : -1) : 0), 26, true, CONTAINER_TONES[(v * 2 + k) % 5], v * 11 + k, { skew: k && v % 2 ? 1 : 0, door: v % 2 ? 1 : -1 });
   }
-  m.snowCap(P.snow, 1);
-  // Drift against one side.
-  for (let x = -6; x <= 6; x++) if (hash3(x, v, 3) < 0.7) m.set(x, 0, -3, P.snow);
-  return m.upscale(2);
+  for (let x = -13; x < 13; x++) if (hash3(x, v, 3) < 0.8) { m.set(x, 0, -5, P.snow); if (hash3(x, v, 4) < 0.5) m.set(x, 1, -5, P.snow); }
+  m.box(-13, 0, -4, 26, 1, 7, P.snowShade);
+  return m.snowCap(P.snow, 1, 1);
 }
 
 // ---------------------------------------------------------------- MAP-1c: street clutter (instanced)
@@ -84,7 +82,7 @@ export function crossingModel(up = false) {
 }
 
 /** A goods wagon (0.3 world per voxel, length 40 along x): 'box' = a container on a flatcar, 'tank', 'hopper'. */
-export function wagonModel(kind = 'box', v = 0) {
+export function wagonModel(kind = 'box', v = 0, lying = false) {
   const m = new VoxelModel();
   const L = 40; const x0 = -20;
   m.box(x0, 2, -4, L, 2, 9, 0x2a2d31);                         // underframe
@@ -106,7 +104,13 @@ export function wagonModel(kind = 'box', v = 0) {
     }
     for (let t = 6; t < L - 8; t++) if (hash3(t, v, 3) < 0.5) m.set(x0 + 1 + t, 9, 5, 0xd9d2bf); // faded stencil
   }
-  return m.snowCap(P.snow, 1, 3);
+  if (!lying) return m.snowCap(P.snow, 1, 3);
+  // Overturned: rolled onto its side in voxel space (y → −z), so its side wall is the new top and snow lies on it;
+  // the wheels face the track, half sunk in the snow.
+  const out = new VoxelModel();
+  for (const p of m.voxels.values()) { if (p.y < 2) continue; out.set(p.x, p.z + 5, -(p.y - 2), p.color, p.glow); }
+  out.box(x0 - 1, 0, -14, L + 2, 1, 16, P.snow); // a drift around it
+  return out.snowCap(P.snow, 1, 1);
 }
 
 /** A small station shelter (0.1 world per voxel): platform slab, posts, a roof, a bench and a name board. */

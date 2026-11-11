@@ -142,7 +142,7 @@ function shopfront(m, x0, z0, w, d, seed) {
     }
     if ((x - x0 - 2) % 7 === 0) for (let y = 1; y < 8; y++) m.set(x, y, z + 1, C.trim);
     m.set(x, 7, z + 1, tones[seed % 4]); m.set(x, 8, z + 1, tones[seed % 4]); // signboard band
-    if (hash3(bay, 3, seed) < 0.5) for (let k = 0; k < 2; k++) m.set(x, 9 - k, z + 2 + k, Math.floor(x / 2) % 2 ? C.red : C.trim); // striped awning
+    if (hash3(bay, 3, seed) < 0.5) for (let k = 0; k < 2; k++) m.set(x, 8, z + 2 + k, Math.floor(x / 2) % 2 ? C.red : C.trim); // striped awning: a flat sheet (snow lies flat on it)
   }
   m.box(x0 + 1, 6, z + 1, w - 2, 1, 1, C.trim);
 }
@@ -238,7 +238,7 @@ export function groceryStore() {
   m.box(15, 8, d, 11, 1, 5, C.creamDark); m.box(15, 7, d + 4, 11, 1, 1, C.red);
   for (const x of [15, 25]) m.box(x, 1, d + 4, 1, 7, 1, C.metalDark);
   // Striped awnings over the shop bays.
-  for (let x = 1; x < w - 1; x++) if (x < 15 || x > 25) for (let k = 0; k < 3; k++) m.set(x, 9 - k, d + k, Math.floor(x / 3) % 2 ? C.red : C.trim);
+  for (let x = 1; x < w - 1; x++) if (x < 15 || x > 25) for (let k = 0; k < 3; k++) m.set(x, 9, d + k, Math.floor(x / 3) % 2 ? C.red : C.trim); // flat striped awning
   neon(m, 'MART', 21, 12, d, C.neonGreen, 2);
   // Posters and price tags in the windows.
   for (const [x, c] of [[4, C.neonWarm], [9, C.red], [31, 0x2f5fa8], [36, C.neonWarm]]) m.box(x, 3, d, 2, 2, 1, c);
@@ -815,8 +815,8 @@ const SMALL_WALLS = [C.sage, C.cream, C.grey, C.brick, C.ochre, 0x8fa3b8, 0xb9a4
 export function smallBuilding(v = 0) {
   const m = new VoxelModel();
   const w = 16 + (v % 3) * 2; const d = 14 + (v % 2) * 3;
-  const floors = 1 + ((v * 3) % 4);
-  block(m, { x0: -Math.floor(w / 2), z0: -Math.floor(d / 2), w, d, floors, wall: SMALL_WALLS[v % SMALL_WALLS.length], seed: 50 + v, shop: floors <= 2 && v % 2 === 0 });
+  const floors = 2 + (v % 3); // MAP-3: at least two floors (a one-floor shop read as an empty box)
+  block(m, { x0: -Math.floor(w / 2), z0: -Math.floor(d / 2), w, d, floors, wall: SMALL_WALLS[v % SMALL_WALLS.length], seed: 50 + v, shop: floors <= 3 && v % 2 === 0 });
   if (v % 4 === 1) graffiti(m, -Math.floor(w / 2) + 2, 2, Math.ceil(d / 2), v);
   return dust(m);
 }
