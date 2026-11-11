@@ -10,7 +10,8 @@ const t0 = Date.now();
 const rec = new Map();
 recordQuads(rec);
 await collect();
-const keep = new Map([...rec].filter(([ck]) => !ck.startsWith('flame|')));
+// Left out (meshed at runtime when needed): the flame, and the fine level of upgraded colony walls (rare, big).
+const keep = new Map([...rec].filter(([ck]) => !ck.startsWith('flame|') && !/^lod0-colony-w[123]\|/.test(ck)));
 const raw = encodePack(keep);
 const gz = zlib.gzipSync(raw, { level: 9 });
 fs.mkdirSync('public', { recursive: true });

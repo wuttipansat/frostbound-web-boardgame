@@ -304,64 +304,179 @@ export function gasStation() {
 // ---------------------------------------------------------------- the colony and the filler blocks
 
 /** The colony: a square wall of stacked shipping containers, barricaded gates, the bonfire, huts, tents and a watch post. */
+// ---------------------------------------------------------------- MAP-3 C: containers and the colony
+
+/** Muted container colours: rust red, navy, olive, teal, faded orange. */
+export const CONTAINER_TONES = [0x8e3a2c, 0x2b3a5c, 0x5d6b3a, 0x2f6b6b, 0xb8682f];
+const dim = (c, k) => { const r = (c >> 16) & 255; const g = (c >> 8) & 255; const b = c & 255; return (Math.round(r * k) << 16) | (Math.round(g * k) << 8) | Math.round(b * k); };
+
 /**
- * The colony's base (MAP-3): a container wall with 4 gates, the packed-snow yard and the fire ring. Buildings stand in
- * their own slots (colonySlot). wall = the "wall" upgrade (0..3): a second container layer, then towers on the corners.
+ * A detailed shipping container (authored grid): corrugated sides (light/dark ribs), dark corner castings, top and
+ * bottom rails, a door end with 4 locking bars and handles, a faded stencil band, rust streaks, roof dents.
+ * Runs `len` along x (alongX) or z from (x0, y0, z0); 7 wide, 8 high. skew: the far half sits 1 voxel over.
+ */
+export function containerBox(m, x0, y0, z0, len, alongX, color, seed = 0, { skew = 0, door = 1 } = {}) {
+  const dark = dim(color, 0.72); const rail = dim(color, 0.55); const rust = 0x7a3b22; const stencil = 0xd9d2bf;
+  for (let t = 0; t < len; t++) {
+    const sk = skew && t >= len / 2 ? skew : 0;
+    const streak = hash3(t, seed, 5) < 0.12;
+    const dent = hash3(t, seed, 9) < 0.1;
+    for (let k = 0; k < 7; k++) for (let y = 0; y < 8; y++) {
+      const end = t === 0 || t === len - 1; const side = k === 0 || k === 6; const cap = y === 0 || y === 7;
+      if (dent && y === 7 && !side && !end) continue; // a dent in the roof
+      let c;
+      if (end && side && cap) c = 0x1c1f24;                              // corner castings
+      else if (cap) c = rail;                                            // top / bottom rails
+      else if (end) {
+        const doorEnd = (t === len - 1) === (door > 0);
+        c = doorEnd && (k === 2 || k === 4) ? (y === 3 ? 0x9aa0a6 : 0x2a2d31) : doorEnd && k === 3 ? dark : dim(color, 0.85);
+      } else if (side) {
+        c = t % 2 ? color : dark;                                        // corrugation
+        if (y === 5 && t > 2 && t < len - 3 && hash3(t, seed + k, 7) < 0.55) c = stencil; // faded stencil band
+        else if (streak && y >= 2 && y <= 5 && t % 2) c = rust;          // rust streak under a seam
+      } else c = y === 6 ? color : dark;
+      const x = alongX ? x0 + t : x0 + k + sk; const z = alongX ? z0 + k + sk : z0 + t;
+      m.set(x, y0 + y, z, c);
+    }
+  }
+  return m;
+}
+
+/** Starter container houses (voxel centres, inside the wall; front faces +z / −z towards the fire's side). */
+export const COLONY_HOUSES = [[18, 18], [-18, -18]];
+/** Yard dressing: [kind, x, z, half-width x, half-depth z] in colony voxels (wall radius 50). */
+export const COLONY_PROPS = [
+  ['logs', 13, -13, 3, 2], ['logs', 17, -10, 2, 3], ['woodpile', 21, -21, 4, 2], ['generator', 24, -13, 2, 2], ['barrel-fire', 17, -24, 1, 1],
+  ['tank', 34, -34, 4, 4], ['crates', 40, -29, 2, 3], ['snowpile', 38, -40, 4, 2],
+  ['logs', -13, 13, 3, 2], ['logs', -9, 17, 2, 3], ['tarp', -20, 20, 4, 3], ['sled', -10, 23, 1, 3], ['line', -24, 17, 1, 7],
+  ['drums', -34, 34, 3, 3], ['pallets', -40, 29, 2, 3], ['barrel-fire', -29, 40, 1, 1], ['snowpile', -40, 40, 3, 3],
+];
+
+function colonyProp(m, kind, x, z) {
+  const W = P.wood; const WD = P.woodDark;
+  switch (kind) {
+    case 'logs': m.box(x - 3, 1, z - 1, 6, 2, 2, 0x6b4a2e); m.box(x - 3, 1, z - 1, 1, 2, 2, 0xb08a5a); break;
+    case 'woodpile': for (let y = 0; y < 3; y++) m.box(x - 4 + y, 1 + y, z - 2, 8 - 2 * y, 1, 4, y % 2 ? 0x7a5636 : 0x5e4129); m.box(x - 4, 1, z - 2, 1, 3, 4, 0xb08a5a); break;
+    case 'generator': m.box(x - 2, 1, z - 2, 4, 3, 4, 0xc9a227); m.box(x - 2, 4, z - 2, 4, 1, 4, 0x2a2d31); m.set(x + 1, 3, z + 2, C.neonGreen, true); m.box(x - 1, 4, z, 1, 2, 1, 0x2a2d31); break;
+    case 'barrel-fire': m.box(x - 1, 1, z - 1, 2, 3, 2, 0x4b3a2e); m.box(x - 1, 4, z - 1, 2, 1, 2, P.fire, true); break;
+    case 'tank': for (let y = 1; y < 9; y++) for (let a = -4; a < 4; a++) for (let b = -4; b < 4; b++) if (a * a + b * b < (y > 7 ? 9 : 16)) m.set(x + a, y, z + b, y % 3 === 0 ? 0x6c7580 : 0x8e979f); for (const [a, b] of [[-3, -3], [2, 2]]) m.box(x + a, 0, z + b, 1, 2, 1, 0x2a2d31); break;
+    case 'crates': m.box(x - 2, 1, z - 3, 4, 3, 3, 0x8a5a2b); m.box(x - 2, 1, z, 4, 3, 3, 0x9a6a38); m.box(x - 1, 4, z - 2, 3, 3, 3, 0x7a5a3a); break;
+    case 'snowpile': for (let y = 1; y < 4; y++) m.box(x - 4 + y, y, z - 2 + (y > 2 ? 1 : 0), 8 - 2 * y, 1, 4 - (y > 2 ? 2 : 0), P.snow); break;
+    case 'tarp': for (const [a, b] of [[-4, -3], [3, -3]]) m.box(x + a, 1, z + b, 1, 6, 1, WD); for (let k = 0; k < 6; k++) m.box(x - 4, 6 - k, z - 3 + k, 8, 1, 1, 0x3f6f8f); m.box(x - 2, 1, z - 1, 3, 2, 2, 0x8a5a2b); break;
+    case 'sled': m.box(x - 1, 1, z - 3, 2, 1, 6, W); m.box(x - 1, 1, z + 3, 2, 2, 1, WD); break;
+    case 'line': m.box(x, 1, z - 7, 1, 8, 1, WD); m.box(x, 1, z + 7, 1, 8, 1, WD); for (let k = -6; k <= 6; k++) { m.set(x, 8 - (Math.abs(k) < 4 ? 1 : 0), z + k, 0x2a2d31); if (k % 3 === 0) m.box(x, 5, z + k, 1, 2, 2, [0xc0392b, 0xe6e2d6, 0x3f6f8f][(k + 9) % 3]); } break;
+    case 'drums': for (const [a, b, c] of [[-2, -2, 0x2f5fa8], [1, -2, 0xc0392b], [-2, 1, 0x3f7a4a], [1, 1, 0x2f5fa8]]) m.box(x + a, 1, z + b, 2, 3, 2, c); break;
+    case 'pallets': for (let y = 0; y < 3; y++) m.box(x - 2, 1 + y, z - 3, 4, 1, 6, y % 2 ? 0xb08a5a : 0x9a7a4e); break;
+    default:
+  }
+}
+
+/** A container house: door cut in the side, a lit window with a shutter, stovepipe, porch with steps, a shovel. */
+function containerHouse(m, cx, cz, front, seed) {
+  const x0 = cx - 6; const z0 = cz - 3;
+  containerBox(m, x0, 1, z0, 13, true, CONTAINER_TONES[seed % 5], seed, { skew: seed % 2 });
+  const fz = front > 0 ? z0 + 6 : z0; const out = front > 0 ? fz + 1 : fz - 1;
+  m.box(cx - 3, 2, fz, 2, 5, 1, P.woodDark);                       // door
+  m.box(cx + 2, 4, fz, 2, 2, 1, C.glassLit, true); m.box(cx + 4, 4, fz, 1, 2, 1, P.wood); // window + shutter
+  m.box(cx + 3, 9, cz, 1, 4, 1, P.rock);                           // stovepipe
+  m.box(cx - 4, 1, Math.min(out, out + front * 2), 5, 1, 3, P.wood); // porch
+  m.box(cx - 4, 0, out + front * 3, 5, 1, 1, P.woodDark);          // step
+  m.box(cx, 1, out + front * 2, 1, 4, 1, 0x7a5636); m.set(cx, 1, out + front * 2 + front, 0x8e979f); // shovel
+}
+/** Stovepipe tops of the starter houses (colony voxels: x, y, z). */
+export const HOUSE_CHIMNEYS = COLONY_HOUSES.map(([x, z]) => [x + 3, 13, z]);
+
+/**
+ * The colony's base (MAP-3): a 2-layer container wall stacked a little untidily (lengths, in/out pushes, skews and
+ * top-layer offsets seeded per container), 4 straight gates, the packed-snow yard and fire, two starter container
+ * houses and the yard dressing. wall = the "wall" upgrade: 1 catwalk + sandbag parapet, 2 spiked barricades and
+ * floodlights at the gates, 3 a tower on every corner.
  */
 export function colony(R = 30, wall = 0) {
   const m = new VoxelModel();
   const gate = 6;
-  const container = (x0, y0, z0, len, alongX, color) => {
-    for (let t = 0; t < len; t++) for (let y = 0; y < 8; y++) for (let k = 0; k < 7; k++) {
-      const x = alongX ? x0 + t : x0 + k; const z = alongX ? z0 + k : z0 + t;
-      const rib = t % 2 === 0 && (k === 0 || k === 6);
-      m.set(x, y0 + y, z, t === 0 || t === len - 1 ? 0x1c1f24 : rib ? color : (color & 0xfefefe) >> 1 | (color & 0x808080));
-    }
-  };
-  for (const s of [-1, 1]) {
-    for (const [a, b] of [[-R, -gate - 1], [gate + 1, R]]) {
-      let t = a; let i = 0;
-      while (t < b) {
-        const len = Math.min(16, b - t);
-        const col = C.cont[(i + (s > 0 ? 1 : 0)) % 3];
-        container(t, 1, s > 0 ? R - 6 : -R, len, true, col);
-        container(s > 0 ? R - 6 : -R, 1, t, len, false, C.cont[(i + 2) % 3]);
-        // Wall levels: some second-layer containers (1), a full second layer (2+).
-        if (wall >= 2 || (wall === 1 && hash3(i, s, 3) > 0.45)) {
-          container(t + 1, 9, s > 0 ? R - 6 : -R, Math.max(4, len - 2), true, C.cont[(i + 1) % 3]);
-          container(s > 0 ? R - 6 : -R, 9, t + 1, Math.max(4, len - 2), false, C.cont[i % 3]);
+  // side: [axis along which the wall runs, sign of the wall's side]
+  const sides = [['x', -1], ['x', 1], ['z', -1], ['z', 1]];
+  sides.forEach(([axis, sg], si) => {
+    const alongX = axis === 'x';
+    const base = sg > 0 ? R - 6 : -R;                 // inner coordinate of the 7-deep wall
+    const lo = alongX ? -R : -R + 7; const hi = alongX ? R : R - 7; // x-walls run through the corners, z-walls butt into them
+    for (let layer = 0; layer < 2; layer++) {
+      let t = lo + (layer ? 1 + Math.floor(hash3(si, 3, 1) * 3) : 0);
+      let i = 0; let prevPush = 0;
+      const gapAt = layer ? 1 + Math.floor(hash3(si, 5, 2) * 3) : -1; // one gap per side in the top layer
+      while (t < hi) {
+        let len = 10 + Math.floor(hash3(si * 31 + i, layer, 7) * 7);
+        // Keep the gate opening straight and clear.
+        if (t < -gate - 1 && t + len > -gate - 1) len = -gate - 1 - t;
+        if (t >= -gate - 1 && t <= gate + 1) { t = gate + 2; continue; }
+        len = Math.min(len, hi - t);
+        if (len < 4) { t += len; continue; }
+        const push = Math.round(hash3(si, i, 11 + layer) * 3) - 2;      // 2 in … 1 out
+        const skew = hash3(i, si, 13 + layer) < 0.3 ? -sg * (push > 0 ? 1 : hash3(i, si, 17) < 0.5 ? 1 : -1) : 0;
+        if (i !== gapAt) {
+          const off = base + push * sg;
+          const c = CONTAINER_TONES[Math.floor(hash3(si * 7 + i, layer, 19) * 5)];
+          if (alongX) containerBox(m, t, 1 + layer * 8, off, len, true, c, si * 50 + i + layer * 13, { skew, door: hash3(i, si, 23) < 0.5 ? 1 : -1 });
+          else containerBox(m, off, 1 + layer * 8, t, len, false, c, si * 50 + i + layer * 13, { skew, door: hash3(i, si, 23) < 0.5 ? 1 : -1 });
+          // Where pushes step by 2+, plug the joint with sandbags (the wall stays closed).
+          if (!layer && i && Math.abs(push - prevPush) >= 2) {
+            if (alongX) m.box(t - 1, 1, base, 2, 4, 7, 0xb8a47a); else m.box(base, 1, t - 1, 7, 4, 2, 0xb8a47a);
+          }
+          prevPush = push;
         }
         t += len; i++;
       }
     }
-    // Gates: crossed planks between two posts with torches.
-    for (const [gx, gz, alongX] of [[0, s * (R - 3), true], [s * (R - 3), 0, false]]) {
-      for (const k of [-gate, gate]) {
-        const x = alongX ? gx + k : gx; const z = alongX ? gz : gz + k;
-        m.box(x, 1, z, 1, 12, 1, P.woodDark); m.set(x, 13, z, P.fire, true);
-      }
-      for (let k = -gate + 1; k < gate; k++) {
-        const x = alongX ? gx + k : gx; const z = alongX ? gz : gz + k;
-        if ((k + gate) % 3 !== 0) { m.set(x, 3, z, P.wood); m.set(x, 6, z, P.wood); }
+    // Gate posts with torches; wall level 2: floodlights and spiked barricades outside.
+    for (const k of [-gate, gate]) {
+      const x = alongX ? k : sg * (R - 3); const z = alongX ? sg * (R - 3) : k;
+      m.box(x, 1, z, 1, 12, 1, P.woodDark); m.set(x, 13, z, P.fire, true);
+      if (wall >= 2) { m.box(x, 13, z, 1, 6, 1, 0x2a2d31); m.box(x - 1, 19, z - 1, 3, 1, 3, 0x2a2d31); m.set(x, 18, z, 0xfff6d8, true); }
+    }
+    for (let k = -gate + 1; k < gate; k++) {
+      const x = alongX ? k : sg * (R - 3); const z = alongX ? sg * (R - 3) : k;
+      if ((k + gate) % 3 !== 0) { m.set(x, 3, z, P.wood); m.set(x, 6, z, P.wood); }
+    }
+    if (wall >= 2) for (const k of [-4, 4]) { // czech hedgehogs outside the gate
+      const x = alongX ? k : sg * (R + 1); const z = alongX ? sg * (R + 1) : k;
+      for (let d = -1; d <= 1; d++) { m.set(x + d, 1 + Math.abs(d), z, 0x3a3f46); m.set(x, 1 + Math.abs(d), z + d, 0x3a3f46); }
+    }
+    // Wall level 1+: sandbag parapet on the outer top edge and a plank catwalk inside it.
+    if (wall >= 1) {
+      for (let t = lo; t < hi; t++) {
+        if (Math.abs(t) <= gate + 1) continue;
+        const outer = sg > 0 ? R : -R; const inner = sg > 0 ? R - 6 : -R + 6;
+        if (alongX) { m.set(t, 17, outer, t % 2 ? 0xb8a47a : 0xa8946a); if (t % 2) m.set(t, 18, outer, 0xb8a47a); m.set(t, 17, inner, P.wood); }
+        else { m.set(outer, 17, t, t % 2 ? 0xb8a47a : 0xa8946a); if (t % 2) m.set(outer, 18, t, 0xb8a47a); m.set(inner, 17, t, P.wood); }
       }
     }
-  }
+  });
   // Level 3: a watch tower on every corner of the wall, a fire basket on top.
   if (wall >= 3) {
     for (const [sx, sz] of [[-1, -1], [-1, 1], [1, -1], [1, 1]]) {
       const x0 = sx > 0 ? R - 7 : -R; const z0 = sz > 0 ? R - 7 : -R;
-      for (const [dx, dz] of [[0, 0], [6, 0], [0, 6], [6, 6]]) m.box(x0 + dx, 1, z0 + dz, 1, 24, 1, P.woodDark);
-      m.box(x0 - 1, 25, z0 - 1, 9, 1, 9, P.wood); m.walls(x0 - 1, 26, z0 - 1, 9, 2, 9, P.woodLight);
-      m.box(x0 + 3, 26, z0 + 3, 1, 1, 1, P.fire, true);
+      for (const [dx, dz] of [[0, 0], [6, 0], [0, 6], [6, 6]]) m.box(x0 + dx, 1, z0 + dz, 1, 28, 1, P.woodDark);
+      m.box(x0 - 1, 29, z0 - 1, 9, 1, 9, P.wood); m.walls(x0 - 1, 30, z0 - 1, 9, 2, 9, P.woodLight);
+      m.box(x0 + 3, 30, z0 + 3, 1, 1, 1, P.fire, true);
     }
   }
-  // Packed-snow yard with a melted ring around the fire.
+  // Packed-snow yard with a melted ring around the fire; trodden paths to the gates.
   for (let x = -R + 7; x < R - 6; x++) for (let z = -R + 7; z < R - 6; z++) {
     const r2 = x * x + z * z;
-    m.set(x, 0, z, r2 <= 20 ? P.dirt : r2 <= 49 ? 0x9aa6b6 : hash3(x, 1, z) < 0.1 ? P.snowShade : P.snow);
+    const path = Math.min(Math.abs(x), Math.abs(z)) < 3;
+    m.set(x, 0, z, r2 <= 20 ? P.dirt : r2 <= 49 ? 0x9aa6b6 : path ? 0xb9c3cf : hash3(x, 1, z) < 0.1 ? P.snowShade : P.snow);
   }
   for (let a = 0; a < 360; a += 24) { const r = (a * Math.PI) / 180; m.box(Math.round(Math.cos(r) * 4), 1, Math.round(Math.sin(r) * 4), 1, 1, 1, P.rockLight); }
   m.box(-2, 1, 0, 5, 1, 1, P.woodDark); m.box(0, 1, -2, 1, 1, 5, P.woodDark);
+  // String lights from each gate towards the fire (on poles beside the path).
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const pole = (r, side) => { const x = dx * r + dz * side; const z = dz * r + dx * side; m.box(x, 1, z, 1, 10, 1, P.woodDark); };
+    pole(R - 9, 4); pole(19, 4);
+    for (let r = 19; r <= R - 9; r++) { const sag = Math.round(Math.sin(((r - 19) / (R - 28)) * Math.PI) * 2); const x = dx * r + dz * 4; const z = dz * r + dx * 4; m.set(x, 10 - sag, z, r % 3 ? 0x2a2d31 : 0xffd27a, r % 3 === 0); }
+  }
+  COLONY_HOUSES.forEach(([x, z], i) => containerHouse(m, x, z, z > 0 ? -1 : 1, i + 2));
+  for (const [kind, x, z] of COLONY_PROPS) colonyProp(m, kind, x, z);
   return m.snowCap(P.snow, 1, 2);
 }
 
@@ -383,14 +498,14 @@ export function colonySlot(kind, level = 0) {
     const sign = { dorm: 0x7a5b4a, greenhouse: C.moss, workshop: C.ochre, infirmary: C.red, radio: C.neonBlue, towers: P.wood, garage: 0xd9822b }[kind] ?? 0x8d949e;
     m.box(-1, 1, 7, 1, 4, 1, P.woodDark); m.box(-3, 4, 7, 5, 3, 1, sign);
   };
-  if (!L || kind === 'spare' || kind === 'reserved') { stakes(); return m.snowCap(P.snow, 1, 1); }
+  if (!L || kind === 'spare' || kind === 'reserved') return new VoxelModel().box(-8, 0, -8, 16, 1, 16, P.snow); // an empty lot: plain snow
   const window = (x, y, z, lit) => m.box(x, y, z, 2, 2, 1, lit ? C.glassLit : C.glass, lit);
   switch (kind) {
     case 'dorm': { // container bunkhouses: one, two side by side, then one stacked on top
-      const box = (x0, y0, z0, c, lit) => { m.box(x0, y0, z0, 13, 7, 6, c); m.box(x0, y0 + 7, z0, 13, 1, 6, C.metalDark); window(x0 + 3, y0 + 3, z0 + 6, lit); window(x0 + 8, y0 + 3, z0 + 6, !lit); m.box(x0 + 11, y0 + 8, z0 + 2, 1, 3, 1, C.metalDark); };
-      box(-6, 1, 0, C.cont[0], true);
-      if (L >= 2) box(-6, 1, -7, C.cont[1], false);
-      if (L >= 3) box(-5, 9, -4, C.cont[2], true);
+      const box = (x0, y0, z0, c, lit) => { containerBox(m, x0, y0, z0, 13, true, c, x0 * 7 + y0 + z0); window(x0 + 3, y0 + 3, z0 + 6, lit); window(x0 + 8, y0 + 3, z0 + 6, !lit); m.box(x0 + 11, y0 + 8, z0 + 2, 1, 3, 1, C.metalDark); };
+      box(-6, 1, 0, CONTAINER_TONES[1], true);
+      if (L >= 2) box(-6, 1, -7, CONTAINER_TONES[2], false);
+      if (L >= 3) box(-5, 9, -4, CONTAINER_TONES[4], true);
       m.box(-1, 1, 6, 3, 5, 1, P.woodDark); // door
       break;
     }

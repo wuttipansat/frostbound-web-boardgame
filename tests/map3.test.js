@@ -122,3 +122,43 @@ test('colony: fits its 5×5 plot, every upgrade has a slot inside the wall, slot
   for (const p of L.survivorSlots) assert.ok(p.length() < 6, 'survivors by the fire');
   for (const p of L.zombieSlots) assert.ok(Math.max(Math.abs(p.x), Math.abs(p.z)) > BOARD.colonyRadius, 'zombies outside the gates');
 });
+
+test('colony (part C): 2-layer wall at level 0, houses and dressing clear of slots, gate paths and the fire; empty lots flat', async () => {
+  const { COLONY_SLOTS } = await import('../src/render/board.js');
+  const city = await import('../src/render/city.js');
+  const m = city.colony(50, 0);
+  const at = (x, z) => { let top = -1; for (let y = 0; y < 40; y++) if (m.get(x, y, z)) top = y; return top; };
+  const tall = [-30, -20, 20, 30].filter((t) => at(t, 47) >= 14 || at(t, 48) >= 14).length;
+  assert.ok(tall >= 3, 'two container layers along the wall');
+  const v = BOARD.colonyRadius / 50; // world per colony voxel
+  const things = [...city.COLONY_PROPS.map(([k, x, z, w, d]) => [k, x, z, w, d]), ...city.COLONY_HOUSES.map(([x, z]) => ['house', x, z, 7, 7])];
+  for (const [k, x, z, w, d] of things) {
+    assert.ok(Math.abs(x) + w <= 44 && Math.abs(z) + d <= 44, `${k} inside the wall`);
+    assert.ok(Math.abs(x) - w > 6 && Math.abs(z) - d > 6, `${k} off the gate paths`);
+    assert.ok(Math.hypot(x, z) * v > 5, `${k} outside the fire ring`);
+    for (const [id, [sx, sz]] of Object.entries(COLONY_SLOTS)) {
+      const cx = sx / v; const cz = sz / v;
+      assert.ok(Math.abs(x - cx) >= w + 8 || Math.abs(z - cz) >= d + 8, `${k} off slot ${id}`);
+    }
+  }
+  for (const kind of ['dorm', 'spare', 'reserved']) {
+    const { max } = city.colonySlot(kind, 0).bounds();
+    assert.equal(max[1], 1, `${kind} empty lot is flat`);
+  }
+});
+
+test('raised ground (part D): blocks stand on GROUND, roads at 0', async () => {
+  const { createBoard, GROUND } = await import('../src/render/board.js');
+  globalThis.document ??= { createElement: () => ({ getContext: () => new Proxy({}, { get: () => () => ({ addColorStop() {} }) }) }) };
+  const s = cities()[0];
+  const board = createBoard();
+  board.setMap(s.map, { snap: true });
+  for (const L of Object.values(board.layout)) {
+    assert.equal(L.center.y, GROUND);
+    for (const p of [...L.survivorSlots, ...L.zombieSlots]) assert.equal(p.y, GROUND);
+  }
+  for (const [id, g] of Object.entries(board.locationGroups)) assert.equal(g.position.y, GROUND, `${id} on the slab`);
+  const marks = board.root.getObjectByName('markings');
+  const ys = marks.geometry.attributes.position.array.filter((_, i) => i % 3 === 1);
+  assert.ok(Math.max(...ys) < 0.1, 'markings on the road');
+});

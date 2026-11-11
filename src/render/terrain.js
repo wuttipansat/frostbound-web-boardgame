@@ -117,45 +117,15 @@ export function buildTerrainHD({ radius, distRoad, distPlot, clip = null, center
     if (rim < 3) return null;
     if (clip && !clip(wx, wz)) return null; // UI-13: one block of the city at a time
     const roadD = distRoad(wx, wz);
-    const plotD = distPlot(wx, wz);
-    const flat = Math.min(roadD - ROAD.half, plotD);
-    const noise = Math.sin(wx * 0.21) * Math.cos(wz * 0.17) + Math.sin((wx + wz) * 0.09) * 0.8 + hash3(x, 1, z) * 0.18;
-    let h = 0;
-    if (flat > 2) h = Math.max(0, Math.round((noise + 0.4) * 2 * Math.min(1, (flat - 2) / 3)));
-    if (rim < 6) h = Math.max(h, Math.floor(hash3(Math.floor(x / 2), 3, Math.floor(z / 2)) * 3));
-    let top;
-    if (roadD < ROAD.half) {
-      // MAP-3: dark ploughed asphalt (markings are decals on top): a few cracks and patches, a little snow along the kerb.
+    // MAP-3 D: the road surface only; everything inside the kerb line is the raised block slab (ground.js) on top.
+    let top = 0x6c737d;
+    const h = 0;
+    if (roadD < ROAD.half + 0.25) {
+      // Dark ploughed asphalt (markings are decals on top): a few cracks and patches, a little snow along the kerb.
       const t = hash3(Math.floor(x / 3), 5, Math.floor(z / 3));
       top = t < 0.06 ? 0x2c3038 : P.asphalt; // patches
       if (hash3(x, 5, z) < 0.025) top = 0x1c1f25; // cracks
       if (roadD > ROAD.half - 0.6 && hash3(x, 7, z) < 0.55) top = P.slush; // snow along the kerb
-      h = 0;
-    } else if (roadD < ROAD.walk) {
-      // Kerb stones (joints every metre), then square sidewalk tiles with grout; some tiles snowed over.
-      if (roadD < ROAD.kerb) top = (x + z) % 3 === 0 ? 0x8d949e : P.kerb;
-      else {
-        const grout = x % 3 === 0 || z % 3 === 0;
-        const t = hash3(Math.floor(x / 3), 13, Math.floor(z / 3));
-        top = grout ? 0x9aa3ad : t < 0.08 ? P.snow : t < 0.14 ? 0xb4bcc6 : P.paving;
-      }
-      h = 0;
-    } else if (paved && paved(wx, wz)) {
-      // MAP-1c: square paving tiles with grout lines, grass in the cracks, a few missing tiles, drifted snow.
-      const tx = Math.floor(x / 3); const tz = Math.floor(z / 3);
-      const grout = x % 3 === 0 || z % 3 === 0;
-      const t = hash3(tx, 21, tz);
-      top = grout ? 0xa7b0bb : t < 0.05 ? 0x5a4a3c : t < 0.11 ? 0x6f8f4e : t > 0.78 || hash3(x, 23, z) < 0.04 ? P.snow : P.paving;
-      h = 0;
-    } else {
-      const coarseN = hash3(Math.floor(x / 5), 9, Math.floor(z / 5));
-      if (flat > 1 && flat < 7 && coarseN > 0.9) top = hash3(x, 2, z) < 0.08 ? 0xe9f6ff : 0xa9cdea; // frozen puddle
-      else if (hash3(x, 4, z) < 0.006) top = 0x4a4f5c; // debris
-      else if (hash3(x, 6, z) < 0.012) top = 0xffffff; // sparkle
-      else {
-        const t = Math.min(1, h / 4);
-        top = bayer(x, 0, z) < 0.35 - t * 0.3 ? P.snowShade : (hash3(x, 8, z) < 0.05 ? P.snowBlue : P.snow);
-      }
     }
     return { h, top };
   };

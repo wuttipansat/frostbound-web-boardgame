@@ -8,6 +8,8 @@ import { LOCATION_BUILDERS_HD, colonyHD, treeModelHD, rockModelHD } from './buil
 import { buildTerrainHD, ROAD } from './terrain.js';
 import { carModel, lampModel, containerModel, clutterModel, CLUTTER_KINDS } from './props.js';
 import { markingQuads, lampSpots } from './streets.js';
+import { blockSlab, GROUND } from './ground.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import * as city from './city.js';
 import { downsample } from './detail.js';
 import { LOCATIONS } from '../content/locations.js';
@@ -55,6 +57,7 @@ const parse = (k) => k.split(',').map(Number);
 
 // MAP-1b / MAP-3: a block is 3×3 chunks inside its sidewalks; a place takes some of them at the street side, the
 // rest hold small buildings and props. Chunk size = (pitch − one street with its sidewalks) / 3.
+export { GROUND };
 export const CHUNK = (BOARD.block - 2 * ROAD.walk) / 3;
 // MAP-3: the colony's row and column are 5 chunks wide (the colony plot is 5×5), every other one 3; street lines
 // stay straight, so a block in the colony's row is 5×3. Grid → world: x = sign(bx)·(|bx|·pitch + CHUNK).
@@ -77,7 +80,7 @@ const FOOT = { church: [1, 2] };
 
 /** Where a place sits in its block: front direction, footprint (in chunks), centre and the chunks it covers. */
 export function placePlan(id, type, bx, bz, roads, foot = null, front = null) {
-  const c = new THREE.Vector3(blockPos(bx), 0, blockPos(bz));
+  const c = new THREE.Vector3(blockPos(bx), GROUND, blockPos(bz)); // MAP-3 D: blocks are raised slabs
   const fronts = { z: `${bx},${bz + 1},h`, x: `${bx + 1},${bz},v`, '-z': `${bx},${bz},h`, '-x': `${bx},${bz},v` };
   // MAP-1d: the block's stored front (older maps: work it out from the streets).
   const pick = front ?? START_FRONT[id] ?? ['z', 'x', '-z', '-x'].find((f) => roads.has(fronts[f])) ?? 'z';
@@ -126,17 +129,17 @@ function colonyLayout() {
   return {
     id: 'colony',
     theta: 0,
-    center: new THREE.Vector3(0, 0, 0),
+    center: new THREE.Vector3(0, GROUND, 0),
     facing: 0,
     label: new THREE.Vector3(0, 9, 0),
     zombieSlots: gateDirs.flatMap(([dx, dz]) => [-1.4, 0, 1.4].map((l) => new THREE.Vector3(
-      dx * (BOARD.colonyRadius + 1.6) + (dz !== 0 ? l : 0), 0, dz * (BOARD.colonyRadius + 1.6) + (dx !== 0 ? l : 0),
+      dx * (BOARD.colonyRadius + 1.6) + (dz !== 0 ? l : 0), GROUND, dz * (BOARD.colonyRadius + 1.6) + (dx !== 0 ? l : 0),
     ))),
     survivorSlots: Array.from({ length: 10 }, (_, k) => {
       const a = (k / 10) * Math.PI * 2 + 0.3;
-      return new THREE.Vector3(Math.cos(a) * 4.2, 0, Math.sin(a) * 4.2);
+      return new THREE.Vector3(Math.cos(a) * 4.2, GROUND, Math.sin(a) * 4.2);
     }),
-    gates: gateDirs.map(([dx, dz]) => new THREE.Vector3(dx * BOARD.colonyRadius, 0, dz * BOARD.colonyRadius)),
+    gates: gateDirs.map(([dx, dz]) => new THREE.Vector3(dx * BOARD.colonyRadius, GROUND, dz * BOARD.colonyRadius)),
     hitRadius: BOARD.colonyRadius + 1,
   };
 }
@@ -392,7 +395,19 @@ export function createBoard({ progressive = false } = {}) {
         return d;
       },
     });
-    const mesh = new THREE.Mesh(geo, MATERIALS.lit);
+    // MAP-3 D: the raised block slab (kerb, paving or snow) merged into the same mesh (no extra draw call).
+    const k = map.blocks[key];
+    const lot = openBlock(k, bx, bz) && k.kind !== 'plaza' && hash3(bx, 77, bz) < 0.5;
+    const snowy = k.kind === 'park' || k.kind === 'rail' || k.kind === 'colony' || lot;
+    const slab = blockSlab({ x0: cx - hx + ROAD.half, x1: cx + hx - ROAD.half, z0: cz - hz + ROAD.half, z1: cz + hz - ROAD.half, walk: ROAD.walk - ROAD.kerb, surface: snowy ? 'snow' : 'paved', detail: cell < 1, seed: [bx, bz] });
+    const sg = new THREE.BufferGeometry();
+    for (const a of ['position', 'normal', 'color']) sg.setAttribute(a, new THREE.BufferAttribute(slab[a], 3));
+    sg.setIndex(new THREE.BufferAttribute(slab.index, 1));
+    if (geo.index.array instanceof Uint16Array) geo.setIndex(new THREE.BufferAttribute(Uint32Array.from(geo.index.array), 1));
+    const merged = mergeGeometries([geo, sg]);
+    geo.dispose(); sg.dispose();
+    merged.computeBoundingSphere();
+    const mesh = new THREE.Mesh(merged, MATERIALS.lit);
     mesh.receiveShadow = true;
     mesh.name = 'terrain';
     return mesh;
@@ -416,7 +431,7 @@ export function createBoard({ progressive = false } = {}) {
       new THREE.MeshBasicMaterial({ map: halo, color: 0xffc46b, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, fog: false }),
     );
     ring.rotation.x = -Math.PI / 2;
-    ring.position.set(L.center.x, 0.06, L.center.z);
+    ring.position.set(L.center.x, GROUND + 0.06, L.center.z);
     root.add(ring);
     rings[L.id] = ring;
   }
@@ -432,7 +447,7 @@ export function createBoard({ progressive = false } = {}) {
     const holder = new THREE.Group(); holder.name = `slot ${id}`;
     holder.add(lodModel(`slot-${kind}-${lv}`, () => city.colonySlot(kind, lv), true));
     const [x, z] = COLONY_SLOTS[id];
-    holder.position.set(x, 0, z);
+    holder.position.set(x, 0, z); // (inside the colony group, which stands on the slab)
     holder.rotation.y = Math.round(Math.atan2(-x, -z) / (Math.PI / 2)) * (Math.PI / 2); // front towards the fire
     holder.userData.view = `${kind}-${lv}`;
     trackGlow(holder);
@@ -472,6 +487,7 @@ export function createBoard({ progressive = false } = {}) {
     let model = null;
     if (b.kind === 'colony') {
       model = colonyModel();
+      model.position.y = GROUND;
       model.name = 'colony';
       locationGroups.colony = model;
     } else if (b.kind === 'place') {
@@ -489,7 +505,7 @@ export function createBoard({ progressive = false } = {}) {
       addPick(L);
     } else if (FILLER_MODELS[b.kind]) {
       model = lodModel(`filler-${b.kind}`, FILLER_MODELS[b.kind]);
-      model.position.set(blockPos(bx), 0, blockPos(bz));
+      model.position.set(blockPos(bx), GROUND, blockPos(bz));
       model.rotation.y = Math.floor(hash3(bx, 7, bz) * 2) * Math.PI;
     }
     if (model) { g.add(model); trackGlow(model); }
@@ -564,7 +580,7 @@ export function createBoard({ progressive = false } = {}) {
       }
       spots.forEach(([x, z], i) => {
         const r = hash3(Math.round(x * 10), 5, Math.round(z * 10));
-        tmp.position.set(x, 0, z); tmp.rotation.set(0, Math.floor(r * 4) * (Math.PI / 2), 0); tmp.scale.setScalar(0.75 + r * 0.6); tmp.updateMatrix();
+        tmp.position.set(x, GROUND, z); tmp.rotation.set(0, Math.floor(r * 4) * (Math.PI / 2), 0); tmp.scale.setScalar(0.75 + r * 0.6); tmp.updateMatrix();
         if (i % 3 === 2) rocks[Math.floor(r * 3)].push(tmp.matrix.clone());
         else if (i === 0 && b.kind === 'place' && r < 0.3) yards[Math.floor(r * 9) % 3].push(tmp.matrix.clone());
         else trees[Math.floor(r * 3)].push(tmp.matrix.clone());
@@ -582,7 +598,7 @@ export function createBoard({ progressive = false } = {}) {
       }
       if (len > 8) {
         for (let k = 0; k < 2; k++) if (h(10 + k) < 0.35) { // cones, crates, barrels, bags, barriers on the sidewalk
-          tmp.position.copy(at(0.15 + h(12 + k) * 0.7, (k ? -1 : 1) * (ROAD.walk - 0.9)));
+          tmp.position.copy(at(0.15 + h(12 + k) * 0.7, (k ? -1 : 1) * (ROAD.walk - 0.9))).setY(GROUND);
           // Lamps win: clutter steps along the sidewalk, out of a lamp's way.
           for (let n = 0; n < 4 && lampsAt.some((l) => Math.hypot(l.x - tmp.position.x, l.z - tmp.position.z) < 1.6); n++) tmp.position.addScaledVector(dir, 1.7);
           tmp.rotation.set(0, h(14 + k) * 6, 0); tmp.scale.setScalar(1); tmp.updateMatrix();
@@ -630,11 +646,11 @@ export function createBoard({ progressive = false } = {}) {
     const lit = []; const dead = []; const poolList = [];
     flickers = [];
     for (const l of spots) {
-      tmp.position.set(l.x + l.dx * 0.45, 0, l.z + l.dz * 0.45); tmp.rotation.set(0, Math.atan2(-l.dz, l.dx), 0); tmp.scale.setScalar(1); tmp.updateMatrix();
+      tmp.position.set(l.x + l.dx * 0.45, GROUND, l.z + l.dz * 0.45); tmp.rotation.set(0, Math.atan2(-l.dz, l.dx), 0); tmp.scale.setScalar(1); tmp.updateMatrix();
       (l.dead ? dead : lit).push(tmp.matrix.clone());
       if (l.dead) continue;
       if (l.flicker) flickers.push(poolList.length);
-      tmp.position.set(l.x + l.dx * 0.85, 0.05, l.z + l.dz * 0.85); tmp.rotation.set(-Math.PI / 2, 0, 0); tmp.scale.setScalar(5); tmp.updateMatrix();
+      tmp.position.set(l.x + l.dx * 0.85, GROUND + 0.05, l.z + l.dz * 0.85); tmp.rotation.set(-Math.PI / 2, 0, 0); tmp.scale.setScalar(5); tmp.updateMatrix();
       poolList.push(tmp.matrix.clone());
     }
     if (lit.length) decor.add(tagLod(instanced(() => lampModel(false), 0.1, lit, { cacheKey: 'lamp3', jitter: 0, castShadow: false }), 'near'));
@@ -682,14 +698,15 @@ export function createBoard({ progressive = false } = {}) {
   // World anchors for ambient particles (match the voxel colony model, 0.6 world units per voxel).
   const s = BOARD.buildingScale;
   const fx = {
-    fire: new THREE.Vector3(0, 1.2 * s, 0),
-    chimneys: [new THREE.Vector3(COLONY_SLOTS.dorm[0], 3.4, COLONY_SLOTS.dorm[1])], // the dorm's stovepipe
+    fire: new THREE.Vector3(0, 1.2 * s + GROUND, 0),
+    // The starter container houses' stovepipes (colony voxels → world) and the dorm's.
+    chimneys: [...city.HOUSE_CHIMNEYS.map(([x, y, z]) => new THREE.Vector3(x, y, z).multiplyScalar(BOARD.colonyRadius / 50).setY(y * BOARD.colonyRadius / 50 + GROUND)), new THREE.Vector3(COLONY_SLOTS.dorm[0], 3.4 + GROUND, COLONY_SLOTS.dorm[1])],
     // MAP-3: gate posts stand in the wall (3 voxels in from its radius), 6 voxels either side of each opening.
     torches: layout.colony.gates.flatMap((g) => {
       const dir = g.clone().normalize();
       const along = Math.abs(dir.x) < 0.01 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
       const v = BOARD.colonyRadius / 50; // world per colony voxel (wall radius = 50 voxels)
-      return [-1, 1].map((k) => dir.clone().multiplyScalar(47 * v).addScaledVector(along, 6 * v * k).setY(13.5 * v));
+      return [-1, 1].map((k) => dir.clone().setY(0).multiplyScalar(47 * v).addScaledVector(along, 6 * v * k).setY(13.5 * v + GROUND));
     }),
   };
 
