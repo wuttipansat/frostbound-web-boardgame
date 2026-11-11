@@ -93,8 +93,7 @@ export function heightmapGeometry({ n, cell, column, side, bottom = -12, aoStren
  * The FROSTBOUND plateau at 2× resolution.
  * env: { radius, distRoad(x,z) -> distance to nearest road (world), distPlot(x,z) -> distance to building plots }
  */
-export function buildTerrainHD({ radius, distRoad, distPlot, clip = null, center = null, half = null, edgeDist = null, paved = null, crossing = null }) {
-  const cell = 0.5;
+export function buildTerrainHD({ radius, distRoad, distPlot, clip = null, center = null, half = null, edgeDist = null, paved = null, crossing = null, cell = 0.5 }) {
   // MAP-1: a block-sized piece (center + half size) instead of the whole slab; edgeDist = distance to the slab's rim.
   const ox = center ? Math.round(center[0] / cell) : 0; const oz = center ? Math.round(center[1] / cell) : 0;
   const n = Math.ceil((half ?? radius) / cell) + 1;

@@ -241,9 +241,7 @@ updateWinter(null);
   document.body.append(bar);
   window.addEventListener('keydown', (ev) => {
     if (ev.target.closest?.('input, textarea')) return;
-    if (ev.key === 'q' || ev.key === 'Q') stage.view.rotate(-1);
-    else if (ev.key === 'e' || ev.key === 'E') stage.view.rotate(1);
-    else if (ev.key === '+' || ev.key === '=') stage.view.zoomStep(1);
+    if (ev.key === '+' || ev.key === '=') stage.view.zoomStep(1);
     else if (ev.key === '-') stage.view.zoomStep(-1);
   });
 }
@@ -251,6 +249,7 @@ updateWinter(null);
 // Step 22: behind an opaque full-screen panel (the draft) draw 1 frame in 4.
 let coverCheck = 0;
 stage.onFrame(() => {
+  board.setZoom?.(stage.camera.zoom); // MAP-2 D: level of detail
   if (++coverCheck % 15) return;
   stage.setIdle(document.querySelector('.draft-screen') ? 4 : 1);
 });
@@ -299,6 +298,10 @@ stage.onFrame(() => {
     v.copy(board.layout[id].label).project(stage.camera);
     const x = ((v.x + 1) / 2) * w;
     // Labels hang above their anchor (translate -100%): keep the whole pill below the top bar.
+    // MAP-2 D: pins off screen are hidden and skip the layout reads below.
+    const off = v.z > 1 || x < -60 || x > w + 60 || ((1 - v.y) / 2) * h < -40 || ((1 - v.y) / 2) * h > h + 40;
+    labels[id].classList.toggle('offscreen', off);
+    if (off) continue;
     const y = Math.max(((1 - v.y) / 2) * h, barBottom + 30);
     labels[id].style.left = `${x}px`;
     labels[id].style.top = `${y}px`;

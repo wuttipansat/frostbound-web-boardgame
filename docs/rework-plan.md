@@ -387,3 +387,14 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - City models (places, colony, small buildings, ruins, parking lot, fountain, rail yard) go through `refineCity`: built at 2× (0.12 world per voxel at the usual scale) with glazing bars and frames on windows, brick courses, metal ribs and wood grain, snow caps one fine voxel thick, and thin parts (posts, rails, fences, ledges, awnings, signs) at half thickness.
 - Plain painted walls and snow stay flat so faces merge: stage 1 is ~0.74 M triangles (was ~0.35 M). Cars and street clutter no longer cast shadows.
 - Not done: terrain stays at 0.5 world per cell (0.25 would quadruple the ground triangles); models were refined, not redrawn by hand.
+
+### MAP-2 part C — pop-in and a pan-only camera (done)
+- New blocks pop in: the ground rises (0.3 s), every chunk piece and street prop pops up with a small overshoot (scale 0.6 → 1.05 → 1, y −6 → 0), later the further it is from the colony, and the building lands last with a puff of snow (a small pool of point clouds). A growth takes under ~3 s; matrices are updated in place.
+- The camera has a fixed angle: drag / one finger pans, wheel / pinch zooms; Q/E, right-drag and two-finger turning are gone. Panning stays inside the city outline + 1 block; the home view eases out when the city grows.
+- Not done: the very first build of a game still appears at once (the board is built before the game starts).
+
+### MAP-2 part D — big-city performance (done)
+- Chunk pieces and street props of one growth share one instanced set (draw calls: 766 → ~240 at stage 4).
+- Levels of detail by zoom: zoom ≥ 0.8 fine (2×) models, 0.5–0.8 the authored ones, below 0.5 half-resolution copies, coarser ground (1 world per cell), half-resolution trees and containers, and no cars, lamps, rocks or clutter.
+- Instanced bounds are recomputed after pop-in so culling is right; pins of places off screen are hidden and skip layout reads.
+- Stage 4 (69 blocks) whole-city view: ~0.84 M triangles drawn (was 7.4 M before the levels of detail), perf.cjs ok.

@@ -1954,3 +1954,6 @@ body.radial-open #toasts { bottom: 250px; }
 .icon-bolt { color: #ffd34d !important; } .icon-heartIco { color: #ff6b6b !important; }
 .rd-meta .hp { display: inline-flex; align-items: center; gap: 2px; } .rd-meta .hp .icon { width: 12px; height: 12px; }
 .rd-sub { font-size: 11px; opacity: .75; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* MAP-2 D: pins of places off screen */
+#labels .loc-label.offscreen { display: none; }

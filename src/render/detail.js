@@ -1,7 +1,7 @@
 // HD detailing: turns an upscaled (2×) VoxelModel into a richer one with material patterns,
 // ordered dithering, window frames + sills, icicles, lumpy snow and bevelled edges.
 // Everything is deterministic (hash-based), so a model always builds the same way.
-import { hash3 } from './voxel.js';
+import { hash3, VoxelModel } from './voxel.js';
 import { P } from './palette.js';
 
 // ---------------------------------------------------------------- colour helpers
@@ -202,4 +202,26 @@ export function refineCity(src, { glass, glassLit, frame, mullion }) {
   // the mesher can merge big faces (dithering every wall would triple the triangle count).
   m.recolor((v) => (v.glow || !['brick', 'metal', 'wood'].includes(materialOf(v.color)) ? undefined : patternColor(v)));
   return m;
+}
+
+/** Half-resolution copy for far views: each 2×2×2 cell becomes one voxel if at least 3 of its 8 are filled
+ *  (the most common colour wins; any glow keeps it glowing). */
+export function downsample(src) {
+  const cells = new Map();
+  for (const v of src.voxels.values()) {
+    const k = `${Math.floor(v.x / 2)},${Math.floor(v.y / 2)},${Math.floor(v.z / 2)}`;
+    let c = cells.get(k);
+    if (!c) cells.set(k, c = { n: 0, colors: new Map(), glow: false });
+    c.n++; c.glow ||= !!v.glow;
+    c.colors.set(v.color, (c.colors.get(v.color) ?? 0) + 1);
+  }
+  const out = new VoxelModel();
+  for (const [k, c] of cells) {
+    if (c.n < 3) continue;
+    const [x, y, z] = k.split(',').map(Number);
+    let best = 0; let color = 0;
+    for (const [col, n] of c.colors) if (n > best) { best = n; color = col; }
+    out.set(x, y, z, color, c.glow);
+  }
+  return out;
 }

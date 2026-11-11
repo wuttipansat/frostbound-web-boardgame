@@ -5,7 +5,7 @@
 // Front (door side) faces +z; the board turns each model so its front faces a side the camera sees.
 import { VoxelModel, hash3 } from './voxel.js';
 import { P } from './palette.js';
-import { refineCity, tagMaterial } from './detail.js';
+import { refineCity, tagMaterial, downsample } from './detail.js';
 
 export const C = {
   sage: 0xa7b5a0, sageDark: 0x8a9884, cream: 0xddd5bc, creamDark: 0xbcb399, ochre: 0xdca04c, ochreDark: 0xb27d33,
@@ -635,4 +635,13 @@ export function fine(key, make) {
   }
   if (!FINE.has(key)) FINE.set(key, refineCity(make(), { glass: C.glass, glassLit: C.glassLit, frame: C.trim, mullion: 0x3a3f46 }));
   return FINE.get(key);
+}
+
+const COARSE = new Map(); const FAR = new Map();
+/** MAP-2 D: level-of-detail versions of a city model: 0 = fine (2×), 1 = as authored, 2 = half resolution. */
+export function lod(level, key, make) {
+  if (level === 0) return fine(key, make);
+  if (level === 1) { if (!COARSE.has(key)) COARSE.set(key, make()); return COARSE.get(key); }
+  if (!FAR.has(key)) FAR.set(key, downsample(lod(1, key, make)));
+  return FAR.get(key);
 }

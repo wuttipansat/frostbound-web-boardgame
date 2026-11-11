@@ -6,7 +6,8 @@ import { MATERIALS } from './voxel.js';
 import { QUALITY } from './quality.js';
 
 const VIEW_HEIGHT = 62; // world units visible vertically at zoom 1
-const PAN_LIMIT = 24;
+const PAN_LIMIT = 24; // stage-1 pan box half size
+const panBox = { minX: -PAN_LIMIT, maxX: PAN_LIMIT, minZ: -PAN_LIMIT, maxZ: PAN_LIMIT };
 
 export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   const q = quality;
@@ -43,28 +44,24 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   controls.dampingFactor = 0.08;
   controls.minZoom = 0.75;
   controls.maxZoom = 3.5;
-  // UI-1: free camera again — drag to pan, two fingers / right drag to turn, pinch / wheel to zoom.
+  // MAP-2 C: a fixed isometric angle — drag to pan, pinch / wheel to zoom, no turning.
   controls.minPolarAngle = THREE.MathUtils.degToRad(40);
   controls.maxPolarAngle = THREE.MathUtils.degToRad(65);
-  controls.enableRotate = true;
+  controls.enableRotate = false;
   controls.enableZoom = true;
   controls.screenSpacePanning = false;
-  controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
-  controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
+  controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+  controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
   controls.screenSpacePanning = false;
   controls.zoomToCursor = true;
   controls.target.set(0, 0, 0);
   controls.addEventListener('change', () => {
-    // Keep the camera focused on the board.
+    // Keep the camera over the city: the target stays inside the map outline + 1 block.
     const t = controls.target;
     t.y = 0;
-    const r = Math.hypot(t.x, t.z);
-    if (r > PAN_LIMIT) {
-      const k = PAN_LIMIT / r;
-      const dx = t.x * k - t.x; const dz = t.z * k - t.z;
-      t.x += dx; t.z += dz;
-      camera.position.x += dx; camera.position.z += dz;
-    }
+    const dx = Math.max(panBox.minX, Math.min(panBox.maxX, t.x)) - t.x;
+    const dz = Math.max(panBox.minZ, Math.min(panBox.maxZ, t.z)) - t.z;
+    if (dx || dz) { t.x += dx; t.z += dz; camera.position.x += dx; camera.position.z += dz; }
   });
   controls.update();
 
@@ -170,26 +167,22 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   }
   requestAnimationFrame(loop);
 
-  // ---- view steps: rotate 90°, 3 zoom levels (eased in the frame loop)
+  // ---- view steps: 3 zoom levels (eased in the frame loop)
   const ZOOMS = [0.95, 1.55, 2.5];
+  const easeV = new THREE.Vector3();
   let zoomIdx = 0;
-  let turnLeft = 0; // radians still to turn
   const view = {
     ZOOMS,
     get zoomLevel() { return zoomIdx; },
     zoomTo(i) { zoomIdx = Math.max(0, Math.min(ZOOMS.length - 1, i)); view.goalZoom = ZOOMS[zoomIdx]; },
     zoomStep(d) { view.goalZoom = Math.max(controls.minZoom, Math.min(controls.maxZoom, (view.goalZoom ?? camera.zoom) * (d > 0 ? 1.3 : 1 / 1.3))); },
-    rotate(dir) { turnLeft += dir * Math.PI / 2; },
     goalZoom: null,
     tick(dt) {
-      if (turnLeft) {
-        const step = Math.sign(turnLeft) * Math.min(Math.abs(turnLeft), dt * 4);
-        turnLeft -= step;
-        const off = camera.position.clone().sub(controls.target);
-        off.applyAxisAngle(new THREE.Vector3(0, 1, 0), step);
-        camera.position.copy(controls.target).add(off);
-        camera.lookAt(controls.target);
-        controls.update();
+      if (view.goalTarget) { // MAP-2 C: ease to the new home view when the city grows
+        const d = easeV.copy(view.goalTarget).sub(controls.target);
+        if (d.length() < 0.05) view.goalTarget = null;
+        d.multiplyScalar(Math.min(1, dt * 4));
+        controls.target.add(d); camera.position.add(d); controls.update();
       }
       if (view.goalZoom != null) {
         camera.zoom += (view.goalZoom - camera.zoom) * Math.min(1, dt * 8);
@@ -216,9 +209,12 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
     const portrait = camera.right - camera.left < camera.top - camera.bottom; // narrow screens: leave more margin
     homeView.zoom = Math.min(controls.maxZoom, 1.05 * (full / Math.max(need, full * 0.45)) * (portrait ? 0.82 : 1));
     controls.minZoom = Math.min(0.75, homeView.zoom * 0.8); // MAP-1: a bigger city can be zoomed out further
-    view.reset();
+    Object.assign(panBox, { minX: (minX - 1) * block, maxX: (maxX + 1) * block, minZ: (minZ - 1) * block, maxZ: (maxZ + 1) * block });
+    if (snap) view.reset();
+    else { view.goalTarget = homeView.target.clone(); view.goalZoom = homeView.zoom; }
   };
   view.reset = () => {
+    view.goalTarget = null;
     camera.position.copy(homeView.pos);
     controls.target.copy(homeView.target);
     view.goalZoom = homeView.zoom;

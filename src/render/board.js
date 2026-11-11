@@ -8,6 +8,7 @@ import { LOCATION_BUILDERS_HD, colonyHD, treeModelHD, rockModelHD } from './buil
 import { buildTerrainHD } from './terrain.js';
 import { carModel, lampModel, containerModel, clutterModel, CLUTTER_KINDS } from './props.js';
 import * as city from './city.js';
+import { downsample } from './detail.js';
 import { LOCATIONS } from '../content/locations.js';
 import { START_MAP, LEGACY_MAP } from '../core/map.js';
 
@@ -151,6 +152,7 @@ function instanced(model, scale, transforms, { castShadow = true, cacheKey = nul
     if (!geo) continue;
     const im = new THREE.InstancedMesh(geo, mat, transforms.length);
     transforms.forEach((t, i) => im.setMatrixAt(i, t));
+    im.userData.base = transforms; // MAP-2 C: pop-in animates from these
     im.castShadow = castShadow && mat === MATERIALS.lit;
     im.receiveShadow = true;
     group.add(im);
@@ -200,6 +202,32 @@ export function createBoard() {
   const glowMats = [];
   const halo = haloTexture();
   const tmp = new THREE.Object3D();
+  // MAP-2 D: three levels of detail for city models, picked by zoom (0 fine 2×, 1 as authored, 2 half).
+  const lodNodes = [];
+  let lodLevel = 0;
+  const LOD_SIZE = [BOARD.buildingScale / 4, BOARD.buildingScale / 2, BOARD.buildingScale];
+  // A node's tag: 0 / 1 / 2 = that level only; 'near' = levels 0–1; 'far' = level 2.
+  const lodShows = (tag, level) => (tag === 'near' ? level < 2 : tag === 'far' ? level === 2 : tag === level);
+  const tagLod = (node, tag) => { node.userData.lod = tag; node.visible = lodShows(tag, lodLevel); lodNodes.push(node); return node; };
+  const lodModel = (key, make) => {
+    const g = new THREE.Group();
+    for (let L = 0; L < 3; L++) g.add(tagLod(city.lod(L, key, make).build({ size: LOD_SIZE[L], jitter: 0, cacheKey: `lod${L}-${key}` }), L));
+    return g;
+  };
+  const PROPS = new Map();
+  /** A prop with a near version and a half-resolution far version. */
+  const lodProp = (key, make, scale, list) => {
+    if (!PROPS.has(key)) { const m = make(); PROPS.set(key, [m, downsample(m)]); }
+    const [near, far] = PROPS.get(key);
+    const g = new THREE.Group();
+    g.add(tagLod(instanced(near, scale, list, { cacheKey: key, jitter: 0 }), 'near'), tagLod(instanced(far, scale * 2, list, { cacheKey: `${key}-far`, jitter: 0, castShadow: false }), 'far'));
+    return g;
+  };
+  const lodInstanced = (key, make, list) => {
+    const g = new THREE.Group();
+    for (let L = 0; L < 3; L++) g.add(tagLod(instanced(city.lod(L, key, make), LOD_SIZE[L], list, { cacheKey: `lod${L}-${key}`, jitter: 0, castShadow: L < 2 }), L));
+    return g;
+  };
   const cellOf = (x, z) => `${Math.round(x / B)},${Math.round(z / B)}`;
   const has = (bx, bz) => !!map?.blocks[`${bx},${bz}`];
 
@@ -216,7 +244,7 @@ export function createBoard() {
       return d;
     };
   };
-  const terrainFor = (key) => {
+  const terrainFor = (key, cell = 0.5) => {
     const [bx, bz] = parse(key);
     const cx = bx * B; const cz = bz * B;
     const near = streets.filter(([a, b]) => Math.min(a.x, b.x) < cx + half + 4 && Math.max(a.x, b.x) > cx - half - 4 && Math.min(a.z, b.z) < cz + half + 4 && Math.max(a.z, b.z) > cz - half - 4);
@@ -234,7 +262,7 @@ export function createBoard() {
       return along > 2.6 && along < 4.2 && across < 1.6 && Math.floor(across * 2.5 + 10) % 2 === 0;
     });
     const geo = buildTerrainHD({
-      center: [cx, cz], half, edgeDist: edgeDist(bx, bz), paved, crossing,
+      center: [cx, cz], half, edgeDist: edgeDist(bx, bz), paved, crossing, cell,
       clip: (x, z) => cellOf(x, z) === key,
       distRoad: (x, z) => { let d = Infinity; for (const [a, b] of near) d = Math.min(d, distToSegment(x, z, a, b)); return d; },
       distPlot: (x, z) => {
@@ -279,17 +307,18 @@ export function createBoard() {
   function buildBlock(key, b) {
     const [bx, bz] = parse(key);
     const g = new THREE.Group(); g.name = `cell ${key}`;
-    const terrain = terrainFor(key);
+    const terrain = new THREE.Group(); terrain.name = 'terrain-lod';
+    terrain.add(tagLod(terrainFor(key), 'near'), tagLod(terrainFor(key, 1), 'far'));
     g.add(terrain);
     let model = null;
     if (b.kind === 'colony') {
-      model = city.fine('colony', () => colonyHD(BOARD.colonyRadius * 2)).build({ size: bScale / 2, jitter, cacheKey: 'fine-colony' });
+      model = lodModel('colony', () => colonyHD(BOARD.colonyRadius * 2));
       model.name = 'colony';
       locationGroups.colony = model;
     } else if (b.kind === 'place') {
       const L = layout[b.placeId];
       const type = b.type ?? b.placeId;
-      model = city.fine(`place-${type}`, LOCATION_BUILDERS_HD[type] ?? LOCATION_BUILDERS_HD.grocery).build({ size: bScale / 2, jitter, cacheKey: `fine-place-${type}` });
+      model = lodModel(`place-${type}`, LOCATION_BUILDERS_HD[type] ?? LOCATION_BUILDERS_HD.grocery);
       // Fit the building into its chunks (models are centred on x/z, front = +z).
       const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
       model.scale.setScalar(Math.min(PLACE_SCALE, (L.plan.fw * CHUNK - 0.2) / size.x, (L.plan.fd * CHUNK - 0.2) / size.z));
@@ -299,14 +328,13 @@ export function createBoard() {
       locationGroups[b.placeId] = model;
       addPick(L);
     } else if (FILLER_MODELS[b.kind]) {
-      model = city.fine(`filler-${b.kind}`, FILLER_MODELS[b.kind]).build({ size: bScale / 2, jitter, cacheKey: `fine-filler-${b.kind}` });
+      model = lodModel(`filler-${b.kind}`, FILLER_MODELS[b.kind]);
       model.position.set(bx * B, 0, bz * B);
       model.rotation.y = Math.floor(hash3(bx, 7, bz) * 2) * Math.PI;
     }
     if (model) { g.add(model); trackGlow(model); }
-    if (RECIPES[b.kind] || b.kind === 'place') { const props = buildProps([key], [], false); g.add(props.group); trackGlow(props.group); }
     root.add(g);
-    return { group: g, terrain, k: 0, target: 1, delay: 0 };
+    return { group: g, terrain, model, k: 1, target: 1, delay: 0 };
   }
 
   /** Instanced trees, rocks, cars and lamps for a set of new blocks and streets: one group per growth. */
@@ -399,16 +427,16 @@ export function createBoard() {
         }
       }
     });
-    trees.forEach((list, k) => { if (list.length) group.add(instanced(treeModelHD(k, 1), 0.25, list, { cacheKey: `tree-${k}`, jitter: 0 })); });
-    houses.forEach((list, v) => { if (list.length) group.add(instanced(city.fine(`small-${v}`, () => city.smallBuilding(v)), BOARD.buildingScale / 4, list, { cacheKey: `fine-small-${v}`, jitter: 0 })); });
-    ruins.forEach((list, v) => { if (list.length) group.add(instanced(city.fine(`ruin-${v}`, () => city.ruinSmall(v)), BOARD.buildingScale / 4, list, { cacheKey: `fine-ruin-${v}`, jitter: 0 })); });
-    if (pieces.parking.length) group.add(instanced(city.fine('parking-small', city.parkingSmall), BOARD.buildingScale / 4, pieces.parking, { cacheKey: 'fine-parking-small', jitter: 0 }));
-    if (pieces.fountain.length) group.add(instanced(city.fine('fountain', city.fountain), BOARD.buildingScale / 4, pieces.fountain, { cacheKey: 'fine-fountain', jitter: 0 }));
-    clutter.forEach((list, k) => { if (list.length) group.add(instanced(clutterModel(k), 0.12, list, { cacheKey: `clutter-${k}`, jitter: 0, castShadow: false })); });
-    rocks.forEach((list, k) => { if (list.length) group.add(instanced(rockModelHD(k), 0.25, list, { cacheKey: `rock-${k}`, jitter: 0 })); });
-    cars.forEach((list, v) => { if (list.length) group.add(instanced(carModel(v), 0.15, list, { cacheKey: `car4-${v}`, jitter: 0, castShadow: false })); });
-    if (lamps.length) group.add(instanced(lampModel(), 0.15, lamps, { cacheKey: 'lamp', jitter: 0, castShadow: false }));
-    yards.forEach((list, k) => { if (list.length) group.add(instanced(containerModel(k, 1 + (k % 2)), 0.2, list, { cacheKey: `container-${k}`, jitter: 0 })); });
+    trees.forEach((list, k) => { if (list.length) group.add(lodProp(`tree-${k}`, () => treeModelHD(k, 1), 0.25, list)); });
+    houses.forEach((list, v) => { if (list.length) group.add(lodInstanced(`small-${v}`, () => city.smallBuilding(v), list)); });
+    ruins.forEach((list, v) => { if (list.length) group.add(lodInstanced(`ruin-${v}`, () => city.ruinSmall(v), list)); });
+    if (pieces.parking.length) group.add(lodInstanced('parking-small', city.parkingSmall, pieces.parking));
+    if (pieces.fountain.length) group.add(lodInstanced('fountain', city.fountain, pieces.fountain));
+    clutter.forEach((list, k) => { if (list.length) group.add(tagLod(instanced(clutterModel(k), 0.12, list, { cacheKey: `clutter-${k}`, jitter: 0, castShadow: false }), 'near')); });
+    rocks.forEach((list, k) => { if (list.length) group.add(tagLod(instanced(rockModelHD(k), 0.25, list, { cacheKey: `rock-${k}`, jitter: 0 }), 'near')); });
+    cars.forEach((list, v) => { if (list.length) group.add(tagLod(instanced(carModel(v), 0.15, list, { cacheKey: `car4-${v}`, jitter: 0, castShadow: false }), 'near')); });
+    if (lamps.length) group.add(tagLod(instanced(lampModel(), 0.15, lamps, { cacheKey: 'lamp', jitter: 0, castShadow: false }), 'near'));
+    yards.forEach((list, k) => { if (list.length) group.add(lodProp(`container-${k}`, () => containerModel(k, 1 + (k % 2)), 0.2, list)); });
     if (attach) root.add(group);
     return { group, k: 0, target: 1, delay: 0 };
   }
@@ -466,6 +494,90 @@ export function createBoard() {
   flameMesh.position.copy(fx.fire).setY(fx.fire.y + 0.25);
   root.add(flameMesh);
 
+  // ---------------------------------------------------------------- MAP-2 C: pop-in
+  // A new block: its ground rises (0.3 s), then each chunk piece pops up with a small overshoot (scale 0.6 → 1.05 → 1,
+  // y −6 → 0, 20 ms apart, nearest the colony first), and the building lands last with a puff of snow.
+  const POP = 0.35;
+  const _m = new THREE.Matrix4(); const _p = new THREE.Vector3(); const _s = new THREE.Vector3();
+  const curve = (p) => {
+    const e = 1 - (1 - p) ** 3;
+    return [p < 0.6 ? 0.6 + 0.45 * (p / 0.6) : 1.05 - 0.05 * ((p - 0.6) / 0.4), -6 * (1 - e)];
+  };
+  function startPop(c, delay, pieceDelay = null) {
+    const meshes = [];
+    c.group.traverse((o) => { if (o.isInstancedMesh && o.userData.base) meshes.push(o); });
+    const pieces = []; // [mesh list, base index, pos, quat, scale, delay]
+    const byBase = new Map();
+    for (const im of meshes) { if (!byBase.has(im.userData.base)) byBase.set(im.userData.base, []); byBase.get(im.userData.base).push(im); }
+    for (const [base, ims] of byBase) base.forEach((mx, i) => {
+      const pos = new THREE.Vector3(); const q = new THREE.Quaternion(); const sc = new THREE.Vector3();
+      mx.decompose(pos, q, sc);
+      pieces.push({ ims, i, pos, q, sc, d: 0 });
+    });
+    pieces.sort((a, b) => a.pos.lengthSq() - b.pos.lengthSq()).forEach((pc, r) => { pc.d = pieceDelay ? pieceDelay(pc.pos) + (r % 7) * 0.02 : 0.25 + r * 0.02; });
+    const last = pieces.reduce((m, pc) => Math.max(m, pc.d), 0.3);
+    const modelAt = c.model ? 0.55 : last; // a block's building lands after its ground and around its pieces
+    c.pop = { t: -delay, pieces, modelAt, end: Math.max(modelAt, last) + POP, landed: false, modelScale: c.model?.scale.x ?? 1, modelY: c.model?.position.y ?? 0 };
+    c.group.visible = !!pieceDelay; // a batch shows at once (its pieces start tiny); a block waits for its turn
+    stepPop(c, 0);
+  }
+  function stepPop(c, dt) {
+    const P = c.pop;
+    P.t += dt;
+    if (P.t < 0) return;
+    c.group.visible = true;
+    const done = P.t >= P.end;
+    if (c.terrain) c.terrain.position.y = done ? 0 : -6 * (1 - (1 - Math.min(1, P.t / 0.3)) ** 3);
+    const dirty = new Set();
+    for (const pc of P.pieces) {
+      const p = done ? 1 : Math.max(0, Math.min(1, (P.t - pc.d) / POP));
+      if (pc.last === p) continue;
+      pc.last = p;
+      const [k, y] = p >= 1 ? [1, 0] : p <= 0 ? [0.001, -6] : curve(p);
+      _m.compose(_p.copy(pc.pos).setY(pc.pos.y + y), pc.q, _s.copy(pc.sc).multiplyScalar(k));
+      for (const im of pc.ims) { im.setMatrixAt(pc.i, _m); dirty.add(im); }
+    }
+    for (const im of dirty) { im.instanceMatrix.needsUpdate = true; if (done) im.computeBoundingSphere(); } // culling bounds
+    if (c.model) {
+      const p = done ? 1 : Math.max(0, Math.min(1, (P.t - P.modelAt) / POP));
+      const [k, y] = p >= 1 ? [1, 0] : p <= 0 ? [0.001, -6] : curve(p);
+      c.model.scale.setScalar(P.modelScale * k);
+      c.model.position.y = P.modelY + y;
+      if (p >= 1 && !P.landed) { P.landed = true; puff(c.model.position); }
+    }
+    if (done) c.pop = null;
+  }
+
+  // Snow puffs: a small pool of point clouds, reused (no allocation per frame).
+  const PUFF_N = 28;
+  const puffs = Array.from({ length: 6 }, () => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(PUFF_N * 3), 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.9, transparent: true, opacity: 0, depthWrite: false }));
+    pts.visible = false; pts.frustumCulled = false;
+    root.add(pts);
+    return { pts, t: 1, at: new THREE.Vector3(), dirs: Array.from({ length: PUFF_N }, (_, i) => [Math.cos(i * 2.4), 0.3 + hash3(i, 1, 7) * 0.8, Math.sin(i * 2.4), 4 + hash3(i, 2, 7) * 4]) };
+  });
+  let puffNext = 0;
+  function puff(at) {
+    const pf = puffs[puffNext++ % puffs.length];
+    pf.t = 0; pf.at.copy(at); pf.pts.visible = true;
+  }
+  function stepPuffs(dt) {
+    for (const pf of puffs) {
+      if (!pf.pts.visible) continue;
+      pf.t += dt / 0.9;
+      if (pf.t >= 1) { pf.pts.visible = false; continue; }
+      const arr = pf.pts.geometry.attributes.position.array;
+      const r = 1 - (1 - pf.t) ** 2;
+      pf.dirs.forEach(([dx, dy, dz, sp], i) => {
+        arr[i * 3] = pf.at.x + dx * sp * r; arr[i * 3 + 1] = pf.at.y + 0.3 + dy * 2.5 * r - pf.t * pf.t * 1.5; arr[i * 3 + 2] = pf.at.z + dz * sp * r;
+      });
+      pf.pts.geometry.attributes.position.needsUpdate = true;
+      pf.pts.material.opacity = 0.85 * (1 - pf.t);
+    }
+  }
+
   let hovered = null;
   let selected = null;
   let lastT = null;
@@ -486,16 +598,18 @@ export function createBoard() {
     setFire(k) { fireLevel = k; },
     setHovered(id) { hovered = id; },
     setSelected(id) { selected = id; },
+    /** MAP-2 D: the camera zoom picks the level of detail of city models. */
+    setZoom(z) {
+      const level = z >= 0.8 ? 0 : z >= 0.5 ? 1 : 2;
+      if (level === lodLevel) return;
+      lodLevel = level;
+      for (const n of lodNodes) n.visible = lodShows(n.userData.lod, level);
+    },
     /** MAP-1: draw the game's map. New blocks rise into place (staggered outward); the first call snaps.
      *  Calls onBounds with the city's outline. */
     setMap(next, { snap = false } = {}) {
       // A different city (new game, loaded save): start over.
-      // MAP-1c: a decoration block that became a place is rebuilt on its own (it rises again).
-      for (const [k, c] of Object.entries(cells)) {
-        if (!next.blocks[k] || c.sig === JSON.stringify(next.blocks[k]) || JSON.parse(c.sig).placeId) continue;
-        root.remove(c.group);
-        delete cells[k];
-      }
+      // MAP-2 A: blocks never change, so any difference means another city (new game / load): start over.
       if (Object.entries(cells).some(([k, c]) => c.sig !== JSON.stringify(next.blocks[k] ?? null))) {
         for (const c of [...Object.values(cells), ...batches]) { root.remove(c.group); }
         for (const k of Object.keys(cells)) delete cells[k];
@@ -505,6 +619,7 @@ export function createBoard() {
         for (const id of Object.keys(layout)) if (id !== 'colony') delete layout[id];
         for (const id of Object.keys(locationGroups)) delete locationGroups[id];
         glowMats.length = 0;
+        lodNodes.length = 0;
         map = null;
         snap = true;
       }
@@ -521,21 +636,28 @@ export function createBoard() {
       for (const k of touched) {
         const c = cells[k];
         if (!c) continue;
-        c.group.remove(c.terrain); c.terrain.geometry.dispose();
-        c.terrain = terrainFor(k); c.group.add(c.terrain);
+        for (const t of c.terrain.children) t.geometry.dispose();
+        c.terrain.clear();
+        c.terrain.add(tagLod(terrainFor(k), 'near'), tagLod(terrainFor(k, 1), 'far'));
       }
       fresh.sort((a, b) => Math.hypot(...parse(a)) - Math.hypot(...parse(b)));
+      const inner = fresh.length ? Math.max(0, Math.hypot(...parse(fresh[0])) - 1) * B : 0;
+      const outer = fresh.length ? (Math.hypot(...parse(fresh[fresh.length - 1])) + 1) * B : 1;
+      const spread = 2.2 / Math.max(1, outer - inner);
       fresh.forEach((k, i) => {
         cells[k] = buildBlock(k, map.blocks[k]);
         cells[k].sig = JSON.stringify(map.blocks[k]);
-        cells[k].delay = snap ? 0 : i * 0.06; // seconds
+        if (!snap) startPop(cells[k], Math.max(0, (Math.hypot(...parse(k)) * B - inner) * spread)); // outward from the colony, a growth ≤ ~3 s
       });
       if (fresh.length || newStreets.length) {
-        const batch = buildProps(fresh.filter((k) => !RECIPES[map.blocks[k].kind] && map.blocks[k].kind !== 'place'), newStreets);
-        batch.delay = snap ? 0 : fresh.length * 0.06;
+        // MAP-2 D: one instanced set per growth for every chunk piece and street prop (few draw calls); each
+        // piece pops on its own, later the further it is from the colony.
+        const batch = buildProps(fresh, newStreets);
+        trackGlow(batch.group);
+        batch.k = 1;
         batches.push(batch);
+        if (!snap) startPop(batch, 0, (pos) => 0.3 + Math.min(2.4, (Math.hypot(pos.x, pos.z) - inner) * spread));
       }
-      for (const c of [...Object.values(cells), ...batches]) if (snap) { c.k = c.target; c.delay = 0; show(c); } else show(c);
       const xs = Object.keys(map.blocks).map((k) => parse(k)[0]); const zs = Object.keys(map.blocks).map((k) => parse(k)[1]);
       const bounds = { minX: Math.min(...xs), maxX: Math.max(...xs), minZ: Math.min(...zs), maxZ: Math.max(...zs), block: B, snap };
       shadow.scale.set((bounds.maxX - bounds.minX + 2.4) * B, (bounds.maxZ - bounds.minZ + 2.4) * B, 1);
@@ -544,7 +666,10 @@ export function createBoard() {
     },
     update(t) {
       const dt = Math.min(0.1, Math.max(0, t - (lastT ?? t))); lastT = t;
-      for (const c of [...Object.values(cells), ...batches]) {
+      for (const c of Object.values(cells)) if (c.pop) stepPop(c, dt);
+      for (const c of batches) if (c.pop) stepPop(c, dt);
+      stepPuffs(dt);
+      for (const c of batches) {
         if (c.k === c.target) continue;
         if (c.delay > 0) { c.delay -= dt; continue; }
         c.k += Math.sign(c.target - c.k) * Math.min(Math.abs(c.target - c.k), dt / 1.1); // ~1.1 s
