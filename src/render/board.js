@@ -205,8 +205,8 @@ export function blockPieces(b, bx, bz, plan, recipe = RECIPES[b.kind] ?? RECIPES
 // ---------------------------------------------------------------- decorations
 
 /** make: () => VoxelModel, only called when the geometry is neither cached nor baked. */
-function instanced(make, scale, transforms, { castShadow = true, cacheKey = null, jitter = 0.05 } = {}) {
-  const { lit, glow } = cacheKey ? geometriesFor(cacheKey, { size: scale, jitter }, make) : make().buildGeometries({ size: scale, jitter });
+function instanced(make, scale, transforms, { castShadow = true, cacheKey = null, jitter = 0.05, ao = true } = {}) {
+  const { lit, glow } = cacheKey ? geometriesFor(cacheKey, { size: scale, jitter, ao }, make) : make().buildGeometries({ size: scale, jitter, ao });
   const group = new THREE.Group();
   for (const [geo, mat] of [[lit, MATERIALS.lit], [glow, MATERIALS.glow]]) {
     if (!geo) continue;
@@ -281,6 +281,8 @@ export function createBoard({ progressive = false } = {}) {
   const lodNodes = [];
   let lodLevel = 0;
   const LOD_SIZE = [BOARD.buildingScale / 4, BOARD.buildingScale / 2, BOARD.buildingScale];
+  // Mesh options per level: the whole-city view (level 2) skips baked ambient occlusion.
+  const lodOpts = (L) => ({ size: LOD_SIZE[L], jitter: 0, ao: L < 2 });
   // A node's tag: 0 / 1 / 2 = that level only; 'near' = levels 0–1; 'far' = level 2.
   const lodShows = (tag, level) => (tag === 'near' ? level < 2 : tag === 'far' ? level === 2 : tag === level);
   // LOAD-1: a level is only built (voxels + mesh) the first time it is shown, so the start builds one level, not three.
@@ -311,14 +313,14 @@ export function createBoard({ progressive = false } = {}) {
   const stats = { maxSliceMs: 0 };
   const lodModel = (key, make, eager = false) => {
     const g = new THREE.Group();
-    for (let L = 0; L < 3; L++) g.add(lazyLod(L, () => groupOf(geometriesFor(`lod${L}-${key}`, { size: LOD_SIZE[L], jitter: 0 }, () => city.lod(L, key, make))), eager));
+    for (let L = 0; L < 3; L++) g.add(lazyLod(L, () => groupOf(geometriesFor(`lod${L}-${key}`, lodOpts(L), () => city.lod(L, key, make))), eager));
     return g;
   };
   /** Model extents (x, z) over all levels, from voxel bounds (no meshing needed). */
   const lodExtent = (key, make) => {
     let x = 0; let z = 0;
     for (let L = 0; L < 3; L++) {
-      const { min, max } = packedBounds(`lod${L}-${key}`, { size: LOD_SIZE[L], jitter: 0 }) ?? city.lod(L, key, make).bounds();
+      const { min, max } = packedBounds(`lod${L}-${key}`, lodOpts(L)) ?? city.lod(L, key, make).bounds();
       x = Math.max(x, (max[0] - min[0]) * LOD_SIZE[L]); z = Math.max(z, (max[2] - min[2]) * LOD_SIZE[L]);
     }
     return { x, z };
@@ -330,13 +332,13 @@ export function createBoard({ progressive = false } = {}) {
     const g = new THREE.Group();
     g.add(
       lazyLod('near', () => instanced(() => propPair(key, make)[0], scale, list, { cacheKey: key, jitter: 0 })),
-      lazyLod('far', () => instanced(() => propPair(key, make)[1], scale * 2, list, { cacheKey: `${key}-far`, jitter: 0, castShadow: false })),
+      lazyLod('far', () => instanced(() => propPair(key, make)[1], scale * 2, list, { cacheKey: `${key}-far`, jitter: 0, castShadow: false, ao: false })),
     );
     return g;
   };
   const lodInstanced = (key, make, list) => {
     const g = new THREE.Group();
-    for (let L = 0; L < 3; L++) g.add(lazyLod(L, () => instanced(() => city.lod(L, key, make), LOD_SIZE[L], list, { cacheKey: `lod${L}-${key}`, jitter: 0, castShadow: L < 2 })));
+    for (let L = 0; L < 3; L++) g.add(lazyLod(L, () => instanced(() => city.lod(L, key, make), LOD_SIZE[L], list, { cacheKey: `lod${L}-${key}`, jitter: 0, castShadow: L < 2, ao: L < 2 })));
     return g;
   };
   const cellOf = (x, z) => `${gridOf(x)},${gridOf(z)}`;
@@ -559,7 +561,8 @@ export function createBoard({ progressive = false } = {}) {
     decor.traverse((o) => { if (o.isMesh && o.geometry !== POOL_GEO) o.geometry.dispose?.(); });
     decor.clear();
     const segs = streets.filter(([, , seg]) => seg !== 'gate');
-    const q = markingQuads(segs);
+    const ground = (x, z) => { const bx = gridOf(x); const bz = gridOf(z); return has(bx, bz) && edgeDist(bx, bz)(x, z) >= 3; };
+    const q = markingQuads(segs, ground);
     if (q.index.length) {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(q.position, 3));
@@ -569,7 +572,6 @@ export function createBoard({ progressive = false } = {}) {
       const m = new THREE.Mesh(g, MARK_MAT); m.receiveShadow = true; m.name = 'markings';
       decor.add(m);
     }
-    const ground = (x, z) => { const bx = gridOf(x); const bz = gridOf(z); return has(bx, bz) && edgeDist(bx, bz)(x, z) >= 3; };
     const spots = lampSpots(segs, ground);
     const lit = []; const dead = []; const poolList = [];
     flickers = [];

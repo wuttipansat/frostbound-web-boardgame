@@ -66,7 +66,7 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   controls.update();
 
   // Lights: cold moon + sky fill. Warm point lights live on the board.
-  const hemi = new THREE.HemisphereLight(0x9fb8e8, 0x2a3450, 1.35);
+  const hemi = new THREE.HemisphereLight(0x9fb8e8, 0x3a2f3c, 1.35); // MAP-3 dusk: teal sky, warm ground bounce
   scene.add(hemi);
   const moon = new THREE.DirectionalLight(0xb8d0ff, 1.6);
   moon.position.set(-25, 70, 45); // UI-13: light the façades the camera sees (+z), long shadows to the back
@@ -131,6 +131,22 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
   window.addEventListener('resize', resize);
   resize();
 
+  // MAP-3: the moon's shadow map follows the view (centred on what the camera looks at, sized to the visible ground),
+  // so every part of a big city gets crisp shadows. Snapped to whole texels so edges don't shimmer while panning.
+  const MOON_OFF = moon.position.clone();
+  let shadowHalf = 0;
+  function fitShadow() {
+    const half = Math.min(140, Math.max(30, (Math.max(camera.right - camera.left, camera.top - camera.bottom) / camera.zoom) * 0.62));
+    if (Math.abs(half - shadowHalf) > shadowHalf * 0.08) {
+      shadowHalf = half;
+      Object.assign(moon.shadow.camera, { left: -half, right: half, top: half, bottom: -half });
+      moon.shadow.camera.updateProjectionMatrix();
+    }
+    const texel = (2 * shadowHalf) / moon.shadow.mapSize.x;
+    const tx = Math.round(controls.target.x / texel) * texel; const tz = Math.round(controls.target.z / texel) * texel;
+    moon.target.position.set(tx, 0, tz);
+    moon.position.set(tx + MOON_OFF.x, MOON_OFF.y, tz + MOON_OFF.z);
+  }
   const frameCallbacks = [];
   const clock = new THREE.Clock();
   let running = true;
@@ -140,6 +156,7 @@ export function createStage(canvas, { snow = true, quality = QUALITY } = {}) {
     snowfall?.update(dt, t);
     mist?.update(dt);
     for (const cb of frameCallbacks) cb(t, dt);
+    fitShadow();
     renderer.info.reset();
     if (post && postWanted) post.render(dt);
     else renderer.render(scene, camera);

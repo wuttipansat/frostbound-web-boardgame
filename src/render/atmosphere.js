@@ -28,8 +28,9 @@ export function atmosphereFor(s) {
   return { storm, dusk, fire, mood };
 }
 
-const DAY = { hemi: new THREE.Color(0xa9c4ee), moon: new THREE.Color(0xd8e4ff), fog: new THREE.Color(0x24344f) };
-const NIGHT = { hemi: new THREE.Color(0x6f8cc8), moon: new THREE.Color(0x8fa8e6), fog: new THREE.Color(0x0e182b) };
+// MAP-3: a low dusk look: teal sky light, a warm low key light by day, cold blue moonlight at night.
+const DAY = { hemi: new THREE.Color(0x9cc6d6), moon: new THREE.Color(0xffe0c2), fog: new THREE.Color(0x24344f) };
+const NIGHT = { hemi: new THREE.Color(0x5f88b0), moon: new THREE.Color(0x8fa8e6), fog: new THREE.Color(0x0e182b) };
 
 /** Eases the stage + board toward a target atmosphere each frame. */
 export function createAtmosphere(stage, board) {

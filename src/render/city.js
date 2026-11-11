@@ -70,7 +70,7 @@ export function block(m, o) {
       if (slot > 2) continue;
       const yb = f * FH + 3;
       const r = hash3(Math.floor((u - 2) / 6), f, seed + side.length * 7);
-      const lit = r < 0.28; const boarded = r > 0.9; const broken = r > 0.8 && !boarded;
+      const lit = r < 0.15; /* MAP-3: ~15% of windows lit */ const boarded = r > 0.9; const broken = r > 0.8 && !boarded;
       for (let y = yb; y < yb + 5; y++) m.set(x, y, z, boarded ? C.board : broken ? 0x15191e : lit ? C.glassLit : C.glass, lit);
       m.set(x + ox, yb - 1, z + oz, trim); // sill
       if (slot === 1) m.set(x + ox, yb + 5, z + oz, trim); // lintel

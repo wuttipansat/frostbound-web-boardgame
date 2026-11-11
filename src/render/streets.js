@@ -46,14 +46,16 @@ export function streetRuns(segments) {
   return { nodes: [...nodes.values()], runs };
 }
 
-/** Flat quads for every marking: { position, normal, color, index } (one mesh for the whole city). */
-export function markingQuads(segments, y = 0.03) {
+/** Flat quads for every marking: { position, normal, color, index } (one mesh for the whole city).
+ *  onGround(x, z) says whether there is street surface at a spot. */
+export function markingQuads(segments, onGround = () => true, y = 0.03) {
   const { runs } = streetRuns(segments);
   const pos = []; const col = [];
   // A rectangle in run space: along t0..t1, lateral l0..l1.
   const rect = (r, t0, t1, l0, l1, c) => {
     const P = (t, l) => (r.axis === 'x' ? [t, y, r.c + l] : [r.c + l, y, t]);
     const q = [P(t0, l0), P(t1, l0), P(t1, l1), P(t0, l1)];
+    if (!q.every((p) => onGround(p[0], p[2]))) return; // no paint over the void at the city's rim
     for (const p of q) pos.push(...p);
     for (let i = 0; i < 4; i++) col.push(...c);
   };
