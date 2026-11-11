@@ -24,7 +24,7 @@ export const BOARD = {
   buildingScale: 0.6, // world units per building voxel
 };
 const FILLER_MODELS = { rail: city.railYard }; // MAP-1c: other decoration blocks are built from chunks
-const PLACE_SCALE = 0.8; // every place and small building shares one voxel size (0.3 × 0.8 world units)
+const PLACE_SCALE = 1; // MAP-3: places and small buildings fill their chunks (0.3 world units per authored voxel)
 // What fills a free chunk, by block kind: [content, weight].
 const RECIPES = {
   place: [['house', 55], ['trees', 18], ['car', 10], ['yard', 10], ['clutter', 7]],
