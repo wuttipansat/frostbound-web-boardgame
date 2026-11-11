@@ -300,16 +300,21 @@ export function hospital() {
   // ER wing on the left, one floor.
   block(m, { x0: -12, z0: 8, w: 12, d: 20, floors: 1, wall: C.sageDark, seed: 45 });
   m.box(-11, 1, 27, 8, 6, 1, C.glass);
-  neon(m, 'ER', -6, 12, 27, C.neonRed, -1);
-  // Red cross on the façade.
-  m.box(15, 34, d, 4, 12, 1, C.neonRed, true); m.box(11, 38, d, 12, 4, 1, C.neonRed, true);
+  // MAP-4: the red cross is a proper sign, off the window grid: a framed white panel on two posts at the front roof
+  // edge, the cross lit inside it. (The ER neon is gone; a small cross plate sits on the ER canopy instead.)
+  const roofY = 5 * FH + 1;
+  for (const x of [12, 21]) m.box(x, roofY, d - 3, 1, 4, 1, C.metalDark);
+  m.box(10, roofY + 4, d - 3, 14, 14, 1, 0x2a2d31);
+  m.box(11, roofY + 5, d - 3, 12, 12, 1, 0xf2f2ee);
+  m.box(15, roofY + 6, d - 4, 4, 10, 1, C.neonRed, true); m.box(12, roofY + 9, d - 4, 10, 4, 1, C.neonRed, true);
   // MAP-3 group 2: a canopy over the ER bay on posts, a rooftop helipad (H in a ring), triage tents with red
   // crosses, oxygen tanks and a generator by the ER, a ramp to the main door. (Ambulances park at the kerb.)
   m.box(-13, 8, 28, 14, 1, 7, C.trim); for (const x of [-13, 0]) m.box(x, 1, 34, 1, 7, 1, C.metalDark);
   m.box(-12, 9, 28, 12, 1, 1, C.red);
+  m.box(-9, 9, 35, 5, 5, 1, 0xf2f2ee); m.box(-7, 10, 36, 1, 3, 1, C.neonRed, true); m.box(-8, 11, 36, 3, 1, 1, C.neonRed, true); // cross plate on the canopy
   const top = 5 * FH + 1;
-  for (let x = 4; x < 30; x++) for (let z = 4; z < 24; z++) { const r = Math.hypot(x - 17, z - 14); if (r < 9.5) m.set(x, top, z, r > 8.3 ? 0xd8b03a : 0x4b525a); }
-  for (const [x, z, ww, dd] of [[13, 10, 2, 9], [20, 10, 2, 9], [15, 14, 5, 1]]) m.box(x, top, z, ww, 1, dd, C.trim);
+  for (let x = 4; x < 30; x++) for (let z = 2; z < 22; z++) { const r = Math.hypot(x - 17, z - 11); if (r < 8.5) m.set(x, top, z, r > 7.3 ? 0xd8b03a : 0x4b525a); }
+  for (const [x, z, ww, dd] of [[13, 7, 2, 9], [20, 7, 2, 9], [15, 11, 5, 1]]) m.box(x, top, z, ww, 1, dd, C.trim);
   for (const [x, z] of [[-14, 38], [-6, 38]]) { for (let y = 0; y < 5; y++) m.box(x - 3 + Math.floor(y / 2), 1 + y, z, 7 - 2 * Math.floor(y / 2), 1, 6, 0xe9e4d8); m.box(x, 3, z + 6, 1, 3, 1, C.red); m.box(x - 1, 4, z + 6, 3, 1, 1, C.red); }
   for (let k = 0; k < 4; k++) m.box(-15 + k * 2, 1, 22, 1, 5, 1, k % 2 ? 0x2f6b4a : 0xe8e8e2);
   m.box(-15, 1, 16, 4, 3, 4, 0xc9a227); m.box(-15, 4, 16, 4, 1, 4, 0x2a2d31);
@@ -318,27 +323,55 @@ export function hospital() {
 }
 
 export function library() {
-  const m = new VoxelModel(); const w = 40; const d = 26;
-  pad(m, -4, -4, w + 8, d + 14, 5);
-  block(m, { w, d, floors: 3, wall: C.cream, trim: C.creamDark, seed: 55 });
-  // Columns and steps across the front.
-  for (let x = 3; x < w - 2; x += 7) m.box(x, 1, d, 3, 19, 3, C.trim);
-  m.box(0, 20, d, w, 2, 4, C.creamDark);
-  m.box(2, 1, d + 3, w - 4, 1, 3, C.greyDark);
-  for (let k = 0; k < 3; k++) m.box(4 + k * 2, 2 + k, d + 5 - k, w - 8 - k * 4, 1, 1, C.trim); // wide steps
-  for (let k = 0; k < 7; k++) m.box(k * 3, 22 + k, d, w - k * 6, 1, 3, k === 6 ? C.creamDark : C.trim); // pediment
-  neon(m, 'BOOKS', 20, 23, d + 3, C.neonWarm, 4);
-  m.box(w - 3, 1, d + 6, 3, 4, 2, 0x2b4a8c); m.box(w - 3, 4, d + 7, 3, 1, 1, 0x1c1f24); // book drop
-  for (const x of [9, 30]) { m.box(x, 11, d + 3, 2, 7, 1, C.red); m.box(x, 13, d + 3, 2, 1, 1, C.neonWarm); } // banners
-  // Collapsed back corner: floors open to the sky, rubble spilling out.
-  m.clearBox(22, 12, 0, 18, 22, 13);
-  m.box(22, FH, 0, 18, 1, 13, C.roofDark);
-  for (let i = 0; i < 70; i++) {
-    const x = 20 + Math.floor(hash3(i, 1, 5) * 22); const z = -6 + Math.floor(hash3(i, 3, 5) * 10);
-    const h = 1 + Math.floor(hash3(i, 2, 5) * 3);
-    m.box(x, 1, z, 2, h, 2, hash3(i, 4, 5) < 0.5 ? C.cream : C.greyDark);
+  // MAP-4: a classical public library: symmetric hall, taller central pavilion with columns, pediment and a low dome,
+  // two side wings with tall arched windows, a plinth and full-width steps. No neon: the name is a pale stone band.
+  const m = new VoxelModel(); const w = 44; const d = 24; const cx = w / 2;
+  pad(m, -4, -4, w + 8, d + 16, 5);
+  const stone = C.cream; const dark = C.creamDark; const trim = C.trim;
+  m.box(-1, 1, -1, w + 2, 3, d + 2, dark);                                   // plinth
+  const wing = (x0, ww) => {
+    m.walls(x0, 4, 0, ww, 18, d, stone); m.box(x0 + 1, 21, 1, ww - 2, 1, d - 2, C.roofDark);
+    m.box(x0 - 1, 22, -1, ww + 2, 2, d + 2, trim); m.box(x0, 24, 0, ww, 2, d, dark);          // cornice + parapet
+    for (const ux of [x0, x0 + ww - 1]) for (let y = 4; y < 22; y++) if (y % 3) m.set(ux, y, d, trim); // quoins
+    for (let k = 0; k < Math.floor((ww - 4) / 5); k++) {
+      const x = x0 + 3 + k * 5;
+      // Upper floor: tall arched window; ground floor: a small square one.
+      for (let y = 12; y < 19; y++) { m.remove(x, y, d - 1); m.remove(x + 1, y, d - 1); m.set(x, y, d - 2, C.glass); m.set(x + 1, y, d - 2, hash3(x, y, 5) < 0.2 ? C.glassLit : C.glass, hash3(x, y, 5) < 0.2); }
+      m.set(x, 19, d - 1, trim); m.set(x + 1, 19, d - 1, trim); m.set(x - 1, 18, d - 1, trim); m.set(x + 2, 18, d - 1, trim);
+      m.box(x - 1, 11, d, 4, 1, 1, trim);                                                    // sill
+      for (let y = 6; y < 9; y++) { m.remove(x, y, d - 1); m.remove(x + 1, y, d - 1); m.set(x, y, d - 2, C.glass); m.set(x + 1, y, d - 2, C.glass); }
+      m.box(x - 1, 5, d, 4, 1, 1, trim);
+    }
+    for (let x = x0 + 2; x < x0 + ww - 2; x += 4) m.box(x, 26, d - 1, 2, 2, 2, trim);          // urns on the parapet
+  };
+  wing(0, 15); wing(w - 15, 15);
+  // Central pavilion, one storey taller, pushed forward.
+  const px0 = 15; const pw = w - 30;
+  m.walls(px0, 4, -2, pw, 26, d + 4, stone); m.box(px0 + 1, 29, -1, pw - 2, 1, d + 2, C.roofDark);
+  m.box(px0 - 1, 30, -3, pw + 2, 2, d + 6, trim);
+  // Low dome with a lantern.
+  for (let y = 0; y < 6; y++) for (let x = -6; x <= 6; x++) for (let z = -6; z <= 6; z++) if (x * x + z * z + (y * 1.6) ** 2 <= 40 && x * x + z * z + (y * 1.6) ** 2 > 22) m.set(cx + x, 32 + y, d / 2 + z, y > 3 ? 0x7d9a8c : 0x6c8a7c);
+  m.box(cx - 1, 38, d / 2 - 1, 3, 3, 3, trim); m.set(cx, 41, d / 2, C.metalDark);
+  // Portico: columns with bases and capitals, entablature with the name band, pediment with a round window.
+  const fz = d + 2;
+  for (let k = 0; k < 4; k++) {
+    const x = px0 + 1 + k * Math.floor((pw - 3) / 3);
+    m.box(x, 4, fz, 2, 1, 2, trim); m.box(x, 5, fz, 2, 15, 2, k === 2 ? 0xd2cbb6 : 0xece6d6); m.box(x - 1, 20, fz - 1, 4, 1, 4, trim);
+    if (k === 2) m.set(x + 1, 12, fz + 1, 0x8a8370); // a crack
   }
-  for (let x = 22; x < 40; x += 3) m.box(x, FH + 1, 12, 1, 4 + Math.floor(hash3(x, 1, 1) * 6), 1, C.creamDark); // broken wall stubs
+  m.box(px0 - 1, 21, fz - 1, pw + 2, 3, 4, trim);
+  for (let x = px0 + 2; x < px0 + pw - 2; x += 2) m.set(x, 22, fz + 3, 0xa8a08a);           // carved name band (unlit)
+  for (let k = 0; k < 6; k++) m.box(px0 - 1 + k * 2, 24 + k, fz - 1, pw + 2 - k * 4, 1, 3, k === 5 ? dark : trim);
+  for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) m.set(cx - 1 + dx, 26 + dy, fz + 2, C.glass);
+  // Double wooden door with a fanlight.
+  m.box(cx - 3, 4, d + 1, 6, 9, 1, 0x5a3a24); m.box(cx, 4, d + 2, 1, 9, 1, 0x3a2416); m.box(cx - 2, 13, d + 1, 4, 2, 1, C.glassLit, true);
+  // Full-width steps, two lamp posts on pedestals, a book-return box, a noticeboard; one boarded window, a little rubble.
+  for (let k = 0; k < 3; k++) m.box(px0 - 3 - k, 1 + 2 - k, fz + 2 + k * 2, pw + 6 + 2 * k, 1, 2, k % 2 ? dark : trim);
+  for (const x of [px0 - 4, px0 + pw + 3]) { m.box(x, 1, fz + 6, 2, 3, 2, trim); m.box(x, 4, fz + 6, 1, 8, 1, C.metalDark); m.box(x - 1, 12, fz + 5, 3, 2, 3, C.glassLit, true); }
+  m.box(w - 4, 1, d + 4, 3, 4, 2, 0x2b4a8c); m.box(w - 4, 4, d + 5, 3, 1, 1, 0x1c1f24);
+  m.box(3, 4, d + 1, 6, 4, 1, P.woodDark); m.box(4, 5, d + 2, 4, 2, 1, 0xe8e2d0);
+  m.box(4, 12, d - 1, 2, 7, 1, C.board);
+  for (let i = 0; i < 10; i++) m.box(w + 1 + Math.floor(hash3(i, 1, 9) * 3), 1, 4 + Math.floor(hash3(i, 2, 9) * 12), 2, 1 + Math.floor(hash3(i, 3, 9) * 2), 2, i % 2 ? stone : dark);
   return dust(m);
 }
 

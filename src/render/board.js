@@ -444,7 +444,14 @@ export function createBoard({ progressive = false } = {}) {
     const k = map.blocks[key];
     const lot = openBlock(k, bx, bz) && k.kind !== 'plaza' && hash3(bx, 77, bz) < 0.5;
     const snowy = k.kind === 'park' || k.kind === 'colony' || lot;
-    const slab = blockSlab({ x0: cx - hx + ROAD.half, x1: cx + hx - ROAD.half, z0: cz - hz + ROAD.half, z1: cz + hz - ROAD.half, walk: ROAD.walk - ROAD.kerb, surface: snowy ? 'snow' : 'paved', detail: cell < 1, seed: [bx, bz] });
+    // MAP-4: an edge with no street but a neighbouring block runs on to the block boundary (the blocks join flush).
+    const roadSet = new Set(map.roads);
+    const open = {
+      x0: !roadSet.has(`${bx},${bz},v`) && has(bx - 1, bz), x1: !roadSet.has(`${bx + 1},${bz},v`) && has(bx + 1, bz),
+      z0: !roadSet.has(`${bx},${bz},h`) && has(bx, bz - 1), z1: !roadSet.has(`${bx},${bz + 1},h`) && has(bx, bz + 1),
+    };
+    const e = (o) => (o ? 0 : ROAD.half);
+    const slab = blockSlab({ x0: cx - hx + e(open.x0), x1: cx + hx - e(open.x1), z0: cz - hz + e(open.z0), z1: cz + hz - e(open.z1), walk: ROAD.walk - ROAD.kerb, surface: snowy ? 'snow' : 'paved', detail: cell < 1, seed: [bx, bz], open });
     const sg = new THREE.BufferGeometry();
     for (const a of ['position', 'normal', 'color']) sg.setAttribute(a, new THREE.BufferAttribute(slab[a], 3));
     sg.setIndex(new THREE.BufferAttribute(slab.index, 1));
@@ -787,34 +794,48 @@ export function createBoard({ progressive = false } = {}) {
         if (hc < 0.3 && tc < r.t1 && ground(cx, cz) && !near(cx, cz, nodes, 11) && !near(cx, cz, lamps, 1.6)) { const ck = Math.floor(hash3(Math.round(tc), 5, rail.look) * (CLUTTER_KINDS - 1)); add(`clutter-${ck}`, () => clutterModel(ck), 0.12, cx, GROUND, cz, hc * 20); }
       }
     });
-    // Power lines along two streets: poles every 12 on the far sidewalk, some leaning, one down; sagging wires.
+    // Power lines (MAP-4): poles every 12 on one sidewalk, cross arm ACROSS the street; each of the 3 wires runs from
+    // insulator to insulator, the ends taken from the pole's full transform (a leaning pole carries its wires).
+    // Runs end with a guy wire to the ground; wires from a fallen pole's neighbours hang to the ground beside it.
     const wires = [];
+    const INS = [-0.9, 0, 0.9].map((xo) => new THREE.Vector3(xo, 6.55, -0.05)); // insulators in pole space (0.1 voxels)
+    const sag = (a, b) => { for (let s2 = 0; s2 < 10; s2++) { const u = s2 / 10; const v = (s2 + 1) / 10; const span = a.distanceTo(b); const pa = a.clone().lerp(b, u); pa.y -= Math.sin(u * Math.PI) * span * 0.05; const pb = a.clone().lerp(b, v); pb.y -= Math.sin(v * Math.PI) * span * 0.05; wires.push(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z); } };
+    const straight = (a, b) => wires.push(a.x, a.y, a.z, b.x, b.y, b.z);
     const long = runs.filter((r) => !(r.axis === rail.axis && Math.abs(r.c - rail.c) < 0.01)).sort((a, b) => (b.t1 - b.t0) - (a.t1 - a.t0) || a.c - b.c).slice(0, 2);
     long.forEach((r, ri) => {
-      let prev = null;
-      const lat = -(ROAD.walk - 0.4);
+      const lat = -(ROAD.kerb + 1.25); // the arm (±1) stays over the sidewalk, clear of the building line
+      const dirT = r.axis === 'x' ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
+      const chain = []; // consecutive poles: { ends: [3 world points], base, down }
+      const flush = () => {
+        // Wire the chain: spans between standing poles; guy wires at both ends; drop wires next to a fallen pole.
+        for (let i = 0; i < chain.length; i++) {
+          const p = chain[i]; const q = chain[i + 1];
+          if (q && !p.down && !q.down) for (let k = 0; k < 3; k++) sag(p.ends[k], q.ends[k]);
+          if (q && (p.down !== q.down)) { const st = p.down ? q : p; const fl = p.down ? p : q; for (let k = 0; k < 3; k++) { const g = fl.base.clone().lerp(st.base, 0.25 + k * 0.08); g.y = GROUND + 0.02; sag(st.ends[k], g); } }
+        }
+        const live = chain.filter((c) => !c.down);
+        for (const [c, sgn] of [[live[0], -1], [live[live.length - 1], 1]]) {
+          if (!c || live.length < 2) continue;
+          const anchor = c.base.clone().addScaledVector(dirT, sgn * 2.6); anchor.y = GROUND;
+          straight(c.ends[1].clone().setY(c.ends[1].y - 0.4), anchor);
+        }
+        chain.length = 0;
+      };
       for (let k = Math.ceil((r.t0 - 6) / 12); k * 12 + 6 <= r.t1; k++) {
         const t = k * 12 + 6;
         const [x, z] = r.axis === 'x' ? [t, r.c + lat] : [r.c + lat, t];
-        if (!ground(x, z) || near(x, z, nodes, 7)) { prev = null; continue; }
+        if (!ground(x, z) || near(x, z, nodes, 7) || near(x, z, lamps, 2.4)) { flush(); continue; }
         const h = hash3(Math.round(t), ri, rail.look + 17);
-        const down = h < 0.08 && Math.abs((r.axis === 'x' ? z : x) - rail.c) > 10 && Math.abs(t - (r.axis === 'x' ? rail.c : rail.c)) > 0 && !(r.axis !== rail.axis && Math.abs(t - rail.c) < 10);
-        const lean = down ? 0 : h < 0.3 ? (h - 0.19) * 0.6 : 0;
-        const yaw = r.axis === 'x' ? 0 : Math.PI / 2;
-        add('pole', powerPoleModel, 0.1, x, GROUND, z, yaw, down ? Math.PI / 2 - 0.08 : lean, 'z');
-        if (down) { prev = null; continue; }
-        const top = new THREE.Vector3(x, GROUND + 6.5, z);
-        if (prev) for (const o of [-0.9, 0, 0.9]) {
-          const off = r.axis === 'x' ? new THREE.Vector3(0, 0, o) : new THREE.Vector3(o, 0, 0);
-          for (let s2 = 0; s2 < 8; s2++) {
-            const a = s2 / 8; const b = (s2 + 1) / 8;
-            const pa = prev.clone().lerp(top, a).add(off); pa.y -= Math.sin(a * Math.PI) * 0.6;
-            const pb = prev.clone().lerp(top, b).add(off); pb.y -= Math.sin(b * Math.PI) * 0.6;
-            wires.push(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z);
-          }
-        }
-        prev = top;
+        const down = h < 0.08 && !near(x, z, lamps, 8.5) && Math.abs((r.axis === 'x' ? z : x) - rail.c) > 10 && !(r.axis !== rail.axis && Math.abs(t - rail.c) < 10);
+        const lean = down ? 0 : h < 0.3 ? (h - 0.19) * 0.5 : 0;
+        const yaw = r.axis === 'x' ? Math.PI / 2 : 0;            // the arm (local x) across the street
+        const tilt = down ? Math.PI / 2 - 0.08 : lean;            // leaning / falling along the street
+        add('pole', powerPoleModel, 0.1, x, GROUND, z, yaw, tilt, 'x'); // tilts along the street (about the arm)
+        _e.set(tilt, yaw, 0, 'YXZ');
+        const mx = new THREE.Matrix4().compose(new THREE.Vector3(x, GROUND, z), _q.setFromEuler(_e), new THREE.Vector3(1, 1, 1));
+        chain.push({ base: new THREE.Vector3(x, GROUND, z), down, ends: INS.map((v) => v.clone().applyMatrix4(mx)) });
       }
+      flush();
     });
     if (wires.length) {
       const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wires, 3));

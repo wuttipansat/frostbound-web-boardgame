@@ -24,7 +24,11 @@ const col = new THREE.Color();
  *      detail (false = the far level: a plain slab), seed: [bx, bz] }
  * Returns typed arrays { position, normal, color, index } in world space.
  */
-export function blockSlab({ x0, x1, z0, z1, walk = 2.2, surface = 'paved', detail = true, seed = [0, 0] }) {
+export function blockSlab({ x0, x1, z0, z1, walk = 2.2, surface = 'paved', detail = true, seed = [0, 0], open = {} }) {
+  // MAP-4: `open` sides ({ x0, x1, z0, z1 }) join a neighbouring block with no street between: no kerb, no corner cut,
+  // no side face there (the caller has already extended that edge to the block boundary).
+  const closed = { x0: !open.x0, x1: !open.x1, z0: !open.z0, z1: !open.z1 };
+  const cut = { '00': closed.x0 && closed.z0 ? CUT : 0, '10': closed.x1 && closed.z0 ? CUT : 0, '01': closed.x0 && closed.z1 ? CUT : 0, '11': closed.x1 && closed.z1 ? CUT : 0 };
   const pos = []; const nrm = []; const cols = []; const idx = [];
   const [sa, sb] = seed;
   const quad = (pts, n, hex) => {
@@ -35,12 +39,14 @@ export function blockSlab({ x0, x1, z0, z1, walk = 2.2, surface = 'paved', detai
   };
   // Top rectangle at height y (wound to face up).
   const top = (ax, az, bx, bz, y, hex) => { if (bx - ax > 1e-4 && bz - az > 1e-4) quad([[ax, y, az], [ax, y, bz], [bx, y, bz], [bx, y, az]], [0, 1, 0], hex); };
-  const cutAt = (x, z) => [[x0, z0], [x1, z0], [x0, z1], [x1, z1]].some(([cx, cz]) => Math.abs(x - cx) + Math.abs(z - cz) < CUT + 0.05);
-  // Outline (octagon) and its side faces from 0 to GROUND.
-  const ring = [[x0 + CUT, z0], [x1 - CUT, z0], [x1, z0 + CUT], [x1, z1 - CUT], [x1 - CUT, z1], [x0 + CUT, z1], [x0, z1 - CUT], [x0, z0 + CUT]];
+  const cutAt = (x, z) => [[x0, z0, cut['00']], [x1, z0, cut['10']], [x0, z1, cut['01']], [x1, z1, cut['11']]].some(([cx, cz, c]) => c && Math.abs(x - cx) + Math.abs(z - cz) < c + 0.05);
+  // Outline (octagon, corners cut only between two kerbed sides) and its side faces from 0 to GROUND.
+  const ring = [[x0 + cut['00'], z0], [x1 - cut['10'], z0], [x1, z0 + cut['10']], [x1, z1 - cut['11']], [x1 - cut['11'], z1], [x0 + cut['01'], z1], [x0, z1 - cut['01']], [x0, z0 + cut['00']]];
+  const sideOf = ['z0', null, 'x1', null, 'z1', null, 'x0', null];
   for (let i = 0; i < 8; i++) {
     const [ax, az] = ring[i]; const [bx, bz] = ring[(i + 1) % 8];
     const ex = bx - ax; const ez = bz - az; const len = Math.hypot(ex, ez);
+    if (len < 1e-6 || (sideOf[i] && !closed[sideOf[i]])) continue;
     const n = [ez / len, 0, -ex / len]; // outward for a clockwise-from-above ring
     const steps = detail && i % 2 === 0 ? Math.max(1, Math.round(len)) : 1; // kerb stone joints every ~1 world
     for (let k = 0; k < steps; k++) {
@@ -49,17 +55,17 @@ export function blockSlab({ x0, x1, z0, z1, walk = 2.2, surface = 'paved', detai
       quad([[p1[0], 0, p1[1]], [p0[0], 0, p0[1]], [p0[0], GROUND, p0[1]], [p1[0], GROUND, p1[1]]], n, detail && k % 2 ? SIDE : 0xb3b0a4);
     }
   }
-  // Base (grout colour) covering the octagon: centre rectangle + 4 trapezoid-free strips (corners left as cut).
+  // Base (grout colour) covering the outline: a triangle fan from the centre (the outline is convex).
   const base = surface === 'snow' ? SNOW_BASE : BASE;
   const yb = GROUND - 0.005;
-  top(x0 + CUT, z0, x1 - CUT, z1, yb, detail ? base : SLABS[0]);
-  top(x0, z0 + CUT, x0 + CUT, z1 - CUT, yb, detail ? base : SLABS[0]);
-  top(x1 - CUT, z0 + CUT, x1, z1 - CUT, yb, detail ? base : SLABS[0]);
-  // The cut corners themselves (triangles as degenerate quads).
-  for (const [cx, cz, sx, sz] of [[x0, z0, 1, 1], [x1, z0, -1, 1], [x0, z1, 1, -1], [x1, z1, -1, -1]]) {
-    const a = [cx + sx * CUT, yb, cz]; const b = [cx, yb, cz + sz * CUT]; const c = [cx + sx * CUT, yb, cz + sz * CUT];
-    const up = (sx * sz > 0);
-    quad(up ? [a, b, c, c] : [a, c, b, b], [0, 1, 0], detail ? KERBS[0] : SLABS[0]);
+  const cxm = (x0 + x1) / 2; const czm = (z0 + z1) / 2;
+  col.setHex(detail ? base : SLABS[0]);
+  for (let i = 0; i < 8; i++) {
+    const [ax, az] = ring[i]; const [bx, bz] = ring[(i + 1) % 8];
+    if (Math.hypot(bx - ax, bz - az) < 1e-6) continue;
+    const b0 = pos.length / 3;
+    for (const p of [[cxm, yb, czm], [bx, yb, bz], [ax, yb, az]]) { pos.push(...p); nrm.push(0, 1, 0); cols.push(col.r, col.g, col.b); }
+    idx.push(b0, b0 + 1, b0 + 2);
   }
   if (!detail) return finish(pos, nrm, cols, idx);
   // Tiles: rect clipped to a zone; skip ones in a cut corner.
@@ -73,7 +79,9 @@ export function blockSlab({ x0, x1, z0, z1, walk = 2.2, surface = 'paved', detai
   const tone = (list, i, j, k) => list[Math.floor(hash3(i * 3 + sa, k, j * 3 + sb) * list.length)];
   // Kerb: a pale band of 2-world stones round the edge.
   const K = [[x0, z0, x1, z0 + KERB], [x0, z1 - KERB, x1, z1], [x0, z0 + KERB, x0 + KERB, z1 - KERB], [x1 - KERB, z0 + KERB, x1, z1 - KERB]];
+  const kSide = ['z0', 'z1', 'x0', 'x1'];
   K.forEach((zone, s) => {
+    if (!closed[kSide[s]]) return; // no kerb where the ground runs on into the next block
     const alongX = s < 2;
     for (let t = Math.floor((alongX ? zone[0] : zone[1]) / 2) * 2; t < (alongX ? zone[2] : zone[3]); t += 2) {
       const hex = KERBS[(t / 2 + s) & 1];
@@ -81,10 +89,10 @@ export function blockSlab({ x0, x1, z0, z1, walk = 2.2, surface = 'paved', detai
     }
   });
   // One grid of large slabs over the whole block (aligned to world coordinates); snow inside parks / lots / colony.
-  const i0 = [x0 + KERB, z0 + KERB, x1 - KERB, z1 - KERB];
-  const inner = [i0[0] + walk, i0[1] + walk, i0[2] - walk, i0[3] - walk];
+  const i0 = [x0 + (closed.x0 ? KERB : 0), z0 + (closed.z0 ? KERB : 0), x1 - (closed.x1 ? KERB : 0), z1 - (closed.z1 ? KERB : 0)];
+  const inner = [i0[0] + (closed.x0 ? walk : 0), i0[1] + (closed.z0 ? walk : 0), i0[2] - (closed.x1 ? walk : 0), i0[3] - (closed.z1 ? walk : 0)];
   const inside = (x, z) => x > inner[0] && x < inner[2] && z > inner[1] && z < inner[3];
-  const edgeD = (x, z) => Math.min(x - i0[0], i0[2] - x, z - i0[1], i0[3] - z);
+  const edgeD = (x, z) => Math.min(closed.x0 ? x - i0[0] : 99, closed.x1 ? i0[2] - x : 99, closed.z0 ? z - i0[1] : 99, closed.z1 ? i0[3] - z : 99);
   const bit = (cx, cz, w, d, hex, y = 0.004) => top(cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2, GROUND + y, hex);
   for (let x = Math.floor(i0[0] / TILE) * TILE; x < i0[2]; x += TILE) {
     for (let z = Math.floor(i0[1] / TILE) * TILE; z < i0[3]; z += TILE) {
