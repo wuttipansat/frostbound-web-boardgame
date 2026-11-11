@@ -856,27 +856,6 @@ export function ruins() {
   return m.snowCap(P.snow, 1, 1);
 }
 
-/** A rail yard: two tracks, a boxcar, a signal. */
-export function railYard() {
-  const m = new VoxelModel();
-  for (let x = 0; x < 56; x++) for (let z = 0; z < 48; z++) m.set(x, 0, z, hash3(x, 5, z) < 0.3 ? 0x6c665e : P.snow);
-  for (const tz of [14, 32]) for (let x = 0; x < 56; x++) {
-    if (x % 3 === 0) m.box(x, 1, tz - 3, 1, 1, 8, 0x5a4232);
-    m.set(x, 2, tz - 2, C.metal); m.set(x, 2, tz + 3, C.metal);
-  }
-  m.box(10, 3, 29, 24, 9, 7, C.cont[0]); m.box(10, 12, 29, 24, 1, 7, C.roofDark);
-  m.clearBox(20, 4, 35, 4, 7, 1);
-  m.box(44, 1, 22, 1, 14, 1, C.metalDark); m.box(43, 13, 22, 3, 3, 1, 0x15191e); m.set(44, 14, 23, C.neonRed, true);
-  return m.snowCap(P.snow, 1, 1);
-}
-
-// ---------------------------------------------------------------- MAP-1b: small buildings that fill a block's free chunks
-
-export const SMALL_VARIANTS = 8;
-export const SMALL_SCALE = 0.86; // instance scale: a small building fills its chunk with a little room around it
-const SMALL_WALLS = [C.sage, C.cream, C.grey, C.brick, C.ochre, 0x8fa3b8, 0xb9a48a, 0x9b8b9e];
-
-/** A small, closed-up building (not a place you can enter): 1–4 floors, sized to one chunk. */
 export function smallBuilding(v = 0) {
   const m = new VoxelModel();
   const w = 16 + (v % 3) * 2; const d = 14 + (v % 2) * 3;

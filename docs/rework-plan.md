@@ -465,3 +465,16 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - Amber traffic lights blink (own small mesh).
 - Audit: 6 seeds × 4 stages, 0 findings; contact sheets regenerated.
 - Left as known limits: place signs face their street, so some face away from the camera (pins carry the names); a small pale wedge can show at one rim corner in whole-city views; draw calls ~120–260 (target 60 needs a renderer rework: terrain merged per growth, models instanced across blocks); the stage-1 railway only crosses a few blocks.
+
+### MAP-4 — a connected city (done)
+- 1 Street hierarchy: a seeded main avenue (the colony-row edge across the railway). Traffic lights and direction signs (hospital / police / station arrows) only at avenue junctions; side-street junctions get stop signs; bus stops only on the avenue.
+- 2 Frontage: downtown front rows are a continuous street wall (small buildings sized to their chunk's width, side by side); residential houses get a picket fence along the sidewalk; industrial yards a chain-link fence.
+- 3 Back alleys: not built as separate pieces (blocks keep their 3×2 build window); the joined ground (item 8) gives the backs of blocks one surface.
+- 4 Networks: power drops from the nearest standing pole to every small building's roof edge within 12; a station platform with a shelter beside the track where the avenue crosses the railway.
+- 5 Wayfinding: "SAFE ZONE →" boards every ~18 along the evacuation route pointing to the colony; a second checkpoint where the route leaves the city.
+- 6 Transitions: near a district border some blocks take the neighbouring district's character.
+- 7 Checks: the audit covers the new pieces (0 findings over 6 seeds × 4 stages). Not built: footprints from the colony to visited places (the game's footprint decals already follow walkers), freight sidings, bus route numbers.
+- 8 Blocks with no street between them join flush (no kerb, cut or side face on that edge; the corner square filled); a street ending there stops at the slab.
+- 9 Hospital: no ER neon; the red cross is a framed white roof sign on posts (helipad moved back), a small cross plate on the ER canopy.
+- 10 Library: a classical civic building (symmetric hall, taller pavilion with 4 columns, entablature, pediment with a round window, low dome with a lantern, arched windows, plinth, full-width steps, lamp posts, book drop, noticeboard, one boarded window, a cracked column); no BOOKS neon.
+- 11 Power lines: cross arms across the street; wires end on the insulators computed from each pole's transform (a leaning pole carries them); poles lean / fall along the street; guy wires at the ends of every run; wires from a fallen pole's neighbours hang to the ground.

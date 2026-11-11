@@ -6,7 +6,7 @@ import { VoxelModel, hash3, MATERIALS, geometriesFor, groupOf, packedBounds } fr
 import { P } from './palette.js';
 import { LOCATION_BUILDERS_HD, colonyHD, treeModelHD, rockModelHD } from './buildings.js';
 import { buildTerrainHD, ROAD } from './terrain.js';
-import { carModel, lampModel, containerModel, clutterModel, CLUTTER_KINDS, crossingModel, wagonModel, bufferStopModel, FURNITURE, furnitureModel, trafficLightModel, streetSignModel, powerPoleModel, vehicleModel, checkpointModel, burntCarModel, tentModel, statueModel } from './props.js';
+import { carModel, lampModel, containerModel, clutterModel, CLUTTER_KINDS, crossingModel, wagonModel, bufferStopModel, shelterModel, stopSignModel, directionSignModel, safeZoneModel, fenceModel, FURNITURE, furnitureModel, trafficLightModel, streetSignModel, powerPoleModel, vehicleModel, checkpointModel, burntCarModel, tentModel, statueModel } from './props.js';
 import { markingQuads, lampSpots, railQuads, streetRuns, rampQuads } from './streets.js';
 import { blockSlab, GROUND } from './ground.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -207,7 +207,20 @@ export function districtOf(bx, bz, look = 0) {
   if (!bx && !bz) return 'colony';
   const a0 = hash3(look, 13, 7) * Math.PI * 2;
   let d = Math.abs(Math.atan2(bz, bx) - a0) % (Math.PI * 2); if (d > Math.PI) d = Math.PI * 2 - d;
-  return d < Math.PI / 3 ? 'downtown' : d > (2 * Math.PI) / 3 ? 'industrial' : 'residential';
+  const pure = (a) => (a < Math.PI / 3 ? 'downtown' : a > (2 * Math.PI) / 3 ? 'industrial' : 'residential');
+  // MAP-4: districts blend over a block: near a border some blocks take the neighbouring district's character.
+  const here = pure(d);
+  for (const step of [-Math.PI / 6, Math.PI / 6]) {
+    let d2 = Math.abs(Math.atan2(bz, bx) + step - a0) % (Math.PI * 2); if (d2 > Math.PI) d2 = Math.PI * 2 - d2;
+    if (pure(d2) !== here && hash3(bx, 97, bz) < 0.4) return pure(d2);
+  }
+  return here;
+}
+/** MAP-4: the main avenue: the colony-row edge line across the railway (seeded side): { axis, c }. */
+export function avenueLine(m) {
+  const rail = railLine(m);
+  const li = hash3(m?.look ?? 0, 19, 4) < 0.5 ? 0 : 1;
+  return { axis: rail.axis === 'x' ? 'z' : 'x', c: blockPos(li) - blockHalf(li) };
 }
 const DISTRICT_RECIPES = {
   downtown: [['shop', 55], ['house', 30], ['car', 8], ['clutter', 7]],
@@ -225,7 +238,7 @@ export const openBlock = (b, bx, bz) => RECIPES[b.kind] && b.kind !== 'place' &&
  * centrepiece and 1–2 pieces) stay inside one 3×2 window at the front; other chunks are open, now and then with one
  * bench or one tree. Seeded by the block, so a block never changes.
  */
-export function blockPieces(b, bx, bz, plan, recipe = RECIPES[b.kind] ?? RECIPES.place) {
+export function blockPieces(b, bx, bz, plan, recipe = RECIPES[b.kind] ?? RECIPES.place, district = null) {
   const out = [];
   const h = (k) => hash3(bx * 7 + k, 73, bz * 7 - k);
   const cols = plan.covered.map((c) => +c.split(',')[1]);
@@ -242,6 +255,8 @@ export function blockPieces(b, bx, bz, plan, recipe = RECIPES[b.kind] ?? RECIPES
   if (b.kind === 'place') n = built >= 4 ? (h(2) < 0.75 ? 1 : 2) : 2;
   else if (openBlock(b, bx, bz)) n = 0;
   else n = 2; // two pieces besides any centrepiece (still inside the 3×2 window)
+  // MAP-4 frontage: downtown, the whole front row of the window is built (a continuous street wall).
+  if (district === 'downtown' && !openBlock(b, bx, bz)) n = Math.max(n, win.filter(([i]) => i === 0).length);
   n = Math.min(n, 6 - built, win.length);
   const used = new Set();
   for (let k = 0; k < n; k++) {
@@ -579,7 +594,7 @@ export function createBoard({ progressive = false } = {}) {
     };
     const houses = Array.from({ length: city.SMALL_VARIANTS }, () => []);
     const put = (list, p, rotY, scale = 1) => { tmp.position.copy(p); tmp.rotation.set(0, rotY, 0); tmp.scale.setScalar(scale); tmp.updateMatrix(); list.push(tmp.matrix.clone()); };
-    const ruins = [[], []]; const pieces = { parking: [], fountain: [] }; const clutter = Array.from({ length: CLUTTER_KINDS }, () => []);
+    const ruins = [[], []]; const pieces = { parking: [], fountain: [] }; const fences = { picket: [], chain: [] }; const clutter = Array.from({ length: CLUTTER_KINDS }, () => []);
     const roadSet = new Set(map.roads);
     for (const key of keys) {
       const b = map.blocks[key];
@@ -598,7 +613,8 @@ export function createBoard({ progressive = false } = {}) {
         }
         // MAP-3 calmer blocks: everything built (place / centrepiece + pieces) fits in a 3×2 window at the street side;
         // the other chunks stay open (paving or snow, now and then one bench or one tree).
-        for (const [i, j, what] of blockPieces(b, bx, bz, plan, recipe)) {
+        for (const [i, j, what0] of blockPieces(b, bx, bz, plan, recipe, district)) {
+          const what = district === 'downtown' && i === 0 && what0 !== 'bench' && what0 !== 'tree' ? 'shop' : what0;
           const p = chunkCenter(plan, i, j);
           const r2 = hash3(bx * 5 + i, 67, bz * 5 + j);
           // Front-row buildings face the street; others any way.
@@ -608,7 +624,14 @@ export function createBoard({ progressive = false } = {}) {
             const shopPool = pool.filter((v) => v % 2 === 0); const housePool = pool.filter((v) => v % 2 === 1);
             const list = what === 'shop' && shopPool.length ? shopPool : what !== 'shop' && housePool.length ? housePool : pool;
             const v = list[Math.floor(r2 * list.length)];
-            put(houses[v % city.SMALL_VARIANTS], p, face, city.SMALL_SCALE);
+            // Downtown front rows: sized to their chunk's width, side by side (no gaps); others the usual size.
+            const wide = district === 'downtown' && i === 0 ? Math.min(1.1, (CHUNK - 0.25) / ((16 + (v % 3) * 2 + 7) * 0.3)) : city.SMALL_SCALE; // + fire escape, AC, snow bank
+            put(houses[v % city.SMALL_VARIANTS], p, face, wide);
+            const floors = 2 + (v % 3); const dep = (14 + (v % 2) * 3) * 0.3 * wide;
+            const toward = plan.fwd.clone(); if (i !== 0) toward.set(Math.sin(face), 0, Math.cos(face));
+            houseSpots.push({ roof: p.clone().addScaledVector(toward, dep / 2 - 0.2).setY(GROUND + floors * 10 * 0.3 * wide + 0.2) });
+            // Residential front yards get a picket fence along the sidewalk.
+            if (district === 'residential' && i === 0) put(fences.picket, p.clone().addScaledVector(plan.fwd, CHUNK / 2 - 0.25), face0);
           } else if (what === 'trees') {
             for (let k = 0; k < 3; k++) {
               const q = p.clone().add(new THREE.Vector3((hash3(k, bx, j) - 0.5) * 4, 0, (hash3(k, bz, i) - 0.5) * 4));
@@ -621,6 +644,7 @@ export function createBoard({ progressive = false } = {}) {
             put(cars[Math.floor(r2 * 4)], p.clone().addScaledVector(across, -1.6), face + Math.PI / 2);
             put(cars[Math.floor(hash3(i, j, bx) * 4)], p.clone().addScaledVector(across, 1.6), face + Math.PI / 2);
           } else if (what === 'yard') {
+            if (district === 'industrial' && i === 0) put(fences.chain, p.clone().addScaledVector(plan.fwd, CHUNK / 2 - 0.2), face0); // a fenced lot
             // Two stacks side by side (offset across their length, whichever way they face).
             const across = new THREE.Vector3(Math.sin(face), 0, Math.cos(face));
             put(yards[Math.floor(r2 * 3)], p.clone().addScaledVector(across, -1.7), face);
@@ -669,6 +693,7 @@ export function createBoard({ progressive = false } = {}) {
     rocks.forEach((list, k) => { if (list.length) group.add(lazyLod('near', () => instanced(() => rockModelHD(k), 0.25, list, { cacheKey: `rock-${k}`, jitter: 0 }))); });
     cars.forEach((list, v) => { if (list.length) group.add(lazyLod('near', () => instanced(() => carModel(v), 0.15, list, { cacheKey: `car4-${v}`, jitter: 0, castShadow: false }))); });
     yards.forEach((list, k) => { if (list.length) group.add(lodProp(`container-${k}`, () => containerModel(k, 1 + (k % 2)), 0.2, list)); });
+    for (const [k, list] of Object.entries(fences)) if (list.length) group.add(lazyLod('near', () => instanced(() => fenceModel(k), 0.1, list, { cacheKey: `fence-${k}`, jitter: 0, castShadow: false })));
     if (attach) root.add(group);
     return { group, k: 0, target: 1, delay: 0 };
   }
@@ -679,6 +704,7 @@ export function createBoard({ progressive = false } = {}) {
   const POOL_MAT = new THREE.MeshBasicMaterial({ map: poolTexture(), color: 0xffb36b, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, fog: false });
   const decor = new THREE.Group(); decor.name = 'street-decor';
   const debugItems = []; // MAP audit: merged furniture pieces { kind, box }
+  const houseSpots = []; // MAP-4: roof edges of small buildings (service drops from the power lines)
   root.add(decor);
   let flickers = []; let pools = null;
   function buildStreetDecor() {
@@ -757,12 +783,24 @@ export function createBoard({ progressive = false } = {}) {
       debugItems.push({ kind: key.replace(/-\d+$/, ''), box });
     };
     const yawTo = (dx, dz) => Math.atan2(dx, dz); // local +z faces (dx, dz)
+    const taken = (x, z, r) => debugItems.some((d) => x > d.box.min.x - r && x < d.box.max.x + r && z > d.box.min.z - r && z < d.box.max.z + r);
     const { nodes, runs } = streetRuns(segs);
     const onRail = (n) => (rail.axis === 'x' ? Math.abs(n.z - rail.c) < 0.01 : Math.abs(n.x - rail.c) < 0.01);
     const junctions = nodes.filter((n) => n.kind === 'junction');
     // Junctions: traffic lights on two corners (one dead now and then, one blinking amber), a street sign.
+    const ave = avenueLine(map);
+    const onAve = (n) => (ave.axis === 'x' ? Math.abs(n.z - ave.c) < 0.01 : Math.abs(n.x - ave.c) < 0.01);
     junctions.forEach((n, i) => {
       if (onRail(n)) return; // level crossings have their own posts
+      if (!onAve(n)) {
+        // MAP-4: side-street junctions get stop signs (one each on two corners) instead of traffic lights.
+        for (const [sx, sz] of [[1, 1], [-1, -1]]) {
+          const x = n.x + sx * (ROAD.kerb + 0.35); const z = n.z + sz * (ROAD.walk + 0.6);
+          if (ground(x, z) && n.dirs.has(sz > 0 ? '+z' : '-z')) add('stop', stopSignModel, 0.1, x, GROUND, z, sz > 0 ? 0 : Math.PI);
+        }
+        return;
+      }
+      { const x = n.x - (ROAD.kerb + 0.35); const z = n.z + (ROAD.walk + 0.6); if (ground(x, z)) add('dirsign', directionSignModel, 0.1, x, GROUND, z, Math.PI / 4); }
       for (const [sx, sz] of [[1, 1], [-1, -1]]) {
         const x = n.x + sx * (ROAD.kerb + 0.35); const z = n.z + sz * (ROAD.walk + 0.6);
         if (!ground(x, z) || !n.dirs.has(sz > 0 ? '+z' : '-z')) continue; // its arm reaches over a street, not a back lane
@@ -785,7 +823,8 @@ export function createBoard({ progressive = false } = {}) {
         if (!ground(x, z) || near(x, z, nodes, 11) || near(x, z, lamps, 1.6)) continue;
         const h = hash3(Math.round(t), ri, rail.look + 13);
         let kind = h < 0.3 ? 'hydrant' : h < 0.5 ? 'bin' : h < 0.6 ? 'postbox' : h < 0.7 ? 'newsbox' : h < 0.74 ? 'phone' : h < 0.86 ? 'busstop' : null;
-        if (kind === 'busstop') { if (busStop) kind = 'bin'; busStop = true; }
+        const aveRun = r.axis === ave.axis && Math.abs(r.c - ave.c) < 0.01;
+        if (kind === 'busstop') { if (busStop || !aveRun) kind = 'bin'; else busStop = true; } // the bus route runs on the avenue
         const [dx, dz] = r.axis === 'x' ? [0, -1] : [-1, 0];
         if (kind) add(`furn-${kind}`, () => furnitureModel(kind), 0.1, x, GROUND, z, yawTo(dx, dz));
         // Street clutter (cones, crates, barrels, bags, barriers) halfway between furniture spots, same side.
@@ -802,8 +841,9 @@ export function createBoard({ progressive = false } = {}) {
     const sag = (a, b) => { for (let s2 = 0; s2 < 10; s2++) { const u = s2 / 10; const v = (s2 + 1) / 10; const span = a.distanceTo(b); const pa = a.clone().lerp(b, u); pa.y -= Math.sin(u * Math.PI) * span * 0.05; const pb = a.clone().lerp(b, v); pb.y -= Math.sin(v * Math.PI) * span * 0.05; wires.push(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z); } };
     const straight = (a, b) => wires.push(a.x, a.y, a.z, b.x, b.y, b.z);
     const long = runs.filter((r) => !(r.axis === rail.axis && Math.abs(r.c - rail.c) < 0.01)).sort((a, b) => (b.t1 - b.t0) - (a.t1 - a.t0) || a.c - b.c).slice(0, 2);
+    const livePoles = [];
     long.forEach((r, ri) => {
-      const lat = -(ROAD.kerb + 1.25); // the arm (±1) stays over the sidewalk, clear of the building line
+      const lat = -(ROAD.kerb + 1.0); // the arm (±1) stays over the sidewalk, clear of the building line
       const dirT = r.axis === 'x' ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
       const chain = []; // consecutive poles: { ends: [3 world points], base, down }
       const flush = () => {
@@ -834,9 +874,16 @@ export function createBoard({ progressive = false } = {}) {
         _e.set(tilt, yaw, 0, 'YXZ');
         const mx = new THREE.Matrix4().compose(new THREE.Vector3(x, GROUND, z), _q.setFromEuler(_e), new THREE.Vector3(1, 1, 1));
         chain.push({ base: new THREE.Vector3(x, GROUND, z), down, ends: INS.map((v) => v.clone().applyMatrix4(mx)) });
+        if (!down) livePoles.push(chain[chain.length - 1]);
       }
       flush();
     });
+    // Service drops: one thin wire from the nearest standing pole to each small building's roof edge within 12.
+    for (const h of houseSpots) {
+      let best = null; let bd = 12;
+      for (const p of livePoles) { const d = Math.hypot(p.base.x - h.roof.x, p.base.z - h.roof.z); if (d < bd) { bd = d; best = p; } }
+      if (best) sag(best.ends[1], h.roof);
+    }
     if (wires.length) {
       const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wires, 3));
       const wl = new THREE.LineSegments(wg, WIRE_MAT); wl.name = 'wires'; decor.add(tagLod(wl, 'near'));
@@ -875,6 +922,31 @@ export function createBoard({ progressive = false } = {}) {
       const [x, z] = r.axis === 'x' ? [t, r.c + ROAD.half / 2] : [r.c + ROAD.half / 2, t];
       if (onRoadOk(x, z)) add('checkpoint', checkpointModel, 0.1, x, 0.03, z, r.axis === 'x' ? 0 : Math.PI / 2);
     }
+    // MAP-4 wayfinding: "SAFE ZONE →" boards along the evacuation route, arrows pointing to the colony; a second
+    // checkpoint where the route leaves the city.
+    eRuns.forEach((r) => {
+      for (let k = Math.ceil((r.t0 - 4.5) / 18); k * 18 + 4.5 <= r.t1; k++) {
+        const t = k * 18 + 4.5; if (Math.abs(t) < 14) continue;
+        const [x, z] = r.axis === 'x' ? [t, r.c + (ROAD.walk - 0.6)] : [r.c + (ROAD.walk - 0.6), t];
+        if (!ground(x, z) || near(x, z, nodes, 9) || near(x, z, lamps, 1.6) || taken(x, z, 0.8)) continue;
+        const toward = t > 0 ? -1 : 1; // the arrow (local +x) points along the street to the colony
+        add('safe', safeZoneModel, 0.1, x, GROUND, z, r.axis === 'x' ? (toward > 0 ? 0 : Math.PI) : (toward > 0 ? -Math.PI / 2 : Math.PI / 2));
+      }
+    });
+    if (eRuns.length) {
+      const far = eRuns.reduce((a, r) => (Math.abs(r.t1) > Math.abs(a.t) ? { r, t: r.t1 - ROAD.walk - 4 } : Math.abs(r.t0) > Math.abs(a.t) ? { r, t: r.t0 + ROAD.walk + 4 } : a), { t: 0 });
+      if (far.r && Math.abs(far.t) > 30) {
+        const [x, z] = far.r.axis === 'x' ? [far.t, far.r.c - ROAD.half / 2] : [far.r.c - ROAD.half / 2, far.t];
+        if (onRoadOk(x, z) && !taken(x, z, 2)) add('checkpoint', checkpointModel, 0.1, x, 0.03, z, far.r.axis === 'x' ? 0 : Math.PI / 2);
+      }
+    }
+    // The station: a platform with a shelter beside the track where the avenue crosses the railway.
+    const cross = (rail.pieces ?? []).find((p) => p[2] === 'road' && Math.abs((p[0] + p[1]) / 2 - ave.c) < 0.5);
+    if (cross) {
+      const t = ave.c + ROAD.walk + 5.5; const lat = 2.35;
+      const [x, z] = rail.axis === 'x' ? [t, rail.c + lat] : [rail.c + lat, t];
+      add('shelter', shelterModel, 0.1, x, GROUND, z, rail.axis === 'x' ? Math.PI : -Math.PI / 2);
+    }
     // Places belong to their street: driveways across the sidewalk, vehicles parked at the kerb, a few signs of use.
     const apron = () => { const m = new VoxelModel(); m.box(-15, 0, -12, 30, 1, 25, (x, _y, z) => (Math.abs(x) === 15 || Math.abs(z) === 12 ? 0x8d949e : 0x2b2e33)); return m; };
     const front = (L, along, out) => { const p = L.plan; return p.c.clone().addScaledVector(p.fwd, p.edge + out).addScaledVector(p.side, p.lat + along); };
@@ -907,7 +979,6 @@ export function createBoard({ progressive = false } = {}) {
     }
     // Small stories, 1–2 per stage, away from place entrances, gates and the evacuation route.
     const entrances = Object.values(layout).flatMap((L) => (L.plan ? [front(L, 0, 1)] : L.gates ?? []));
-    const taken = (x, z, r) => debugItems.some((d) => x > d.box.min.x - r && x < d.box.max.x + r && z > d.box.min.z - r && z < d.box.max.z + r);
     const clear = (x, z, road = false) => (road ? onRoadOk(x, z) : ground(x, z)) && !entrances.some((e) => Math.hypot(e.x - x, e.z - z) < 7) && !taken(x, z, 1.5) && !lamps.some((l) => Math.hypot(l.x - x, l.z - z) < 2.5);
     const ringOfT = (r, t) => { const [x, z] = r.axis === 'x' ? [t, r.c] : [r.c, t]; return Math.max(Math.abs(gridOf(x)), Math.abs(gridOf(z))); };
     for (let st = 1; st <= (map.stage ?? 1); st++) {
@@ -1212,6 +1283,7 @@ export function createBoard({ progressive = false } = {}) {
         glowMats.length = 0;
         lodNodes.length = 0;
         queue.length = 0;
+        houseSpots.length = 0;
         map = null;
         snap = true;
       }
@@ -1222,7 +1294,6 @@ export function createBoard({ progressive = false } = {}) {
       computeLayout(map, layout);
       streets = streetSegments(map.roads, layout);
       const newStreets = streets.filter(([, , seg]) => seg === 'gate' ? !oldRoads.size : !oldRoads.has(seg));
-      buildStreetDecor();
       // Old blocks next to new ones (or new streets) get fresh terrain: their rim is now inside the city.
       const touched = new Set();
       for (const k of fresh) { const [bx, bz] = parse(k); for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) touched.add(`${bx + dx},${bz + dz}`); }
@@ -1254,6 +1325,7 @@ export function createBoard({ progressive = false } = {}) {
         batches.push(batch);
         if (!snap) startPop(batch, 0, (pos) => 0.3 + Math.min(2.4, (Math.hypot(pos.x, pos.z) - inner) * spread));
       }
+      buildStreetDecor(); // after the blocks: power drops need the new buildings
       const xs = Object.keys(map.blocks).map((k) => parse(k)[0]); const zs = Object.keys(map.blocks).map((k) => parse(k)[1]);
       // World extents of the open blocks (street centre lines around them).
       const lo = (v) => blockPos(v) - blockHalf(v); const hi = (v) => blockPos(v) + blockHalf(v);

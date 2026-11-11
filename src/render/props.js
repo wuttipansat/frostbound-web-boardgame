@@ -260,3 +260,45 @@ export function bufferStopModel() {
   m.box(-4, 10, -1, 1, 6, 1, 0x3a3f46); m.box(-4, 16, -2, 1, 3, 3, 0xff3a2a, true);
   return m.snowCap(P.snow, 1, 2);
 }
+
+// ---------------------------------------------------------------- MAP-4: signs and fences (0.1 world per voxel)
+
+/** A stop sign on a post (octagon-ish red plate, white band), facing +z. */
+export function stopSignModel() {
+  const m = new VoxelModel();
+  m.box(0, 0, 0, 1, 20, 1, 0x8e979f);
+  for (let y = 0; y < 7; y++) for (let x = -3; x <= 3; x++) if (Math.abs(x) + Math.abs(y - 3) <= 4) m.set(x, 19 + y, 1, y === 3 && Math.abs(x) < 3 ? 0xf0f0ea : 0xc0392b);
+  return m.snowCap(P.snow, 1, 2);
+}
+
+/** A direction sign: post with three arrow plates (hospital red, police blue, station green), facing +z. */
+export function directionSignModel() {
+  const m = new VoxelModel();
+  m.box(0, 0, 0, 1, 30, 1, 0x3a4048);
+  [[27, 0xc0392b, 1], [23, 0x2b4a8c, -1], [19, 0x1f6b45, 1]].forEach(([y, c, s]) => {
+    for (let x = 0; x < 9; x++) m.box(s > 0 ? 1 + x : -1 - x, y, 1, 1, 3 - (x === 8 ? 2 : 0), 1, c);
+    m.set(s > 0 ? 9 : -9, y + 1, 1, c); m.set(s > 0 ? 4 : -4, y + 1, 2, 0xf0f0ea);
+  });
+  return m.snowCap(P.snow, 1, 2);
+}
+
+/** A hand-painted board on legs: "SAFE ZONE →" (the arrow points along +x). */
+export function safeZoneModel() {
+  const m = new VoxelModel();
+  for (const x of [-6, 6]) m.box(x, 0, 0, 1, 9, 1, 0x5e4129);
+  m.box(-8, 9, 0, 17, 7, 1, 0xd9cfa8);
+  for (let x = -6; x < 2; x++) if (x % 3) m.set(x, 13, 1, 0x1c1f24);
+  for (let x = -6; x < 4; x++) m.set(x, 11, 1, 0x2f6b4a);
+  for (let k = 0; k < 3; k++) { m.set(4 + k, 11 + k, 1, 0x2f6b4a); m.set(4 + k, 11 - k, 1, 0x2f6b4a); }
+  return m.snowCap(P.snow, 1, 2);
+}
+
+/** A fence 6 world long along x: 'picket' (white wooden, residential) or 'chain' (chain-link with posts, industrial). */
+export function fenceModel(kind = 'picket') {
+  const m = new VoxelModel();
+  for (let x = -30; x < 30; x++) {
+    if (kind === 'picket') { if (x % 2 === 0) m.box(x, 0, 0, 1, 7, 1, 0xe8e4d8); m.set(x, 2, -1, 0xd8d2c2); m.set(x, 5, -1, 0xd8d2c2); }
+    else { if (x % 6 === 0) m.box(x, 0, 0, 1, 12, 1, 0x6c7580); for (let y = 1; y < 11; y++) if ((x + y) % 2 === 0) m.set(x, y, 0, 0x9aa3ad); m.set(x, 11, 0, 0x6c7580); if (x % 3 === 0) m.set(x, 12, 0, 0x8e979f); }
+  }
+  return m.snowCap(P.snow, 1, 2);
+}
