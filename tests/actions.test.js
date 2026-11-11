@@ -32,9 +32,9 @@ test('costs are personal: attack / search come from the survivor\'s skills (2..6
   for (const id of ['corwin-daly', 'teodor-rusu']) {
     assert.equal(c(id, 'search') % 2, 1, 'odd');
   }
-  // MAP-1: walking = 12 + 4 per block of street (12 + 4 per block; every stage-1 place is next door to the colony).
+  // MAP-1: walking = 14 + 2 per block of street (14 + 2 per block; every stage-1 place is next door to the colony).
   assert.equal(walkCost(s, 'colony', 'hospital'), 16);
-  assert.equal(walkCost(s, 'police', 'hospital'), 20, 'two blocks by street');
+  assert.equal(walkCost(s, 'police', 'hospital'), 18, 'two blocks by street');
 });
 
 test('attack: needs zombies and energy; kills one', () => {

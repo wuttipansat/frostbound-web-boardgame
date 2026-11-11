@@ -38,6 +38,8 @@ tag('metal', [P.metal, P.metalDark, 0x111111, 0x1d2840]);
 tag('glass', [P.glass, 0xbfe6ff]);
 tag('pine', [P.pine, P.pineDark]);
 export const materialOf = (color) => MAT.get(color) ?? 'paint';
+/** Register more colours for a material (e.g. the city palette). */
+export const tagMaterial = (kind, colors) => tag(kind, colors);
 
 const FRAME = 0xe6dfd0;
 const SILL = 0xd8d0bf;
@@ -154,3 +156,50 @@ export function detailBuilding(m, { seed = 0, icicles = true, bevel = 0.4 } = {}
 }
 
 export const DETAIL_COLORS = { FRAME, SILL, ICE, ICE_TIP, MORTAR };
+
+// ---------------------------------------------------------------- MAP-2 B: city models at 2× resolution
+
+/**
+ * Turn a city model (authored at 1 voxel = 0.24 world) into a 2× one with real detail: window mullions,
+ * transoms and frames, brick courses / wall panels, lumpy snow. glass / glassLit / frame are the model's colours.
+ */
+export function refineCity(src, { glass, glassLit, frame, mullion }) {
+  // Thin parts (posts, rails, fences, ledges, awnings, signs: 1 voxel with air on both sides) become half as
+  // thick at 2×, which is what makes the finer grid show.
+  const thin = [];
+  for (const v of src.voxels.values()) {
+    if (materialOf(v.color) === 'snow') continue;
+    const air = (dx, dy, dz) => !src.get(v.x + dx, v.y + dy, v.z + dz);
+    thin.push([v.x, v.y, v.z, air(-1, 0, 0) && air(1, 0, 0), air(0, -1, 0) && air(0, 1, 0) && v.y > 0, air(0, 0, -1) && air(0, 0, 1)]);
+  }
+  const m = src.upscale(2);
+  for (const [x, y, z, tx, ty, tz] of thin) {
+    for (let dx = 0; dx < 2; dx++) for (let dy = 0; dy < 2; dy++) for (let dz = 0; dz < 2; dz++) {
+      if ((tx && dx) || (ty && dy) || (tz && dz)) m.remove(2 * x + dx, 2 * y + dy, 2 * z + dz);
+    }
+  }
+  lumpySnow(m, { p: 1 }); // snow caps one fine voxel thick
+  const isGlass = (v) => v && (v.color === glass || v.color === glassLit);
+  const edits = [];
+  for (const v of m.voxels.values()) {
+    if (!isGlass(v)) continue;
+    const out = H4.find(([dx, dz]) => !m.get(v.x + dx, v.y, v.z + dz));
+    if (!out) continue;
+    const [tx, tz] = out[0] !== 0 ? [0, 1] : [1, 0];
+    const run = (sx, sy, sz) => { let n = 0; while (n < 40 && isGlass(m.get(v.x + sx * (n + 1), v.y + sy * (n + 1), v.z + sz * (n + 1)))) n++; return n; };
+    const l = run(-tx, 0, -tz); const r = run(tx, 0, tz); const d = run(0, -1, 0); const u = run(0, 1, 0);
+    const w = l + r + 1; const h = d + u + 1;
+    // A cross of glazing bars on windows (wide shop glass gets bars every 6), then the frame around.
+    const bar = (w >= 5 && (l === Math.floor((w - 1) / 2) || (w > 12 && l % 6 === 5))) || (h >= 7 && d === Math.floor(h * 0.62));
+    if (bar) edits.push([v, mullion]);
+    for (const [ax, ay, az] of [[tx, 0, tz], [-tx, 0, -tz], [0, 1, 0], [0, -1, 0]]) {
+      const n = m.get(v.x + ax, v.y + ay, v.z + az);
+      if (n && !isGlass(n) && !n.glow && materialOf(n.color) !== 'snow') edits.push([n, frame]);
+    }
+  }
+  for (const [v, c] of edits) { v.color = c; v.glow = false; }
+  // Patterns only where they read as material (brick courses, metal ribs, wood); plain paint and snow stay flat so
+  // the mesher can merge big faces (dithering every wall would triple the triangle count).
+  m.recolor((v) => (v.glow || !['brick', 'metal', 'wood'].includes(materialOf(v.color)) ? undefined : patternColor(v)));
+  return m;
+}

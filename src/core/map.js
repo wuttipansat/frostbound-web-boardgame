@@ -28,6 +28,12 @@ function startRoads() {
   for (const c of [0, 1]) for (let i = -1; i <= 1; i++) r.push(`${c},${i},v`, `${i},${c},h`);
   return r;
 }
+// Fronts of the stage-1 blocks (the first six places keep the sides they always faced).
+const OLD_FRONT = { police: 'z', grocery: 'z', school: 'z', hospital: 'x', library: 'x', gas: 'x' };
+for (const blocks of [START_BLOCKS, LEGACY_BLOCKS]) {
+  const roads = new Set(startRoads());
+  for (const [k, b] of Object.entries(blocks)) if (b.kind !== 'colony') b.front = OLD_FRONT[b.placeId] ?? frontOf(roads, ...parse(k));
+}
 export const START_MAP = Object.freeze({ stage: 1, blocks: START_BLOCKS, roads: startRoads(), searchesSinceMap: 0, pending: false });
 export const LEGACY_MAP = Object.freeze({ ...START_MAP, blocks: LEGACY_BLOCKS });
 /** The places that come with a map's blocks. */
@@ -40,7 +46,7 @@ export const newMap = (legacy = false) => JSON.parse(JSON.stringify(legacy ? LEG
 export const mapOf = (s) => s.map ?? LEGACY_MAP;
 
 /** Searches it takes to find the map that opens stage n+1: [min, max] (guaranteed at max). */
-export const mapRange = (stage) => (stage === 1 ? [3, 5] : [3 * stage * stage + 2, 4 * stage * stage + 4]); // 3–5, 14–20, 29–40, 50–68, …
+export const mapRange = (stage) => (stage === 1 ? [3, 4] : [3 * stage * stage + 2, 4 * stage * stage + 4]); // 3–4, 14–20, 29–40, 50–68, …
 
 // ---------------------------------------------------------------- places
 
@@ -169,29 +175,37 @@ export function growMap(s, makePlace) {
     const out = Math.abs(x) >= Math.abs(z) ? [x + Math.sign(x), z] : [x, z + Math.sign(z)];
     if (!placed.has(key(...out))) { placed.add(key(...out)); added.push(key(...out)); }
   }
-  // 3. Kinds (MAP-1c): 2–3 places per growth, the rest decoration. The missing originals turn up first, in the
-  //    decoration blocks closest to the colony (the map shows the old town was still standing there).
-  const order = added.map((k) => [k, random(s)]).sort((a, b) => a[1] - b[1]).map(([k]) => k);
-  let nPlaces = 2 + (random(s) < 0.5 ? 1 : 0);
+  // 3. Streets first (blocks are placeholders), so places can be put where the walk is shortest.
+  for (const k of added) m.blocks[k] = { kind: 'pending' };
+  m.stage = n;
+  growRoads(s, m, added, n);
+  // 4. Kinds (MAP-1d): 2–3 places per growth, the rest decoration; old blocks never change. The missing
+  //    originals come first, on the new blocks with the shortest road to the colony; then the weighted table.
+  let nPlaces = Math.min(added.length, 2 + (random(s) < 0.5 ? 1 : 0));
   const have = new Set(Object.values(m.blocks).map((b) => b.type ?? b.placeId));
-  const missing = ORIGINALS.filter((t) => !have.has(t));
-  const inner = Object.keys(m.blocks).filter((k) => !m.blocks[k].placeId && m.blocks[k].kind !== 'rail' && !added.includes(k))
-    .map((k) => [k, ring(...parse(k)) + random(s) * 0.5]).sort((a, b) => a[1] - b[1]).map(([k]) => k);
-  const converted = [];
-  while (nPlaces > 0 && missing.length && inner.length) {
-    const k = inner.shift(); const type = missing.shift();
-    m.blocks[k] = { kind: 'place', placeId: makePlace(type, k), type };
-    converted.push(k); nPlaces--;
-  }
-  order.forEach((k, i) => {
+  const missing = ORIGINALS.filter((t) => !have.has(t)).slice(0, 2);
+  const graph = cacheOf(m).graph;
+  const dist = new Map(added.map((k) => [k, roadSteps(graph, cornersOf(0, 0), cornersOf(...parse(k))) + random(s) * 0.5]));
+  const byDist = added.slice().sort((a, b) => dist.get(a) - dist.get(b));
+  const placesAt = new Set();
+  for (const k of byDist) { if (!missing.length || !nPlaces) break; placesAt.add(k); m.blocks[k] = { kind: 'place', placeId: makePlace(missing[0], k), type: missing.shift() }; nPlaces--; }
+  const rest = added.filter((k) => !placesAt.has(k)).map((k) => [k, random(s)]).sort((a, b) => a[1] - b[1]).map(([k]) => k);
+  rest.forEach((k, i) => {
     if (i < nPlaces) {
-      const type = missing.shift() ?? pickWeighted(s, PLACE_TABLE.map(([t, w0, per]) => [t, w0 + per * (n - 2)]).filter(([, w]) => w > 0));
+      const type = pickWeighted(s, PLACE_TABLE.map(([t, w0, per]) => [t, w0 + per * (n - 2)]).filter(([, w]) => w > 0));
       m.blocks[k] = { kind: 'place', placeId: makePlace(type, k), type };
     } else m.blocks[k] = { kind: FILLER_KINDS[Math.floor(random(s) * FILLER_KINDS.length)] };
   });
-  m.stage = n;
-  growRoads(s, m, added, n);
+  // 5. Each block keeps the front it gets now (its look never depends on streets added later).
+  const roadSet = new Set(m.roads);
+  for (const k of added) m.blocks[k].front = frontOf(roadSet, ...parse(k));
   return added;
+}
+
+/** The street side a block faces: +z, +x, −z, −x in that order of preference (the camera sees +z and +x). */
+export function frontOf(roads, bx, bz) {
+  const sides = { z: `${bx},${bz + 1},h`, x: `${bx + 1},${bz},v`, '-z': `${bx},${bz},h`, '-x': `${bx},${bz},v` };
+  return ['z', 'x', '-z', '-x'].find((f) => roads.has(sides[f])) ?? 'z';
 }
 
 /** New streets: extend dead ends outward, then link every new block to the network, plus a few spurs. */

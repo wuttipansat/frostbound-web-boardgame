@@ -38,7 +38,7 @@ export const ENERGY = Object.freeze({
   HURT: 20,               // 2+ wounds: the pool's max is this much lower
   STORM: 4,               // storm days (every 3rd day): actions outside the colony cost more
   COST: Object.freeze({ move: 12, barricade: 19, lure: 11 }),
-  WALK_BASE: 12, WALK_BLOCK: 4, WALK_CAP: 40, // MAP-1: walking = 8 + 4 per block of street
+  WALK_BASE: 14, WALK_BLOCK: 2, WALK_CAP: 40, // MAP-1: walking = 14 + 2 per block of street
   SEARCH: 17,
   PER_SKILL: 2,
   CROWDED: 7,             // 2+ zombies here: search / barricade cost more

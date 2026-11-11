@@ -49,10 +49,11 @@ const EDGE = 1.5 * CHUNK; // from the block centre to the inner edge of the side
 const FOOT = { church: [1, 2] };
 
 /** Where a place sits in its block: front direction, footprint (in chunks), centre and the chunks it covers. */
-export function placePlan(id, type, bx, bz, roads, foot = null) {
+export function placePlan(id, type, bx, bz, roads, foot = null, front = null) {
   const c = new THREE.Vector3(bx * BOARD.block, 0, bz * BOARD.block);
   const fronts = { z: `${bx},${bz + 1},h`, x: `${bx + 1},${bz},v`, '-z': `${bx},${bz},h`, '-x': `${bx},${bz},v` };
-  const pick = START_FRONT[id] ?? ['z', 'x', '-z', '-x'].find((f) => roads.has(fronts[f])) ?? 'z';
+  // MAP-1d: the block's stored front (older maps: work it out from the streets).
+  const pick = front ?? START_FRONT[id] ?? ['z', 'x', '-z', '-x'].find((f) => roads.has(fronts[f])) ?? 'z';
   const toFront = { z: [0, 1], x: [1, 0], '-z': [0, -1], '-x': [-1, 0] }[pick];
   const fwd = new THREE.Vector3(toFront[0], 0, toFront[1]);
   const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
@@ -70,8 +71,8 @@ export function placePlan(id, type, bx, bz, roads, foot = null) {
 /** World centre of chunk (row i from the front, column j) of a block. */
 export const chunkCenter = (plan, i, j) => plan.at((1 - i) * CHUNK, (j - 1) * CHUNK);
 
-function placeLayout(id, type, bx, bz, roads) {
-  const plan = placePlan(id, type, bx, bz, roads);
+function placeLayout(id, type, bx, bz, roads, front) {
+  const plan = placePlan(id, type, bx, bz, roads, null, front);
   const { at, lat } = plan;
   const nSurv = LOCATIONS[type]?.survivorSlots ?? 3;
   return {
@@ -114,7 +115,7 @@ export function computeLayout(map = LEGACY_MAP, into = {}) {
   const roads = new Set(map.roads);
   for (const [k, b] of Object.entries(map.blocks)) {
     if (b.kind !== 'place' || into[b.placeId]) continue;
-    into[b.placeId] = placeLayout(b.placeId, b.type ?? b.placeId, ...parse(k), roads);
+    into[b.placeId] = placeLayout(b.placeId, b.type ?? b.placeId, ...parse(k), roads, b.front);
   }
   into.colony ??= colonyLayout();
   return into;
@@ -282,13 +283,13 @@ export function createBoard() {
     g.add(terrain);
     let model = null;
     if (b.kind === 'colony') {
-      model = colonyHD(BOARD.colonyRadius * 2).build({ size: bScale, jitter });
+      model = city.fine('colony', () => colonyHD(BOARD.colonyRadius * 2)).build({ size: bScale / 2, jitter, cacheKey: 'fine-colony' });
       model.name = 'colony';
       locationGroups.colony = model;
     } else if (b.kind === 'place') {
       const L = layout[b.placeId];
       const type = b.type ?? b.placeId;
-      model = (LOCATION_BUILDERS_HD[type] ?? LOCATION_BUILDERS_HD.grocery)().build({ size: bScale, jitter, cacheKey: `place-${type}` });
+      model = city.fine(`place-${type}`, LOCATION_BUILDERS_HD[type] ?? LOCATION_BUILDERS_HD.grocery).build({ size: bScale / 2, jitter, cacheKey: `fine-place-${type}` });
       // Fit the building into its chunks (models are centred on x/z, front = +z).
       const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
       model.scale.setScalar(Math.min(PLACE_SCALE, (L.plan.fw * CHUNK - 0.2) / size.x, (L.plan.fd * CHUNK - 0.2) / size.z));
@@ -298,7 +299,7 @@ export function createBoard() {
       locationGroups[b.placeId] = model;
       addPick(L);
     } else if (FILLER_MODELS[b.kind]) {
-      model = FILLER_MODELS[b.kind]().build({ size: bScale, jitter, cacheKey: `filler-${b.kind}` });
+      model = city.fine(`filler-${b.kind}`, FILLER_MODELS[b.kind]).build({ size: bScale / 2, jitter, cacheKey: `fine-filler-${b.kind}` });
       model.position.set(bx * B, 0, bz * B);
       model.rotation.y = Math.floor(hash3(bx, 7, bz) * 2) * Math.PI;
     }
@@ -328,7 +329,7 @@ export function createBoard() {
         // MAP-1b/c: a block is 3×3 chunks. A place (or a decoration block's centrepiece) takes some on the street
         // side; the rest hold small buildings, shops, trees, cars, container stacks, ruins or clutter.
         const cp = CENTERPIECE[b.kind];
-        const plan = b.kind === 'place' ? layout[b.placeId].plan : placePlan(`${b.kind}@`, b.kind, bx, bz, roadSet, cp ? [cp[1], cp[2]] : [0, 0]);
+        const plan = b.kind === 'place' ? layout[b.placeId].plan : placePlan(`${b.kind}@`, b.kind, bx, bz, roadSet, cp ? [cp[1], cp[2]] : [0, 0], b.front);
         const recipe = RECIPES[b.kind] ?? RECIPES.place;
         const face0 = Math.atan2(plan.fwd.x, plan.fwd.z);
         if (cp) {
@@ -399,13 +400,13 @@ export function createBoard() {
       }
     });
     trees.forEach((list, k) => { if (list.length) group.add(instanced(treeModelHD(k, 1), 0.25, list, { cacheKey: `tree-${k}`, jitter: 0 })); });
-    houses.forEach((list, v) => { if (list.length) group.add(instanced(city.smallBuilding(v), BOARD.buildingScale / 2, list, { cacheKey: `small-${v}`, jitter: 0 })); });
-    ruins.forEach((list, v) => { if (list.length) group.add(instanced(city.ruinSmall(v), BOARD.buildingScale / 2, list, { cacheKey: `ruin-${v}`, jitter: 0 })); });
-    if (pieces.parking.length) group.add(instanced(city.parkingSmall(), BOARD.buildingScale / 2, pieces.parking, { cacheKey: 'parking-small', jitter: 0 }));
-    if (pieces.fountain.length) group.add(instanced(city.fountain(), BOARD.buildingScale / 2, pieces.fountain, { cacheKey: 'fountain', jitter: 0 }));
-    clutter.forEach((list, k) => { if (list.length) group.add(instanced(clutterModel(k), 0.12, list, { cacheKey: `clutter-${k}`, jitter: 0 })); });
+    houses.forEach((list, v) => { if (list.length) group.add(instanced(city.fine(`small-${v}`, () => city.smallBuilding(v)), BOARD.buildingScale / 4, list, { cacheKey: `fine-small-${v}`, jitter: 0 })); });
+    ruins.forEach((list, v) => { if (list.length) group.add(instanced(city.fine(`ruin-${v}`, () => city.ruinSmall(v)), BOARD.buildingScale / 4, list, { cacheKey: `fine-ruin-${v}`, jitter: 0 })); });
+    if (pieces.parking.length) group.add(instanced(city.fine('parking-small', city.parkingSmall), BOARD.buildingScale / 4, pieces.parking, { cacheKey: 'fine-parking-small', jitter: 0 }));
+    if (pieces.fountain.length) group.add(instanced(city.fine('fountain', city.fountain), BOARD.buildingScale / 4, pieces.fountain, { cacheKey: 'fine-fountain', jitter: 0 }));
+    clutter.forEach((list, k) => { if (list.length) group.add(instanced(clutterModel(k), 0.12, list, { cacheKey: `clutter-${k}`, jitter: 0, castShadow: false })); });
     rocks.forEach((list, k) => { if (list.length) group.add(instanced(rockModelHD(k), 0.25, list, { cacheKey: `rock-${k}`, jitter: 0 })); });
-    cars.forEach((list, v) => { if (list.length) group.add(instanced(carModel(v), 0.15, list, { cacheKey: `car4-${v}`, jitter: 0 })); });
+    cars.forEach((list, v) => { if (list.length) group.add(instanced(carModel(v), 0.15, list, { cacheKey: `car4-${v}`, jitter: 0, castShadow: false })); });
     if (lamps.length) group.add(instanced(lampModel(), 0.15, lamps, { cacheKey: 'lamp', jitter: 0, castShadow: false }));
     yards.forEach((list, k) => { if (list.length) group.add(instanced(containerModel(k, 1 + (k % 2)), 0.2, list, { cacheKey: `container-${k}`, jitter: 0 })); });
     if (attach) root.add(group);

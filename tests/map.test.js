@@ -29,10 +29,12 @@ test('map: growth keeps old blocks, stays connected, every place has a road (fuz
       growCity(s);
       const gained = Object.keys(s.locations).length - placesBefore;
       assert.ok(gained >= 2 && gained <= 3, `seed ${seed} stage ${n}: ${gained} new places`);
-      if (n === 3) for (const id of ['library', 'police', 'school', 'hospital']) assert.ok(s.locations[id], `seed ${seed}: ${id} back by stage 3`);
+      if (n === 2) for (const id of ['library', 'hospital']) assert.ok(s.locations[id], `seed ${seed}: ${id} at stage 2`);
+      if (n === 3) for (const id of ['library', 'police', 'school', 'hospital']) assert.ok(s.locations[id], `seed ${seed}: ${id} by stage 3`);
       assert.equal(s.map.stage, n);
-      // Old blocks stay; a decoration block may turn into one of the original places.
-      for (const [k, b] of Object.entries(JSON.parse(before))) assert.ok(b.placeId ? JSON.stringify(s.map.blocks[k]) === JSON.stringify(b) : s.map.blocks[k], `seed ${seed}: block ${k} kept`);
+      // MAP-1d: old blocks never change (kind, place, front).
+      for (const [k, b] of Object.entries(JSON.parse(before))) assert.deepEqual(s.map.blocks[k], b, `seed ${seed}: block ${k} kept`);
+      for (const b of Object.values(s.map.blocks)) assert.ok(b.kind === 'colony' || b.front, 'every block has a front');
       // Connected to the colony (4-neighbour flood fill).
       const seen = new Set(['0,0']); const todo = ['0,0'];
       while (todo.length) {
@@ -80,4 +82,19 @@ test('map: a bot game with growth finishes', () => {
   const { state, errors } = simulate({ seed: 7, scenarioId: 'crawler', days: 25 });
   assert.equal(errors.length, 0);
   assert.ok(state.result);
+});
+
+test('map: an old block lays out the same after the city grows (stable fronts and chunk plans)', async () => {
+  const { computeLayout, placePlan } = await import('../src/render/board.js');
+  const s = createGame({ seed: 5 });
+  growCity(s);
+  const before = computeLayout(structuredClone(s.map));
+  const plans = Object.fromEntries(Object.entries(s.map.blocks).filter(([, b]) => !b.placeId).map(([k, b]) => [k, placePlan(`${b.kind}@`, b.kind, ...key(k), new Set(s.map.roads), [1, 1], b.front).covered]));
+  growCity(s); growCity(s);
+  const after = computeLayout(structuredClone(s.map));
+  for (const [id, L] of Object.entries(before)) assert.deepEqual(after[id].center.toArray(), L.center.toArray(), `${id} stays put`);
+  for (const [k, cov] of Object.entries(plans)) {
+    const b = s.map.blocks[k];
+    assert.deepEqual(placePlan(`${b.kind}@`, b.kind, ...key(k), new Set(s.map.roads), [1, 1], b.front).covered, cov, `block ${k} keeps its chunk plan`);
+  }
 });

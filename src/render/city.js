@@ -5,6 +5,7 @@
 // Front (door side) faces +z; the board turns each model so its front faces a side the camera sees.
 import { VoxelModel, hash3 } from './voxel.js';
 import { P } from './palette.js';
+import { refineCity, tagMaterial } from './detail.js';
 
 export const C = {
   sage: 0xa7b5a0, sageDark: 0x8a9884, cream: 0xddd5bc, creamDark: 0xbcb399, ochre: 0xdca04c, ochreDark: 0xb27d33,
@@ -618,4 +619,20 @@ export function ruinSmall(v = 0) {
   for (let k = 0; k < 8; k++) m.set(x0 + 4 + k, 1 + k, z0 + 6, C.rust); // bent girder
   moss(m, x0, z0, w, d, 10, 70 + v);
   return m.snowCap(P.snow, 0.75, 1);
+}
+
+// ---------------------------------------------------------------- MAP-2 B: 2× city models
+
+let tagged = false;
+const FINE = new Map();
+/** The 2× (0.12 world per voxel at the usual scale) version of a city model, built once per key. */
+export function fine(key, make) {
+  if (!tagged) {
+    tagged = true;
+    tagMaterial('brick', [C.brick]);
+    tagMaterial('metal', [C.metal, C.metalDark]);
+    tagMaterial('wood', [C.board, 0x7a5a3a, 0x8a5a2b]);
+  }
+  if (!FINE.has(key)) FINE.set(key, refineCity(make(), { glass: C.glass, glassLit: C.glassLit, frame: C.trim, mullion: 0x3a3f46 }));
+  return FINE.get(key);
 }

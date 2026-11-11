@@ -376,3 +376,14 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - Every place and small building shares one voxel size (0.3 × 0.8). The shared building code adds fire escapes on tall buildings, satellite dishes, roof plants and debris, warning signs; the grocery has a lit billboard, the motel a walkway on columns with a railing and upstairs doors, and a roof-edge MOTEL sign with a dead letter. Church is one chunk wide.
 - Decoration blocks are built from chunks: a fenced parking lot (2×2), a frozen fountain, small ruined buildings with stepped broken walls, shops, houses, trees, parked cars (4 kinds, incl. a taxi and a van with headlights on), container stacks and clutter. Each block owns its chunk props, so a decoration block that turns into a place is rebuilt and rises again.
 - Ground: built-up blocks are flat square paving with grout, grass in the cracks, missing tiles and drifted snow; zebra crossings at junctions; lamps on both sides of every street; cones, crates, barrels, trash bags and barriers on the sidewalks.
+
+### MAP-2 part A — stable blocks (done)
+- Every block stores its front side when it is created (`frontOf`); layouts and chunk plans read it, so an old block looks the same however the streets grow. No block ever changes kind.
+- The originals come in the new ring: stage 2 brings library + hospital, stage 3 police + school, each on the new block with the shortest road to the colony; other places from the weighted table. New places start with 0 … stage−2 zombies.
+- Walking = 14 + 2 per block of street (16 from the colony to a stage-1 place); first map in 3–4 searches. Balance crawler normal (30 games): 27%.
+- Test: after two growths, every old place keeps its centre and every old decoration block its chunk plan.
+
+### MAP-2 part B — finer voxels (done, with limits)
+- City models (places, colony, small buildings, ruins, parking lot, fountain, rail yard) go through `refineCity`: built at 2× (0.12 world per voxel at the usual scale) with glazing bars and frames on windows, brick courses, metal ribs and wood grain, snow caps one fine voxel thick, and thin parts (posts, rails, fences, ledges, awnings, signs) at half thickness.
+- Plain painted walls and snow stay flat so faces merge: stage 1 is ~0.74 M triangles (was ~0.35 M). Cars and street clutter no longer cast shadows.
+- Not done: terrain stays at 0.5 world per cell (0.25 would quadruple the ground triangles); models were refined, not redrawn by hand.
