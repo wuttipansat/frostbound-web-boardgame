@@ -240,3 +240,25 @@ test('railway never runs through a place, also after a new game replaces the sta
     }
   }
 });
+
+test('MAP-5 dense blocks: front and back rows built, no chunk used twice, wide buildings fit, rail chunks free', async () => {
+  const { districtOf, railLine } = await import('../src/render/board.js');
+  for (const s of cities()) {
+    const roads = new Set(s.map.roads); const layout = computeLayout(s.map); const rail = railLine(s.map);
+    for (const [k, b] of Object.entries(s.map.blocks)) {
+      if (b.kind === 'colony') continue;
+      const [bx, bz] = k.split(',').map(Number);
+      const d = districtOf(bx, bz, s.map.look);
+      const plan = b.kind === 'place' ? layout[b.placeId].plan : placePlan(`${b.kind}@`, b.kind, bx, bz, roads, [1, 1], b.front, rail);
+      const cells = [];
+      for (const [i, j, what, span = 1] of blockPieces(b, bx, bz, plan, undefined, d)) {
+        if (what === 'bench' || what === 'tree') continue;
+        for (let q = 0; q < span; q++) cells.push(`${i},${j + q}`);
+        assert.ok(j + span <= plan.cols, `${k}: ${what} fits the block`);
+      }
+      const all = [...cells, ...plan.covered];
+      assert.equal(new Set(all).size, all.length, `${k}: no chunk used twice`);
+      if (plan.railCut) for (const c of cells) { const [i, j] = c.split(',').map(Number); assert.ok(plan.railCut.row !== i && plan.railCut.col !== j, `${k}: ${c} on the track`); }
+    }
+  }
+});

@@ -302,3 +302,28 @@ export function fenceModel(kind = 'picket') {
   }
   return m.snowCap(P.snow, 1, 2);
 }
+
+// ---------------------------------------------------------------- MAP-5: courtyard life (0.1 world per voxel)
+
+/** A courtyard camp: a ring of stones with a fire, logs to sit on, a tent and a pot. */
+export function campModel() {
+  const m = new VoxelModel();
+  for (let a = 0; a < 10; a++) m.set(Math.round(Math.cos(a * 0.63) * 4), 0, Math.round(Math.sin(a * 0.63) * 4), 0x8d949e);
+  m.box(-1, 0, -1, 3, 1, 3, 0x2a2622); m.box(0, 1, 0, 1, 2, 1, P.fire, true); m.set(-1, 1, 0, P.ember ?? 0xff7a2a, true); m.set(1, 1, 0, P.fire, true);
+  m.box(-2, 4, 0, 5, 1, 1, 0x3a3f46); m.box(0, 3, 0, 1, 1, 1, 0x3a3f46); // pot on a bar
+  for (const x of [-3, 3]) m.box(x, 0, -2, 1, 5, 1, 0x3a3f46);
+  m.box(-7, 0, 6, 6, 2, 2, 0x6b4a2e); m.box(3, 0, -8, 2, 2, 6, 0x6b4a2e);
+  for (let y = 0; y < 8; y++) m.box(8 + Math.floor(y / 2), y, 2, 14 - y, 1, 10, y % 3 ? 0x5d6b3a : 0x4b5730);
+  return m.snowCap(P.snow, 1, 2);
+}
+
+/** A washing line between two poles with clothes still on it, and a snowman. */
+export function laundryModel() {
+  const m = new VoxelModel();
+  for (const x of [-20, 20]) m.box(x, 0, 0, 1, 18, 1, 0x5e4129);
+  for (let x = -19; x < 20; x++) m.set(x, 17 - (Math.abs(x) < 12 ? 1 : 0), 0, 0x2a2d31);
+  [[-14, 0xc0392b], [-8, 0xe6e2d6], [-2, 0x3f6f8f], [5, 0xd8b03a], [11, 0x5d6b3a]].forEach(([x, c]) => m.box(x, 10, 0, 4, 6, 1, c));
+  for (const [y, r] of [[0, 4], [7, 3], [12, 2]]) for (let dy = 0; dy < r * 2 - 1; dy++) for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) if (dx * dx + dz * dz + (dy - r + 1) ** 2 <= r * r) m.set(dx + 8, y + dy, dz + 12, 0xf2f5f8);
+  m.set(8, 13, 14, 0xd9822b); m.set(7, 14, 14, 0x1c1f24); m.set(9, 14, 14, 0x1c1f24);
+  return m;
+}

@@ -856,6 +856,13 @@ export function ruins() {
   return m.snowCap(P.snow, 1, 1);
 }
 
+// ---------------------------------------------------------------- MAP-1b: small buildings that fill a block's free chunks
+
+export const SMALL_VARIANTS = 8;
+export const SMALL_SCALE = 0.86; // instance scale: a small building fills its chunk with a little room around it
+const SMALL_WALLS = [C.sage, C.cream, C.grey, C.brick, C.ochre, 0x8fa3b8, 0xb9a48a, 0x9b8b9e];
+
+/** A small, closed-up building (not a place you can enter): 2–4 floors, sized to one chunk. */
 export function smallBuilding(v = 0) {
   const m = new VoxelModel();
   const w = 16 + (v % 3) * 2; const d = 14 + (v % 2) * 3;
@@ -957,4 +964,90 @@ export function lod(level, key, make) {
   if (level === 1) { if (!COARSE.has(key)) COARSE.set(key, make()); return COARSE.get(key); }
   if (!FAR.has(key)) FAR.set(key, downsample(lod(1, key, make)));
   return FAR.get(key);
+}
+
+// ---------------------------------------------------------------- MAP-5: more building kinds and sizes
+// One chunk ≈ 24 voxels at the small-building scale (0.86 × 0.3 world); two chunks side by side ≈ 48.
+
+/** A tall downtown block on one chunk: 5–8 floors (v 0..3), balconies on some, a water tank or sign on top. */
+export function tallBuilding(v = 0) {
+  const m = new VoxelModel();
+  const w = 18; const d = 16; const floors = [5, 6, 5, 7][v % 4];
+  const walls = [C.grey, 0x8fa3b8, C.cream, 0x9b8b9e];
+  block(m, { x0: -9, z0: -8, w, d, floors, wall: walls[v % 4], seed: 80 + v, shop: v % 2 === 0, balconies: v % 2 === 1 });
+  if (v === 3) { const y = floors * FH + 3; m.box(-6, y, -4, 12, 6, 1, C.metalDark); neon(m, 'HOTEL', 0, y + 1, -3, C.neonPink, 2); }
+  return dust(m);
+}
+
+/** Row houses: three narrow two-storey houses side by side on one chunk, each with its own door, stoop and colour. */
+export function rowHouses(v = 0) {
+  const m = new VoxelModel();
+  const tones = [[C.brick, C.cream, 0x8fa3b8], [C.sage, C.ochre, C.grey]][v % 2];
+  for (let k = 0; k < 3; k++) {
+    const x0 = -9 + k * 6;
+    block(m, { x0, z0: -7, w: 6, d: 14, floors: 2, wall: tones[k], seed: 90 + v * 3 + k });
+    m.clearBox(x0 + 2, 1, 6, 2, 6, 1); m.box(x0 + 2, 1, 5, 2, 6, 1, [0x6b4a30, 0x2f4f6f, 0x7a2a2a][k]);
+    m.box(x0 + 1, 1, 7, 4, 1, 2, C.greyDark);
+    for (let j = 0; j <= 3; j++) m.box(x0 - 1 + j, 2 * FH + 1 + j, -8 + j, 1, 1, 16 - 2 * j, C.roofDark); // gable
+  }
+  return dust(m);
+}
+
+/** An office block on two chunks: 6 floors of ribbon windows, a glass lobby, a rooftop sign frame. */
+export function officeBlock(v = 0) {
+  const m = new VoxelModel();
+  const w = 42; const d = 16; const floors = 6;
+  const H = block(m, { x0: -21, z0: -8, w, d, floors, wall: v % 2 ? C.greyDark : 0x5b6f8a, seed: 100 + v });
+  for (let f = 0; f < floors; f++) for (let x = -19; x < 19; x++) { const y = f * FH + 4; m.set(x, y, 7, C.glass); m.set(x, y + 1, 7, hash3(x, f, v) < 0.08 ? C.glassLit : C.glass, hash3(x, f, v) < 0.08); }
+  m.box(-6, 1, 7, 12, 7, 1, C.glass); m.box(-6, 8, 8, 12, 1, 2, C.trim);
+  for (const x of [-15, 14]) m.box(x, H + 1, 0, 1, 7, 1, C.metalDark); m.box(-15, H + 6, 0, 30, 4, 1, C.trim);
+  return dust(m);
+}
+
+/** A cinema on two chunks: a marquee with chaser lights and a title with a dead letter, a tall vertical sign. */
+export function cinema() {
+  const m = new VoxelModel();
+  block(m, { x0: -21, z0: -8, w: 42, d: 16, floors: 2, wall: 0x7a2a2a, trim: C.cream, seed: 111 });
+  m.box(-14, 9, 8, 28, 4, 4, C.trim);
+  for (let x = -14; x < 14; x += 2) { m.set(x, 9, 12, C.neonWarm, true); m.set(x, 12, 12, C.neonWarm, true); }
+  neon(m, 'CINEMA', 0, 10, 12, C.neonRed, 3);
+  m.box(-18, 8, 9, 3, 20, 2, 0x2a2d31); for (let y = 10; y < 26; y += 3) m.box(-18, y, 11, 3, 2, 1, C.neonBlue, true);
+  m.box(-4, 1, 7, 8, 7, 1, C.glass);
+  return dust(m);
+}
+
+/** A two-deck parking garage on two chunks: open decks on columns, a ramp, a couple of snowed cars. */
+export function parkingGarage() {
+  const m = new VoxelModel();
+  for (let deck = 0; deck < 3; deck++) m.box(-21, deck * 8, -8, 42, 1, 16, C.grey);
+  for (let x = -21; x <= 20; x += 7) for (const z of [-8, 7]) m.box(x, 1, z, 1, 16, 1, C.greyDark);
+  for (let x = -21; x < 21; x++) { m.set(x, 9, 7, C.trim); m.set(x, 17, 7, C.trim); m.set(x, 9, -8, C.trim); m.set(x, 17, -8, C.trim); }
+  for (let k = 0; k < 8; k++) m.box(10 + k, 1 + k, -2, 1, 1, 5, C.grey); // ramp
+  for (const [x, y, c] of [[-16, 1, 0xa63a2e], [-6, 9, 0x2b4170], [0, 17, 0xd8b03a]]) { m.box(x, y, -6, 7, 3, 4, c); m.box(x + 2, y + 3, -6, 3, 2, 4, c); }
+  m.box(-21, 18, -8, 6, 4, 1, 0x2b4a8c); m.set(-18, 19, -9, 0xf0f0ea);
+  return dust(m);
+}
+
+/** An industrial shed on two chunks: a wide low hall, ribbed metal, two loading doors, a chimney stack. */
+export function shedBuilding(v = 0) {
+  const m = new VoxelModel();
+  const c = v % 2 ? 0x6c7580 : 0x8a6a4a;
+  for (let x = -21; x < 21; x++) for (let y = 1; y < 14; y++) for (const z of [-8, 7]) m.set(x, y, z, x % 2 ? c : (c & 0xfefefe) >> 1 | 0x202020);
+  for (let z = -8; z < 8; z++) for (let y = 1; y < 14; y++) { m.set(-21, y, z, c); m.set(20, y, z, c); }
+  for (let k = 0; k < 5; k++) m.box(-21, 14 + k, -8 + k, 42, 1, 16 - 2 * k, C.roofDark);
+  for (const x of [-14, 4]) { m.clearBox(x, 1, 7, 8, 9, 1); m.box(x, 1, 6, 8, 9, 1, C.metal); for (let y = 2; y < 10; y += 2) m.box(x, y, 7, 8, 1, 1, C.metalDark); }
+  m.box(15, 1, -5, 3, 30, 3, C.brick); m.box(15, 30, -5, 3, 1, 3, 0x2a2d31);
+  return dust(m);
+}
+
+/** A landmark tower on two chunks: 10 floors, a setback crown, a water tank and a blinking aerial. */
+export function landmarkTower(v = 0) {
+  const m = new VoxelModel();
+  const H = block(m, { x0: -18, z0: -8, w: 36, d: 16, floors: 8, wall: v % 2 ? 0x9aa6b2 : C.cream, seed: 120 + v, shop: true, balconies: true });
+  block(m, { x0: -12, z0: -5, w: 24, d: 10, floors: 2, wall: v % 2 ? 0x8b97a3 : C.creamDark, seed: 121 + v });
+  m.clearBox(-12, 1, -5, 24, H - 1, 10); // (the crown sits on the roof: lift it)
+  const crown = new VoxelModel(); block(crown, { x0: -12, z0: -5, w: 24, d: 10, floors: 2, wall: v % 2 ? 0x8b97a3 : C.creamDark, seed: 122 + v });
+  m.merge(crown, 0, H, 0);
+  m.box(0, H + 2 * FH + 4, 0, 1, 14, 1, C.metalDark); m.set(0, H + 2 * FH + 18, 0, C.neonRed, true);
+  return dust(m);
 }

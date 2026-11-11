@@ -105,7 +105,7 @@ const BUDGET = { entry: 140, three: 135, initial: 310 }; // KB gzip (MAP-3 E / M
     // Budgets (triangles drawn incl. the shadow pass): stage 1 ≤ 0.8 M, any stage ≤ 1.0 M; draw calls guard against regressions.
     for (const c of report.city) {
       if (c.tris > (c.stage === 1 ? 0.8e6 : 1.0e6)) problems.push(`stage ${c.stage}: ${c.tris} triangles`);
-      if (c.calls > 270) problems.push(`stage ${c.stage}: ${c.calls} draw calls`); // regression guard (MAP-3 E adds railway, furniture, wires)
+      if (c.calls > 300) problems.push(`stage ${c.stage}: ${c.calls} draw calls`); // regression guard (MAP-3 E / MAP-5: railway, furniture, wires, more building kinds)
     }
     if (report.city.at(-1).stage < 4) problems.push('city did not grow to stage 4');
     await ctx.close();

@@ -6,7 +6,7 @@ import { VoxelModel, hash3, MATERIALS, geometriesFor, groupOf, packedBounds } fr
 import { P } from './palette.js';
 import { LOCATION_BUILDERS_HD, colonyHD, treeModelHD, rockModelHD } from './buildings.js';
 import { buildTerrainHD, ROAD } from './terrain.js';
-import { carModel, lampModel, containerModel, clutterModel, CLUTTER_KINDS, crossingModel, wagonModel, bufferStopModel, shelterModel, stopSignModel, directionSignModel, safeZoneModel, fenceModel, FURNITURE, furnitureModel, trafficLightModel, streetSignModel, powerPoleModel, vehicleModel, checkpointModel, burntCarModel, tentModel, statueModel } from './props.js';
+import { carModel, lampModel, containerModel, clutterModel, CLUTTER_KINDS, crossingModel, wagonModel, bufferStopModel, shelterModel, stopSignModel, directionSignModel, safeZoneModel, fenceModel, campModel, laundryModel, FURNITURE, furnitureModel, trafficLightModel, streetSignModel, powerPoleModel, vehicleModel, checkpointModel, burntCarModel, tentModel, statueModel } from './props.js';
 import { markingQuads, lampSpots, railQuads, streetRuns, rampQuads } from './streets.js';
 import { blockSlab, GROUND } from './ground.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -231,7 +231,7 @@ const DISTRICT_RECIPES = {
 const DISTRICT_SMALL = { downtown: [2, 4, 5, 7, 1], residential: [0, 3, 6, 1], industrial: [3, 6, 0] };
 
 /** MAP-3: a decoration block with nothing built on it (a square, a lawn, an empty lot): about a quarter of them. */
-export const openBlock = (b, bx, bz) => RECIPES[b.kind] && b.kind !== 'place' && hash3(bx, 71, bz) < 0.18;
+export const openBlock = (b, bx, bz) => RECIPES[b.kind] && b.kind !== 'place' && hash3(bx, 71, bz) < 0.125; // ~1 in 8
 
 /**
  * MAP-3 calmer blocks: the chunks of a block that get something, as [row, column, what]. Built things (the place or
@@ -239,38 +239,64 @@ export const openBlock = (b, bx, bz) => RECIPES[b.kind] && b.kind !== 'place' &&
  * bench or one tree. Seeded by the block, so a block never changes.
  */
 export function blockPieces(b, bx, bz, plan, recipe = RECIPES[b.kind] ?? RECIPES.place, district = null) {
+  // MAP-5 density: downtown and residential blocks build their front AND back rows (a street wall on both sides);
+  // the rows between are a courtyard / alley. Industrial blocks fill a front window with yards and sheds. About one
+  // block in eight stays open. Entries: [row, col, what, span] (span 2 = a building over two columns).
   const out = [];
   const h = (k) => hash3(bx * 7 + k, 73, bz * 7 - k);
-  const cols = plan.covered.map((c) => +c.split(',')[1]);
-  // The window's first column: it must hold every column the place / centrepiece covers.
-  const first = cols.length ? Math.max(0, Math.max(...cols) - 2) : 0;
-  const last = cols.length ? Math.min(Math.min(...cols), plan.cols - 3) : plan.cols - 3;
-  const w0 = first + Math.floor(h(1) * (last - first + 1));
-  const win = [];
   const onRail = (i, j) => plan.railCut && (plan.railCut.row === i || plan.railCut.col === j);
-  for (let i = 0; i < 2; i++) for (let j = w0; j < w0 + 3; j++) if (!plan.covered.includes(`${i},${j}`) && !onRail(i, j)) win.push([i, j]);
-  win.sort((a, c) => a[0] - c[0] || hash3(bx + a[1], 75, bz) - hash3(bx + c[1], 75, bz)); // front row first
-  const built = plan.covered.length; // chunks already taken by the place / centrepiece
-  let n;
-  if (b.kind === 'place') n = built >= 4 ? (h(2) < 0.75 ? 1 : 2) : 2;
-  else if (openBlock(b, bx, bz)) n = 0;
-  else n = 2; // two pieces besides any centrepiece (still inside the 3×2 window)
-  // MAP-4 frontage: downtown, the whole front row of the window is built (a continuous street wall).
-  if (district === 'downtown' && !openBlock(b, bx, bz)) n = Math.max(n, win.filter(([i]) => i === 0).length);
-  n = Math.min(n, 6 - built, win.length);
+  const free = (i, j) => i >= 0 && j >= 0 && i < plan.rows && j < plan.cols && !plan.covered.includes(`${i},${j}`) && !onRail(i, j);
   const used = new Set();
-  for (let k = 0; k < n; k++) {
-    const [i, j] = win[k];
-    out.push([i, j, pickBy(recipe, hash3(bx * 3 + j, 61 + i, bz * 3 + i))]);
-    used.add(`${i},${j}`);
+  const take = (i, j, what, span = 1) => { out.push([i, j, what, span]); for (let k = 0; k < span; k++) used.add(`${i},${j + k}`); };
+  const open = openBlock(b, bx, bz);
+  const dense = !open && (district === 'downtown' || district === 'residential') && b.kind !== 'park';
+  if (dense) {
+    const back = plan.rows - 1;
+    for (const i of [0, back]) {
+      for (let j = 0; j < plan.cols; j++) {
+        if (!free(i, j) || used.has(`${i},${j}`)) continue;
+        // Back rows are partly built (downtown 3 in 4, residential 1 in 2): gaps keep it light and let the yards breathe.
+        if (i === back && hash3(bx * 9 + j, 95, bz * 9) > (district === 'downtown' ? 0.6 : 0.4)) continue;
+        // Downtown: some pairs of chunks become one wide building (office, cinema, garage, landmark tower).
+        if (district === 'downtown' && free(i, j + 1) && !used.has(`${i},${j + 1}`) && hash3(bx * 5 + j, 81 + i, bz * 5) < 0.45) {
+          const r = hash3(bx * 3 + j, 83 + i, bz * 3);
+          const ring = Math.max(Math.abs(bx), Math.abs(bz));
+          take(i, j, ring <= 2 && r < 0.22 ? 'tower' : r < 0.55 ? 'office' : r < 0.78 ? 'cinema' : 'garage', 2);
+          continue;
+        }
+        take(i, j, district === 'residential' && hash3(bx + j, 85 + i, bz) < 0.5 ? 'rows' : 'shop');
+      }
+    }
+    // The courtyard rows: one lived-in spot (campfire + tent, or laundry + snowman), the rest an alley.
+    let court = false;
+    for (let i = 1; i < back; i++) for (let j = 0; j < plan.cols; j++) {
+      if (!free(i, j)) continue;
+      if (!court && hash3(bx + j, 87, bz + i) < 0.5) { take(i, j, hash3(bx, 89, bz + j) < 0.5 ? 'camp' : 'laundry'); court = true; } else take(i, j, 'alley');
+    }
+  } else if (!open) {
+    // Industrial / other decoration blocks: a 3×2 window at the street side, yards with a shed now and then.
+    const cols = plan.covered.map((c) => +c.split(',')[1]);
+    const first = cols.length ? Math.max(0, Math.max(...cols) - 2) : 0;
+    const last = cols.length ? Math.min(Math.min(...cols), plan.cols - 3) : plan.cols - 3;
+    const w0 = first + Math.floor(h(1) * (last - first + 1));
+    const win = [];
+    for (let i = 0; i < 2; i++) for (let j = w0; j < w0 + 3; j++) if (free(i, j)) win.push([i, j]);
+    win.sort((a, c) => a[0] - c[0] || hash3(bx + a[1], 75, bz) - hash3(bx + c[1], 75, bz));
+    const n = Math.min(b.kind === 'place' ? 2 : 3, 6 - plan.covered.length, win.length);
+    for (let k = 0; k < n; k++) {
+      const [i, j] = win[k];
+      if (used.has(`${i},${j}`)) continue;
+      if (district === 'industrial' && free(i, j + 1) && !used.has(`${i},${j + 1}`) && win.some(([a, c]) => a === i && c === j + 1) && hash3(bx + j, 91, bz + i) < 0.4) { take(i, j, 'shed', 2); continue; }
+      take(i, j, pickBy(recipe, hash3(bx * 3 + j, 61 + i, bz * 3 + i)));
+    }
   }
   // Open chunks: one bench or one tree in some of them.
   for (let i = 0; i < plan.rows; i++) for (let j = 0; j < plan.cols; j++) {
     const k = `${i},${j}`;
     if (used.has(k) || plan.covered.includes(k) || onRail(i, j)) continue;
     const r = hash3(bx * 11 + j, 79 + i, bz * 11 + i);
-    if (r < 0.14) out.push([i, j, 'bench']);
-    else if (r < (b.kind === 'park' ? 0.6 : 0.3)) out.push([i, j, 'tree']);
+    if (r < 0.14) out.push([i, j, 'bench', 1]);
+    else if (r < (b.kind === 'park' ? 0.6 : 0.3)) out.push([i, j, 'tree', 1]);
   }
   return out;
 }
@@ -383,10 +409,14 @@ export function createBoard({ progressive = false } = {}) {
   function drainQueue(budgetMs = 6) {
     if (queueDirty) { queue.sort((a, b) => a.getWorldPosition(_w).lengthSq() - b.getWorldPosition(_w).lengthSq()); queueDirty = false; }
     const t0 = performance.now();
-    while (queue.length && performance.now() - t0 < budgetMs) { const n = queue.shift(); n.userData.queued = false; realize(n); }
+    while (queue.length && performance.now() - t0 < budgetMs) {
+      const n = queue.shift(); n.userData.queued = false;
+      const t1 = performance.now(); realize(n); const dt = performance.now() - t1;
+      if (dt > stats.slowMs) { stats.slowMs = dt; let k = '?'; n.traverse((o) => { if (k === '?' && o.userData.kind) k = o.userData.kind; }); stats.slowKind = k; }
+    }
     stats.maxSliceMs = Math.max(stats.maxSliceMs, performance.now() - t0);
   }
-  const stats = { maxSliceMs: 0 };
+  const stats = { maxSliceMs: 0, slowMs: 0, slowKind: '' };
   const lodModel = (key, make, eager = false) => {
     const g = new THREE.Group();
     for (let L = 0; L < 3; L++) g.add(lazyLod(L, () => groupOf(geometriesFor(`lod${L}-${key}`, lodOpts(L), () => city.lod(L, key, make))), eager));
@@ -412,9 +442,10 @@ export function createBoard({ progressive = false } = {}) {
     );
     return g;
   };
-  const lodInstanced = (key, make, list) => {
+  // fine = false: the close-up level reuses the authored model (MAP-5 filler buildings: big, many, seen from afar).
+  const lodInstanced = (key, make, list, fine = true) => {
     const g = new THREE.Group();
-    for (let L = 0; L < 3; L++) g.add(lazyLod(L, () => instanced(() => city.lod(L, key, make), LOD_SIZE[L], list, { cacheKey: `lod${L}-${key}`, jitter: 0, castShadow: L < 2, ao: L < 2 })));
+    for (let L = 0; L < 3; L++) { const M = !fine && L === 0 ? 1 : L; g.add(lazyLod(L, () => instanced(() => city.lod(M, key, make), LOD_SIZE[M], list, { cacheKey: `lod${M}-${key}`, jitter: 0, castShadow: M < 2, ao: M < 2 }))); }
     return g;
   };
   const cellOf = (x, z) => `${gridOf(x)},${gridOf(z)}`;
@@ -433,7 +464,9 @@ export function createBoard({ progressive = false } = {}) {
       return d;
     };
   };
-  const terrainFor = (key, cell = 0.5) => {
+  // MAP-5: the heightmap only shows the streets now (blocks are slabs on top), so 1 world per cell is enough.
+  const terrainFor = (key, far = false) => {
+    const cell = far ? 2 : 1;
     const [bx, bz] = parse(key);
     const cx = blockPos(bx); const cz = blockPos(bz); const hx = blockHalf(bx); const hz = blockHalf(bz);
     const near = streets.filter(([a, b]) => Math.min(a.x, b.x) < cx + hx + 4 && Math.max(a.x, b.x) > cx - hx - 4 && Math.min(a.z, b.z) < cz + hz + 4 && Math.max(a.z, b.z) > cz - hz - 4);
@@ -466,7 +499,7 @@ export function createBoard({ progressive = false } = {}) {
       z0: !roadSet.has(`${bx},${bz},h`) && has(bx, bz - 1), z1: !roadSet.has(`${bx},${bz + 1},h`) && has(bx, bz + 1),
     };
     const e = (o) => (o ? 0 : ROAD.half);
-    const slab = blockSlab({ x0: cx - hx + e(open.x0), x1: cx + hx - e(open.x1), z0: cz - hz + e(open.z0), z1: cz + hz - e(open.z1), walk: ROAD.walk - ROAD.kerb, surface: snowy ? 'snow' : 'paved', detail: cell < 1, seed: [bx, bz], open });
+    const slab = blockSlab({ x0: cx - hx + e(open.x0), x1: cx + hx - e(open.x1), z0: cz - hz + e(open.z0), z1: cz + hz - e(open.z1), walk: ROAD.walk - ROAD.kerb, surface: snowy ? 'snow' : 'paved', detail: !far, seed: [bx, bz], open });
     const sg = new THREE.BufferGeometry();
     for (const a of ['position', 'normal', 'color']) sg.setAttribute(a, new THREE.BufferAttribute(slab[a], 3));
     sg.setIndex(new THREE.BufferAttribute(slab.index, 1));
@@ -549,7 +582,7 @@ export function createBoard({ progressive = false } = {}) {
     const [bx, bz] = parse(key);
     const g = new THREE.Group(); g.name = `cell ${key}`;
     const terrain = new THREE.Group(); terrain.name = 'terrain-lod';
-    terrain.add(lazyLod('near', () => terrainFor(key), true), lazyLod('far', () => terrainFor(key, 1), true));
+    terrain.add(lazyLod('near', () => terrainFor(key), true), lazyLod('far', () => terrainFor(key, true), true));
     g.add(terrain);
     let model = null;
     if (b.kind === 'colony') {
@@ -594,7 +627,9 @@ export function createBoard({ progressive = false } = {}) {
     };
     const houses = Array.from({ length: city.SMALL_VARIANTS }, () => []);
     const put = (list, p, rotY, scale = 1) => { tmp.position.copy(p); tmp.rotation.set(0, rotY, 0); tmp.scale.setScalar(scale); tmp.updateMatrix(); list.push(tmp.matrix.clone()); };
-    const ruins = [[], []]; const pieces = { parking: [], fountain: [] }; const fences = { picket: [], chain: [] }; const clutter = Array.from({ length: CLUTTER_KINDS }, () => []);
+    const ruins = [[], []]; const pieces = { parking: [], fountain: [] }; const fences = { picket: [], chain: [] };
+    const big = {}; const courts = [];
+    const matrixAt = (p, rotY, scale) => { tmp.position.copy(p); tmp.rotation.set(0, rotY, 0); tmp.scale.setScalar(scale); tmp.updateMatrix(); return tmp.matrix.clone(); }; const clutter = Array.from({ length: CLUTTER_KINDS }, () => []);
     const roadSet = new Set(map.roads);
     for (const key of keys) {
       const b = map.blocks[key];
@@ -613,12 +648,26 @@ export function createBoard({ progressive = false } = {}) {
         }
         // MAP-3 calmer blocks: everything built (place / centrepiece + pieces) fits in a 3×2 window at the street side;
         // the other chunks stay open (paving or snow, now and then one bench or one tree).
-        for (const [i, j, what0] of blockPieces(b, bx, bz, plan, recipe, district)) {
-          const what = district === 'downtown' && i === 0 && what0 !== 'bench' && what0 !== 'tree' ? 'shop' : what0;
-          const p = chunkCenter(plan, i, j);
+        for (const [i, j, what, span = 1] of blockPieces(b, bx, bz, plan, recipe, district)) {
+          const p = span === 2 ? chunkCenter(plan, i, j).add(chunkCenter(plan, i, j + 1)).multiplyScalar(0.5) : chunkCenter(plan, i, j);
           const r2 = hash3(bx * 5 + i, 67, bz * 5 + j);
-          // Front-row buildings face the street; others any way.
-          const face = i === 0 ? face0 : Math.floor(r2 * 4) * (Math.PI / 2);
+          // Front-row buildings face the street, back-row ones the back street; others any way.
+          const backRow = i === plan.rows - 1 && plan.rows > 2;
+          const face = i === 0 ? face0 : backRow ? face0 + Math.PI : span === 2 ? face0 : Math.floor(r2 * 4) * (Math.PI / 2); // wide ones lie along the street
+          const BIG = { tower: [city.landmarkTower, 2], office: [city.officeBlock, 2], cinema: [() => city.cinema(), 1], garage: [() => city.parkingGarage(), 1], shed: [city.shedBuilding, 2] };
+          if (BIG[what]) {
+            const [mk, nv] = BIG[what]; const v = Math.floor(r2 * nv);
+            (big[`${what}-${v}`] ??= { make: () => mk(v), list: [] }).list.push(matrixAt(p, face, city.SMALL_SCALE));
+            continue;
+          }
+          if (what === 'rows' || (what === 'shop' && district === 'downtown' && Math.max(Math.abs(bx), Math.abs(bz)) <= 2 && hash3(bx + j, 93 + i, bz) < 0.3)) {
+            const isRows = what === 'rows'; const v = Math.floor(r2 * (isRows ? 2 : 4));
+            (big[`${isRows ? 'rows' : 'tall'}-${v}`] ??= { make: () => (isRows ? city.rowHouses(v) : city.tallBuilding(v)), list: [] }).list.push(matrixAt(p, face, city.SMALL_SCALE));
+            if (isRows && district === 'residential' && (i === 0 || backRow)) put(fences.picket, p.clone().addScaledVector(plan.fwd, (backRow ? -1 : 1) * (CHUNK / 2 - 0.25)), face0);
+            continue;
+          }
+          if (what === 'alley') { if (r2 < 0.5) put(clutter[Math.floor(r2 * 8) % (CLUTTER_KINDS - 1)], p, face); continue; }
+          if (what === 'camp' || what === 'laundry') { courts.push({ p, face, what }); continue; }
           if (what === 'house' || what === 'shop') {
             const pool = DISTRICT_SMALL[district] ?? [0, 1, 2, 3, 4, 5, 6, 7];
             const shopPool = pool.filter((v) => v % 2 === 0); const housePool = pool.filter((v) => v % 2 === 1);
@@ -685,7 +734,7 @@ export function createBoard({ progressive = false } = {}) {
       }
     });
     trees.forEach((list, k) => { if (list.length) group.add(lodProp(`tree-${k}`, () => treeModelHD(k, 1), 0.25, list)); });
-    houses.forEach((list, v) => { if (list.length) group.add(lodInstanced(`small-${v}`, () => city.smallBuilding(v), list)); });
+    houses.forEach((list, v) => { if (list.length) group.add(lodInstanced(`small-${v}`, () => city.smallBuilding(v), list, false)); });
     ruins.forEach((list, v) => { if (list.length) group.add(lodInstanced(`ruin-${v}`, () => city.ruinSmall(v), list)); });
     if (pieces.parking.length) group.add(lodInstanced('parking-small', city.parkingSmall, pieces.parking));
     if (pieces.fountain.length) group.add(lodInstanced('fountain', city.fountain, pieces.fountain));
@@ -693,6 +742,8 @@ export function createBoard({ progressive = false } = {}) {
     rocks.forEach((list, k) => { if (list.length) group.add(lazyLod('near', () => instanced(() => rockModelHD(k), 0.25, list, { cacheKey: `rock-${k}`, jitter: 0 }))); });
     cars.forEach((list, v) => { if (list.length) group.add(lazyLod('near', () => instanced(() => carModel(v), 0.15, list, { cacheKey: `car4-${v}`, jitter: 0, castShadow: false }))); });
     yards.forEach((list, k) => { if (list.length) group.add(lodProp(`container-${k}`, () => containerModel(k, 1 + (k % 2)), 0.2, list)); });
+    for (const [k, { make, list }] of Object.entries(big)) group.add(lodInstanced(`b5-${k}`, make, list, false));
+    courtyards.push(...courts);
     for (const [k, list] of Object.entries(fences)) if (list.length) group.add(lazyLod('near', () => instanced(() => fenceModel(k), 0.1, list, { cacheKey: `fence-${k}`, jitter: 0, castShadow: false })));
     if (attach) root.add(group);
     return { group, k: 0, target: 1, delay: 0 };
@@ -705,6 +756,7 @@ export function createBoard({ progressive = false } = {}) {
   const decor = new THREE.Group(); decor.name = 'street-decor';
   const debugItems = []; // MAP audit: merged furniture pieces { kind, box }
   const houseSpots = []; // MAP-4: roof edges of small buildings (service drops from the power lines)
+  const courtyards = []; // MAP-5: courtyard spots { p, face, what }
   root.add(decor);
   let flickers = []; let pools = null;
   function buildStreetDecor() {
@@ -946,6 +998,12 @@ export function createBoard({ progressive = false } = {}) {
       const t = ave.c + ROAD.walk + 5.5; const lat = 2.35;
       const [x, z] = rail.axis === 'x' ? [t, rail.c + lat] : [rail.c + lat, t];
       add('shelter', shelterModel, 0.1, x, GROUND, z, rail.axis === 'x' ? Math.PI : -Math.PI / 2);
+    }
+    // MAP-5 courtyards: a camp or a washing line with a snowman inside the blocks.
+    for (const c of courtyards) {
+      if (taken(c.p.x, c.p.z, 0.5)) continue;
+      if (c.what === 'camp') add('camp', campModel, 0.1, c.p.x, GROUND, c.p.z, c.face);
+      else add('laundry', laundryModel, 0.1, c.p.x, GROUND, c.p.z, c.face);
     }
     // Places belong to their street: driveways across the sidewalk, vehicles parked at the kerb, a few signs of use.
     const apron = () => { const m = new VoxelModel(); m.box(-15, 0, -12, 30, 1, 25, (x, _y, z) => (Math.abs(x) === 15 || Math.abs(z) === 12 ? 0x8d949e : 0x2b2e33)); return m; };
@@ -1283,7 +1341,7 @@ export function createBoard({ progressive = false } = {}) {
         glowMats.length = 0;
         lodNodes.length = 0;
         queue.length = 0;
-        houseSpots.length = 0;
+        houseSpots.length = 0; courtyards.length = 0;
         map = null;
         snap = true;
       }
@@ -1304,7 +1362,7 @@ export function createBoard({ progressive = false } = {}) {
         c.terrain.traverse((t) => t.geometry?.dispose());
         for (const t of c.terrain.children) { const i = lodNodes.indexOf(t); if (i >= 0) lodNodes.splice(i, 1); }
         c.terrain.clear();
-        c.terrain.add(lazyLod('near', () => terrainFor(k), true), lazyLod('far', () => terrainFor(k, 1), true));
+        c.terrain.add(lazyLod('near', () => terrainFor(k), true), lazyLod('far', () => terrainFor(k, true), true));
       }
       fresh.sort((a, b) => Math.hypot(...parse(a)) - Math.hypot(...parse(b)));
       const dist = (k) => { const [x, z] = parse(k); return Math.hypot(blockPos(x), blockPos(z)); };
