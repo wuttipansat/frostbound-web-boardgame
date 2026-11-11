@@ -327,3 +327,14 @@ export function laundryModel() {
   m.set(8, 13, 14, 0xd9822b); m.set(7, 14, 14, 0x1c1f24); m.set(9, 14, 14, 0x1c1f24);
   return m;
 }
+
+/** A crow (0.1 world per voxel): perched pose; the board animates flight by moving the instance. */
+export function crowModel() {
+  const m = new VoxelModel();
+  m.box(-1, 1, 0, 3, 2, 1, 0x15171a); m.box(1, 3, 0, 1, 1, 1, 0x15171a); m.set(2, 3, 0, 0x3a3f46); m.set(-2, 2, 0, 0x15171a);
+  m.box(-1, 2, -1, 2, 1, 1, 0x1c1f24); m.box(-1, 2, 1, 2, 1, 1, 0x1c1f24); m.set(0, 0, 0, 0x3a3f46);
+  return m;
+}
+
+/** One warm bulb of a string of lights. */
+export function bulbModel() { return new VoxelModel().set(0, 0, 0, 0xffd27a, true); }

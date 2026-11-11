@@ -6,7 +6,7 @@ import { VoxelModel, hash3, MATERIALS, geometriesFor, groupOf, packedBounds } fr
 import { P } from './palette.js';
 import { LOCATION_BUILDERS_HD, colonyHD, treeModelHD, rockModelHD } from './buildings.js';
 import { buildTerrainHD, ROAD } from './terrain.js';
-import { carModel, lampModel, containerModel, clutterModel, CLUTTER_KINDS, crossingModel, wagonModel, bufferStopModel, shelterModel, stopSignModel, directionSignModel, safeZoneModel, fenceModel, campModel, laundryModel, FURNITURE, furnitureModel, trafficLightModel, streetSignModel, powerPoleModel, vehicleModel, checkpointModel, burntCarModel, tentModel, statueModel } from './props.js';
+import { carModel, lampModel, containerModel, clutterModel, CLUTTER_KINDS, crossingModel, wagonModel, bufferStopModel, shelterModel, stopSignModel, directionSignModel, safeZoneModel, fenceModel, campModel, laundryModel, crowModel, bulbModel, FURNITURE, furnitureModel, trafficLightModel, streetSignModel, powerPoleModel, vehicleModel, checkpointModel, burntCarModel, tentModel, statueModel } from './props.js';
 import { markingQuads, lampSpots, railQuads, streetRuns, rampQuads } from './streets.js';
 import { blockSlab, GROUND } from './ground.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -757,6 +757,7 @@ export function createBoard({ progressive = false } = {}) {
   const debugItems = []; // MAP audit: merged furniture pieces { kind, box }
   const houseSpots = []; // MAP-4: roof edges of small buildings (service drops from the power lines)
   const courtyards = []; // MAP-5: courtyard spots { p, face, what }
+  const crowPerches = []; const BASE_CHIMNEYS = 3; // the colony's two houses + the dorm
   root.add(decor);
   let flickers = []; let pools = null;
   function buildStreetDecor() {
@@ -888,12 +889,11 @@ export function createBoard({ progressive = false } = {}) {
     // Power lines (MAP-4): poles every 12 on one sidewalk, cross arm ACROSS the street; each of the 3 wires runs from
     // insulator to insulator, the ends taken from the pole's full transform (a leaning pole carries its wires).
     // Runs end with a guy wire to the ground; wires from a fallen pole's neighbours hang to the ground beside it.
-    const wires = [];
+    const wires = []; const livePoles = [];
     const INS = [-0.9, 0, 0.9].map((xo) => new THREE.Vector3(xo, 6.55, -0.05)); // insulators in pole space (0.1 voxels)
     const sag = (a, b) => { for (let s2 = 0; s2 < 10; s2++) { const u = s2 / 10; const v = (s2 + 1) / 10; const span = a.distanceTo(b); const pa = a.clone().lerp(b, u); pa.y -= Math.sin(u * Math.PI) * span * 0.05; const pb = a.clone().lerp(b, v); pb.y -= Math.sin(v * Math.PI) * span * 0.05; wires.push(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z); } };
     const straight = (a, b) => wires.push(a.x, a.y, a.z, b.x, b.y, b.z);
     const long = runs.filter((r) => !(r.axis === rail.axis && Math.abs(r.c - rail.c) < 0.01)).sort((a, b) => (b.t1 - b.t0) - (a.t1 - a.t0) || a.c - b.c).slice(0, 2);
-    const livePoles = [];
     long.forEach((r, ri) => {
       const lat = -(ROAD.kerb + 1.0); // the arm (±1) stays over the sidewalk, clear of the building line
       const dirT = r.axis === 'x' ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
@@ -935,10 +935,6 @@ export function createBoard({ progressive = false } = {}) {
       let best = null; let bd = 12;
       for (const p of livePoles) { const d = Math.hypot(p.base.x - h.roof.x, p.base.z - h.roof.z); if (d < bd) { bd = d; best = p; } }
       if (best) sag(best.ends[1], h.roof);
-    }
-    if (wires.length) {
-      const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wires, 3));
-      const wl = new THREE.LineSegments(wg, WIRE_MAT); wl.name = 'wires'; decor.add(tagLod(wl, 'near'));
     }
     // The evacuation route: the street on the other axis beside the colony, cars abandoned nose to tail in the
     // outbound lane, a bus, a jack-knifed truck, and an army checkpoint near the colony.
@@ -999,6 +995,27 @@ export function createBoard({ progressive = false } = {}) {
       const [x, z] = rail.axis === 'x' ? [t, rail.c + lat] : [rail.c + lat, t];
       add('shelter', shelterModel, 0.1, x, GROUND, z, rail.axis === 'x' ? Math.PI : -Math.PI / 2);
     }
+    // MAP-5 overhead: strings of warm lights across a few side streets, from facade to facade.
+    runs.forEach((r, ri) => {
+      if (r.axis === ave.axis && Math.abs(r.c - ave.c) < 0.01) return;
+      for (let k = Math.ceil((r.t0 - 13.5) / 27); k * 27 + 13.5 <= r.t1; k++) {
+        const t = k * 27 + 13.5;
+        if (hash3(Math.round(t), ri, rail.look + 51) > 0.55 || near(...(r.axis === 'x' ? [t, r.c] : [r.c, t]), nodes, 9)) continue;
+        const P = (lat, y) => (r.axis === 'x' ? new THREE.Vector3(t, y, r.c + lat) : new THREE.Vector3(r.c + lat, y, t));
+        const a = P(-(ROAD.walk + 0.4), GROUND + 4.6); const b = P(ROAD.walk + 0.4, GROUND + 4.6);
+        if (!onSlab(a.x - (r.axis === 'x' ? 0 : 0.6), a.z - (r.axis === 'x' ? 0.6 : 0)) || !onSlab(b.x + (r.axis === 'x' ? 0 : 0.6), b.z + (r.axis === 'x' ? 0.6 : 0))) continue;
+        sag(a, b);
+        for (let q = 1; q < 10; q++) { const u = q / 10; const p = a.clone().lerp(b, u); p.y -= Math.sin(u * Math.PI) * a.distanceTo(b) * 0.05 + 0.08; add('bulb', bulbModel, 0.12, p.x, p.y, p.z, 0); }
+      }
+    });
+    // Crows on roof edges and on the power line arms.
+    crowPerches.length = 0;
+    houseSpots.forEach((hs, i) => { if (hash3(i, 7, rail.look) < 0.18) crowPerches.push(hs.roof.clone()); });
+    livePoles.forEach((p, i) => { if (hash3(i, 9, rail.look) < 0.25) crowPerches.push(p.ends[0].clone().add(new THREE.Vector3(0, 0.15, 0))); });
+    crowPerches.splice(40);
+    // Smoke from a few chimneys and burn barrels in the city (the colony's chimneys stay first).
+    fx.chimneys.splice(BASE_CHIMNEYS);
+    houseSpots.forEach((hs, i) => { if (fx.chimneys.length < BASE_CHIMNEYS + 5 && hash3(i, 11, rail.look) < 0.08) fx.chimneys.push(hs.roof.clone().add(new THREE.Vector3(0, 0.6, 0))); });
     // MAP-5 courtyards: a camp or a washing line with a snowman inside the blocks.
     for (const c of courtyards) {
       if (taken(c.p.x, c.p.z, 0.5)) continue;
@@ -1063,6 +1080,10 @@ export function createBoard({ progressive = false } = {}) {
           for (let i = 0; i < 5; i++) { const [x, z] = r.axis === 'x' ? [t + (i - 2) * 0.9, r.c + ROAD.walk - 1 - hash3(i, st, 47)] : [r.c + ROAD.walk - 1 - hash3(i, st, 47), t + (i - 2) * 0.9]; if (clear(x, z)) { const c = [1, 2, 3][i % 3]; add(`clutter-${c}`, () => clutterModel(c), 0.12, x, GROUND, z, i * 1.3); } }
         }
       }
+    }
+    if (wires.length) {
+      const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wires, 3));
+      const wl = new THREE.LineSegments(wg, WIRE_MAT); wl.name = 'wires'; decor.add(tagLod(wl, 'near'));
     }
     const merge = (list, mat, name) => {
       if (!list.length) return;
@@ -1297,6 +1318,27 @@ export function createBoard({ progressive = false } = {}) {
     }
   }
 
+  // MAP-5 crows: perched on roof edges and pole arms; when the camera comes close they take off and circle away,
+  // settling again when it pulls back. One instanced mesh; nothing when the graphics tier is Battery saver.
+  const crowGeo = geometriesFor('crow', { size: 0.1, jitter: 0 }, crowModel).lit;
+  const crows = new THREE.InstancedMesh(crowGeo, MATERIALS.lit, 40); crows.count = 0; crows.frustumCulled = false; crows.name = 'crows';
+  root.add(crows);
+  let zoomNow = 1; let flight = 0;
+  function stepCrows(t, dt) {
+    const saver = typeof document !== 'undefined' && document.body?.dataset?.gfx === 'saver';
+    crows.visible = !saver && crowPerches.length > 0 && lodLevel < 2;
+    if (!crows.visible) return;
+    flight += ((zoomNow > 1.6 ? 1 : 0) - flight) * Math.min(1, dt * (zoomNow > 1.6 ? 1.5 : 0.3));
+    crows.count = crowPerches.length;
+    crowPerches.forEach((p, i) => {
+      const a = i * 2.4 + t * 0.6; const f = flight;
+      tmp.position.set(p.x + Math.cos(a) * 6 * f, p.y + f * (5 + (i % 4)), p.z + Math.sin(a) * 6 * f);
+      tmp.rotation.set(0, f > 0.05 ? -a : i * 1.3, 0); tmp.scale.setScalar(1 + f * 0.3 * Math.abs(Math.sin(t * 12 + i))); tmp.updateMatrix();
+      crows.setMatrixAt(i, tmp.matrix);
+    });
+    crows.instanceMatrix.needsUpdate = true;
+  }
+
   let hovered = null;
   let selected = null;
   let lastT = null;
@@ -1319,6 +1361,7 @@ export function createBoard({ progressive = false } = {}) {
     setSelected(id) { selected = id; },
     /** MAP-2 D: the camera zoom picks the level of detail of city models. */
     setZoom(z) {
+      zoomNow = z;
       const level = z >= 0.8 ? 0 : z >= 0.56 ? 1 : 2; // MAP-3: a stage-4 overview (zoom ~0.5) uses the light level
       if (level === lodLevel) return;
       lodLevel = level;
@@ -1422,6 +1465,7 @@ export function createBoard({ progressive = false } = {}) {
       for (const c of batches) if (c.pop) stepPop(c, dt);
       for (let i = slotPops.length - 1; i >= 0; i--) { stepPop(slotPops[i], dt); if (!slotPops[i].pop) slotPops.splice(i, 1); }
       stepPuffs(dt);
+      stepCrows(t, dt);
       AMBER_MAT.visible = Math.floor(t * 1.6) % 2 === 0; // amber signals blink
       if (pools && flickers.length) {
         for (const [n, i] of flickers.entries()) { const f = Math.sin(t * 9 + n * 2.3) > 0.6 || Math.sin(t * 23 + n) > 0.93 ? 0.15 : 1; _c.setScalar(f); pools.setColorAt(i, _c); }

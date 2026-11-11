@@ -684,46 +684,6 @@ export function colonySlot(kind, level = 0) {
   return m.snowCap(P.snow, 1, 1);
 }
 
-/** Filler block: a fenced parking lot with painted bays and a couple of wrecks. */
-export function parkingLot() {
-  const m = new VoxelModel(); const w = 56; const d = 48;
-  for (let x = 0; x < w; x++) for (let z = 0; z < d; z++) {
-    let c = C.asphalt;
-    if ((x % 9 === 0 && (z < 14 || z > d - 15)) || (z === 14 || z === d - 15)) c = C.paint;
-    if (hash3(x, 3, z) < 0.15) c = P.snow;
-    m.set(x, 0, z, c);
-  }
-  for (let x = 0; x < w; x++) { m.set(x, 1, 0, C.metalDark); m.set(x, 1, d - 1, C.metalDark); if (x % 4 === 0) { m.box(x, 1, 0, 1, 5, 1, C.metal); m.box(x, 1, d - 1, 1, 5, 1, C.metal); } m.set(x, 4, 0, C.metal); m.set(x, 4, d - 1, C.metal); }
-  for (let z = 0; z < d; z++) if (z < 18 || z > 30) { m.set(0, 1, z, C.metalDark); if (z % 4 === 0) m.box(0, 1, z, 1, 5, 1, C.metal); m.set(0, 4, z, C.metal); }
-  const car = (x, z, c) => { m.box(x, 1, z, 6, 3, 11, c); m.box(x, 4, z + 3, 6, 2, 5, c); m.box(x, 4, z + 2, 6, 2, 1, C.glass); for (const [dx, dz] of [[-1, 1], [6, 1], [-1, 8], [6, 8]]) m.box(x + dx, 0, z + dz, 1, 2, 2, 0x15171a); };
-  car(10, 2, 0xa63a2e); car(28, 2, 0x2b4170); car(19, d - 13, 0xd8b03a); car(37, d - 13, 0xe4e2da);
-  // A container stack in the corner.
-  for (let y = 0; y < 2; y++) m.box(42, 1 + y * 8, 18, 12, 8, 7, C.cont[y]);
-  return m.snowCap(P.snow, 1, 1);
-}
-
-/** Filler block: stacked shipping containers, crates and barrels. */
-export function containerYard() {
-  const m = new VoxelModel();
-  pad(m, 0, 0, 56, 48, 9);
-  let i = 0;
-  for (let gx = 4; gx < 50; gx += 16) for (let gz = 4; gz < 44; gz += 11) {
-    if (hash3(gx, gz, 1) < 0.25) continue;
-    const h = 1 + Math.floor(hash3(gx, gz, 2) * 3);
-    for (let k = 0; k < h; k++) {
-      const c = C.cont[(i + k) % 3];
-      for (let t = 0; t < 14; t++) for (let y = 0; y < 8; y++) for (let z = 0; z < 7; z++) {
-        const rib = t % 2 === 0 && (z === 0 || z === 6);
-        m.set(gx + t, 1 + k * 8 + y, gz + z, t === 0 || t === 13 ? 0x1c1f24 : rib ? c : (c & 0xfefefe) >> 1 | (c & 0x808080));
-      }
-    }
-    i++;
-  }
-  for (const [x, z] of [[2, 40], [5, 42], [50, 2]]) m.box(x, 1, z, 3, 3, 3, 0x8a5a2b);
-  for (const [x, z] of [[30, 40], [33, 41]]) m.box(x, 1, z, 2, 4, 2, 0x2f5fa8);
-  return m.snowCap(P.snow, 1, 1);
-}
-
 // ---------------------------------------------------------------- MAP-1: places found as the city grows
 
 export function warehouse() {
@@ -806,55 +766,6 @@ export function farmhouse() {
 }
 
 // ---------------------------------------------------------------- MAP-1: blocks without a place
-
-/** A town square: paving, a frozen fountain, benches and bare trees. */
-export function plaza() {
-  const m = new VoxelModel();
-  pad(m, 0, 0, 56, 48, 41);
-  for (let x = 0; x < 12; x++) for (let z = 0; z < 12; z++) {
-    const r = Math.hypot(x - 5.5, z - 5.5);
-    if (r < 6) m.box(22 + x, 1, 18 + z, 1, r > 4.6 ? 2 : 1, 1, r > 4.6 ? C.trim : 0xbfe3f5);
-  }
-  m.box(27, 1, 23, 2, 6, 2, C.trim); m.box(26, 7, 22, 4, 1, 4, C.trim);
-  for (const [x, z, r] of [[8, 10, 0], [44, 10, 0], [8, 36, 1], [44, 36, 1]]) {
-    m.box(x, 1, z, 7, 1, 2, 0x7a5a3a); m.box(x, 2, z + (r ? 0 : 1), 7, 2, 1, 0x7a5a3a);
-  }
-  for (const [x, z] of [[4, 4], [50, 4], [4, 42], [50, 42]]) { m.box(x, 1, z, 1, 9, 1, 0x4b3a2c); m.box(x - 2, 7, z, 5, 1, 1, 0x4b3a2c); m.box(x, 8, z - 2, 1, 1, 5, 0x4b3a2c); }
-  return m.snowCap(P.snow, 1, 1);
-}
-
-/** A snowed-in park: pines, a frozen pond, a playground frame. */
-export function park() {
-  const m = new VoxelModel();
-  for (let x = 0; x < 56; x++) for (let z = 0; z < 48; z++) {
-    const pond = Math.hypot((x - 36) / 1.3, z - 30) < 8;
-    m.set(x, 0, z, pond ? (hash3(x, 1, z) < 0.1 ? 0xe9f6ff : 0xa9cdea) : hash3(x, 3, z) < 0.05 ? C.mossDark : P.snow);
-  }
-  for (const [x, z, h] of [[6, 6, 14], [14, 30, 18], [46, 8, 16], [6, 40, 12], [26, 12, 15]]) {
-    m.box(x, 1, z, 1, 3, 1, 0x4b3a2c);
-    for (let k = 0; k < h - 3; k++) { const r = Math.max(0, Math.floor((h - 3 - k) / 3)); m.box(x - r, 4 + k, z - r, 2 * r + 1, 1, 2 * r + 1, k % 3 === 0 ? P.snow : 0x2f5a3c); }
-  }
-  for (const x of [16, 26]) m.box(x, 1, 40, 1, 8, 1, C.metal);
-  m.box(16, 8, 40, 11, 1, 1, C.metal);
-  m.box(19, 2, 40, 1, 6, 1, C.metalDark); m.box(23, 2, 40, 1, 6, 1, C.metalDark);
-  return m.snowCap(P.snow, 1, 1);
-}
-
-/** A collapsed building: broken walls, rubble, a bent girder. */
-export function ruins() {
-  const m = new VoxelModel();
-  pad(m, 0, 0, 56, 48, 43);
-  m.walls(8, 1, 8, 30, 10, 26, C.grey);
-  for (let x = 8; x < 38; x++) for (let z = 8; z < 34; z++) for (let y = 1; y < 11; y++) {
-    if (hash3(Math.floor(x / 3), y, Math.floor(z / 3)) < 0.35 + y * 0.05) m.remove?.(x, y, z);
-  }
-  for (let i = 0; i < 70; i++) {
-    const x = 6 + Math.floor(hash3(i, 1, 9) * 40); const z = 6 + Math.floor(hash3(i, 2, 9) * 34);
-    m.box(x, 1, z, 2, 1 + Math.floor(hash3(i, 3, 9) * 3), 2, hash3(i, 4, 9) < 0.5 ? C.greyDark : C.grey);
-  }
-  for (let k = 0; k < 14; k++) m.set(40 + Math.floor(k / 3), 1 + k, 20, C.rust);
-  return m.snowCap(P.snow, 1, 1);
-}
 
 // ---------------------------------------------------------------- MAP-1b: small buildings that fill a block's free chunks
 

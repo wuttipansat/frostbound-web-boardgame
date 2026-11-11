@@ -34,7 +34,7 @@ function audit(board, map, seed, stage) {
     if (it.kind.startsWith('place:')) continue;
     if (!onSlab(c.x, c.z) && !onRoad(c.x, c.z)) { note('over the void / off the ground', seed, stage, it.kind, at); continue; }
     const want = onSlab(c.x, c.z) ? GROUND : 0;
-    if (!/^(pole|tree|wagon-lying|crossing|tlight|lamp|sign)/.test(it.kind) && Math.abs(it.box.min.y - want) > 0.2) note(it.box.min.y > want ? 'floating' : 'buried', seed, stage, `${it.kind} (base ${it.box.min.y.toFixed(2)}, ground ${want})`, at);
+    if (!/^(pole|tree|wagon-lying|crossing|tlight|lamp|sign|bulb)/.test(it.kind) && Math.abs(it.box.min.y - want) > 0.2) note(it.box.min.y > want ? 'floating' : 'buried', seed, stage, `${it.kind} (base ${it.box.min.y.toFixed(2)}, ground ${want})`, at);
     const across = rail.axis === 'x' ? [it.box.min.z, it.box.max.z] : [it.box.min.x, it.box.max.x];
     const along = rail.axis === 'x' ? c.x : c.z;
     const railHere = has(...(rail.axis === 'x' ? [gridOf(along), rail.r] : [rail.r, gridOf(along)]));
@@ -54,7 +54,7 @@ function audit(board, map, seed, stage) {
   // Entrances: a door's sidewalk and the colony gates.
   const doors = Object.values(board.layout).flatMap((L) => (L.plan ? [[L.id, L.plan.c.clone().addScaledVector(L.plan.fwd, L.plan.edge + 1).addScaledVector(L.plan.side, L.plan.lat)]] : (L.gates ?? []).map((g) => ['gate', g])));
   for (const it of items) {
-    if (it.kind.startsWith('place:') || /^(apron|lamp|tree)/.test(it.kind)) continue;
+    if (it.kind.startsWith('place:') || /^(apron|lamp|tree|bulb)/.test(it.kind)) continue; // (bulbs hang overhead)
     const c = it.box.getCenter(it.box.min.clone());
     if (onRoadAt(c.x, c.z)) continue; // vehicles in the street don't block a door on the sidewalk
     for (const [id, d] of doors) if (Math.hypot(c.x - d.x, c.z - d.z) < 3) note('blocks an entrance', seed, stage, `${it.kind} at ${id}`, [c.x, c.z]);
