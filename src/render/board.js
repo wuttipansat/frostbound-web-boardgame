@@ -197,7 +197,7 @@ function streetSegments(roadKeys, layout) {
     const [x1, z1] = d === 'h' ? cornerPos(+cx + 1, +cz) : cornerPos(+cx, +cz + 1);
     out.push([new THREE.Vector3(x0, 0, z0), new THREE.Vector3(x1, 0, z1), seg]);
   }
-  for (const g of layout.colony.gates) out.push([g.clone(), g.clone().normalize().multiplyScalar(blockHalf(0)), 'gate']);
+  for (const g of layout.colony.gates) { const f = g.clone().setY(0); out.push([f.clone(), f.clone().normalize().multiplyScalar(blockHalf(0)), 'gate']); } // at road level
   return out;
 }
 
@@ -271,6 +271,7 @@ function instanced(make, scale, transforms, { castShadow = true, cacheKey = null
     const im = new THREE.InstancedMesh(geo, mat, transforms.length);
     transforms.forEach((t, i) => im.setMatrixAt(i, t));
     im.userData.base = transforms; // MAP-2 C: pop-in animates from these
+    im.userData.kind = cacheKey ?? 'prop'; // MAP audit: what this is
     im.castShadow = castShadow && mat === MATERIALS.lit;
     im.receiveShadow = true;
     group.add(im);
@@ -583,9 +584,9 @@ export function createBoard({ progressive = false } = {}) {
         const district = districtOf(bx, bz, map.look);
         const recipe = b.kind === 'park' ? RECIPES.park : DISTRICT_RECIPES[district] ?? RECIPES[b.kind] ?? RECIPES.place;
         const face0 = Math.atan2(plan.fwd.x, plan.fwd.z);
-        if (cp) {
+        if (cp && plan.fw === cp[1] && plan.fd === cp[2]) { // (in the rail row a 2×2 centrepiece no longer fits: left out)
           const at = plan.center.clone();
-          if (cp[0] === 'ruinBig') put(ruins[1], at, face0, PLACE_SCALE); else put(pieces[cp[0]], at, face0, PLACE_SCALE);
+          if (cp[0] === 'ruinBig') put(ruins[1], at, face0, 0.8); else put(pieces[cp[0]], at, face0, 0.8); // centrepieces fit their chunks at 0.8
         }
         // MAP-3 calmer blocks: everything built (place / centrepiece + pieces) fits in a 3×2 window at the street side;
         // the other chunks stay open (paving or snow, now and then one bench or one tree).
@@ -608,14 +609,17 @@ export function createBoard({ progressive = false } = {}) {
           } else if (what === 'tree') put(trees[Math.floor(r2 * 3)], p.clone().add(new THREE.Vector3((r2 - 0.5) * 3, 0, (hash3(i, j, 5) - 0.5) * 3)), r2 * 6, 0.8 + r2 * 0.4);
           else if (what === 'bench') put(clutter[CLUTTER_KINDS - 1], p.clone().addScaledVector(plan.fwd, CHUNK * 0.35), face0 + Math.PI);
           else if (what === 'car') {
-            put(cars[Math.floor(r2 * 4)], p.clone().addScaledVector(plan.side, -1.3), face + Math.PI / 2);
-            put(cars[Math.floor(hash3(i, j, bx) * 4)], p.clone().addScaledVector(plan.side, 1.3), face + Math.PI / 2);
+            const across = new THREE.Vector3(Math.sin(face + Math.PI / 2), 0, Math.cos(face + Math.PI / 2)); // side by side
+            put(cars[Math.floor(r2 * 4)], p.clone().addScaledVector(across, -1.6), face + Math.PI / 2);
+            put(cars[Math.floor(hash3(i, j, bx) * 4)], p.clone().addScaledVector(across, 1.6), face + Math.PI / 2);
           } else if (what === 'yard') {
-            put(yards[Math.floor(r2 * 3)], p.clone().addScaledVector(plan.fwd, -1.2), face);
-            put(yards[Math.floor(hash3(j, i, bz) * 3)], p.clone().addScaledVector(plan.fwd, 1.4), face);
+            // Two stacks side by side (offset across their length, whichever way they face).
+            const across = new THREE.Vector3(Math.sin(face), 0, Math.cos(face));
+            put(yards[Math.floor(r2 * 3)], p.clone().addScaledVector(across, -1.7), face);
+            put(yards[Math.floor(hash3(j, i, bz) * 3)], p.clone().addScaledVector(across, 1.8), face);
           } else if (what === 'ruin') put(ruins[Math.floor(r2 * 2)], p, face, PLACE_SCALE);
           else if (what === 'rocks') { for (let k = 0; k < 2; k++) put(rocks[k], p.clone().add(new THREE.Vector3((k - 0.5) * 3, 0, (r2 - 0.5) * 3)), r2 * 6, 0.9); }
-          else for (let k = 0; k < 2; k++) put(clutter[Math.floor(hash3(k, i + bx, j + bz) * (CLUTTER_KINDS - 1))], p.clone().add(new THREE.Vector3((hash3(k, 3, j) - 0.5) * 4, 0, (hash3(k, 5, i) - 0.5) * 4)), hash3(k, i, j) * 6);
+          else for (let k = 0; k < 2; k++) put(clutter[Math.floor(hash3(k, i + bx, j + bz) * (CLUTTER_KINDS - 1))], p.clone().add(new THREE.Vector3((k ? 1.9 : -1.9) + (hash3(k, 3, j) - 0.5) * 0.6, 0, (hash3(k, 5, i) - 0.5) * 3)), hash3(k, i, j) * 6);
         }
         continue;
       }
@@ -638,21 +642,14 @@ export function createBoard({ progressive = false } = {}) {
       const dir = b.clone().sub(a); const len = dir.length(); dir.normalize();
       const side = new THREE.Vector3(-dir.z, 0, dir.x);
       const at = (t, lat) => a.clone().addScaledVector(dir, len * t).addScaledVector(side, lat);
-      const h = (k) => hash3(i, k, seg.length * 3 + (seg.charCodeAt(0) ?? 0));
-      if (len > 6 && h(2) < 0.6) {
+      // Seeded by the street itself (not its place in the list), so a city built in one go = one grown step by step.
+      const sk = seg === 'gate' ? [Math.round(b.x), 9, Math.round(b.z)] : seg.split(',').map((v) => (v === 'h' ? 1 : v === 'v' ? 2 : +v));
+      const h = (k) => hash3(sk[0] * 31 + sk[2] * 7 + k, sk[1] * 13 + 3, k * 17 + sk[2]);
+      const nearRail = (p) => Math.abs((railRow.axis === 'x' ? p.z : p.x) - railRow.c) < RAIL_CLEAR + 3;
+      if (false && len > 6 && h(2) < 0.6 && !nearRail(at(0.5, 0))) { // MAP audit: random street cars clashed with the route / place vehicles
         tmp.position.copy(at(0.3 + h(3) * 0.4, (h(4) < 0.5 ? -1 : 1) * ROAD.half / 2));
         tmp.rotation.set(0, Math.atan2(dir.x, dir.z) - Math.PI / 2 + (h(5) - 0.5) * 0.6, 0); tmp.scale.setScalar(1); tmp.updateMatrix();
         cars[Math.floor(h(6) * 4)].push(tmp.matrix.clone());
-      }
-      if (len > 8) {
-        for (let k = 0; k < 2; k++) if (h(10 + k) < 0.35) { // cones, crates, barrels, bags, barriers on the sidewalk
-          tmp.position.copy(at(0.15 + h(12 + k) * 0.7, (k ? -1 : 1) * (ROAD.walk - 0.9))).setY(GROUND);
-          // Lamps win: clutter steps along the sidewalk, out of a lamp's way.
-          for (let n = 0; n < 4 && lampsAt.some((l) => Math.hypot(l.x - tmp.position.x, l.z - tmp.position.z) < 1.6); n++) tmp.position.addScaledVector(dir, 1.7);
-          if (Math.abs((railRow.axis === 'x' ? tmp.position.z : tmp.position.x) - railRow.c) < RAIL_CLEAR + 0.6) continue; // not on the track
-          tmp.rotation.set(0, h(14 + k) * 6, 0); tmp.scale.setScalar(1); tmp.updateMatrix();
-          clutter[Math.floor(h(16 + k) * (CLUTTER_KINDS - 1))].push(tmp.matrix.clone());
-        }
       }
     });
     trees.forEach((list, k) => { if (list.length) group.add(lodProp(`tree-${k}`, () => treeModelHD(k, 1), 0.25, list)); });
@@ -673,6 +670,7 @@ export function createBoard({ progressive = false } = {}) {
   const MARK_MAT = new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const POOL_MAT = new THREE.MeshBasicMaterial({ map: poolTexture(), color: 0xffb36b, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, fog: false });
   const decor = new THREE.Group(); decor.name = 'street-decor';
+  const debugItems = []; // MAP audit: merged furniture pieces { kind, box }
   root.add(decor);
   let flickers = []; let pools = null;
   function buildStreetDecor() {
@@ -693,7 +691,8 @@ export function createBoard({ progressive = false } = {}) {
       decor.add(m);
     }
     const posts = railCrossings(rail);
-    const spots = lampSpots(segs, ground).filter((l) => !posts.some((p) => Math.hypot(p.x - l.x, p.z - l.z) < 2.5) && Math.abs((rail.axis === 'x' ? l.z : l.x) - rail.c) > RAIL_CLEAR + 0.6);
+    const slabAt = (x, z) => { const bx = gridOf(x); const bz = gridOf(z); return has(bx, bz) && Math.abs(x - blockPos(bx)) <= blockHalf(bx) - ROAD.half - 0.2 && Math.abs(z - blockPos(bz)) <= blockHalf(bz) - ROAD.half - 0.2; };
+    const spots = lampSpots(segs, (x, z) => ground(x, z) && slabAt(x, z)).filter((l) => !posts.some((p) => Math.hypot(p.x - l.x, p.z - l.z) < 2.5) && Math.abs((rail.axis === 'x' ? l.z : l.x) - rail.c) > RAIL_CLEAR + 0.6);
     const lit = []; const dead = []; const poolList = [];
     flickers = [];
     for (const l of spots) {
@@ -721,8 +720,13 @@ export function createBoard({ progressive = false } = {}) {
   // ---------------------------------------------------------------- MAP-3 E2: street furniture, power lines, the evacuation route
   // Everything here is merged into one lit mesh + one glow mesh for the whole city (2 draw calls).
   function buildFurniture(rail, segs, ground0, lamps) {
+    debugItems.length = 0;
     const lit = []; const glow = [];
-    const ground = (x, z) => ground0(x, z) && Math.abs((rail.axis === 'x' ? z : x) - rail.c) > RAIL_CLEAR + 0.6; // nothing on the track
+    // On a block slab (not over a back lane between blocks), off the track, and clear of doors and gates.
+    const onSlab = (x, z) => { const bx = gridOf(x); const bz = gridOf(z); return has(bx, bz) && Math.abs(x - blockPos(bx)) <= blockHalf(bx) - ROAD.half - 0.2 && Math.abs(z - blockPos(bz)) <= blockHalf(bz) - ROAD.half - 0.2; };
+    const doors = Object.values(layout).flatMap((L) => (L.plan ? [L.plan.c.clone().addScaledVector(L.plan.fwd, L.plan.edge + 1).addScaledVector(L.plan.side, L.plan.lat)] : L.gates ?? []));
+    const ground = (x, z) => ground0(x, z) && onSlab(x, z) && Math.abs((rail.axis === 'x' ? z : x) - rail.c) > RAIL_CLEAR + 2.2 && !doors.some((d) => Math.hypot(d.x - x, d.z - z) < 3.5);
+    const onRoadOk = (x, z) => ground0(x, z) && Math.abs((rail.axis === 'x' ? z : x) - rail.c) > RAIL_CLEAR + 0.6;
     const _q = new THREE.Quaternion(); const _e = new THREE.Euler();
     const add = (key, make, size, x, y, z, yaw, tilt = 0, tiltAxis = 'x') => {
       const g = geometriesFor(key, { size, jitter: 0 }, make);
@@ -730,6 +734,10 @@ export function createBoard({ progressive = false } = {}) {
       const mx = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), _q.setFromEuler(_e), new THREE.Vector3(1, 1, 1));
       if (g.lit) lit.push(g.lit.clone().applyMatrix4(mx));
       if (g.glow) glow.push(g.glow.clone().applyMatrix4(mx));
+      // MAP audit: remember what went into the merged mesh and where (world box).
+      const box = (g.lit ?? g.glow).boundingBox.clone().applyMatrix4(mx);
+      if (g.glow && g.lit) box.union(g.glow.boundingBox.clone().applyMatrix4(mx));
+      debugItems.push({ kind: key.replace(/-\d+$/, ''), box });
     };
     const yawTo = (dx, dz) => Math.atan2(dx, dz); // local +z faces (dx, dz)
     const { nodes, runs } = streetRuns(segs);
@@ -740,7 +748,7 @@ export function createBoard({ progressive = false } = {}) {
       if (onRail(n)) return; // level crossings have their own posts
       for (const [sx, sz] of [[1, 1], [-1, -1]]) {
         const x = n.x + sx * (ROAD.kerb + 0.35); const z = n.z + sz * (ROAD.walk + 0.6);
-        if (!ground(x, z)) continue;
+        if (!ground(x, z) || !n.dirs.has(sz > 0 ? '+z' : '-z')) continue; // its arm reaches over a street, not a back lane
         const h = hash3(i, sx + 5, rail.look);
         const state = h < 0.3 ? 'dead' : h < 0.5 ? 'amber' : 'red';
         // The arm reaches over the street this corner stands beside (towards −sx).
@@ -761,9 +769,12 @@ export function createBoard({ progressive = false } = {}) {
         const h = hash3(Math.round(t), ri, rail.look + 13);
         let kind = h < 0.3 ? 'hydrant' : h < 0.5 ? 'bin' : h < 0.6 ? 'postbox' : h < 0.7 ? 'newsbox' : h < 0.74 ? 'phone' : h < 0.86 ? 'busstop' : null;
         if (kind === 'busstop') { if (busStop) kind = 'bin'; busStop = true; }
-        if (!kind) continue;
         const [dx, dz] = r.axis === 'x' ? [0, -1] : [-1, 0];
-        add(`furn-${kind}`, () => furnitureModel(kind), 0.1, x, GROUND, z, yawTo(dx, dz));
+        if (kind) add(`furn-${kind}`, () => furnitureModel(kind), 0.1, x, GROUND, z, yawTo(dx, dz));
+        // Street clutter (cones, crates, barrels, bags, barriers) halfway between furniture spots, same side.
+        const tc = t + 4.5; const [cx, cz] = r.axis === 'x' ? [tc, r.c + lat] : [r.c + lat, tc];
+        const hc = hash3(Math.round(tc), ri, rail.look + 19);
+        if (hc < 0.3 && tc < r.t1 && ground(cx, cz) && !near(cx, cz, nodes, 11) && !near(cx, cz, lamps, 1.6)) { const ck = Math.floor(hash3(Math.round(tc), 5, rail.look) * (CLUTTER_KINDS - 1)); add(`clutter-${ck}`, () => clutterModel(ck), 0.12, cx, GROUND, cz, hc * 20); }
       }
     });
     // Power lines along two streets: poles every 12 on the far sidewalk, some leaning, one down; sagging wires.
@@ -777,7 +788,7 @@ export function createBoard({ progressive = false } = {}) {
         const [x, z] = r.axis === 'x' ? [t, r.c + lat] : [r.c + lat, t];
         if (!ground(x, z) || near(x, z, nodes, 7)) { prev = null; continue; }
         const h = hash3(Math.round(t), ri, rail.look + 17);
-        const down = h < 0.08;
+        const down = h < 0.08 && Math.abs((r.axis === 'x' ? z : x) - rail.c) > 10 && Math.abs(t - (r.axis === 'x' ? rail.c : rail.c)) > 0 && !(r.axis !== rail.axis && Math.abs(t - rail.c) < 10);
         const lean = down ? 0 : h < 0.3 ? (h - 0.19) * 0.6 : 0;
         const yaw = r.axis === 'x' ? 0 : Math.PI / 2;
         add('pole', powerPoleModel, 0.1, x, GROUND, z, yaw, down ? Math.PI / 2 - 0.08 : lean, 'z');
@@ -812,16 +823,17 @@ export function createBoard({ progressive = false } = {}) {
       const yaw0 = r.axis === 'x' ? 0 : -Math.PI / 2;
       for (let t = r.t0 + ROAD.walk + 2.5; t < r.t1 - ROAD.walk - 2.5;) {
         const [x, z] = at(t, -ROAD.half / 2);
-        if (!ground(x, z) || (Math.abs(t) < 12)) { t += 4.4; continue; } // keep the colony's gate road clear
+        if (!onRoadOk(x, z) || Math.abs(t) < 12 || doors.some((d) => Math.hypot(d.x - x, d.z - z) < 13)) { t += 4.4; continue; } // keep gate roads and place fronts clear
         const h = hash3(Math.round(t * 3), 23, rail.look);
-        if (!bus && h < 0.12 && t + 10 < r.t1 - ROAD.walk) { add(`veh-bus-${rail.look % 2}`, () => vehicleModel('bus', rail.look), 0.15, x + dir[0] * 2.5, 0.05, z + dir[1] * 2.5, yaw0); bus = true; t += 10; continue; }
-        if (!truck && h > 0.88 && t + 13 < r.t1 - ROAD.walk) {
+        const armNear = (d0, d1) => lamps.some((l) => { const [lx, lz] = r.axis === 'x' ? [l.x, l.z] : [l.z, l.x]; return lx > t + d0 && lx < t + d1 && Math.abs(lz - r.c) < ROAD.half + 1.5; });
+        if (!bus && h < 0.12 && t + 9 < r.t1 - ROAD.walk - 2.5 && !armNear(-3, 9)) { add(`veh-bus-${rail.look % 2}`, () => vehicleModel('bus', rail.look), 0.15, x + dir[0] * 2.5, 0.05, z + dir[1] * 2.5, yaw0); bus = true; t += 12; continue; }
+        if (!truck && h > 0.88 && t + 13 < r.t1 - ROAD.walk && !armNear(-3, 13)) {
           const [cx, cz] = at(t + 11, -0.4);
-          add('veh-cab', () => vehicleModel('cab'), 0.15, cx, 0.05, cz, yaw0 + 0.5);
-          add('veh-trailer', () => vehicleModel('trailer'), 0.15, x + dir[0] * 4.5, 0.05, z + dir[1] * 4.5, yaw0 - 0.25);
-          truck = true; t += 14; continue;
+          add('veh-cab', () => vehicleModel('cab'), 0.15, cx, 0.05, cz, yaw0 + 0.3);
+          add('veh-trailer', () => vehicleModel('trailer'), 0.15, x + dir[0] * 4.5, 0.05, z + dir[1] * 4.5, yaw0 - 0.12);
+          truck = true; t += 17; continue;
         }
-        if (h < 0.82) { const v = Math.floor(hash3(Math.round(t), 29, rail.look) * 4); add(`car4-${v}`, () => carModel(v), 0.15, x, 0, z, yaw0 + Math.PI / 2 + (h - 0.4) * 0.3); }
+        if (h < 0.82) { const v = Math.floor(hash3(Math.round(t), 29, rail.look) * 4); add(`car4-${v}`, () => carModel(v), 0.15, x, 0, z, yaw0 + (h - 0.4) * 0.3) /* along the lane */; }
         t += 4.4;
       }
     });
@@ -830,33 +842,42 @@ export function createBoard({ progressive = false } = {}) {
       const r = eRuns.find((q) => q.t0 < 0 && q.t1 > 0) ?? eRuns[0];
       const t = Math.min(r.t1 - ROAD.walk - 3, Math.max(r.t0 + ROAD.walk + 3, 14));
       const [x, z] = r.axis === 'x' ? [t, r.c + ROAD.half / 2] : [r.c + ROAD.half / 2, t];
-      if (ground(x, z)) add('checkpoint', checkpointModel, 0.1, x, 0.03, z, r.axis === 'x' ? 0 : Math.PI / 2);
+      if (onRoadOk(x, z)) add('checkpoint', checkpointModel, 0.1, x, 0.03, z, r.axis === 'x' ? 0 : Math.PI / 2);
     }
     // Places belong to their street: driveways across the sidewalk, vehicles parked at the kerb, a few signs of use.
     const apron = () => { const m = new VoxelModel(); m.box(-15, 0, -12, 30, 1, 25, (x, _y, z) => (Math.abs(x) === 15 || Math.abs(z) === 12 ? 0x8d949e : 0x2b2e33)); return m; };
     const front = (L, along, out) => { const p = L.plan; return p.c.clone().addScaledVector(p.fwd, p.edge + out).addScaledVector(p.side, p.lat + along); };
     const yawAlong = (L) => Math.atan2(L.plan.side.x, L.plan.side.z) - Math.PI / 2; // vehicle length (local x) along the street
+    const parked = [];
     for (const L of Object.values(layout)) {
       if (!L.plan) continue;
       const type = map.blocks[Object.keys(map.blocks).find((k) => map.blocks[k].placeId === L.id)]?.type ?? L.id;
       const half = (L.plan.fw * CHUNK) / 2;
       const yawF = Math.atan2(L.plan.fwd.x, L.plan.fwd.z);
       const kerbLane = (ROAD.walk - ROAD.half) + 1.2; // from the building line out to the parking lane
-      const park = (key, make, along, i = 0) => { const p = front(L, along, kerbLane); add(key, make, 0.15, p.x, 0.05, p.z, yawAlong(L) + i * 0.04); };
+      // Parked at the kerb, shifted along the street until no lamp arm hangs over it.
+      const park = (key, make, along, i = 0, room = 5.2) => {
+        let p = null; // no free spot at this kerb: leave it out
+        for (const d of [0, 3, -3, 6, -6, 9, -9]) { const q = front(L, along + d, kerbLane); if (!lamps.some((l) => Math.hypot(l.x - q.x, l.z - q.z) < room) && !parked.some((o) => o.distanceTo(q) < 5.5)) { p = q; break; } }
+        if (!p) return;
+        parked.push(p);
+        add(key, make, 0.15, p.x, 0.05, p.z, yawAlong(L) + i * 0.04);
+      };
       if (type === 'gas' || type === 'grocery' || type === 'hospital') {
         for (const a of type === 'gas' ? [-half + 2, half - 2] : [half - 2.2]) { const p = front(L, a, 1.25); add('apron', apron, 0.1, p.x, GROUND - 0.06, p.z, yawF); }
       }
       if (type === 'hospital') { park('veh-ambulance', () => vehicleModel('ambulance'), half - 2.2); park('veh-ambulance', () => vehicleModel('ambulance'), -half + 3, 1); }
       if (type === 'police') {
         park('veh-police', () => vehicleModel('police'), -half + 2.5); park('veh-police', () => vehicleModel('police'), half - 2.5, 1);
-        for (const a of [-2, 0, 2]) { const p = front(L, a, 1.6); add('clutter-4', () => clutterModel(4), 0.12, p.x, GROUND, p.z, yawF + Math.PI / 2); }
+        for (const a of [-3.4, 3.4]) { const p = front(L, a, 1.6); add('clutter-4', () => clutterModel(4), 0.12, p.x, GROUND, p.z, yawF + Math.PI / 2); }
       }
-      if (type === 'school') park(`veh-bus-1`, () => vehicleModel('bus', 1), 0);
+      if (type === 'school') park(`veh-bus-1`, () => vehicleModel('bus', 1), 0, 0, 7);
       if (type === 'library') { const p = front(L, half - 1.5, 1.3); add('statue', statueModel, 0.1, p.x, GROUND, p.z, yawF); }
     }
     // Small stories, 1–2 per stage, away from place entrances, gates and the evacuation route.
     const entrances = Object.values(layout).flatMap((L) => (L.plan ? [front(L, 0, 1)] : L.gates ?? []));
-    const clear = (x, z) => ground(x, z) && !entrances.some((e) => Math.hypot(e.x - x, e.z - z) < 7);
+    const taken = (x, z, r) => debugItems.some((d) => x > d.box.min.x - r && x < d.box.max.x + r && z > d.box.min.z - r && z < d.box.max.z + r);
+    const clear = (x, z, road = false) => (road ? onRoadOk(x, z) : ground(x, z)) && !entrances.some((e) => Math.hypot(e.x - x, e.z - z) < 7) && !taken(x, z, 1.5) && !lamps.some((l) => Math.hypot(l.x - x, l.z - z) < 2.5);
     const ringOfT = (r, t) => { const [x, z] = r.axis === 'x' ? [t, r.c] : [r.c, t]; return Math.max(Math.abs(gridOf(x)), Math.abs(gridOf(z))); };
     for (let st = 1; st <= (map.stage ?? 1); st++) {
       for (let k = 0; k < 2; k++) {
@@ -871,10 +892,10 @@ export function createBoard({ progressive = false } = {}) {
         const yaw = r.axis === 'x' ? 0 : Math.PI / 2;
         const kind = Math.floor(hash3(st, k, rail.look + 43) * 4);
         if (kind === 0) { // a fallen pine across the lane, a gap cut through it
-          const [x, z] = at(-0.8); if (!clear(x, z)) continue;
+          const [x, z] = at(-0.8); if (!clear(x, z, true)) continue;
           add('tree-1', () => treeModelHD(1, 1), 0.25, x, 0.3, z, yaw, Math.PI / 2 - 0.05, 'z');
         } else if (kind === 1) { // a burnt-out car
-          const [x, z] = at(1.4); if (!clear(x, z)) continue;
+          const [x, z] = at(1.4); if (!clear(x, z, true)) continue;
           const v = Math.floor(h * 4); add(`car-burnt-${v}`, () => burntCarModel(v), 0.15, x, 0, z, yaw + 0.4);
         } else if (kind === 2) { // a tent camp on the sidewalk by a blank wall
           for (const [i, d] of [[0, -2.5], [1, 1.5]]) { const [x, z] = r.axis === 'x' ? [t + d, r.c + (ROAD.walk - 1.2)] : [r.c + (ROAD.walk - 1.2), t + d]; if (clear(x, z)) add(`tent-${i}`, () => tentModel(i), 0.1, x, GROUND, z, yaw + i * 0.3); }
@@ -984,6 +1005,7 @@ export function createBoard({ progressive = false } = {}) {
     g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
     const sh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false, fog: false }));
     sh.rotation.x = -Math.PI / 2; sh.position.set(4, -16, 6); sh.renderOrder = -1;
+    sh.visible = false; // MAP audit: its square corner showed as a pale wedge under big cities
     root.add(sh);
     return sh;
   })();
@@ -1211,6 +1233,23 @@ export function createBoard({ progressive = false } = {}) {
       api.onBounds?.(bounds);
     },
     setBase,
+    /** MAP audit: every placed thing with a world box: { kind, box, group } (visible level of detail). */
+    auditItems() {
+      const out = debugItems.map((d) => ({ ...d, group: 'furniture' }));
+      const box = new THREE.Box3(); const m = new THREE.Matrix4();
+      root.updateMatrixWorld(true);
+      root.traverse((o) => {
+        if (!o.isInstancedMesh || o.material.isMeshBasicMaterial || o.name === 'lamp-pools') return; // lit parts only (glow materials are cloned)
+        for (let p = o; p; p = p.parent) if (p.visible === false) return;
+        if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+        for (let i = 0; i < o.count; i++) {
+          o.getMatrixAt(i, m);
+          out.push({ kind: String(o.userData.kind).replace(/^lod\d-/, '').replace(/-far$/, ''), box: box.copy(o.geometry.boundingBox).applyMatrix4(m.premultiply(o.matrixWorld)).clone(), group: 'instanced' });
+        }
+      });
+      for (const [id, g] of Object.entries(locationGroups)) if (id !== 'colony') out.push({ kind: `place:${id}`, box: new THREE.Box3().setFromObject(g), group: 'place' });
+      return out;
+    },
     /** LOAD-1: models still waiting to be made (progressive start). */
     get pending() { return queue.length; },
     /** Make every waiting model now (tests, screenshots). */

@@ -808,7 +808,7 @@ export function railYard() {
 // ---------------------------------------------------------------- MAP-1b: small buildings that fill a block's free chunks
 
 export const SMALL_VARIANTS = 8;
-export const SMALL_SCALE = 1; // instance scale (× 0.3 world units per voxel): a small building fills its chunk
+export const SMALL_SCALE = 0.9; // instance scale: a small building fills its chunk with a little room around it
 const SMALL_WALLS = [C.sage, C.cream, C.grey, C.brick, C.ochre, 0x8fa3b8, 0xb9a48a, 0x9b8b9e];
 
 /** A small, closed-up building (not a place you can enter): 1–4 floors, sized to one chunk. */
