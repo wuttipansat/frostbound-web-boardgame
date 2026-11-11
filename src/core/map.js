@@ -2,7 +2,9 @@
 // streets run on the block edges ("corners" lattice: corner cx,cz is the top-left corner of block cx,cz).
 // Stage n has a (2n+1)×(2n+1) outline, irregular: some ring blocks are left out, a few poke one step past it.
 import { random } from './rng.js';
-import { LOCATIONS, PLACE_TABLE, FILLER_KINDS } from '../content/locations.js';
+import { LOCATIONS, PLACE_TABLE, FILLER_KINDS, PLACE_RULES, TIER_STAGE, yieldsOf } from '../content/locations.js';
+import { ITEMS } from '../content/items.js';
+import { zoneOf, FILLER_BY_ZONE } from './zones.js';
 
 const key = (x, z) => `${x},${z}`;
 const parse = (k) => k.split(',').map(Number);
@@ -52,7 +54,7 @@ export const mapRange = (stage) => (stage === 1 ? [3, 4] : [3 * stage * stage + 
 
 /** A place's type (its content id): new places carry `type`, the first six are their own type. */
 export const typeOf = (s, id) => s.locations?.[id]?.type ?? id;
-export const locDef = (s, id) => LOCATIONS[typeOf(s, id)];
+export const locDef = (s, id) => LOCATIONS[typeOf(s, id)] ?? LOCATIONS.grocery; // (an unknown type from a save: a plain shop)
 /** Every place on the map, colony first. */
 export const placesOf = (s) => Object.keys(s.locations);
 export const outsideOf = (s) => placesOf(s).filter((l) => l !== 'colony');
@@ -188,14 +190,37 @@ export function growMap(s, makePlace) {
   const dist = new Map(added.map((k) => [k, roadSteps(graph, cornersOf(0, 0), cornersOf(...parse(k))) + random(s) * 0.5]));
   const byDist = added.slice().sort((a, b) => dist.get(a) - dist.get(b));
   const placesAt = new Set();
-  for (const k of byDist) { if (!missing.length || !nPlaces) break; placesAt.add(k); m.blocks[k] = { kind: 'place', placeId: makePlace(missing[0], k), type: missing.shift() }; nPlaces--; }
+  // MAP-6: a place goes where it fits its zone and tier (the nearest fitting block for a missing original).
+  const look = m.look ?? 0;
+  const tierOk = (t) => (TIER_STAGE[PLACE_RULES[t]?.tier] ?? 1) <= n;
+  const fits = (t, k) => tierOk(t) && (PLACE_RULES[t]?.zones.includes(zoneOf(...parse(k), look)) ?? true);
+  while (missing.length && nPlaces) {
+    const free = byDist.filter((k) => !placesAt.has(k));
+    const k = free.find((b) => fits(missing[0], b)) ?? free[0];
+    if (!k) break;
+    placesAt.add(k); m.blocks[k] = { kind: 'place', placeId: makePlace(missing[0], k), type: missing.shift() }; nPlaces--;
+  }
   const rest = added.filter((k) => !placesAt.has(k)).map((k) => [k, random(s)]).sort((a, b) => a[1] - b[1]).map(([k]) => k);
+  const table = PLACE_TABLE.map(([t, w0, per]) => [t, w0 + per * (n - 2)]).filter(([, w]) => w > 0);
   rest.forEach((k, i) => {
     if (i < nPlaces) {
-      const type = pickWeighted(s, PLACE_TABLE.map(([t, w0, per]) => [t, w0 + per * (n - 2)]).filter(([, w]) => w > 0));
+      const options = table.filter(([t]) => fits(t, k));
+      const type = pickWeighted(s, options.length ? options : table.filter(([t]) => tierOk(t)));
       m.blocks[k] = { kind: 'place', placeId: makePlace(type, k), type };
-    } else m.blocks[k] = { kind: FILLER_KINDS[Math.floor(random(s) * FILLER_KINDS.length)] };
+    } else { const kinds = FILLER_BY_ZONE[zoneOf(...parse(k), m.look ?? 0)] ?? FILLER_KINDS; m.blocks[k] = { kind: kinds[Math.floor(random(s) * kinds.length)] }; } // MAP-6: decoration that fits the zone
   });
+  // 4b. MAP-6: the map always holds a food, a wood and a metal source: if one is missing, a decoration block of this
+  //     growth becomes one (a place that fits its zone when there is one).
+  for (const res of ['food', 'wood', 'metal']) {
+    if (Object.values(m.blocks).some((b) => b.kind === 'place' && yieldsOf(b.type ?? b.placeId, ITEMS)[res])) continue;
+    const sources = table.filter(([t]) => tierOk(t) && yieldsOf(t, ITEMS)[res]);
+    const spots = added.filter((k) => m.blocks[k].kind !== 'place');
+    const k = spots.find((b) => sources.some(([t]) => fits(t, b))) ?? spots[0];
+    if (!k || !sources.length) continue;
+    const fit = sources.filter(([t]) => fits(t, k));
+    const type = pickWeighted(s, fit.length ? fit : sources);
+    m.blocks[k] = { kind: 'place', placeId: makePlace(type, k), type };
+  }
   // 5. Each block keeps the front it gets now (its look never depends on streets added later).
   const roadSet = new Set(m.roads);
   for (const k of added) m.blocks[k].front = frontOf(roadSet, ...parse(k));

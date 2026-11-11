@@ -109,12 +109,82 @@ export const LOCATIONS = {
     survivorSlots: 3, zombieSlots: 6,
     deck: { 'rice-sack': 3, 'canned-beans': 2, 'beef-jerky': 2, wood: 4, 'hunting-bow': 1, 'jerry-can': 2, sled: 1, 'fire-axe': 1, 'engine-part': 1 },
   },
+  // MAP-6: tiered places (bigger, richer and more dangerous further in) and resource areas.
+  mall: {
+    id: 'mall', name: 'Shopping Mall', blurb: 'Northgate Mall. The escalators froze mid-step; the food court did not.',
+    survivorSlots: 4, zombieSlots: 6,
+    deck: { cloth: 4, 'padded-parka': 2, 'winter-boots': 2, 'snow-suit': 1, 'canned-beans': 3, chocolate: 2, coffee: 2, 'big-backpack': 1, flashlight: 1, 'kitchen-knife': 1, 'baseball-bat': 1, 'first-aid-pouch': 2, painkillers: 1, 'lone-wanderer': 1, 'duct-tape': 1 },
+  },
+  hardware: {
+    id: 'hardware', name: 'Hardware Store', blurb: 'Brandt & Sons Hardware. Nails by the pound, if you can find the scale.',
+    survivorSlots: 3, zombieSlots: 6,
+    deck: { 'tool-kit': 1, 'socket-set': 1, 'duct-tape': 3, 'zip-ties': 3, scrap: 3, wood: 3, 'fire-axe': 1, crowbar: 1, flashlight: 1, 'jerry-can': 1, 'heater-part': 1, 'canned-beans': 1 },
+  },
+  military: {
+    id: 'military', name: 'Army Base', blurb: 'Camp Halden. The quarantine line held for nine days.',
+    survivorSlots: 4, zombieSlots: 6,
+    deck: { ammo: 4, 'remington-870': 1, 'mosin-nagant': 1, 'glock-19': 2, 'riot-vest': 1, 'first-aid-kit': 2, 'field-manual': 1, 'canned-beans': 3, 'beef-jerky': 2, 'jerry-can': 2, 'engine-part': 1, 'snow-suit': 1, 'big-backpack': 1, scrap: 2 },
+  },
+  factory: {
+    id: 'factory', name: 'Factory', blurb: 'Keller Machine Works. The night shift never clocked out.',
+    survivorSlots: 3, zombieSlots: 6,
+    deck: { scrap: 6, 'motor-junk': 2, 'engine-part': 2, 'heater-part': 1, 'tool-kit': 1, 'socket-set': 1, 'jerry-can': 2, wood: 2, 'scrap-plate': 1, 'duct-tape': 1, 'zip-ties': 1, 'canned-beans': 1 },
+  },
+  forest: {
+    id: 'forest', name: 'Pine Woods', blurb: 'A logging track into the pines. Somebody left the woodpile neat.',
+    survivorSlots: 3, zombieSlots: 6,
+    deck: { wood: 8, 'fire-axe': 1, 'hunting-bow': 1, 'beef-jerky': 1, sled: 1, 'lone-wanderer': 1, cloth: 1, 'canned-beans': 1 },
+  },
+  scrapyard: {
+    id: 'scrapyard', name: 'Scrapyard', blurb: 'Wrecks stacked three high. The crane still has a car in its jaws.',
+    survivorSlots: 3, zombieSlots: 6,
+    deck: { scrap: 7, 'motor-junk': 2, 'engine-part': 1, 'scrap-plate': 1, 'jerry-can': 2, crowbar: 1, 'socket-set': 1, wood: 1, 'canned-beans': 1 },
+  },
 };
+
+/**
+ * MAP-6: where a place type may stand and from which stage: tier 1 from the start, tier 2 from stage 2, tier 3 from
+ * stage 3. Zones: core/zones.js.
+ */
+export const PLACE_RULES = {
+  grocery: { tier: 1, zones: ['residential', 'commercial', 'outskirts'] },
+  gas: { tier: 1, zones: ['outskirts', 'residential', 'industrial'] },     // on a main road at the edge of town
+  farmhouse: { tier: 1, zones: ['outskirts'] },
+  church: { tier: 1, zones: ['residential', 'outskirts'] },
+  motel: { tier: 1, zones: ['outskirts', 'residential', 'industrial'] },   // by the highway
+  apartment: { tier: 1, zones: ['residential', 'commercial'] },
+  warehouse: { tier: 1, zones: ['industrial'] },
+  forest: { tier: 1, zones: ['outskirts'] },
+  scrapyard: { tier: 1, zones: ['industrial', 'outskirts'] },
+  school: { tier: 2, zones: ['residential', 'outskirts'] },
+  library: { tier: 2, zones: ['commercial', 'residential'] },
+  police: { tier: 2, zones: ['commercial', 'residential'] },
+  hospital: { tier: 2, zones: ['commercial', 'residential'] },
+  mall: { tier: 2, zones: ['commercial'] },
+  hardware: { tier: 2, zones: ['residential', 'commercial', 'industrial'] },
+  military: { tier: 3, zones: ['outskirts', 'industrial'] },
+  factory: { tier: 3, zones: ['industrial'] },
+};
+/** First stage a tier can turn up in. */
+export const TIER_STAGE = { 1: 1, 2: 2, 3: 3 };
+
+/** MAP-6: what a place is a good source of: food, wood, metal (from its deck). */
+export function yieldsOf(type, items) {
+  const deck = LOCATIONS[type]?.deck ?? {};
+  let food = 0; let wood = 0; let metal = 0;
+  for (const [id, n] of Object.entries(deck)) {
+    if (items[id]?.type === 'food' || items[id]?.counts === 'food') food += n;
+    if (id === 'wood') wood += n;
+    if (id === 'scrap' || id === 'motor-junk' || id === 'scrap-plate') metal += n;
+  }
+  return { food: food >= 5, wood: wood >= 4, metal: metal >= 5 };
+}
 
 /** MAP-1: place types for new blocks: [type, weight at stage 2, extra weight per stage]. */
 export const PLACE_TABLE = [
   ['grocery', 2, 0], ['school', 1, 0], ['gas', 2, 0], ['library', 1, 0], ['police', 1, 0.5], ['hospital', 1, 0.5],
   ['warehouse', 3, 0.5], ['motel', 2, 0.5], ['apartment', 3, 1], ['church', 1, 0.5], ['farmhouse', 1, 1],
+  ['mall', 1, 0.5], ['hardware', 2, 0], ['military', 1, 0.5], ['factory', 1, 0.5], ['forest', 2, 0.5], ['scrapyard', 2, 0.5],
 ];
 /** Blocks without a place. */
 export const FILLER_KINDS = ['plaza', 'parking', 'containers', 'park', 'ruins', 'rail', 'shops'];

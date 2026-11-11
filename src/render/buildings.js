@@ -304,6 +304,7 @@ export const LOCATION_BUILDERS = {
   apartment: city.apartment,
   church: city.church,
   farmhouse: city.farmhouse,
+  mall: city.mall, hardware: city.hardware, military: city.military, factory: city.factory, forest: city.forest, scrapyard: city.scrapyard, // MAP-6
 };
 
 // ---------------------------------------------------------------- HD (2×) versions
@@ -314,7 +315,7 @@ const SEED = { police: 1, grocery: 2, school: 3, hospital: 4, library: 5, gas: 6
 
 /** HD location models: built at 2× resolution with frames, icicles, patterns and bevels. Render at half the voxel size. */
 // UI-13: city models are authored at full resolution already (no upscale / detail pass).
-export const LOCATION_BUILDERS_HD = Object.fromEntries(Object.entries(LOCATION_BUILDERS).map(([id, build]) => [id, () => build()]));
+export const LOCATION_BUILDERS_HD = Object.fromEntries(Object.entries(LOCATION_BUILDERS).map(([id, build]) => [id, () => city.withLit(0.1, build)])); // MAP-6: places keep a few lights on
 
 export function colonyHD(radius = 18, wall = 0) {
   return city.colony(Math.round(radius * 1.67), wall); // full-resolution city colony (wall at the palisade radius)

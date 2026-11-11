@@ -6,6 +6,8 @@ import { SCENARIOS_BY_ID } from '../content/scenarios.js';
 import { CRISES_BY_ID } from '../content/crises.js';
 import { RULES, ENERGY, REST, FIGHT, SEASON, SIEGE, XP, BOND, DIFFICULTY, SEARCH_SPAWN } from './constants.js';
 import { locDef, typeOf, outsideOf, roadDistance, ringOf, mapOf, mapRange } from './map.js';
+import { zoneOf } from './zones.js';
+import { blockOf } from './map.js';
 
 export { locDef, typeOf, outsideOf, placesOf, mapOf, mapRange, ringOf } from './map.js';
 
@@ -171,9 +173,11 @@ export function walkCost(s, from, to) {
   return Math.min(ENERGY.WALK_CAP, ENERGY.WALK_BASE + ENERGY.WALK_BLOCK * roadDistance(s, from, to));
 }
 
-/** Chance (0..1) that searching here makes a zombie appear: by place type and ring, +10% per extra search there today. */
+/** Chance (0..1) that searching here makes a zombie appear: by place type, ring and zone (downtown +5%), +10% per extra search there today. */
 export function searchSpawnChance(s, locationId) {
-  const base = (SEARCH_SPAWN[typeOf(s, locationId)] ?? 0.15) + SEARCH_SPAWN.RING * Math.max(0, ringOf(s, locationId) - 1);
+  const bk = s.map ? blockOf(s, locationId) : null; // MAP-6: downtown is busier
+  const downtown = bk && zoneOf(...bk.split(',').map(Number), s.map.look ?? 0) === 'commercial' ? SEARCH_SPAWN.DOWNTOWN : 0;
+  const base = (SEARCH_SPAWN[typeOf(s, locationId)] ?? 0.15) + SEARCH_SPAWN.RING * Math.max(0, ringOf(s, locationId) - 1) + downtown;
   return Math.max(0, Math.min(1, base + SEARCH_SPAWN.EXTRA * (s.searches?.[locationId] ?? 0)));
 }
 

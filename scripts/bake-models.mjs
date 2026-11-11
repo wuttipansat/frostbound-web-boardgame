@@ -18,5 +18,5 @@ fs.mkdirSync('public', { recursive: true });
 fs.writeFileSync(`public/${PACK_FILE}`, gz.toString('base64'));
 console.log(`baked ${keep.size} models: ${(raw.length / 1e6).toFixed(1)} MB raw, ${(gz.length / 1e6).toFixed(2)} MB gzip, ${Date.now() - t0} ms`);
 const { LOCATION_BUILDERS_HD } = await import('../src/render/buildings.js');
-const missing = Object.keys(LOCATION_BUILDERS_HD).filter((t) => ![0, 1, 2].every((L) => [...keep.keys()].some((k) => k.startsWith(`lod${L}-place-${t}|`))));
+const missing = Object.keys(LOCATION_BUILDERS_HD).filter((t) => ![1, 2].every((L) => [...keep.keys()].some((k) => k.startsWith(`lod${L}-place-${t}|`))));
 if (missing.length) console.log(`not baked (meshed at runtime): ${missing.join(', ')}`);

@@ -338,3 +338,67 @@ export function crowModel() {
 
 /** One warm bulb of a string of lights. */
 export function bulbModel() { return new VoxelModel().set(0, 0, 0, 0xffd27a, true); }
+
+// ---------------------------------------------------------------- MAP-6: damage and snow gradients (0.1 world per voxel)
+
+/** A ploughed snow heap against the kerb (downtown): a long lumpy mound, grey with grime at the foot. */
+export function snowHeapModel(v = 0) {
+  const m = new VoxelModel();
+  for (let x = -18; x < 18; x++) for (let z = -6; z < 6; z++) {
+    const h = Math.round((1 - (x / 18) ** 2) * (1 - (z / 6) ** 2) * (9 + hash3(x >> 2, v, z >> 2) * 5));
+    for (let y = 0; y < h; y++) m.set(x, y, z, y < 2 ? 0x9a9c9e : hash3(x, y, z) < 0.1 ? 0xd9dde2 : P.snow);
+  }
+  return m;
+}
+
+/** A sandbag wall (downtown barricade): three courses, staggered, with a sheet of plywood. */
+export function sandbagModel() {
+  const m = new VoxelModel();
+  for (let c = 0; c < 3; c++) for (let k = -3; k < 3; k++) m.box(k * 6 + (c % 2) * 3 - 1, c * 3, -2, 5, 3, 4, (x, y, z) => (hash3(x, y + c, z) < 0.3 ? 0x7d6f52 : 0x938466));
+  m.box(-8, 9, -1, 12, 8, 1, 0x8a6a44);
+  return m.snowCap(P.snow, 1, 2);
+}
+
+/** A wind-blown drift (outskirts): a low, flat-topped dune with a ragged edge (two or three steps, no stair lines). */
+export function driftModel(v = 0) {
+  const m = new VoxelModel();
+  for (let x = -12; x < 12; x++) for (let z = -7; z < 7; z++) {
+    const r = (x / 12) ** 2 + (z / 7) ** 2 + (hash3(x >> 1, v, z >> 1) - 0.5) * 0.35;
+    const h = r < 0.25 ? 3 + v : r < 0.6 ? 2 : r < 0.95 ? 1 : 0;
+    for (let y = 0; y < h; y++) m.set(x, y, z, P.snow);
+  }
+  return m;
+}
+
+// ---------------------------------------------------------------- MAP-6: what a place has, shown outside its door
+
+/** A woodpile: split logs stacked between two stakes. */
+export function woodpileModel() {
+  const m = new VoxelModel();
+  for (let y = 0; y < 5; y++) for (let x = -7; x < 7; x++) m.box(x, y, -2 + (y % 2), 1, 1, 4, (x + y) % 3 ? 0x7a5532 : 0xb08a5a);
+  for (const x of [-8, 7]) m.box(x, 0, -1, 1, 7, 1, 0x5a3e28);
+  return m.snowCap(P.snow, 1, 2);
+}
+/** A scrap heap: sheets, a wheel, pipes. */
+export function scrapHeapModel() {
+  const m = new VoxelModel();
+  for (let k = 0; k < 4; k++) m.box(-6 + k, k, -4 + k, 12 - 2 * k, 1, 8 - 2 * k, (x, y, z) => (hash3(x, y, z) < 0.4 ? 0x9a4b2f : hash3(x, z, y) < 0.5 ? 0x6c7580 : 0x4b525a));
+  m.box(-7, 0, 3, 3, 3, 1, 0x1c1f24); m.box(2, 3, -5, 1, 1, 8, 0x8e979f);
+  return m.snowCap(P.snow, 0.8, 2);
+}
+/** Food crates: a stack of wooden crates and sacks under a tarp. */
+export function cratesModel() {
+  const m = new VoxelModel();
+  for (const [x, y, z] of [[-6, 0, -3], [-1, 0, -3], [-4, 4, -3], [3, 0, -2]]) { m.box(x, y, z, 5, 4, 5, 0xa07a4a); m.box(x, y + 1, z + 5, 5, 1, 1, 0x7a5532); }
+  m.box(4, 4, -2, 4, 2, 4, 0xd8c08a);
+  return m.snowCap(P.snow, 1, 2);
+}
+
+/** A bridge parapet (MAP-6 river): a low concrete wall with posts, 5.6 long, standing at a kerb over the ice. */
+export function bridgeParapetModel() {
+  const m = new VoxelModel();
+  m.box(-28, 0, -1, 56, 3, 3, 0x8d949e);
+  for (let x = -28; x < 28; x += 7) m.box(x, 3, -1, 2, 6, 3, 0x9aa3ad);
+  m.box(-28, 9, -1, 56, 2, 3, 0xb0b8c0);
+  return m.snowCap(P.snow, 1, 2);
+}

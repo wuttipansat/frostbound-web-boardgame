@@ -4,8 +4,17 @@
 import fs from 'node:fs';
 const fakeCtx = new Proxy({}, { get: () => () => ({ addColorStop() {} }) });
 globalThis.document ??= { createElement: () => ({ getContext: () => fakeCtx }) };
-const { createBoard, blockPos, blockHalf, gridOf, GROUND, railLine, BOARD } = await import('../src/render/board.js');
+const { createBoard, blockPos, blockHalf, gridOf, GROUND, railLine, riverLine, BOARD, districtOf } = await import('../src/render/board.js');
+// MAP-6: what may stand in which district (props in context); anything else is a finding.
+const ZONE_RULES = [
+  [/^laundry/, ['residential']], [/^(heap|sandbags)/, ['downtown']], [/^fountain/, ['downtown', 'residential']],
+  [/^furn-(hydrant|newsbox|phone|busstop|bin)/, ['downtown', 'residential', 'industrial', 'colony']],
+  [/^cottage/, ['outskirts']], [/^drift/, ['outskirts']], [/^b5-(tower|office|cinema|garage)/, ['downtown']], [/^container/, ['industrial']],
+];
 const { ROAD } = await import('../src/render/terrain.js');
+const { PLACE_RULES, TIER_STAGE } = await import('../src/content/locations.js');
+const { ORIGINALS } = await import('../src/core/map.js');
+const { zoneOf } = await import('../src/core/zones.js');
 const { createGame } = await import('../src/core/state.js');
 const { growCity } = await import('../src/core/rules/city.js');
 
@@ -39,6 +48,22 @@ function audit(board, map, seed, stage) {
     const along = rail.axis === 'x' ? c.x : c.z;
     const railHere = has(...(rail.axis === 'x' ? [gridOf(along), rail.r] : [rail.r, gridOf(along)]));
     if (railHere && !RAIL_KINDS.test(it.kind) && across[0] < rail.c + 1.6 && across[1] > rail.c - 1.6) note('on the railway', seed, stage, it.kind, at);
+    { // MAP-6: nothing stands on the river ice but its bridge parapets
+      const rv = riverLine(map); const ac = rv.axis === 'x' ? [it.box.min.z, it.box.max.z] : [it.box.min.x, it.box.max.x];
+      const al = rv.axis === 'x' ? c.x : c.z; const here = has(...(rv.axis === 'x' ? [gridOf(al), rv.r] : [rv.r, gridOf(al)]));
+      if (here && !/^parapet/.test(it.kind) && ac[0] < rv.c + 2.2 && ac[1] > rv.c - 2.2) note('on the river', seed, stage, it.kind, at);
+    }
+  }
+  for (const it of items) {
+    const rule = ZONE_RULES.find(([re]) => re.test(it.kind)); if (!rule) continue;
+    const c = it.box.getCenter(it.box.min.clone()); const d = districtOf(gridOf(c.x), gridOf(c.z), map.look);
+    if (!rule[1].includes(d)) note('out of its zone', seed, stage, `${it.kind} in ${d}`, [c.x, c.z]);
+  }
+  // Places: in a zone and tier that fit them (a missing original may stand anywhere: it comes back where it can).
+  for (const [k, b] of Object.entries(map.blocks)) {
+    if (b.kind !== 'place' || !b.type || ORIGINALS.includes(b.type)) continue;
+    const rule = PLACE_RULES[b.type]; const [bx, bz] = k.split(',').map(Number);
+    if (!rule || !rule.zones.includes(zoneOf(bx, bz, map.look)) || TIER_STAGE[rule.tier] > stage) note('place out of its zone / tier', seed, stage, `${b.type} in ${zoneOf(bx, bz, map.look)}`, [blockPos(bx), blockPos(bz)]);
   }
   // Overlaps (top view), places included.
   for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {

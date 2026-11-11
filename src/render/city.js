@@ -17,6 +17,10 @@ export const C = {
   cont: [0xa63a2e, 0x2b4170, 0x2f6446],
 };
 const FH = 10; // floor height in voxels
+// MAP-6: a dying town: few windows are lit (places, where people and generators are, a few more).
+let litRate = 0.03;
+/** Build a model with another lit-window rate (places). */
+export function withLit(rate, make) { const was = litRate; litRate = rate; try { return make(); } finally { litRate = was; } }
 
 // 3×5 pixel font, drawn at scale 2 (6×10 voxels a letter).
 const GLYPH = {
@@ -27,7 +31,7 @@ const GLYPH = {
   R: ['110', '101', '110', '101', '101'], S: ['011', '100', '010', '001', '110'], T: ['111', '010', '010', '010', '010'],
 };
 
-/** Neon letters on a dark board on the front plane z, centred on cx, bottom at y. Letter `dead` is unlit. */
+/** Neon letters on a dark board on the front plane z, centred on cx, bottom at y. Letter `dead` (or every index in a list) is unlit. */
 export function neon(m, text, cx, y, z, color, dead = -1, k = 1) {
   const w = text.length * 4 * k - k;
   const x0 = Math.round(cx - w / 2);
@@ -36,7 +40,8 @@ export function neon(m, text, cx, y, z, color, dead = -1, k = 1) {
     const g = GLYPH[ch]; if (!g) return;
     g.forEach((row, r) => [...row].forEach((bit, c) => {
       if (bit !== '1') return;
-      m.box(x0 + (i * 4 + c) * k, y + (4 - r) * k, z + 1, k, k, 1, i === dead ? 0x4a3a3c : color, i !== dead);
+      const off = Array.isArray(dead) ? dead.includes(i) : i === dead;
+      m.box(x0 + (i * 4 + c) * k, y + (4 - r) * k, z + 1, k, k, 1, off ? 0x4a3a3c : color, !off);
     }));
   });
 }
@@ -70,7 +75,7 @@ export function block(m, o) {
       if (slot > 2) continue;
       const yb = f * FH + 3;
       const r = hash3(Math.floor((u - 2) / 6), f, seed + side.length * 7);
-      const lit = r < 0.15; /* MAP-3: ~15% of windows lit */ const boarded = r > 0.9; const broken = r > 0.8 && !boarded;
+      const lit = r < litRate; /* MAP-6: ~3% of windows lit */ const boarded = r > 0.9; const broken = r > 0.8 && !boarded;
       // MAP-3: windows sit one voxel back in the wall (depth on the façade); boards are nailed on the face.
       for (let y = yb; y < yb + 5; y++) {
         if (boarded) { m.set(x, y, z, C.board); continue; }
@@ -796,6 +801,30 @@ export function smallBuilding(v = 0) {
   return dust(m);
 }
 
+// ---------------------------------------------------------------- MAP-6: the outskirts
+
+export const COTTAGE_VARIANTS = 4;
+/** An outskirts cottage on one chunk: one floor and an attic under a steep roof, a porch, a chimney, a woodpile, a mailbox. */
+export function cottage(v = 0) {
+  const m = new VoxelModel();
+  const w = 14; const d = 11; const x0 = -7; const z0 = -7;
+  const wall = [0x9b7b5a, C.cream, 0x8fa3b8, C.sage][v % 4];
+  const roof = [C.roofDark, 0x6a3a2e, C.roof, 0x4b525a][v % 4];
+  const H = block(m, { x0, z0, w, d, floors: 1, wall, seed: 140 + v });
+  m.clearBox(x0, H + 1, z0, w, 3, d);
+  for (let k = 0; k <= Math.floor(d / 2) + 1; k++) m.box(x0 - 1, H + 1 + k, z0 - 2 + k, w + 2, 1, d + 4 - 2 * k, k % 2 ? roof : C.roofDark);
+  for (const x of [x0, x0 + w - 1]) for (let k = 0; k < Math.floor(d / 2); k++) m.box(x, H + 1 + k, z0 + k, 1, 1, d - 2 * k, wall); // gable ends
+  m.box(x0 + w - 4, H + 2, z0 + 2, 2, Math.floor(d / 2) + 3, 2, C.brick); // chimney
+  const dx = x0 + (v % 2 ? 3 : w - 6); const fz = z0 + d - 1;
+  m.clearBox(dx, 1, fz, 3, 6, 1); m.box(dx, 1, fz - 1, 3, 6, 1, v % 2 ? 0x6b4a30 : 0x7a2a2a);
+  m.box(x0 + 1, 1, z0 + d, w - 2, 1, 3, 0x7a5a3a); // porch
+  for (const x of [x0 + 1, x0 + w - 2]) m.box(x, 2, z0 + d + 2, 1, 6, 1, 0x7a5a3a);
+  m.box(x0, 8, z0 + d, w, 1, 4, C.roofDark);
+  m.box(x0 - 3, 1, z0 + 1, 2, 3, 7, (x, y, z) => ((z + y) % 2 ? 0x7a5532 : 0xa07a4a)); // woodpile by the wall
+  m.box(x0 + w + 1, 1, z0 + d + 4, 1, 4, 1, 0x5a4a3a); m.box(x0 + w, 5, z0 + d + 4, 3, 2, 2, v % 2 ? 0x2b4170 : 0x3a3f46); // mailbox
+  return dust(m);
+}
+
 // ---------------------------------------------------------------- MAP-1c: decoration pieces sized to chunks
 
 /** A fenced parking lot (2×2 chunks): painted bays, a booth, a few parked / wrecked cars. Centred. */
@@ -886,7 +915,7 @@ export function tallBuilding(v = 0) {
   const w = 18; const d = 16; const floors = [5, 6, 5, 7][v % 4];
   const walls = [C.grey, 0x8fa3b8, C.cream, 0x9b8b9e];
   block(m, { x0: -9, z0: -8, w, d, floors, wall: walls[v % 4], seed: 80 + v, shop: v % 2 === 0, balconies: v % 2 === 1 });
-  if (v === 3) { const y = floors * FH + 3; m.box(-6, y, -4, 12, 6, 1, C.metalDark); neon(m, 'HOTEL', 0, y + 1, -3, C.neonPink, 2); }
+  if (v === 3) { const y = floors * FH + 3; m.box(-6, y, -4, 12, 6, 1, C.metalDark); neon(m, 'HOTEL', 0, y + 1, -3, C.neonPink, [0, 1, 3, 4]); } // MAP-6: one letter left
   return dust(m);
 }
 
@@ -909,7 +938,7 @@ export function officeBlock(v = 0) {
   const m = new VoxelModel();
   const w = 42; const d = 16; const floors = 6;
   const H = block(m, { x0: -21, z0: -8, w, d, floors, wall: v % 2 ? C.greyDark : 0x5b6f8a, seed: 100 + v });
-  for (let f = 0; f < floors; f++) for (let x = -19; x < 19; x++) { const y = f * FH + 4; m.set(x, y, 7, C.glass); m.set(x, y + 1, 7, hash3(x, f, v) < 0.08 ? C.glassLit : C.glass, hash3(x, f, v) < 0.08); }
+  for (let f = 0; f < floors; f++) for (let x = -19; x < 19; x++) { const y = f * FH + 4; m.set(x, y, 7, C.glass); m.set(x, y + 1, 7, hash3(x, f, v) < 0.02 ? C.glassLit : C.glass, hash3(x, f, v) < 0.02); }
   m.box(-6, 1, 7, 12, 7, 1, C.glass); m.box(-6, 8, 8, 12, 1, 2, C.trim);
   for (const x of [-15, 14]) m.box(x, H + 1, 0, 1, 7, 1, C.metalDark); m.box(-15, H + 6, 0, 30, 4, 1, C.trim);
   return dust(m);
@@ -920,9 +949,9 @@ export function cinema() {
   const m = new VoxelModel();
   block(m, { x0: -21, z0: -8, w: 42, d: 16, floors: 2, wall: 0x7a2a2a, trim: C.cream, seed: 111 });
   m.box(-14, 9, 8, 28, 4, 4, C.trim);
-  for (let x = -14; x < 14; x += 2) { m.set(x, 9, 12, C.neonWarm, true); m.set(x, 12, 12, C.neonWarm, true); }
-  neon(m, 'CINEMA', 0, 10, 12, C.neonRed, 3);
-  m.box(-18, 8, 9, 3, 20, 2, 0x2a2d31); for (let y = 10; y < 26; y += 3) m.box(-18, y, 11, 3, 2, 1, C.neonBlue, true);
+  for (let x = -14; x < 14; x += 2) { const on = x % 10 === 0; m.set(x, 9, 12, on ? C.neonWarm : 0x5a4a3a, on); m.set(x, 12, 12, 0x5a4a3a); } // MAP-6: most bulbs gone
+  neon(m, 'CINEMA', 0, 10, 12, C.neonRed, [0, 1, 2, 4, 5]);
+  m.box(-18, 8, 9, 3, 20, 2, 0x2a2d31); for (let y = 10; y < 26; y += 3) m.box(-18, y, 11, 3, 2, 1, y < 14 ? C.neonBlue : 0x2f3a44, y < 14);
   m.box(-4, 1, 7, 8, 7, 1, C.glass);
   return dust(m);
 }
@@ -960,5 +989,189 @@ export function landmarkTower(v = 0) {
   const crown = new VoxelModel(); block(crown, { x0: -12, z0: -5, w: 24, d: 10, floors: 2, wall: v % 2 ? 0x8b97a3 : C.creamDark, seed: 122 + v });
   m.merge(crown, 0, H, 0);
   m.box(0, H + 2 * FH + 4, 0, 1, 14, 1, C.metalDark); m.set(0, H + 2 * FH + 18, 0, C.neonRed, true);
+  return dust(m);
+}
+
+// ---------------------------------------------------------------- MAP-6: tiered places and resource areas
+
+const OLIVE = 0x5d6b3a; const OLIVE_DARK = 0x46512b; const RUST = 0x8a4a2e;
+/** A snowed car shell (for lots and yards): 7×4 body, 3×2 cab. */
+function carShell(m, x, y, z, color, alongX = true) {
+  if (alongX) { m.box(x, y, z, 7, 3, 4, color); m.box(x + 2, y + 3, z, 3, 2, 4, color); m.box(x + 2, y + 3, z, 1, 2, 4, C.glass); }
+  else { m.box(x, y, z, 4, 3, 7, color); m.box(x, y + 3, z + 2, 4, 2, 3, color); m.box(x, y + 3, z + 2, 4, 2, 1, C.glass); }
+}
+/** A chain-link fence line (posts every 4, mesh between) along x or z. */
+function chainFence(m, x0, z0, len, alongX, h = 7, gap = null) {
+  for (let u = 0; u < len; u++) {
+    if (gap && u >= gap[0] && u < gap[1]) continue;
+    const x = alongX ? x0 + u : x0; const z = alongX ? z0 : z0 + u;
+    if (u % 4 === 0) m.box(x, 1, z, 1, h, 1, C.metalDark);
+    else for (let y = 1; y < h; y++) if ((u + y) % 2 === 0) m.set(x, y, z, 0x9aa3ad);
+    m.set(x, h, z, C.metalDark);
+  }
+}
+/** A simple pine (cone of discs, snow on the tiers). */
+function pine(m, x, z, h = 14, seed = 0) {
+  m.box(x, 1, z, 1, 3, 1, 0x5a3e28);
+  for (let y = 3; y < h; y++) {
+    const r = Math.max(0, Math.round((h - y) * 0.38 + (y % 3 === 0 ? 1 : 0)));
+    for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) if (dx * dx + dz * dz <= r * r + 1) m.set(x + dx, y, z + dz, y % 3 === 0 && hash3(dx, y, seed) < 0.6 ? P.snow : hash3(dx + seed, y, dz) < 0.5 ? 0x2f5a3a : 0x264a30);
+  }
+  m.set(x, h, z, P.snow);
+}
+
+/** Tier 2: a shopping mall on 2×2 chunks: a two-storey box with a glass entrance, a pylon sign, a car park in front. */
+export function mall() {
+  const m = new VoxelModel();
+  for (let x = -21; x < 21; x++) for (let z = 2; z < 21; z++) m.set(x, 0, z, (x + 21) % 6 === 0 && z > 4 && z < 11 ? C.paint : hash3(x >> 2, 3, z >> 2) < 0.6 ? P.snow : C.asphalt); // the car park, mostly snowed
+  block(m, { x0: -20, z0: -20, w: 40, d: 22, floors: 2, wall: C.cream, trim: C.creamDark, seed: 150, shop: true });
+  m.clearBox(-7, 1, 1, 14, 9, 1); m.box(-7, 1, 1, 14, 9, 1, C.glass); m.box(-8, 10, 2, 16, 1, 3, C.trim); // glass entrance + canopy
+  neon(m, 'MALL', 0, 22, 2, C.neonBlue, 2, 2);
+  m.box(12, 1, 18, 2, 22, 2, C.metalDark); m.box(4, 23, 18, 18, 8, 2, 0x2b4a8c); neon(m, 'SALE', 13, 25, 19, C.neonWarm, [0, 3]); // pylon sign
+  for (const [x, z, c] of [[-18, 6, 0xa63a2e], [-10, 12, 0x2b4170], [4, 6, 0x6c7580]]) carShell(m, x, 1, z, c);
+  m.box(8, 1, 14, 6, 3, 2, C.metal); for (let x = 8; x < 14; x += 2) m.box(x, 4, 14, 1, 1, 2, C.metalDark); // trolley corral
+  return dust(m);
+}
+
+/** Tier 2: a hardware store on one chunk: a low shop, a TOOLS sign, a lumber rack and gas cages outside. */
+export function hardware() {
+  const m = new VoxelModel();
+  pad(m, -11, -9, 22, 20, 151);
+  block(m, { x0: -9, z0: -8, w: 18, d: 14, floors: 1, wall: 0xb9a48a, seed: 152, shop: true });
+  neon(m, 'TOOLS', 0, 12, 6, C.neonRed, 3);
+  m.box(-10, 1, 7, 6, 1, 3, C.metalDark); for (let y = 2; y < 7; y++) m.box(-10, y, 7 + (y % 2), 6, 1, 1, y % 2 ? 0xc9a066 : 0xa07a4a); // lumber rack
+  m.box(5, 1, 7, 4, 5, 3, C.metal); for (let x = 5; x < 9; x++) m.set(x, 3, 9, 0xd04a3a); // gas cage
+  return dust(m);
+}
+
+/** Tier 3: an army base on 3×2 chunks: a fence with a gate, two watchtowers, barracks, trucks, a helipad. */
+export function military() {
+  const m = new VoxelModel();
+  for (let x = -31; x < 31; x++) for (let z = -20; z < 21; z++) m.set(x, 0, z, hash3(x >> 3, 5, z >> 3) < 0.3 ? 0x8a8f86 : P.snow);
+  chainFence(m, -31, 20, 62, true, 8, [24, 38]); chainFence(m, -31, -20, 62, true, 8); chainFence(m, -31, -20, 40, false, 8); chainFence(m, 30, -20, 40, false, 8);
+  for (const x of [-30, 25]) { // watchtowers
+    for (const [dx, dz] of [[0, 0], [4, 0], [0, 4], [4, 4]]) m.box(x + dx, 1, 14 + dz, 1, 14, 1, 0x6a4a30);
+    m.box(x - 1, 15, 13, 7, 1, 7, 0x6a4a30); m.walls(x - 1, 16, 13, 7, 4, 7, OLIVE); m.clearBox(x, 18, 19, 5, 1, 1);
+    for (let k = 0; k < 2; k++) m.box(x - 1 + k, 20 + k, 13 + k, 7 - 2 * k, 1, 7 - 2 * k, OLIVE_DARK);
+    m.box(x + 2, 19, 20, 1, 1, 1, 0xfff2c0, true); // a searchlight
+  }
+  for (const z of [-17, -7]) { // barracks: long huts with a rounded roof
+    m.walls(-26, 1, z, 30, 7, 8, OLIVE); for (let k = 0; k < 3; k++) m.box(-27, 8 + k, z + k, 32, 1, 8 - 2 * k, k === 2 ? OLIVE_DARK : OLIVE);
+    for (let x = -23; x < 2; x += 5) m.box(x, 3, z + 7, 2, 2, 1, C.glass);
+    m.clearBox(-12, 1, z + 7, 3, 5, 1); m.box(-12, 1, z + 6, 3, 5, 1, 0x3a3f2a);
+  }
+  for (let a = 0; a < 64; a++) { const x = 17 + Math.round(Math.cos(a / 10.2) * 8); const z = -9 + Math.round(Math.sin(a / 10.2) * 8); m.set(x, 1, z, 0xd8d2c2); } // helipad
+  for (const [x, z] of [[14, -12], [14, -6], [19, -12]]) m.box(x, 1, z, 1, 1, 7, 0xd8d2c2); m.box(14, 1, -9, 6, 1, 1, 0xd8d2c2);
+  for (const [x, z] of [[-24, 4], [-12, 4]]) { m.box(x, 1, z, 10, 5, 5, OLIVE_DARK); m.box(x + 7, 1, z, 3, 7, 5, OLIVE); m.box(x + 9, 4, z, 1, 2, 5, C.glass); for (const dx of [1, 6]) m.box(x + dx, 0, z - 1, 2, 2, 7, 0x1c1f24); } // trucks
+  for (let k = 0; k < 8; k++) m.box(-6 + k * 2, 1, 17 + (k % 2), 2, 3, 2, 0x938466); // sandbags by the gate
+  return dust(m);
+}
+
+/** Tier 3: a factory on 2×2 chunks: a sawtooth-roof hall, two brick chimneys, a yard of drums and pallets. */
+export function factory() {
+  const m = new VoxelModel();
+  pad(m, -21, -21, 42, 42, 153);
+  m.walls(-20, 1, -20, 40, 14, 26, 0x8a6a4a);
+  for (let x = -20; x < 20; x += 2) m.box(x, 1, 5, 1, 14, 1, 0x7a5a3a);
+  for (let z = -20; z < 6; z += 6) for (let k = 0; k < 6; k++) { m.box(-20, 15 + k, z + k, 40, 1, 1, C.roofDark); m.box(-20, 15 + k, z + 5, 40, 1, 1, k === 5 ? C.glass : C.roof); } // sawtooth
+  for (let x = -18; x < 18; x += 8) { m.clearBox(x, 1, 5, 5, 8, 1); m.box(x, 1, 4, 5, 8, 1, C.metal); }
+  for (const x of [-15, 10]) { m.box(x, 1, -16, 4, 38, 4, C.brick); for (let y = 30; y < 38; y += 3) m.box(x, y, -16, 4, 1, 4, 0x6a3a2e); }
+  neon(m, 'WORKS', 0, 22, 6, C.neonWarm, [0, 1, 4]);
+  for (const [x, z] of [[-18, 10], [-14, 12], [12, 9], [15, 13]]) m.box(x, 1, z, 3, 4, 3, hash3(x, z, 1) < 0.5 ? 0x2b4170 : RUST); // drums
+  for (const [x, z] of [[-4, 12], [2, 14]]) m.box(x, 1, z, 5, 2, 4, 0x8a5a2b); // pallets
+  return dust(m);
+}
+
+/** Resource area (wood): pine woods on 2×2 chunks: a logging track, stumps, a long woodpile, a shed with an axe. */
+export function forest() {
+  const m = new VoxelModel();
+  for (let x = -21; x < 21; x++) for (let z = -21; z < 21; z++) m.set(x, 0, z, Math.abs(x - 2) < 3 && z > -6 ? 0xb9c2cc : P.snow); // the track
+  let n = 0;
+  for (let x = -18; x < 19; x += 8) for (let z = -18; z < 19; z += 8) {
+    const jx = x + Math.round((hash3(x, 1, z) - 0.5) * 3); const jz = z + Math.round((hash3(x, 2, z) - 0.5) * 3);
+    if (Math.abs(jx - 2) < 6 && jz > -8) { if (hash3(x, 3, z) < 0.6) m.box(jx, 1, jz, 2, 2, 2, 0x8a6a44); continue; } // stumps in the clearing
+    pine(m, jx, jz, 13 + Math.floor(hash3(x, 4, z) * 8), n++);
+  }
+  for (let y = 1; y < 5; y++) for (let x = -14; x < -4; x++) m.box(x, y, 14 + (y % 2), 1, 1, 3, (x + y) % 2 ? 0x7a5532 : 0xb08a5a); // woodpile
+  m.walls(8, 1, 10, 9, 7, 7, 0x6a4a30); m.box(7, 8, 9, 11, 1, 9, C.roofDark); m.box(10, 1, 16, 3, 5, 1, 0x3a2a1a); // shed
+  m.box(-2, 1, 12, 4, 2, 1, 0x7a5532); m.box(0, 3, 12, 1, 3, 1, 0x7a5532); m.box(0, 6, 12, 2, 1, 1, C.metal); // chopping block + axe
+  return dust(m);
+}
+
+/** Resource area (metal): a scrapyard on 2×2 chunks: wrecks stacked three high, a crane with a car, an office hut. */
+export function scrapyard() {
+  const m = new VoxelModel();
+  for (let x = -21; x < 21; x++) for (let z = -21; z < 21; z++) m.set(x, 0, z, hash3(x >> 2, 9, z >> 2) < 0.5 ? 0x6a6458 : P.snow);
+  chainFence(m, -21, 20, 42, true, 7, [6, 16]); chainFence(m, -21, -21, 42, true, 7); chainFence(m, -21, -21, 41, false, 7); chainFence(m, 20, -21, 41, false, 7);
+  const tones = [RUST, 0x6c7580, 0xa63a2e, 0x2b4170, 0x5d6b3a, 0x8e979f];
+  for (let row = 0; row < 3; row++) for (let k = 0; k < 4; k++) {
+    const h = 1 + Math.floor(hash3(row, k, 7) * 3);
+    for (let y = 0; y < h; y++) m.box(-18 + k * 8, 1 + y * 3, -18 + row * 9 + (y % 2), 7, 3, 5, tones[(row * 4 + k + y) % tones.length]); // crushed wrecks
+  }
+  m.box(12, 1, -16, 3, 26, 3, 0xd8b03a); m.box(-2, 26, -16, 18, 2, 3, 0xd8b03a); m.box(12, 27, -16, 3, 3, 3, 0x3a3f46); // crane
+  m.box(-1, 18, -15, 1, 8, 1, C.metalDark); carShell(m, -4, 13, -16, 0x2b4170, true);
+  for (let k = 0; k < 3; k++) m.box(4 + k * 3, 1 + k, 4 - k, 8 - k * 2, 2, 6 - k, k % 2 ? RUST : C.metalDark); // a scrap heap
+  m.walls(10, 1, 8, 9, 7, 7, 0x2f6b6b); m.box(9, 8, 7, 11, 1, 9, C.roofDark); m.box(12, 3, 14, 3, 2, 1, C.glassLit, true); // office hut
+  return dust(m);
+}
+
+// ---------------------------------------------------------------- MAP-6: companions of places (one chunk each, SMALL_SCALE)
+
+/** A playground beside a school: swings, a slide, a climbing frame, under snow. */
+export function playground() {
+  const m = new VoxelModel(); pad(m, -11, -11, 22, 22, 160);
+  for (const x of [-9, -1]) m.box(x, 1, -6, 1, 9, 1, 0xc0392b); m.box(-9, 9, -6, 9, 1, 1, 0xc0392b);
+  for (const x of [-7, -3]) { m.box(x, 4, -6, 1, 5, 1, C.metalDark); m.box(x - 1, 3, -7, 3, 1, 3, 0x2b4170); }
+  for (let k = 0; k < 7; k++) m.box(3 + k, 8 - k, 2, 1, 1, 3, 0xd8b03a); m.box(2, 1, 2, 1, 8, 3, C.metal);
+  for (let y = 1; y < 8; y += 3) m.box(-8, y, 4, 7, 1, 5, 0x2f6b6b); for (const [x, z] of [[-8, 4], [-2, 4], [-8, 8], [-2, 8]]) m.box(x, 1, z, 1, 7, 1, 0x2f6b6b);
+  return dust(m);
+}
+/** A pharmacy beside a hospital: a small shop with a green cross. */
+export function pharmacy() {
+  const m = new VoxelModel();
+  block(m, { x0: -9, z0: -8, w: 18, d: 15, floors: 2, wall: C.trim, seed: 161, shop: true });
+  m.box(-2, 13, 7, 4, 2, 1, C.neonGreen, true); m.box(-1, 12, 7, 2, 4, 1, C.neonGreen, true);
+  return dust(m);
+}
+/** An impound lot behind a police station: towed cars inside a chain fence. */
+export function impound() {
+  const m = new VoxelModel(); pad(m, -11, -11, 22, 22, 162);
+  chainFence(m, -11, -11, 22, true); chainFence(m, -11, 10, 22, true, 7, [8, 14]); chainFence(m, -11, -11, 22, false); chainFence(m, 10, -11, 22, false);
+  for (const [x, z, c] of [[-9, -8, 0x6c7580], [1, -8, RUST], [-9, 1, 0x2b4170]]) carShell(m, x, 1, z, c);
+  return dust(m);
+}
+/** A graveyard beside a church: rows of stones and a picket fence. */
+export function graveyard() {
+  const m = new VoxelModel(); pad(m, -11, -11, 22, 22, 163);
+  for (let x = -11; x < 11; x += 2) { m.box(x, 1, -11, 1, 4, 1, 0xe8e4d8); m.box(x, 1, 10, 1, 4, 1, 0xe8e4d8); }
+  for (let r = 0; r < 3; r++) for (let k = 0; k < 4; k++) {
+    const x = -8 + k * 5; const z = -7 + r * 6; const h = 3 + Math.floor(hash3(r, k, 3) * 3);
+    if (hash3(r, k, 5) < 0.3) { m.box(x, 1, z, 1, h + 2, 1, 0x8a8f86); m.box(x - 1, h, z, 3, 1, 1, 0x8a8f86); } else m.box(x - 1, 1, z, 3, h, 1, 0x9a9c9e);
+  }
+  return dust(m);
+}
+/** A roadside diner beside a gas station or motel: a long low box, a counter window, a DINER sign with dead letters. */
+export function diner() {
+  const m = new VoxelModel();
+  block(m, { x0: -10, z0: -6, w: 20, d: 12, floors: 1, wall: 0xb8c4c8, trim: 0xc0392b, seed: 164, shop: true });
+  neon(m, 'DINER', 0, 12, 6, C.neonPink, [1, 2, 4]);
+  return dust(m);
+}
+/** An industrial water tower: a tank on four legs with a ladder. */
+export function waterTower() {
+  const m = new VoxelModel();
+  for (const [x, z] of [[-5, -5], [4, -5], [-5, 4], [4, 4]]) m.box(x, 1, z, 1, 22, 1, C.metalDark);
+  for (let y = 22; y < 32; y++) for (let a = 0; a < 40; a++) m.set(Math.round(Math.cos(a / 6.4) * 6), y, Math.round(Math.sin(a / 6.4) * 6), y % 3 ? 0x8fa3b8 : 0x6c7580);
+  for (let k = 0; k <= 6; k++) m.box(-6 + k, 32 + Math.floor(k / 2), -6 + k, 13 - 2 * k, 1, 13 - 2 * k, C.roofDark);
+  for (let y = 1; y < 22; y += 2) m.set(6, y, 0, C.metal);
+  return dust(m);
+}
+/** A power substation: transformers behind a fence, insulator gantries (the reason the lights are out). */
+export function substation() {
+  const m = new VoxelModel(); pad(m, -11, -11, 22, 22, 165);
+  chainFence(m, -11, -11, 22, true); chainFence(m, -11, 10, 22, true); chainFence(m, -11, -11, 22, false); chainFence(m, 10, -11, 22, false);
+  for (const x of [-7, 1]) { m.box(x, 1, -4, 6, 6, 5, 0x6c7580); for (let k = 0; k < 3; k++) m.box(x + 1 + k * 2, 7, -2, 1, 3, 1, 0xd8d2c2); }
+  for (const z of [-8, 6]) { m.box(-9, 1, z, 1, 14, 1, C.metalDark); m.box(8, 1, z, 1, 14, 1, C.metalDark); m.box(-9, 14, z, 18, 1, 1, C.metalDark); }
+  m.box(-3, 1, 5, 6, 2, 3, 0x1c1f24); // a burnt-out transformer
   return dust(m);
 }
