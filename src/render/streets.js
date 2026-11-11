@@ -194,3 +194,37 @@ export function railQuads(rail, pieces) {
   }
   return { position: new Float32Array(pos), normal: new Float32Array(nrm), color: new Float32Array(col), index };
 }
+
+/**
+ * MAP-3: dropped kerbs: at each zebra crossing a sloped ramp from the road up to the block slab on both sides.
+ * onSlab(x, z) says whether a block slab is there; top = slab height. Returns quads like markingQuads.
+ */
+export function rampQuads(segments, onSlab, top) {
+  const { nodes } = streetRuns(segments);
+  const pos = []; const nrm = []; const col = [];
+  const C1 = [0.72, 0.73, 0.75]; const C2 = [0.6, 0.61, 0.63];
+  for (const n of nodes) {
+    if (n.kind !== 'junction') continue;
+    for (const d of n.dirs) {
+      const axis = d[1]; const s = d[0] === '+' ? 1 : -1;
+      for (const side of [-1, 1]) {
+        const P = (along, lat, y) => (axis === 'x' ? [n.x + s * along, y, n.z + side * lat] : [n.x + side * lat, y, n.z + s * along]);
+        const mid = P((ROAD.kerb + ROAD.walk) / 2, ROAD.half + 0.6, 0);
+        if (!onSlab(mid[0], mid[2])) continue;
+        const a0 = ROAD.kerb + 0.15; const a1 = ROAD.walk - 0.15;
+        const q = [P(a0, ROAD.half - 0.5, 0.025), P(a1, ROAD.half - 0.5, 0.025), P(a1, ROAD.half + 0.2, top + 0.012), P(a0, ROAD.half + 0.2, top + 0.012)];
+        // Normal of the slope (pointing up and away from the slab), then make the winding face it.
+        const out = axis === 'x' ? [0, 0, -side] : [-side, 0, 0];
+        const len = Math.hypot(top, 0.7); const nm = [out[0] * top / len, 0.7 / len, out[2] * top / len];
+        const e1 = q[1].map((v, i) => v - q[0][i]); const e2 = q[2].map((v, i) => v - q[0][i]);
+        const cr = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+        const pts = cr[1] > 0 ? q : [q[0], q[3], q[2], q[1]];
+        for (const p of pts) { pos.push(...p); nrm.push(...nm); col.push(...((Math.round(p[0] + p[2]) & 1) ? C1 : C2)); }
+      }
+    }
+  }
+  const nq = pos.length / 12;
+  const index = new Uint32Array(nq * 6);
+  for (let q = 0; q < nq; q++) index.set([q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3], q * 6);
+  return { position: new Float32Array(pos), normal: new Float32Array(nrm), color: new Float32Array(col), index };
+}

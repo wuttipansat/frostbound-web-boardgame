@@ -7,7 +7,7 @@ import { P } from './palette.js';
 import { LOCATION_BUILDERS_HD, colonyHD, treeModelHD, rockModelHD } from './buildings.js';
 import { buildTerrainHD, ROAD } from './terrain.js';
 import { carModel, lampModel, containerModel, clutterModel, CLUTTER_KINDS, crossingModel, wagonModel, bufferStopModel, FURNITURE, furnitureModel, trafficLightModel, streetSignModel, powerPoleModel, vehicleModel, checkpointModel, burntCarModel, tentModel, statueModel } from './props.js';
-import { markingQuads, lampSpots, railQuads, streetRuns } from './streets.js';
+import { markingQuads, lampSpots, railQuads, streetRuns, rampQuads } from './streets.js';
 import { blockSlab, GROUND } from './ground.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import * as city from './city.js';
@@ -218,7 +218,7 @@ const DISTRICT_RECIPES = {
 const DISTRICT_SMALL = { downtown: [2, 4, 5, 7, 1], residential: [0, 3, 6, 1], industrial: [3, 6, 0] };
 
 /** MAP-3: a decoration block with nothing built on it (a square, a lawn, an empty lot): about a quarter of them. */
-export const openBlock = (b, bx, bz) => RECIPES[b.kind] && b.kind !== 'place' && hash3(bx, 71, bz) < 0.25;
+export const openBlock = (b, bx, bz) => RECIPES[b.kind] && b.kind !== 'place' && hash3(bx, 71, bz) < 0.18;
 
 /**
  * MAP-3 calmer blocks: the chunks of a block that get something, as [row, column, what]. Built things (the place or
@@ -241,7 +241,7 @@ export function blockPieces(b, bx, bz, plan, recipe = RECIPES[b.kind] ?? RECIPES
   let n;
   if (b.kind === 'place') n = built >= 4 ? (h(2) < 0.75 ? 1 : 2) : 2;
   else if (openBlock(b, bx, bz)) n = 0;
-  else n = built ? 1 : 2; // 1–2 pieces, counting the centrepiece
+  else n = 2; // two pieces besides any centrepiece (still inside the 3×2 window)
   n = Math.min(n, 6 - built, win.length);
   const used = new Set();
   for (let k = 0; k < n; k++) {
@@ -288,6 +288,7 @@ function pickBy(list, r) {
 /** A soft glowing ring texture for hover/selection halos. */
 const POOL_GEO = new THREE.PlaneGeometry(1, 1);
 const WIRE_MAT = new THREE.LineBasicMaterial({ color: 0x1c1f24 });
+const AMBER_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, fog: false }); // blinking amber signals
 /** A soft warm spot of lamp light on the ground. */
 function poolTexture() {
   const c = document.createElement('canvas');
@@ -690,6 +691,15 @@ export function createBoard({ progressive = false } = {}) {
       const m = new THREE.Mesh(g, MARK_MAT); m.receiveShadow = true; m.name = 'markings';
       decor.add(m);
     }
+    // Dropped kerbs at the zebras (one mesh).
+    const slabTest = (x, z) => { const bx = gridOf(x); const bz = gridOf(z); return has(bx, bz) && Math.abs(x - blockPos(bx)) <= blockHalf(bx) - ROAD.half + 0.7 && Math.abs(z - blockPos(bz)) <= blockHalf(bz) - ROAD.half + 0.7; };
+    const rq = rampQuads(segs, slabTest, GROUND);
+    if (rq.index.length) {
+      const g = new THREE.BufferGeometry();
+      for (const a of ['position', 'normal', 'color']) g.setAttribute(a, new THREE.BufferAttribute(rq[a], 3));
+      g.setIndex(new THREE.BufferAttribute(rq.index, 1));
+      const m = new THREE.Mesh(g, MATERIALS.lit); m.receiveShadow = true; m.name = 'kerb-ramps'; decor.add(m);
+    }
     const posts = railCrossings(rail);
     const slabAt = (x, z) => { const bx = gridOf(x); const bz = gridOf(z); return has(bx, bz) && Math.abs(x - blockPos(bx)) <= blockHalf(bx) - ROAD.half - 0.2 && Math.abs(z - blockPos(bz)) <= blockHalf(bz) - ROAD.half - 0.2; };
     const spots = lampSpots(segs, (x, z) => ground(x, z) && slabAt(x, z)).filter((l) => !posts.some((p) => Math.hypot(p.x - l.x, p.z - l.z) < 2.5) && Math.abs((rail.axis === 'x' ? l.z : l.x) - rail.c) > RAIL_CLEAR + 0.6);
@@ -721,7 +731,7 @@ export function createBoard({ progressive = false } = {}) {
   // Everything here is merged into one lit mesh + one glow mesh for the whole city (2 draw calls).
   function buildFurniture(rail, segs, ground0, lamps) {
     debugItems.length = 0;
-    const lit = []; const glow = [];
+    const lit = []; const glow = []; const amber = [];
     // On a block slab (not over a back lane between blocks), off the track, and clear of doors and gates.
     const onSlab = (x, z) => { const bx = gridOf(x); const bz = gridOf(z); return has(bx, bz) && Math.abs(x - blockPos(bx)) <= blockHalf(bx) - ROAD.half - 0.2 && Math.abs(z - blockPos(bz)) <= blockHalf(bz) - ROAD.half - 0.2; };
     const doors = Object.values(layout).flatMap((L) => (L.plan ? [L.plan.c.clone().addScaledVector(L.plan.fwd, L.plan.edge + 1).addScaledVector(L.plan.side, L.plan.lat)] : L.gates ?? []));
@@ -733,7 +743,7 @@ export function createBoard({ progressive = false } = {}) {
       _e.set(tiltAxis === 'x' ? tilt : 0, yaw, tiltAxis === 'z' ? tilt : 0, 'YXZ');
       const mx = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), _q.setFromEuler(_e), new THREE.Vector3(1, 1, 1));
       if (g.lit) lit.push(g.lit.clone().applyMatrix4(mx));
-      if (g.glow) glow.push(g.glow.clone().applyMatrix4(mx));
+      if (g.glow) (key === 'tlight-amber' ? amber : glow).push(g.glow.clone().applyMatrix4(mx)); // amber lights blink on their own
       // MAP audit: remember what went into the merged mesh and where (world box).
       const box = (g.lit ?? g.glow).boundingBox.clone().applyMatrix4(mx);
       if (g.glow && g.lit) box.union(g.glow.boundingBox.clone().applyMatrix4(mx));
@@ -911,7 +921,7 @@ export function createBoard({ progressive = false } = {}) {
       const mesh = new THREE.Mesh(geo, mat); mesh.name = name; mesh.receiveShadow = true; mesh.castShadow = mat === MATERIALS.lit;
       decor.add(mesh);
     };
-    merge(lit, MATERIALS.lit, 'furniture'); merge(glow, MATERIALS.glow, 'furniture-glow');
+    merge(lit, MATERIALS.lit, 'furniture'); merge(glow, MATERIALS.glow, 'furniture-glow'); merge(amber, AMBER_MAT, 'amber-lights');
   }
 
   // ---------------------------------------------------------------- MAP-3 E: the railway
@@ -1261,6 +1271,7 @@ export function createBoard({ progressive = false } = {}) {
       for (const c of batches) if (c.pop) stepPop(c, dt);
       for (let i = slotPops.length - 1; i >= 0; i--) { stepPop(slotPops[i], dt); if (!slotPops[i].pop) slotPops.splice(i, 1); }
       stepPuffs(dt);
+      AMBER_MAT.visible = Math.floor(t * 1.6) % 2 === 0; // amber signals blink
       if (pools && flickers.length) {
         for (const [n, i] of flickers.entries()) { const f = Math.sin(t * 9 + n * 2.3) > 0.6 || Math.sin(t * 23 + n) > 0.93 ? 0.15 : 1; _c.setScalar(f); pools.setColorAt(i, _c); }
         pools.instanceColor.needsUpdate = true;

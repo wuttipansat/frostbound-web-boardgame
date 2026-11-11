@@ -90,6 +90,12 @@ export function block(m, o) {
     m.set(x + ox, 1, z + oz, C.greyDark);
     if (u === 0 || u === len - 1 || (u % 12 === 6 && u < len - 3)) for (let y = 2; y < H; y++) if (!m.get(x + ox, y, z + oz)) m.set(x + ox, y, z + oz, trim);
     m.set(x + ox, H - 1, z + oz, trim); m.set(x + ox, H, z + oz, C.creamDark);
+    // Snow drifted against the wall base: a low, uneven bank (never across a doorway or shopfront at the front).
+    const n = hash3(Math.floor(u / 4), 17, seed);
+    if (n < 0.55 && !(side === 'front' && o.shop)) {
+      m.set(x + 2 * ox, 1, z + 2 * oz, P.snow);
+      if (n < 0.3) m.set(x + ox, 2, z + oz, P.snow);
+    }
   });
   if (shop) shopfront(m, x0, z0, w, d, seed);
   if (balconies) {
@@ -834,7 +840,7 @@ export function railYard() {
 // ---------------------------------------------------------------- MAP-1b: small buildings that fill a block's free chunks
 
 export const SMALL_VARIANTS = 8;
-export const SMALL_SCALE = 0.9; // instance scale: a small building fills its chunk with a little room around it
+export const SMALL_SCALE = 0.86; // instance scale: a small building fills its chunk with a little room around it
 const SMALL_WALLS = [C.sage, C.cream, C.grey, C.brick, C.ochre, 0x8fa3b8, 0xb9a48a, 0x9b8b9e];
 
 /** A small, closed-up building (not a place you can enter): 1–4 floors, sized to one chunk. */
@@ -842,8 +848,21 @@ export function smallBuilding(v = 0) {
   const m = new VoxelModel();
   const w = 16 + (v % 3) * 2; const d = 14 + (v % 2) * 3;
   const floors = 2 + (v % 3); // MAP-3: at least two floors (a one-floor shop read as an empty box)
-  block(m, { x0: -Math.floor(w / 2), z0: -Math.floor(d / 2), w, d, floors, wall: SMALL_WALLS[v % SMALL_WALLS.length], seed: 50 + v, shop: floors <= 3 && v % 2 === 0 });
-  if (v % 4 === 1) graffiti(m, -Math.floor(w / 2) + 2, 2, Math.ceil(d / 2), v);
+  const shop = floors <= 3 && v % 2 === 0;
+  const x0 = -Math.floor(w / 2); const z0 = -Math.floor(d / 2);
+  const H = block(m, { x0, z0, w, d, floors, wall: SMALL_WALLS[v % SMALL_WALLS.length], seed: 50 + v, shop, balconies: v % 3 === 1 });
+  if (v % 4 === 1) graffiti(m, x0 + 2, 2, z0 + d, v);
+  // MAP-3 variety: houses get a front door with a little canopy and a stoop; some a pitched roof with a chimney.
+  if (!shop) {
+    const dx = x0 + Math.floor(w / 2) - 1; const fz = z0 + d - 1;
+    m.clearBox(dx, 1, fz, 3, 6, 1); m.box(dx, 1, fz - 1, 3, 6, 1, v % 2 ? 0x6b4a30 : 0x2f4f6f); m.set(dx + 2, 3, fz, 0xd8b03a);
+    m.box(dx - 1, 7, fz + 1, 5, 1, 2, C.roofDark); m.box(dx - 1, 1, fz + 1, 5, 1, 2, C.greyDark);
+  }
+  if (v % 4 === 3) {
+    m.clearBox(x0, H + 1, z0, w, 3, d); // no parapet: a gable roof instead
+    for (let k = 0; k <= Math.floor(d / 2); k++) m.box(x0 - 1, H + 1 + k, z0 - 1 + k, w + 2, 1, d + 2 - 2 * k, k % 2 ? C.roofDark : C.roof);
+    m.box(x0 + 3, H + 2, z0 + 3, 2, Math.floor(d / 2) + 2, 2, C.brick);
+  }
   return dust(m);
 }
 
