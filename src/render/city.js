@@ -304,7 +304,11 @@ export function gasStation() {
 // ---------------------------------------------------------------- the colony and the filler blocks
 
 /** The colony: a square wall of stacked shipping containers, barricaded gates, the bonfire, huts, tents and a watch post. */
-export function colony(R = 30) {
+/**
+ * The colony's base (MAP-3): a container wall with 4 gates, the packed-snow yard and the fire ring. Buildings stand in
+ * their own slots (colonySlot). wall = the "wall" upgrade (0..3): a second container layer, then towers on the corners.
+ */
+export function colony(R = 30, wall = 0) {
   const m = new VoxelModel();
   const gate = 6;
   const container = (x0, y0, z0, len, alongX, color) => {
@@ -322,7 +326,11 @@ export function colony(R = 30) {
         const col = C.cont[(i + (s > 0 ? 1 : 0)) % 3];
         container(t, 1, s > 0 ? R - 6 : -R, len, true, col);
         container(s > 0 ? R - 6 : -R, 1, t, len, false, C.cont[(i + 2) % 3]);
-        if (hash3(i, s, 3) > 0.45) container(t + 2, 9, s > 0 ? R - 6 : -R, Math.max(4, len - 4), true, C.cont[(i + 1) % 3]);
+        // Wall levels: some second-layer containers (1), a full second layer (2+).
+        if (wall >= 2 || (wall === 1 && hash3(i, s, 3) > 0.45)) {
+          container(t + 1, 9, s > 0 ? R - 6 : -R, Math.max(4, len - 2), true, C.cont[(i + 1) % 3]);
+          container(s > 0 ? R - 6 : -R, 9, t + 1, Math.max(4, len - 2), false, C.cont[i % 3]);
+        }
         t += len; i++;
       }
     }
@@ -338,6 +346,15 @@ export function colony(R = 30) {
       }
     }
   }
+  // Level 3: a watch tower on every corner of the wall, a fire basket on top.
+  if (wall >= 3) {
+    for (const [sx, sz] of [[-1, -1], [-1, 1], [1, -1], [1, 1]]) {
+      const x0 = sx > 0 ? R - 7 : -R; const z0 = sz > 0 ? R - 7 : -R;
+      for (const [dx, dz] of [[0, 0], [6, 0], [0, 6], [6, 6]]) m.box(x0 + dx, 1, z0 + dz, 1, 24, 1, P.woodDark);
+      m.box(x0 - 1, 25, z0 - 1, 9, 1, 9, P.wood); m.walls(x0 - 1, 26, z0 - 1, 9, 2, 9, P.woodLight);
+      m.box(x0 + 3, 26, z0 + 3, 1, 1, 1, P.fire, true);
+    }
+  }
   // Packed-snow yard with a melted ring around the fire.
   for (let x = -R + 7; x < R - 6; x++) for (let z = -R + 7; z < R - 6; z++) {
     const r2 = x * x + z * z;
@@ -345,22 +362,101 @@ export function colony(R = 30) {
   }
   for (let a = 0; a < 360; a += 24) { const r = (a * Math.PI) / 180; m.box(Math.round(Math.cos(r) * 4), 1, Math.round(Math.sin(r) * 4), 1, 1, 1, P.rockLight); }
   m.box(-2, 1, 0, 5, 1, 1, P.woodDark); m.box(0, 1, -2, 1, 1, 5, P.woodDark);
-  // Huts from half containers, lit windows, stovepipes.
-  const hut = (x0, z0, c) => {
-    container(x0, 1, z0, 12, true, c);
-    m.box(x0 + 3, 4, z0 + 7, 2, 2, 1, P.window, true); m.box(x0 + 7, 1, z0 + 7, 2, 6, 1, P.woodDark);
-    m.box(x0 + 9, 9, z0 + 2, 1, 4, 1, P.rock);
-  };
-  hut(-20, -21, C.cont[0]); hut(8, -21, C.cont[1]); hut(-20, 12, C.cont[2]);
-  for (const [x, z, c] of [[12, 13, 0x5b6f8a], [-4, -22, 0x7a5b4a]]) {
-    for (let k = 0; k < 4; k++) m.box(x - 4 + k, 1 + k, z, 9 - 2 * k, 1, 6, c);
-  }
-  // Watch post in the far corner.
-  const wx = R - 14; const wz = -R + 8;
-  for (const [dx, dz] of [[0, 0], [5, 0], [0, 5], [5, 5]]) m.box(wx + dx, 1, wz + dz, 1, 16, 1, P.woodDark);
-  m.box(wx - 1, 17, wz - 1, 8, 1, 8, P.wood); m.walls(wx - 1, 18, wz - 1, 8, 2, 8, P.woodLight); m.set(wx + 2, 20, wz + 2, P.fire, true);
-  for (const [x, z] of [[8, -6], [10, -6], [8, -4]]) m.box(x, 1, z, 2, 2, 2, 0x8a5a2b);
   return m.snowCap(P.snow, 1, 2);
+}
+
+/** What each colony slot can show. */
+export const SLOT_KINDS = ['dorm', 'greenhouse', 'workshop', 'infirmary', 'radio', 'towers', 'garage', 'spare', 'reserved'];
+
+/**
+ * MAP-3: one colony slot (16×16 voxels, front = +z). level 0 = a staked-out lot with a sign; 1–3 = a growing
+ * building; the garage shows the snow crawler stage by stage (level 0..4).
+ */
+export function colonySlot(kind, level = 0) {
+  const m = new VoxelModel();
+  const L = level;
+  const pad = L ? 0x9aa3ad : P.snowShade;
+  m.box(-8, 0, -8, 16, 1, 16, (x, _y, z) => (L && (x + z) % 5 === 0 ? 0x8d949e : pad));
+  const stakes = () => {
+    for (const [x, z] of [[-7, -7], [6, -7], [-7, 6], [6, 6]]) m.box(x, 1, z, 1, 3, 1, P.woodDark);
+    for (let t = -6; t < 6; t++) { m.set(t, 3, -7, 0xd9cfa8); m.set(t, 3, 6, 0xd9cfa8); m.set(-7, 3, t, 0xd9cfa8); m.set(6, 3, t, 0xd9cfa8); }
+    const sign = { dorm: 0x7a5b4a, greenhouse: C.moss, workshop: C.ochre, infirmary: C.red, radio: C.neonBlue, towers: P.wood, garage: 0xd9822b }[kind] ?? 0x8d949e;
+    m.box(-1, 1, 7, 1, 4, 1, P.woodDark); m.box(-3, 4, 7, 5, 3, 1, sign);
+  };
+  if (!L || kind === 'spare' || kind === 'reserved') { stakes(); return m.snowCap(P.snow, 1, 1); }
+  const window = (x, y, z, lit) => m.box(x, y, z, 2, 2, 1, lit ? C.glassLit : C.glass, lit);
+  switch (kind) {
+    case 'dorm': { // container bunkhouses: one, two side by side, then one stacked on top
+      const box = (x0, y0, z0, c, lit) => { m.box(x0, y0, z0, 13, 7, 6, c); m.box(x0, y0 + 7, z0, 13, 1, 6, C.metalDark); window(x0 + 3, y0 + 3, z0 + 6, lit); window(x0 + 8, y0 + 3, z0 + 6, !lit); m.box(x0 + 11, y0 + 8, z0 + 2, 1, 3, 1, C.metalDark); };
+      box(-6, 1, 0, C.cont[0], true);
+      if (L >= 2) box(-6, 1, -7, C.cont[1], false);
+      if (L >= 3) box(-5, 9, -4, C.cont[2], true);
+      m.box(-1, 1, 6, 3, 5, 1, P.woodDark); // door
+      break;
+    }
+    case 'greenhouse': { // glass houses that grow longer, green glow inside
+      const len = 6 + 3 * L;
+      for (let x = -len / 2 | 0; x < (len / 2 | 0); x++) for (let z = -4; z <= 4; z++) {
+        const h = 5 - Math.floor(Math.abs(z) / 2);
+        for (let y = 1; y <= h; y++) {
+          const edge = Math.abs(z) === 4 || y === h || x === (-len / 2 | 0) || x === (len / 2 | 0) - 1;
+          if (edge) m.set(x, y, z, x % 3 === 0 || y === h ? 0xdfe6ea : 0x9fd6c4);
+          else if (y === 1) m.set(x, y, z, (x + z) % 2 ? 0x3e7d3a : 0x5aa04a, (x + z) % 4 === 0);
+        }
+      }
+      break;
+    }
+    case 'workshop': { // timber shed, open front with a workbench; a crane arm, then a chimney
+      m.box(-6, 1, -5, 12, 7, 1, P.wood); m.box(-6, 1, -5, 1, 7, 10, P.wood); m.box(5, 1, -5, 1, 7, 10, P.wood);
+      m.box(-7, 8, -6, 14, 1, 12, C.roofDark);
+      m.box(-4, 1, -3, 7, 2, 2, P.woodDark); m.box(-3, 3, -3, 2, 1, 1, C.metal); // bench + vice
+      if (L >= 2) { m.box(6, 1, 4, 1, 12, 1, C.metalDark); m.box(1, 12, 4, 6, 1, 1, C.ochre); m.box(1, 9, 4, 1, 3, 1, C.metalDark); }
+      if (L >= 3) { m.box(-5, 9, -4, 2, 6, 2, P.rock); m.box(-7, 1, 2, 3, 4, 3, 0x8a5a2b); window(-1, 5, -4, true); }
+      break;
+    }
+    case 'infirmary': { // a tent, then a white container, then two storeys; red cross on the front
+      if (L === 1) {
+        for (let y = 0; y < 6; y++) m.box(-5 + y, 1 + y, -4, 11 - 2 * y, 1, 9, 0xe9e4d8);
+      } else {
+        m.box(-6, 1, -4, 12, 7, 8, 0xe9e4d8); m.box(-6, 8, -4, 12, 1, 8, C.greyDark);
+        if (L >= 3) { m.box(-5, 9, -3, 10, 6, 7, 0xe9e4d8); m.box(-5, 15, -3, 10, 1, 7, C.greyDark); window(-3, 11, 4, true); window(2, 11, 4, false); }
+        window(-4, 4, 4, true);
+      }
+      const cy = L === 1 ? 3 : 4;
+      m.box(1, cy, 5, 3, 1, 1, C.red); m.box(2, cy - 1, 5, 1, 3, 1, C.red);
+      break;
+    }
+    case 'radio': { // a lattice mast that grows, a shack, then a dish; red light on top
+      const h = 10 + 8 * L;
+      for (let y = 1; y <= h; y++) { m.set(2, y, -2, C.metalDark); m.set(4, y, -2, C.metalDark); if (y % 3 === 0) { m.set(3, y, -2, C.metal); } }
+      m.set(3, h + 1, -2, C.neonRed, true);
+      if (L >= 2) { m.box(-6, 1, 0, 7, 6, 6, 0x5b6f8a); m.box(-6, 7, 0, 7, 1, 6, C.roofDark); window(-4, 3, 6, true); }
+      if (L >= 3) { m.box(5, h - 6, -4, 1, 4, 4, C.trim); m.box(6, h - 5, -3, 1, 2, 2, C.metal); }
+      for (const [x, z] of [[-6, -7], [7, -7], [3, 6]]) m.set(x, 1, z, C.metalDark); // guy-wire anchors
+      break;
+    }
+    case 'towers': { // a watch tower that grows with the wall
+      const h = 8 + 5 * L;
+      for (const [dx, dz] of [[-3, -3], [2, -3], [-3, 2], [2, 2]]) m.box(dx, 1, dz, 1, h, 1, P.woodDark);
+      for (let y = 4; y < h; y += 4) m.box(-3, y, -3, 6, 1, 1, P.wood);
+      m.box(-4, h + 1, -4, 8, 1, 8, P.wood); m.walls(-4, h + 2, -4, 8, 2, 8, P.woodLight);
+      m.box(-4, h + 5, -4, 8, 1, 8, C.roofDark); m.set(0, h + 2, 0, P.fire, true);
+      break;
+    }
+    case 'garage': { // an open shed with the snow crawler: frame, engine, cabin, then fuelled with its lights on
+      for (const [x, z] of [[-8, -8], [7, -8], [-8, 7], [7, 7]]) m.box(x, 1, z, 1, 10, 1, P.woodDark);
+      m.box(-8, 11, -8, 16, 1, 16, C.roofDark);
+      m.box(-6, 1, -4, 12, 2, 8, 0x2a2f36); // tracks
+      for (let x = -6; x < 6; x += 2) { m.set(x, 1, -4, 0x15171a); m.set(x, 1, 3, 0x15171a); }
+      m.box(-5, 3, -3, 10, 1, 6, C.metalDark); // frame
+      if (L >= 2) { m.box(-5, 4, -2, 4, 3, 4, 0x4b525a); m.box(-4, 7, -1, 1, 2, 1, C.metalDark); }
+      if (L >= 3) { m.box(-1, 4, -3, 6, 5, 6, 0xd9822b); m.box(0, 6, 3, 4, 2, 1, C.glass); m.box(-1, 9, -3, 6, 1, 6, 0xb86a1f); }
+      if (L >= 4) { m.box(5, 5, -2, 1, 1, 1, 0xfff1c2, true); m.box(5, 5, 1, 1, 1, 1, 0xfff1c2, true); m.box(-7, 1, 5, 2, 3, 1, C.red); m.box(-4, 1, 5, 2, 3, 1, C.red); }
+      break;
+    }
+    default: stakes();
+  }
+  return m.snowCap(P.snow, 1, 1);
 }
 
 /** Filler block: a fenced parking lot with painted bays and a couple of wrecks. */

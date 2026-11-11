@@ -94,6 +94,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
 
   // ---------------------------------------------------------------- state changes
 
+  let lastBaseKey = null;
   let lastMapKey = null;
   function set(patch) {
     Object.assign(ui, patch);
@@ -313,6 +314,11 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
     if (map && mapKey !== lastMapKey) {
       board.setMap?.(map, { snap: lastMapKey === null || map.stage <= +lastMapKey.split(':')[0] });
       lastMapKey = mapKey;
+    }
+    // MAP-3: base upgrades show in the colony (snap on the first show, pop in on an upgrade).
+    if (state) {
+      const baseKey = JSON.stringify(state.base ?? {});
+      if (baseKey !== lastBaseKey) { board.setBase?.(state.base ?? {}, { snap: lastBaseKey === null }); lastBaseKey = baseKey; }
     }
     pieces.setActing?.(x.canAct ? actingSurvivors(state) : []);
     const tutVisible = ui.tutStep < DONE && tutorialVisible(ui.tutStep, {

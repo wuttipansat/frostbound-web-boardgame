@@ -316,8 +316,8 @@ const SEED = { police: 1, grocery: 2, school: 3, hospital: 4, library: 5, gas: 6
 // UI-13: city models are authored at full resolution already (no upscale / detail pass).
 export const LOCATION_BUILDERS_HD = Object.fromEntries(Object.entries(LOCATION_BUILDERS).map(([id, build]) => [id, () => build()]));
 
-export function colonyHD(radius = 18) {
-  return city.colony(Math.round(radius * 1.67)); // full-resolution city colony (wall at the old palisade radius)
+export function colonyHD(radius = 18, wall = 0) {
+  return city.colony(Math.round(radius * 1.67), wall); // full-resolution city colony (wall at the palisade radius)
 }
 
 /**

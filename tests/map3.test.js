@@ -93,3 +93,32 @@ test('lamps: spaced on each side, never in a junction box, always on the sidewal
     }
   }
 });
+
+test('colony: fits its 5×5 plot, every upgrade has a slot inside the wall, slots never overlap', async () => {
+  const { COLONY_SLOTS, slotView } = await import('../src/render/board.js');
+  const { colonyHD } = await import('../src/render/buildings.js');
+  const { BUILDING_IDS } = await import('../src/content/buildings.js');
+  const { colonySlot } = await import('../src/render/city.js');
+  const voxel = BOARD.colonyRadius / 50; // world per colony voxel (as authored)
+  for (const w of [0, 3]) {
+    const { min, max } = colonyHD(BOARD.colonyRadius * 2, w).bounds();
+    assert.ok((max[0] - min[0]) * voxel <= 5 * CHUNK + 0.5 && (max[2] - min[2]) * voxel <= 5 * CHUNK + 0.5, `wall level ${w} fits the plot`);
+  }
+  const shown = new Set(Object.keys(COLONY_SLOTS).map((id) => slotView(id, {})[0]));
+  for (const id of [...BUILDING_IDS, 'crawler']) {
+    const kind = id === 'wall' ? 'towers' : id === 'crawler' ? 'garage' : id;
+    assert.ok(shown.has(kind), `${id} has a slot`);
+  }
+  assert.equal(Object.keys(COLONY_SLOTS).filter((k) => k.startsWith('reserved')).length, 2, 'two reserved lots');
+  const inner = (50 - 6) * voxel; // inside face of the container wall
+  const half = (k, lv) => { const { min, max } = colonySlot(k, lv).bounds(); return Math.max(max[0] - min[0], max[2] - min[2]) / 2 * voxel; };
+  for (const [id, [x, z]] of Object.entries(COLONY_SLOTS)) {
+    const h = Math.max(...[0, 1, 2, 3, 4].map((lv) => half(slotView(id, { [id]: lv, wall: lv, crawler: lv })[0], lv)));
+    assert.ok(Math.abs(x) + h <= inner && Math.abs(z) + h <= inner, `${id} inside the wall`);
+    assert.ok(Math.min(Math.abs(x), Math.abs(z)) - h > 1.8, `${id} keeps the gate paths clear`);
+    for (const [id2, [x2, z2]] of Object.entries(COLONY_SLOTS)) if (id < id2) assert.ok(Math.max(Math.abs(x - x2), Math.abs(z - z2)) >= 4.8, `${id} / ${id2} apart`);
+  }
+  const L = computeLayout().colony;
+  for (const p of L.survivorSlots) assert.ok(p.length() < 6, 'survivors by the fire');
+  for (const p of L.zombieSlots) assert.ok(Math.max(Math.abs(p.x), Math.abs(p.z)) > BOARD.colonyRadius, 'zombies outside the gates');
+});

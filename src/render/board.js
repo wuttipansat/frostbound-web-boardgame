@@ -17,7 +17,7 @@ export const BOARD = {
   block: 30,          // MAP-3: block pitch (world): a 3-chunk block + one street (two lanes + sidewalks)
   radius: 46,         // stage-1 slab half size (world units)
   locationRadius: 27,
-  colonyRadius: 9,    // palisade radius (world units)
+  colonyRadius: 15,   // MAP-3: colony wall radius (world units): the wall fills the 5×5-chunk plot
   ringRoad: 12.5,
   buildingScale: 0.6, // world units per building voxel
 };
@@ -35,6 +35,19 @@ const RECIPES = {
 };
 // A big piece some decoration blocks put on their street side: [model key, wide, deep].
 const CENTERPIECE = { parking: ['parking', 2, 2], plaza: ['fountain', 1, 1], park: ['fountain', 1, 1], ruins: ['ruinBig', 1, 1] };
+// MAP-3: colony slots (world x, z from the fire; front faces the fire). Fixed for every game; two reserved lots.
+export const COLONY_SLOTS = {
+  dorm: [10.5, 4.5], infirmary: [4.5, 10.5], greenhouse: [-10.5, 4.5], workshop: [-4.5, 10.5],
+  radio: [10.5, -4.5], towers: [4.5, -10.5], garage: [-10.5, -4.5], spare: [-4.5, -10.5],
+  'reserved-1': [10.2, 10.2], 'reserved-2': [-10.2, -10.2],
+};
+/** What a slot shows for the base levels ({ dorm: 2, wall: 1, crawler: 3, … }). */
+export const slotView = (id, levels = {}) => {
+  if (id === 'towers') return ['towers', levels.wall ?? 0];
+  if (id === 'garage') return ['garage', levels.crawler ?? 0];
+  if (id === 'spare' || id.startsWith('reserved')) return [id.startsWith('reserved') ? 'reserved' : 'spare', 0];
+  return [id, levels[id] ?? 0];
+};
 // The six starting places keep their old fronts; new ones face a street (+z / +x first: the sides the camera sees).
 const START_FRONT = { police: 'z', grocery: 'z', school: 'z', hospital: 'x', library: 'x', gas: 'x' };
 
@@ -408,6 +421,47 @@ export function createBoard({ progressive = false } = {}) {
     rings[L.id] = ring;
   }
 
+  // ---------------------------------------------------------------- MAP-3 colony: wall by level + building slots
+  let baseLevels = {};
+  const colony = { group: null, base: null, slots: {} };
+  const slotPops = [];
+  const dropLod = (g) => g.traverse((o) => { const i = lodNodes.indexOf(o); if (i >= 0) lodNodes.splice(i, 1); });
+  const colonyBase = () => { const w = baseLevels.wall ?? 0; return lodModel(`colony-w${w}`, () => colonyHD(BOARD.colonyRadius * 2, w), true); };
+  function slotModel(id) {
+    const [kind, lv] = slotView(id, baseLevels);
+    const holder = new THREE.Group(); holder.name = `slot ${id}`;
+    holder.add(lodModel(`slot-${kind}-${lv}`, () => city.colonySlot(kind, lv), true));
+    const [x, z] = COLONY_SLOTS[id];
+    holder.position.set(x, 0, z);
+    holder.rotation.y = Math.round(Math.atan2(-x, -z) / (Math.PI / 2)) * (Math.PI / 2); // front towards the fire
+    holder.userData.view = `${kind}-${lv}`;
+    trackGlow(holder);
+    return holder;
+  }
+  function colonyModel() {
+    const g = new THREE.Group();
+    colony.group = g; colony.base = colonyBase(); g.add(colony.base);
+    colony.slots = {};
+    for (const id of Object.keys(COLONY_SLOTS)) g.add(colony.slots[id] = slotModel(id));
+    return g;
+  }
+  /** Show the base upgrades: the wall's level and what stands in every slot; changes pop in unless snap. */
+  function setBase(levels = {}, { snap = false } = {}) {
+    const prev = baseLevels;
+    baseLevels = { ...levels };
+    if (!colony.group) return;
+    const swap = (old, next) => {
+      colony.group.remove(old); dropLod(old); colony.group.add(next); trackGlow(next);
+      if (!snap) { const c = { group: next, model: next }; startPop(c, 0); slotPops.push(c); }
+    };
+    if ((prev.wall ?? 0) !== (baseLevels.wall ?? 0)) { const old = colony.base; colony.base = colonyBase(); swap(old, colony.base); }
+    for (const id of Object.keys(COLONY_SLOTS)) {
+      const [kind, lv] = slotView(id, baseLevels);
+      if (colony.slots[id]?.userData.view === `${kind}-${lv}`) continue;
+      const old = colony.slots[id]; colony.slots[id] = slotModel(id); swap(old, colony.slots[id]);
+    }
+  }
+
   /** One block: terrain, its building / colony / filler. */
   function buildBlock(key, b) {
     const [bx, bz] = parse(key);
@@ -417,7 +471,7 @@ export function createBoard({ progressive = false } = {}) {
     g.add(terrain);
     let model = null;
     if (b.kind === 'colony') {
-      model = lodModel('colony', () => colonyHD(BOARD.colonyRadius * 2), true);
+      model = colonyModel();
       model.name = 'colony';
       locationGroups.colony = model;
     } else if (b.kind === 'place') {
@@ -629,12 +683,13 @@ export function createBoard({ progressive = false } = {}) {
   const s = BOARD.buildingScale;
   const fx = {
     fire: new THREE.Vector3(0, 1.2 * s, 0),
-    chimneys: [new THREE.Vector3(-8 * s, 8.6 * s, -10 * s), new THREE.Vector3(11 * s, 8.6 * s, -11 * s)],
-    // Gate posts stand at the palisade (18 voxels out), 3 voxels either side of each opening.
+    chimneys: [new THREE.Vector3(COLONY_SLOTS.dorm[0], 3.4, COLONY_SLOTS.dorm[1])], // the dorm's stovepipe
+    // MAP-3: gate posts stand in the wall (3 voxels in from its radius), 6 voxels either side of each opening.
     torches: layout.colony.gates.flatMap((g) => {
       const dir = g.clone().normalize();
       const along = Math.abs(dir.x) < 0.01 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
-      return [-1, 1].map((k) => dir.clone().multiplyScalar(18 * s).addScaledVector(along, 3 * s * k).setY(7 * s));
+      const v = BOARD.colonyRadius / 50; // world per colony voxel (wall radius = 50 voxels)
+      return [-1, 1].map((k) => dir.clone().multiplyScalar(47 * v).addScaledVector(along, 6 * v * k).setY(13.5 * v));
     }),
   };
 
@@ -826,6 +881,7 @@ export function createBoard({ progressive = false } = {}) {
       deferring = false;
       api.onBounds?.(bounds);
     },
+    setBase,
     /** LOAD-1: models still waiting to be made (progressive start). */
     get pending() { return queue.length; },
     /** Make every waiting model now (tests, screenshots). */
@@ -835,6 +891,7 @@ export function createBoard({ progressive = false } = {}) {
       const dt = Math.min(0.1, Math.max(0, t - (lastT ?? t))); lastT = t;
       for (const c of Object.values(cells)) if (c.pop) stepPop(c, dt);
       for (const c of batches) if (c.pop) stepPop(c, dt);
+      for (let i = slotPops.length - 1; i >= 0; i--) { stepPop(slotPops[i], dt); if (!slotPops[i].pop) slotPops.splice(i, 1); }
       stepPuffs(dt);
       if (pools && flickers.length) {
         for (const [n, i] of flickers.entries()) { const f = Math.sin(t * 9 + n * 2.3) > 0.6 || Math.sin(t * 23 + n) > 0.93 ? 0.15 : 1; _c.setScalar(f); pools.setColorAt(i, _c); }

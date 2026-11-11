@@ -10,6 +10,9 @@ export async function collect({ seeds = [1, 2, 3, 4, 5, 6], stages = 4 } = {}) {
   const board = createBoard();
   const zoomAll = () => { for (const z of [0.3, 0.6, 0.9]) board.setZoom(z); };
   zoomAll();
+  // MAP-3: every colony wall level and slot building.
+  for (let lv = 0; lv <= 4; lv++) { const L = Math.min(3, lv); board.setBase({ dorm: L, wall: L, greenhouse: L, workshop: L, infirmary: L, radio: L, crawler: lv }, { snap: true }); zoomAll(); }
+  board.setBase({}, { snap: true });
   board.setMap(LEGACY_MAP, { snap: true }); zoomAll();
   for (const seed of seeds) {
     const s = createGame({ seed, players: 1 });
