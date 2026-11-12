@@ -537,3 +537,8 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - Outskirts: cottages only in the front row (facing the road), woods behind them; front-row open chunks are woods or drifts, fields and ponds lie behind.
 - Residential sidewalks get street trees between the furniture.
 - Pack 4.23 MB gzip (limit raised to 4.3 MB; leaving the cottages' or fields' close-up level out of the pack made the start build them, a 90 ms step, since the default zoom shows the close-up level). Stage 1 0.56 M, stage 4 0.65 M triangles, ≤ 275 draw calls, build step 8 ms; entry 162.8 KB; audit 0; 173 tests.
+
+### MAP-10 — more trees outside the woods (done)
+- Open chunks in town take a tree far more often (parks 75%, residential 60%, downtown 45%, industrial 30%), a third of them as a group of three; courtyard alleys in town blocks get a yard tree; fields get a tree at their edge; outskirts front-row chunks are a clump, a lone tree or a drift, back chunks gain lone trees between fields, ponds and drifts.
+- Street trees on residential and outskirts sidewalks, and a few downtown.
+- Stage 1 0.63 M, stage 4 0.72 M triangles (budget 1.3 / 1.6 M), ≤ 291 draw calls; pack 4.22 MB; audit 0; 173 tests.

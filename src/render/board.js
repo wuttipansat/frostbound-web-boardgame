@@ -385,18 +385,24 @@ export function blockPieces(b, bx, bz, plan, recipe = null, district = null) {
     const r = hash3(bx * 11 + j, 79 + i, bz * 11 + i);
     // MAP-7: the outskirts are land: woods in clumps, small fields, a frozen pond, drifts.
     if (district === 'outskirts') {
-      if (i === 0) { if (r < 0.4) out.push([i, j, 'clump', 1]); else if (r < 0.7) out.push([i, j, 'drift', 1]); continue; } // MAP-9: fields and ponds lie behind
-      if (r < 0.3) out.push([i, j, 'clump', 1]);
-      else if (r < 0.48) out.push([i, j, 'field', 1]);
-      else if (r < 0.56 && !out.some((o) => o[2] === 'pond')) out.push([i, j, 'pond', 1]);
-      else if (r < 0.8) out.push([i, j, 'drift', 1]);
+      // MAP-10: more trees — a clump, a lone tree, or a drift; almost no bare chunk.
+      if (i === 0) { if (r < 0.4) out.push([i, j, 'clump', 1]); else if (r < 0.65) out.push([i, j, 'tree', 1]); else if (r < 0.85) out.push([i, j, 'drift', 1]); continue; } // MAP-9: fields and ponds lie behind
+      if (r < 0.32) out.push([i, j, 'clump', 1]);
+      else if (r < 0.5) out.push([i, j, 'field', 1]);
+      else if (r < 0.58 && !out.some((o) => o[2] === 'pond')) out.push([i, j, 'pond', 1]);
+      else if (r < 0.78) out.push([i, j, 'tree', 1]);
+      else if (r < 0.92) out.push([i, j, 'drift', 1]);
       continue;
     }
     // MAP-6: benches only in parks and squares; the outskirts are wooded.
     const square = (b.kind === 'park' || b.kind === 'plaza') && district !== 'outskirts';
     if (square && r < 0.14) out.push([i, j, 'bench', 1]);
-    else if (r < (b.kind === 'park' || district === 'outskirts' ? 0.6 : 0.3)) out.push([i, j, 'tree', 1]);
-    else if (district === 'outskirts' && r < 0.8) out.push([i, j, 'drift', 1]); // MAP-6: deep drifts out of town
+    else {
+      // MAP-10: trees cover the open ground in town too (parks most, residential well, downtown some, industrial a few);
+      // with a district, a third of them are a group of three.
+      const base = b.kind === 'park' ? 0.75 : district === 'residential' ? 0.6 : district === 'downtown' ? 0.45 : district === 'industrial' ? 0.3 : 0.3;
+      if (r < base) out.push([i, j, district && r < base * 0.33 ? 'trees' : 'tree', 1]);
+    }
   }
   return out;
 }
@@ -821,7 +827,11 @@ export function createBoard({ progressive = false } = {}) {
             if (isRows && district === 'residential' && (i === 0 || backRow)) put(fences.picket, p.clone().addScaledVector(plan.fwd, (backRow ? -1 : 1) * (CHUNK / 2 - 0.25)), face0);
             continue;
           }
-          if (what === 'alley') { if (r2 < 0.5) put(clutter[Math.floor(r2 * 8) % (CLUTTER_KINDS - 1)], p, face); continue; }
+          if (what === 'alley') {
+            if (r2 < 0.5) put(clutter[Math.floor(r2 * 8) % (CLUTTER_KINDS - 1)], p, face);
+            if (r2 > 0.3 && district !== 'industrial') put(trees[Math.floor(r2 * 7) % 3], p.clone().add(new THREE.Vector3((r2 - 0.5) * 2.2, 0, (hash3(i, j, bx) - 0.5) * 2.2)), r2 * 6, 0.65 + r2 * 0.3); // MAP-10: a tree in the yard
+            continue;
+          }
           if (what === 'camp' || what === 'laundry') { courts.push({ p, face, what }); continue; }
           if (what === 'house' && district === 'outskirts') { // MAP-6: a cottage facing the road, its garden behind
             const dead = hash3(bx + j, 101, bz + i) < 0.25; // MAP-7: one in four abandoned
@@ -856,6 +866,7 @@ export function createBoard({ progressive = false } = {}) {
             }
           } else if (what === 'field' || what === 'pond') {
             const v = what === 'pond' ? 0 : Math.floor(r2 * 3);
+            if (hash3(bx + j, 125, bz + i) < 0.55) { const a = hash3(i, j, 127) * 6.28; put(trees[Math.floor(r2 * 5) % 3], p.clone().add(new THREE.Vector3(Math.cos(a) * 2.4, 0, Math.sin(a) * 2.4)), a, 0.6 + r2 * 0.35); } // MAP-10: a tree at the field's edge
             pushT((big[`b7-${what}-${v}`] ??= { make: () => (what === 'pond' ? city.pondPiece() : city.fieldPiece(v)), list: [] }).list, matrixAt(p, face0 + Math.floor(r2 * 4) * (Math.PI / 2), city.SMALL_SCALE), null);
           } else if (what === 'trees') {
             for (let k = 0; k < 3; k++) {
@@ -1080,13 +1091,13 @@ export function createBoard({ progressive = false } = {}) {
         if (!ground(x, z) || near(x, z, nodes, 11) || near(x, z, lamps, 1.6)) continue;
         const h = hash3(Math.round(t), ri, rail.look + 13);
         const zoneHere = districtOf(gridOf(x), gridOf(z), map.look);
-        let kind = zoneHere === 'outskirts' ? (h < 0.2 ? 'postbox' : null) // MAP-6: the outskirts have no city furniture
+        let kind = zoneHere === 'outskirts' ? (h < 0.15 ? 'postbox' : null) // MAP-6: the outskirts have no city furniture
           : h < 0.3 ? 'hydrant' : h < 0.5 ? 'bin' : h < 0.6 ? 'postbox' : h < 0.7 ? 'newsbox' : h < 0.74 ? 'phone' : h < 0.86 ? 'busstop' : null;
         const aveRun = r.axis === ave.axis && Math.abs(r.c - ave.c) < 0.01;
         if (kind === 'busstop') { if (busStop || !aveRun) kind = 'bin'; else busStop = true; } // the bus route runs on the avenue
         const [dx, dz] = r.axis === 'x' ? [0, -1] : [-1, 0];
         if (kind) add(`furn-${kind}`, () => furnitureModel(kind), 0.1, x, GROUND, z, yawTo(dx, dz));
-        else if (zoneHere === 'residential' && !taken(x, z, 1)) add('tree-street', () => treeModelHD(2, 0), 0.16, x, GROUND, z, h * 9, 0, 'x', true); // MAP-9: street trees
+        else if ((zoneHere === 'residential' || zoneHere === 'outskirts' || (zoneHere === 'downtown' && h > 0.93)) && !taken(x, z, 1)) add('tree-street', () => treeModelHD(2, 0), 0.16, x, GROUND, z, h * 9, 0, 'x', true); // MAP-9/10: street trees (downtown a few)
         // Street clutter (cones, crates, barrels, bags, barriers) halfway between furniture spots, same side.
         const tc = t + 4.5; const [cx, cz] = r.axis === 'x' ? [tc, r.c + lat] : [r.c + lat, tc];
         const hc = hash3(Math.round(tc), ri, rail.look + 19);
