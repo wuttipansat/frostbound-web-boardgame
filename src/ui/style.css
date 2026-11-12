@@ -1962,3 +1962,13 @@ body.radial-open #toasts { bottom: 250px; }
 
 /* MAP-2 D: pins of places off screen */
 #labels .loc-label.offscreen { display: none; }
+
+/* GAME-1: the "found" window after a search: the items deal in one by one. */
+.dialog.found { max-width: 560px; text-align: center; }
+.dialog.found .found-who { display: flex; gap: 8px; align-items: center; justify-content: center; margin: 4px 0 10px; }
+.dialog.found .found-who img { width: 32px; height: 32px; border-radius: 50%; }
+.dialog.found .found-cards { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 6px 0 12px; }
+.dialog.found .found-card { position: relative; animation: found-in .45s cubic-bezier(.2,.9,.3,1.2) both; animation-delay: calc(var(--i) * 0.12s); cursor: default; }
+.dialog.found .found-warn { color: #ff8a7a; font-weight: 700; }
+@keyframes found-in { from { opacity: 0; transform: translateY(16px) scale(.85) rotate(-4deg); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .dialog.found .found-card { animation: none; } }

@@ -7,7 +7,8 @@ import { SCENARIOS } from '../../content/scenarios.js';
 import { CRISES_BY_ID } from '../../content/crises.js';
 import { CROSSROADS_BY_ID } from '../../content/crossroads.js';
 import { RULES, ENERGY, FIGHT } from '../../core/constants.js';
-import { survivorDef, itemOf, woundLimit, aliveSurvivors } from '../../core/selectors.js';
+import { survivorDef, itemOf, woundLimit, aliveSurvivors, holderOf, packFree } from '../../core/selectors.js';
+import { itemShort } from '../itemText.js';
 import * as act from '../../core/actions.js';
 import { checklistView } from './help.js';
 import { daySummary, highlights, journalLine } from '../journal.js';
@@ -211,6 +212,34 @@ function effectArt(ctx, effects) {
   return effects.filter((e) => e.type === 'discard' || e.type === 'drawItem').map((e) => (e.type === 'discard' && e.item
     ? ctx.art.item(TYPE_REP[e.item], 's', { cls: 'fx-art minus', alt: '' })
     : h('span', { class: 'fx-art plus' }, icon('search'))));
+}
+
+/** GAME-1: what a search turned up — the items (picture, name, what they do), who carries them, what is left there. */
+export function foundModal(ctx, q) {
+  const s = ctx.state;
+  const kept = q.uids.filter((u) => holderOf(s, u) === q.survivorId);
+  const loc = s.locations[q.locationId];
+  const finds = loc?.batches?.length ?? Math.ceil((loc?.deck?.length ?? 0) / 3);
+  const name = survivorDef(q.survivorId)?.name ?? '';
+  return dialog('found',
+    h('small', { class: 'kicker' }, icon('search'), ` ${c('locations', q.locationId, 'name')}`),
+    h('h2', {}, t('found.title', { n: kept.length })),
+    h('p', { class: 'found-who' }, ctx.art.portrait(q.survivorId, 's', { alt: '' }), h('span', {}, t('found.who', { name }))),
+    h('div', { class: 'found-cards' }, kept.map((uid, i) => {
+      const it = itemOf(s, uid);
+      return h('div', { class: `item-card found-card t-${it.type} tier-${it.tier}`, style: { '--i': i } },
+        h('span', { class: 'ic-head' }, h('span', { class: 'ic-type' }, t(`item.${it.type}`)),
+          h('span', { class: 'ic-tier', 'aria-label': t(`tier.${it.tier}`) }, Array.from({ length: it.tier }, () => h('i')))),
+        h('span', { class: 'iname' }, c('items', it.id, 'name')),
+        h('span', { class: 'ic-art' }, ctx.art.item(it.id, 's', { alt: '' })),
+        h('span', { class: 'ishort' }, t(...itemShort(it))));
+    })),
+    q.spawned ? h('p', { class: 'found-warn' }, icon('skull'), ` ${t('found.spawned')}`) : null,
+    h('p', { class: 'muted small' }, [
+      t('found.pack', { n: packFree(s, q.survivorId) }),
+      finds ? t('found.left', { n: finds }) : t('found.empty'),
+    ].join(' · ')),
+    h('div', { class: 'row end' }, h('button', { class: 'btn primary', 'data-autofocus': '', onclick: ctx.dismissQueue }, t('found.ok'))));
 }
 
 /** Blueprint search: the player saw one card too many and puts one back. */

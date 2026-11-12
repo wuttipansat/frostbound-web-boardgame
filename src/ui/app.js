@@ -19,7 +19,7 @@ import { renderHint, rulesModal } from './views/help.js';
 import { createDirector, eventsFromLog } from './director.js';
 import {
   setupScreen, settingsModal, draftModal, crossroadsModal, gameOverModal, toastLayer, colonyModal,
-  confirmEndModal, pickModal, crossResultModal,
+  confirmEndModal, pickModal, crossResultModal, foundModal,
 } from './views/modals.js';
 import { lureTargets, actingSurvivors, allItems } from './options.js';
 
@@ -131,8 +131,12 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
     state = res.state;
     // UI-6: say what a search found.
     if (action.type === 'SEARCH') {
-      const got = (state.survivors[action.survivorId]?.pack ?? []).filter((u) => !packBefore.includes(u)).map((u) => c('items', itemOf(state, u)?.id, 'name'));
-      toast(got.length ? t('toast.found', { items: got.join(', ') }) : t('toast.foundNone'), got.length ? 'good' : '');
+      // GAME-1: a window shows what the search turned up (after a blueprint pick, what was kept).
+      const sv = state.survivors[action.survivorId];
+      const uids = [...(sv?.pack ?? []).filter((u) => !packBefore.includes(u)), ...(state.team.pick?.uids ?? [])].filter((u, i, a) => a.indexOf(u) === i);
+      const spawned = newLogEntries(prevLog, state.log).some((e) => e.k === 'search' && e.spawned);
+      if (uids.length) ui.queue.push({ type: 'found', survivorId: action.survivorId, locationId: sv.location, uids, spawned });
+      else toast(t('toast.foundNone'), '');
     }
     const added = newLogEntries(prevLog, state.log);
     // MAP-1: a city map turned up / the city grew.
@@ -347,6 +351,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
     }
     const picker = x.canAct && state.team.pick;
     if (picker) return [null, () => pickModal(x, picker)];
+    if (q?.type === 'found') return [`found:${state.log.length}:${q.uids.join()}:${getLangKey()}`, () => foundModal(x, q)]; // GAME-1
     if (ui.modal === 'confirmEnd' && x.canAct) return [null, () => confirmEndModal(x)];
     return [null, null];
   }

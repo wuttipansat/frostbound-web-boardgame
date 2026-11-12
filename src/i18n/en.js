@@ -628,6 +628,7 @@ export default {
   'log.spotsFound': '{count} small places to search turned up in the new streets',
   'rules.spots.title': 'Small search spots', 'rules.spots.text': 'Abandoned houses, cars and containers on the map hold a few items. One search takes everything there (2–4 items) for less AP and with fewer zombies than a place, and then it stays empty. A search icon marks them when you zoom in.', 'rules.spots.ex': 'Walk to the abandoned car next door: two quick searches for scrap and a jerry can.',
   'loc.finds': 'Finds left here: each search turns up the next 2–4 items', 'loc.findsShort': 'finds',
+  'found.title': 'Found {n} item(s)', 'found.who': '{name} puts them in the backpack', 'found.spawned': 'The noise drew a zombie here!', 'found.pack': 'Backpack: {n} slot(s) free', 'found.left': '{n} more find(s) here', 'found.empty': 'Nothing left here', 'found.ok': 'Take them',
   'toast.mapFound': 'A city map! Bring it home and use it to grow the city', 'toast.mapGrown': 'The city grows! {n} new places',
   'log.mapFound': '{name} found a city map at {place}', 'log.mapGrown': 'The city grows to stage {stage}: new {places}',
 };
