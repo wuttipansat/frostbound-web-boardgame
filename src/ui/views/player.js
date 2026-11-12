@@ -4,7 +4,7 @@ import { h, mount } from '../dom.js';
 import { icon, heart } from '../icons.js';
 import { t, c, getLang } from '../../i18n/index.js';
 import { flashTip } from '../tooltip.js';
-import { aliveSurvivors, survivorDef, itemOf, woundLimit, holderOf, apMax, sleepPlan, atkOf, xpLevel, gearOf, actionCost, killsPerAttack, heroOf } from '../../core/selectors.js';
+import { aliveSurvivors, survivorDef, itemOf, woundLimit, holderOf, apMax, sleepPlan, atkOf, xpLevel, gearOf, actionCost, killsPerAttack, heroOf, packSize } from '../../core/selectors.js';
 import {
   cardOptions, endTurnOption, cardNeeds, cardTargets, giveTargets, allItems, shouldConfirmEndTurn, cardUsable, actingSurvivors,
 } from '../options.js';
@@ -231,7 +231,7 @@ function renderHand(container, ctx, shown, hand, { isActor, compact, phoneLoc })
 
   const s = ctx.state;
   const sizeOf = (id) => (id === 'stockpile' ? s.stockpile.length : s.survivors[id].pack.length);
-  const countOf = (id) => (id === 'stockpile' ? String(sizeOf(id)) : `${sizeOf(id)}/${RULES.PACK}`);
+  const countOf = (id) => (id === 'stockpile' ? String(sizeOf(id)) : `${sizeOf(id)}/${packSize(s, id)}`); // (a big backpack or a sled adds slots)
   const home = ctx.handHome;
   const usable = ctx.handTab === home;
   const head = compact ? null : h('div', { class: 'hand-head' },

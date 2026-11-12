@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { RULES } from '../src/core/constants.js';
 import assert from 'node:assert/strict';
 import { reduce, tryReduce } from '../src/core/reducer.js';
 import * as a from '../src/core/actions.js';
@@ -133,7 +134,7 @@ test('step 8 items: consumables, gadgets, crafting', async () => {
   assert.equal(tryReduce(s, a.playCard(ammo, { targetSurvivorId: 'corwin-daly' })).error, 'needGun');
   [s, pack] = giveCard(s, 'big-backpack', 'corwin-daly');
   s = reduce(s, a.equip(pack, 'corwin-daly'));
-  assert.equal(packSize(s, 'corwin-daly'), 5);
+  assert.equal(packSize(s, 'corwin-daly'), RULES.PACK + 2);
   // Crafting: materials from the stockpile + AP, at the colony.
   let w; [s, w] = giveCard(s, 'wood', 'stockpile'); [s, w] = giveCard(s, 'wood', 'stockpile');
   assert.equal(tryReduce(s, craft('baseball-bat', 'agnes-pell')).error, 'needWorkshop');

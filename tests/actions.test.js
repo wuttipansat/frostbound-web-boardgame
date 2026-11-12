@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { RULES } from '../src/core/constants.js';
 import { reduce, tryReduce } from '../src/core/reducer.js';
 import * as a from '../src/core/actions.js';
 import { walkCost, actionCost, apMax, searchSpawnChance } from '../src/core/selectors.js';
@@ -68,7 +69,7 @@ test('search: not in colony, draws from location deck, specialists draw two', ()
   const deck = s.locations.grocery.deck.length;
   const r = reduce(s, a.search('hattie-moss'));
   const got = r.survivors['hattie-moss'].pack.length; // GAME-1: a find of 2–4 (+1 for the specialist), as much as the pack holds
-  assert.ok(got >= 3 && got <= 3, `into the backpack: ${got}`);
+  assert.ok(got >= 3 && got <= 5, `into the backpack: ${got}`);
   assert.equal(r.stockpile.length, hand, 'not home yet');
   assert.equal(r.locations.grocery.deck.length, deck - got);
   assert.equal(energy(r), 100 - actionCost(s, 'hattie-moss', 'search'));
@@ -183,10 +184,10 @@ test('deposit (beacon scenario) needs a survivor in the colony and the right ite
   assert.equal(tryReduce(st, a.deposit(f2)).error, 'scenarioHasNoDeposit');
 });
 
-test('backpacks: 3 slots; items go home on arrival; hand over for free at the same place', () => {
+test('backpacks: RULES.PACK slots; items go home on arrival; hand over for free at the same place', () => {
   let { s } = setup({ 'hattie-moss': 'grocery', 'corwin-daly': 'grocery', 'agnes-pell': 'school' });
   let x;
-  for (let i = 0; i < 3; i++) [s, x] = giveCard(s, 'bedpan', 'hattie-moss');
+  for (let i = 0; i < RULES.PACK; i++) [s, x] = giveCard(s, 'bedpan', 'hattie-moss');
   assert.equal(tryReduce(s, a.search('hattie-moss')).error, 'packFull');
   assert.equal(tryReduce(s, a.give(x, 'agnes-pell')).error, 'notHere');
   s = reduce(s, a.give(x, 'corwin-daly'));

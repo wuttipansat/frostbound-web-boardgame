@@ -23,7 +23,7 @@ export const RULES = Object.freeze({
   OVERRUN_HP: 30,         // a full place hurts the weakest survivor there   // the daily crisis needs +1 item every 10 days            // the most survivors the team can have
   DRAFT_OPTIONS: 6,
   STARTING_HAND: 3,        // items in the stockpile at the start
-  PACK: 3,                // backpack slots per survivor
+  PACK: 8,                // backpack slots per survivor (GAME-1: 8, a find is 2–4 items)
   WOUNDS_TO_DIE: 3,
   BEDS: 2,                // beds at the colony (the dorm adds more in Step 12)
   HP_MAX: 100,
