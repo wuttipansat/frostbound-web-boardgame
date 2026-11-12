@@ -2,3 +2,6 @@ node_modules/
 dist/
 .DS_Store
 public/models-pack.txt
+godot/.godot/
+godot/build/
+godot/assets/models/
