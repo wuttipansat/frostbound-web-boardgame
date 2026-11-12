@@ -29,9 +29,10 @@ export function writeGlb(prims, { name = 'model' } = {}) {
     for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) { const v = mesh.position[i * 3 + k]; if (v < min[k]) min[k] = v; if (v > max[k]) max[k] = v; }
     const pos = acc({ bufferView: add(Float32Array.from(mesh.position), ARRAY_BUFFER), componentType: FLOAT, count: n, type: 'VEC3', min, max });
     const nor = acc({ bufferView: add(Float32Array.from(mesh.normal), ARRAY_BUFFER), componentType: FLOAT, count: n, type: 'VEC3' });
-    const col16 = new Uint16Array(n * 3);
-    for (let i = 0; i < col16.length; i++) col16[i] = Math.round(Math.min(1, Math.max(0, mesh.color[i])) * 65535);
-    const col = acc({ bufferView: add(col16, ARRAY_BUFFER), componentType: USHORT, normalized: true, count: n, type: 'VEC3' });
+    // (RGBA: vertex attribute elements must be 4-byte aligned, so no 6-byte VEC3 of shorts)
+    const col16 = new Uint16Array(n * 4);
+    for (let i = 0; i < n; i++) { for (let k = 0; k < 3; k++) col16[i * 4 + k] = Math.round(Math.min(1, Math.max(0, mesh.color[i * 3 + k])) * 65535); col16[i * 4 + 3] = 65535; }
+    const col = acc({ bufferView: add(col16, ARRAY_BUFFER), componentType: USHORT, normalized: true, count: n, type: 'VEC4' });
     const small = n <= 65535;
     const idx = small ? Uint16Array.from(mesh.index) : Uint32Array.from(mesh.index);
     const ind = acc({ bufferView: add(idx, ELEMENT_ARRAY_BUFFER), componentType: small ? USHORT : UINT, count: idx.length, type: 'SCALAR' });

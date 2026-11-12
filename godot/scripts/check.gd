@@ -5,9 +5,9 @@ extends SceneTree
 
 func _init() -> void:
 	var bad := 0
-	var data_files := ["constants", "locations", "items", "buildings", "crises", "crossroads", "scenarios", "survivors", "i18n/en", "i18n/th"]
+	var data_files: Array[String] = ["constants", "locations", "items", "buildings", "crises", "crossroads", "scenarios", "survivors", "i18n/en", "i18n/th"]
 	for f in data_files:
-		var path := "res://data/" + f + ".json"
+		var path: String = "res://data/" + f + ".json"
 		if JSON.parse_string(FileAccess.get_file_as_string(path)) == null:
 			printerr("bad data: ", path)
 			bad += 1
