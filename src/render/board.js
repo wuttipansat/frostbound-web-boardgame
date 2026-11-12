@@ -883,11 +883,58 @@ export function createBoard({ progressive = false } = {}) {
         for (const [p, l] of [[a, lat0], [b, lat0], [b, lat1], [a, lat1]]) { const v = p.clone().addScaledVector(sd, l); pos.push(v.x, y, v.z); col.push(...c); }
         idx.push(n, n + 2, n + 1, n, n + 3, n + 2);
       };
-      const snow = new THREE.Color(P.snow); const rut = new THREE.Color(0xa9b2bd); const packed = new THREE.Color(0xccd3db);
-      for (const [a, b] of snowRoads) {
-        quad(a, b, -ROAD.half, ROAD.half, 0.025, [snow.r, snow.g, snow.b]);
-        quad(a, b, -1.3, 1.3, 0.03, [packed.r, packed.g, packed.b]); // one track down the middle
-        for (const l of [-0.95, 0.75]) quad(a, b, l, l + 0.3, 0.035, [rut.r, rut.g, rut.b]);
+      // MAP-7 fix: snow over asphalt, not a pale strip. Two tyre tracks show the dark road through; the edges are
+      // ragged; where a country road meets a town street the snow stops short of the junction and breaks into
+      // patches; it never covers a level crossing (the rails stay visible); a junction of country roads is snowed too.
+      const C3 = (hex) => { const c = new THREE.Color(hex); return [c.r, c.g, c.b]; };
+      const snow = C3(P.snow); const packed = C3(0xd6dde5); const rut = C3(0x3b4049); const rut2 = C3(0x565c66);
+      const nk2 = (v) => `${Math.round(v.x * 10)},${Math.round(v.z * 10)}`;
+      const ends = new Map(); // node → does a town street meet it?
+      for (const sg of segs) { const isC = country(sg); for (const v of [sg[0], sg[1]]) { const k = nk2(v); const e = ends.get(k) ?? { town: false, country: 0, v }; if (!isC) e.town = true; else e.country++; ends.set(k, e); } }
+      const h2 = (a, b, k) => hash3(Math.round(a * 4), Math.round(b * 4), k);
+      const railAt = (v) => Math.abs((rail.axis === 'x' ? v.z : v.x) - rail.c);
+      for (const [a0, b0] of snowRoads) {
+        const d = b0.clone().sub(a0); const len = d.length(); d.normalize();
+        const alongRail = Math.abs(d.x) > 0.5 ? rail.axis === 'x' : rail.axis === 'z';
+        const trim = (v) => (ends.get(nk2(v))?.town ? ROAD.walk + 0.6 : 0);
+        let t0 = trim(a0); let t1 = len - trim(b0);
+        // Pieces along the street, leaving out the level crossing.
+        const pieces = [];
+        const cross = alongRail ? null : (rail.axis === 'x' ? (rail.c - a0.z) / (d.z || 1e-9) : (rail.c - a0.x) / (d.x || 1e-9));
+        if (cross !== null && cross > -1 && cross < len + 1) {
+          if (cross - RAIL_CLEAR - 1.6 > t0) pieces.push([t0, cross - RAIL_CLEAR - 1.6]);
+          if (cross + RAIL_CLEAR + 1.6 < t1) pieces.push([cross + RAIL_CLEAR + 1.6, t1]);
+        } else pieces.push([t0, t1]);
+        for (const [u0, u1] of pieces) {
+          if (u1 - u0 < 0.5) continue;
+          const A = a0.clone().addScaledVector(d, u0); const B = a0.clone().addScaledVector(d, u1);
+          quad(A, B, -ROAD.half + 0.25, ROAD.half - 0.25, 0.025, snow);
+          quad(A, B, -1.5, 1.5, 0.028, packed); // the packed track
+          for (const l of [-1.05, 0.65]) { quad(A, B, l, l + 0.42, 0.032, rut); quad(A, B, l + 0.1, l + 0.3, 0.034, rut2); } // dark asphalt in the ruts
+          // Ragged edges: drifted lumps reaching to the kerb, bare slivers in between.
+          for (let t = u0; t < u1 - 0.6; t += 0.9) for (const sg of [-1, 1]) {
+            const h = h2(a0.x + d.x * t, a0.z + d.z * t, sg + 3); if (h < 0.45) continue;
+            const P0 = a0.clone().addScaledVector(d, t); const P1 = a0.clone().addScaledVector(d, Math.min(u1, t + 0.5 + h * 0.6));
+            quad(P0, P1, sg > 0 ? ROAD.half - 0.3 : -ROAD.half, sg > 0 ? ROAD.half : -ROAD.half + 0.3, 0.026, snow);
+          }
+          // Where it was cut short (a town junction or the crossing): the snow runs on along both kerbs, tapering off
+          // toward the ploughed asphalt, with a few thin tongues of packed snow in the middle.
+          for (const [u, dir] of [[u0, -1], [u1, 1]]) {
+            if ((dir < 0 ? u0 : len - u1) < 0.5) continue;
+            for (let k = 0; k < 5; k++) {
+              const ta = u + dir * k * 0.55; const tb = u + dir * (k + 1) * 0.55; const w = 1.3 * (1 - k / 5) + h2(a0.x + k, a0.z + u, 17) * 0.25;
+              const [A, B] = dir > 0 ? [ta, tb] : [tb, ta];
+              for (const sg of [-1, 1]) quad(a0.clone().addScaledVector(d, A), a0.clone().addScaledVector(d, B), sg > 0 ? ROAD.half - 0.25 - w : -ROAD.half + 0.25, sg > 0 ? ROAD.half - 0.25 : -ROAD.half + 0.25 + w, 0.026, snow);
+            }
+            for (const l of [-0.6, 0.55]) { const L = 0.6 + h2(a0.z + l, a0.x + u, 19) * 1.2; const [A, B] = dir > 0 ? [u, u + L] : [u - L, u]; quad(a0.clone().addScaledVector(d, A), a0.clone().addScaledVector(d, B), l - 0.18, l + 0.18, 0.027, packed); }
+          }
+        }
+      }
+      // Junctions where only country roads meet: snow over the crossing square too.
+      for (const e of ends.values()) {
+        if (e.town || e.country < 2 || railAt(e.v) < RAIL_CLEAR + 2) continue;
+        const v = e.v; const x = new THREE.Vector3(1, 0, 0);
+        quad(v.clone().addScaledVector(x, -ROAD.half + 0.25), v.clone().addScaledVector(x, ROAD.half - 0.25), -ROAD.half + 0.25, ROAD.half - 0.25, 0.025, snow);
       }
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
