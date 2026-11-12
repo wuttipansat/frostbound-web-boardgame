@@ -261,6 +261,7 @@ export function restock(s) {
     const uid = `r${s.day}${loc}${k >= near.length ? `.${k}` : ''}`;
     s.cards[uid] = itemId;
     s.locations[loc].deck.unshift(uid); // under the pile: found after what is already there
+    const bt = s.locations[loc].batches; if (bt) { if (bt.length && bt[0] < 4) bt[0] += 1; else bt.unshift(1); } // GAME-1: joins the last find
   });
 }
 const RESTOCK_MIN = 6;

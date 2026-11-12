@@ -3,7 +3,8 @@ import { PHASES, RULES, DIFFICULTY } from './constants.js';
 import { newMap, mapPlaces, addSpots } from './map.js';
 import { random, normalizeSeed, shuffle } from './rng.js';
 import { assert } from './errors.js';
-import { LOCATIONS, SPOT_RULES } from '../content/locations.js';
+import { LOCATIONS, SPOT_RULES, PLACE_RULES, SEARCH_BATCHES } from '../content/locations.js';
+import { ITEMS } from '../content/items.js';
 import { SURVIVORS } from '../content/survivors.js';
 import { SCENARIOS_BY_ID } from '../content/scenarios.js';
 import { CRISES } from '../content/crises.js';
@@ -97,7 +98,7 @@ export function makeSpot(s, type, rand) {
     let r = rand() * total; const itemId = (weights.find(([, w]) => (r -= w) < 0) ?? weights[0])[0];
     const uid = `s${id}.${k}`; s.cards[uid] = itemId; deck.push(uid);
   }
-  s.locations[id] = { zombies: 0, barricades: 0, deck, type };
+  s.locations[id] = { zombies: 0, barricades: 0, deck, type, batches: [deck.length] }; // GAME-1: one find, all at once
   return id;
 }
 
@@ -114,6 +115,24 @@ export function stockPlace(s, id, type, prefix, zombies = 0) {
       }
     }
   }
+  // GAME-1: a place holds 6–15 finds by its size (tier 1: 6–8, tier 2: 9–11, tier 3: 12–15), each 2–4 items; its deck
+  // is topped up with common items from its own table so the finds average 3 items.
+  let batches = null;
+  if (def.deck) {
+    const [lo, hi] = SEARCH_BATCHES[PLACE_RULES[type]?.tier ?? 1];
+    let b = lo + Math.floor(random(s) * (hi - lo + 1));
+    b = Math.max(b, Math.ceil(deck.length / 4));
+    const common = Object.entries(def.deck).filter(([itemId]) => !RARE.includes(itemId) && !itemId.startsWith('blueprint-') && ITEMS[itemId]?.type !== 'survivor');
+    const total = common.reduce((a, [, w]) => a + w, 0);
+    while (common.length && deck.length < b * 3) {
+      let r = random(s) * total; const itemId = (common.find(([, w]) => (r -= w) < 0) ?? common[0])[0];
+      const uid = prefix === 'c' ? `c${Object.keys(s.cards).length}` : `${prefix}${id}.${n++}`;
+      s.cards[uid] = itemId; deck.push(uid);
+    }
+    batches = Array(b).fill(2); let left = deck.length - 2 * b;
+    for (let guard = 0; left > 0 && guard < 1000; guard++) { const k = Math.floor(random(s) * b); if (batches[k] < 4) { batches[k]++; left--; } }
+    if (left > 0) batches[batches.length - 1] += left;
+  }
   // The crawler's rare parts lie deep: somewhere in the lower half of their pile (decks are drawn from the end).
   const pile = def.deck ? shuffle(s, deck) : null;
   if (pile) {
@@ -122,7 +141,7 @@ export function stockPlace(s, id, type, prefix, zombies = 0) {
       pile.splice(Math.floor(random(s) * (pile.length / 2)), 0, uid);
     }
   }
-  const loc = { zombies, barricades: 0, deck: pile };
+  const loc = { zombies, barricades: 0, deck: pile, batches };
   if (type !== id) loc.type = type;
   return loc;
 }

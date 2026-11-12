@@ -1743,10 +1743,7 @@ img.art-item.blank { image-rendering: auto; background: none; }
 #labels .loc-label.pin.spot { padding: 3px; min-height: 0; gap: 3px; background: rgba(242,179,61,.85); color: #1a1408; border: 2px solid rgba(11,20,36,.7); }
 #labels .loc-label.pin.spot svg { width: 13px; height: 13px; }
 #labels .loc-label.pin.spot .pz { color: #fff; background: rgba(160,30,30,.85); border-radius: 999px; padding: 0 4px; }
-.cd-set { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; font-size: 12px; opacity: .85; margin: 4px 0; }
-.cd-set.on { opacity: 1; color: #f2b33d; }
-.cd-set .cd-set-items { flex-basis: 100%; opacity: .8; }
-.tok-sets { display: flex; gap: 4px; align-items: center; font-size: 11px; color: #f2b33d; }
+
 #labels .loc-label.pin .pz { color: #ff8a7e; display: inline-flex; gap: 2px; align-items: center; }
 #labels .loc-label.pin .pp { color: #f2b33d; display: inline-flex; gap: 2px; align-items: center; }
 #labels .loc-label.pin .icon { width: 12px; height: 12px; }

@@ -84,11 +84,11 @@ test('a blueprint draws one extra card when searching its location, then one goe
   const n = s.locations.police.deck.length;
   let r = reduce(s, a.search('maren-holt'));
   const pick = r.team.pick;
-  assert.equal(pick.uids.length, 2);
+  assert.ok(pick.uids.length >= 3, 'a find (2–4) plus one'); // GAME-1
   assert.equal(tryReduce(r, a.endTurn()).error, 'pickPending');
   r = reduce(r, a.returnCard(pick.uids[0]));
   assert.equal(r.team.pick, null);
-  assert.equal(r.locations.police.deck.length, n - 1);
+  assert.equal(r.locations.police.deck.length, n - (pick.uids.length - 1));
   assert.equal(r.locations.police.deck[0], pick.uids[0], 'returned to the bottom');
   assert.ok(r.survivors['maren-holt'].pack.includes(pick.uids[1]));
   assert.equal(r.survivors['maren-holt'].gear.book, bp);

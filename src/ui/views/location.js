@@ -34,7 +34,7 @@ export function renderLocationPanel(el, ctx) {
     h('span', { class: 'stat warm', tip: t('loc.survivors'), tabindex: '0' }, icon('person'), h('b', {}, `${here.length}/${def.survivorSlots ?? '∞'}`), h('small', {}, t('loc.survivors'))),
     h('span', { class: 'stat danger', tip: `${t('loc.zombies')} — ${t('tip.zombies', { n: loc.zombies })}`, tabindex: '0' }, icon('skull'), h('b', {}, `${loc.zombies}/${def.zombieSlots}`), h('small', {}, t('loc.zombies'))),
     isSpot(s, id) ? null : h('span', { class: 'stat', tip: t('loc.barricades'), tabindex: '0' }, icon('barricade'), h('b', {}, loc.barricades), h('small', {}, t('loc.barricades'))),
-    loc.deck ? h('span', { class: 'stat', tip: t('loc.cards'), tabindex: '0' }, icon('search'), h('b', {}, loc.deck.deckCount ?? loc.deckCount ?? loc.deck.length), h('small', {}, t('loc.cardsShort'))) : null,
+    loc.deck ? h('span', { class: 'stat', tip: t('loc.finds'), tabindex: '0' }, icon('search'), h('b', {}, loc.batches?.length ?? Math.ceil(loc.deck.length / 3)), h('small', {}, t('loc.findsShort'))) : null,
     // Step 23: threat forecast — zombies this place gets if the round ended now.
     spawnForecast(s)[id] ? h('span', { class: 'stat danger forecast', tip: t('loc.forecast', { n: spawnForecast(s)[id] }), tabindex: '0' }, icon('crisis'), h('b', {}, `+${spawnForecast(s)[id]}`), h('small', {}, t('loc.forecastShort'))) : null);
 

@@ -162,8 +162,11 @@ export const SPOT_TYPES = {
   },
 };
 Object.assign(LOCATIONS, SPOT_TYPES);
+/** GAME-1: how many finds (searches) a place holds by tier; each find is 2–4 items. */
+export const SEARCH_BATCHES = { 1: [6, 8], 2: [9, 11], 3: [12, 15] };
 /** GAME-1 balance knobs for spots. */
-export const SPOT_RULES = { CARDS: [2, 4], AP_SHARE: 0.6, SPAWN: 0.05, START: ['1,1', '-1,1', '0,1'], PER_GROWTH: [2, 4] };
+export const SPOT_RULES = { CARDS: [2, 4], AP_SHARE: 0.6, // (a spot is one find: all its cards at once)
+  SPAWN: 0.05, START: ['1,1', '-1,1', '0,1'], PER_GROWTH: [2, 4] };
 
 /**
  * MAP-6: where a place type may stand and from which stage: tier 1 from the start, tier 2 from stage 2, tier 3 from

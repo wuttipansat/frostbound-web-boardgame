@@ -94,7 +94,13 @@ export function search(s, { survivorId }) {
   assert(s.locations[sv.location].deck.length > 0, 'deckEmpty');
   assert(!isOverrun(s, sv.location), 'placeOverrun');
   const a = ability(survivorId);
-  const n = Math.min(packFree(s, survivorId), a.type === 'doubleSearch' && a.location === typeOf(s, sv.location) ? 2 : 1);
+  // GAME-1: a search turns up the next find (2–4 items; a doubleSearch survivor one more), as much as the backpack holds;
+  // what does not fit stays there for the next search.
+  const loc = s.locations[sv.location];
+  const size = loc.batches?.length ? loc.batches.pop() : 2 + (loc.deck.length % 3);
+  const want = size + (a.type === 'doubleSearch' && a.location === typeOf(s, sv.location) ? 1 : 0);
+  const n = Math.min(packFree(s, survivorId), want, loc.deck.length);
+  if (n < size && loc.batches) loc.batches.push(size - n);
   assert(n > 0, 'packFull');
   const chance = Math.max(0, searchSpawnChance(s, sv.location) - (sv.trait === 'scavenger' ? 0.05 : 0));
   pay(s, survivorId, 'search');
@@ -124,6 +130,7 @@ function rollMap(s, locationId) {
   const uid = `map${s.map.stage + 1}`;
   s.cards[uid] = 'city-map-piece';
   s.locations[locationId].deck.push(uid);
+  const b = s.locations[locationId].batches; if (b?.length) b[b.length - 1] += 1; // (comes with the next find)
   s.map.searchesSinceMap = 0;
   s.map.pending = true;
   return uid;

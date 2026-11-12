@@ -884,7 +884,7 @@ export function createBoard({ progressive = false } = {}) {
           }
           if (what === 'alley') {
             if (r2 < 0.5) put(clutter[Math.floor(r2 * 8) % (CLUTTER_KINDS - 1)], p, face);
-            if (r2 > 0.3 && district !== 'industrial') put(trees[Math.floor(r2 * 7) % 3], p.clone().add(new THREE.Vector3((r2 - 0.5) * 2.2, 0, (hash3(i, j, bx) - 0.5) * 2.2)), r2 * 6, 0.65 + r2 * 0.3); // MAP-10: a tree in the yard
+            if (r2 > 0.3 && district !== 'industrial' && !plan.railCut) put(trees[Math.floor(r2 * 7) % 3], p.clone().add(new THREE.Vector3((r2 - 0.5) * 2.2, 0, (hash3(i, j, bx) - 0.5) * 2.2)), r2 * 6, 0.65 + r2 * 0.3); // MAP-10: a tree in the yard
             continue;
           }
           if (what === 'camp' || what === 'laundry') { courts.push({ p, face, what }); continue; }
@@ -921,7 +921,7 @@ export function createBoard({ progressive = false } = {}) {
             }
           } else if (what === 'field' || what === 'pond') {
             const v = what === 'pond' ? 0 : Math.floor(r2 * 3);
-            if (hash3(bx + j, 125, bz + i) < 0.55) { const a = hash3(i, j, 127) * 6.28; put(trees[Math.floor(r2 * 5) % 3], p.clone().add(new THREE.Vector3(Math.cos(a) * 2.4, 0, Math.sin(a) * 2.4)), a, 0.6 + r2 * 0.35); } // MAP-10: a tree at the field's edge
+            if (!plan.railCut && hash3(bx + j, 125, bz + i) < 0.55) { const a = hash3(i, j, 127) * 6.28; put(trees[Math.floor(r2 * 5) % 3], p.clone().add(new THREE.Vector3(Math.cos(a) * 2.4, 0, Math.sin(a) * 2.4)), a, 0.6 + r2 * 0.35); } // MAP-10: a tree at the field's edge
             pushT((big[`b7-${what}-${v}`] ??= { make: () => (what === 'pond' ? city.pondPiece() : city.fieldPiece(v)), list: [] }).list, matrixAt(p, face0 + Math.floor(r2 * 4) * (Math.PI / 2), city.SMALL_SCALE), null);
           } else if (what === 'trees') {
             for (let k = 0; k < 3; k++) {
@@ -976,6 +976,10 @@ export function createBoard({ progressive = false } = {}) {
         cars[Math.floor(h(6) * 4)].push(tmp.matrix.clone());
       }
     });
+    // Trees never stand in the railway or river corridor (crowns of trees near it, fallen trunks, field-edge trees).
+    const cutsHere = cutLines(map); const _p = new THREE.Vector3();
+    const clearOfCuts = (mx) => { _p.setFromMatrixPosition(mx); return cutsHere.every((l) => Math.abs((l.axis === 'x' ? _p.z : _p.x) - l.c) > RAIL_CLEAR + 3.4); };
+    for (const lists of [trees, birches]) lists.forEach((list, k) => { lists[k] = list.filter(clearOfCuts); });
     trees.forEach((list, k) => { if (list.length) group.add(lodProp(`tree-${k}`, () => treeModelHD(k, 1), 0.25, list)); });
     houses.forEach((list, v) => { if (list.length) group.add(lodInstanced(`small-${v}`, () => city.smallBuilding(v), list, false)); });
     cottages.forEach((list, v) => { if (list.length) group.add(lodInstanced(`cottage-${v}`, () => city.cottage(v), list)); }); // VOXEL-2: refined up close
@@ -1381,7 +1385,7 @@ export function createBoard({ progressive = false } = {}) {
         const yaw = r.axis === 'x' ? 0 : Math.PI / 2;
         const kind = Math.floor(hash3(st, k, rail.look + 43) * 4);
         if (kind === 0) { // a fallen pine across the lane, a gap cut through it
-          const [x, z] = at(-0.8); if (!clear(x, z, true) || !offRiver(x, z, 6)) continue; // (the trunk is long: keep it off the ice)
+          const [x, z] = at(-0.8); if (!clear(x, z, true) || !offRiver(x, z, 6) || Math.abs((rail.axis === 'x' ? z : x) - rail.c) < RAIL_CLEAR + 6) continue; // (the trunk is long: keep it off the ice and the track)
           add('tree-1', () => treeModelHD(1, 1), 0.25, x, 0.3, z, yaw, Math.PI / 2 - 0.05, 'z');
         } else if (kind === 1) { // a burnt-out car
           const [x, z] = at(1.4); if (!clear(x, z, true)) continue;

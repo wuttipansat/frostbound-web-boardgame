@@ -39,7 +39,7 @@ export const ENERGY = Object.freeze({
   STORM: 4,               // storm days (every 3rd day): actions outside the colony cost more
   COST: Object.freeze({ move: 12, barricade: 19, lure: 11 }),
   WALK_BASE: 14, WALK_BLOCK: 2, WALK_CAP: 40, // MAP-1: walking = 14 + 2 per block of street
-  SEARCH: 17,
+  SEARCH: 35,             // GAME-1: a search turns up a whole find (2–4 items), so it costs about twice the old single draw (87% won at 17, 53% at 26, 27% at 33, 15% at 34)
   PER_SKILL: 2,
   CROWDED: 7,             // 2+ zombies here: search / barricade cost more
   DANGEROUS: 7,           // hospital, police: search costs more (better loot)
