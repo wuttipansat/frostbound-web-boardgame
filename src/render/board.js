@@ -1255,7 +1255,7 @@ export function createBoard({ progressive = false } = {}) {
       // Parked at the kerb, shifted along the street until no lamp arm hangs over it.
       const park = (key, make, along, i = 0, room = 5.2) => {
         let p = null; // no free spot at this kerb: leave it out
-        for (const d of [0, 3, -3, 6, -6, 9, -9]) { const q = front(L, along + d, kerbLane); if (offRiver(q.x, q.z, 2) && onRoadOk(q.x, q.z) && !lamps.some((l) => Math.hypot(l.x - q.x, l.z - q.z) < room) && !parked.some((o) => o.distanceTo(q) < 5.5)) { p = q; break; } }
+        for (const d of [0, 3, -3, 6, -6, 9, -9]) { const q = front(L, along + d, kerbLane); const e1 = front(L, along + d - room / 2, kerbLane); const e2 = front(L, along + d + room / 2, kerbLane); if (offRiver(q.x, q.z, 2) && onRoadOk(q.x, q.z) && onRoadOk(e1.x, e1.z) && onRoadOk(e2.x, e2.z) && !lamps.some((l) => Math.hypot(l.x - q.x, l.z - q.z) < room) && !parked.some((o) => o.distanceTo(q) < 5.5)) { p = q; break; } }
         if (!p) return;
         parked.push(p);
         add(key, make, 0.15, p.x, 0.05, p.z, yawAlong(L) + i * 0.04);

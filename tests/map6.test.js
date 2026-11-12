@@ -116,7 +116,7 @@ test('a place keeps its grounds on its own side of the railway / river; outskirt
       if (d === 'outskirts' && b.kind !== 'place') for (const [i, , what] of pieces) if (what === 'house') assert.equal(i, 0, `${seed} ${k}: a cottage behind the front row`);
       if (b.kind !== 'place' || !plan.railCut) continue;
       cut++;
-      const own = new Set(PLACE_GROUNDS[b.type ?? b.placeId] ?? []);
+      const own = new Set((PLACE_GROUNDS[b.type ?? b.placeId] ?? []).filter((w) => !['clump', 'field'].includes(w))); // (those also grow anywhere in the outskirts)
       const side = (i, j) => [plan.railCut.row === undefined ? 0 : Math.sign(i - plan.railCut.row), plan.railCut.col === undefined ? 0 : Math.sign(j - plan.railCut.col)].join();
       const [ci, cj] = plan.covered[0].split(',').map(Number);
       for (const [i, j, what] of pieces) if (own.has(what)) assert.equal(side(i, j), side(ci, cj), `${seed} ${k}: ${what} across the cut`);

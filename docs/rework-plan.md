@@ -542,3 +542,8 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - Open chunks in town take a tree far more often (parks 75%, residential 60%, downtown 45%, industrial 30%), a third of them as a group of three; courtyard alleys in town blocks get a yard tree; fields get a tree at their edge; outskirts front-row chunks are a clump, a lone tree or a drift, back chunks gain lone trees between fields, ponds and drifts.
 - Street trees on residential and outskirts sidewalks, and a few downtown.
 - Stage 1 0.63 M, stage 4 0.72 M triangles (budget 1.3 / 1.6 M), ≤ 291 draw calls; pack 4.22 MB; audit 0; 173 tests.
+
+### MAP-11 — the city grows as a connected grid (done)
+- Growth (core/map.js growRoads): every side a new block shares with another block is a street, so new blocks always have streets between them, like the first 3×3 (before: 47% of shared edges between blocks were flush joins with no street). Old blocks and saves keep their streets.
+- Balance (300 crawler-normal games): 18% won (17% before).
+- Render: a vehicle parked at a place's kerb keeps its whole length off the railway (the school bus overhung a level crossing).

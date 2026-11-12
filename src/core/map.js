@@ -297,6 +297,12 @@ function growRoads(s, m, added, n) {
       roads.add(opts[Math.floor(random(s) * opts.length)]);
     }
   }
+  // MAP-11: every side a new block shares with another block is a street: the city grows as a connected grid of
+  // blocks with streets between them (no blocks joined flush), like the first 3×3.
+  for (const k of added) {
+    const [bx, bz] = parse(k);
+    for (const [seg, nx, nz] of [[`${bx},${bz},h`, bx, bz - 1], [`${bx},${bz + 1},h`, bx, bz + 1], [`${bx},${bz},v`, bx - 1, bz], [`${bx + 1},${bz},v`, bx + 1, bz]]) if (m.blocks[key(nx, nz)]) roads.add(seg);
+  }
   // A few dead-end spurs.
   const spurs = 1 + Math.floor(random(s) * 3);
   const net = [...nodes()].map(parse);
