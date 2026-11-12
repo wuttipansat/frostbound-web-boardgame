@@ -1,7 +1,7 @@
 # Orbit camera: drag to turn, wheel / pinch to zoom (mouse and touch).
 extends Node3D
 
-@export var distance := 70.0
+@export var distance := 95.0
 @export var min_distance := 20.0
 @export var max_distance := 160.0
 @export var pitch := -40.0
