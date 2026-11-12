@@ -1,0 +1,183 @@
+[
+ {
+  "value": 0,
+  "json": "0",
+  "hash": "350ca8af"
+ },
+ {
+  "value": 0,
+  "json": "0",
+  "hash": "350ca8af"
+ },
+ {
+  "value": 1,
+  "json": "1",
+  "hash": "340ca71c"
+ },
+ {
+  "value": -1,
+  "json": "-1",
+  "hash": "14cd0a2b"
+ },
+ {
+  "value": 2147483648,
+  "json": "2147483648",
+  "hash": "26d6add4"
+ },
+ {
+  "value": 4294967301,
+  "json": "4294967301",
+  "hash": "0b7b7f80"
+ },
+ {
+  "value": 0.5,
+  "json": "0.5",
+  "hash": "5480b4d2"
+ },
+ {
+  "value": 0.30000000000000004,
+  "json": "0.30000000000000004",
+  "hash": "e387e8ac"
+ },
+ {
+  "value": 0.3333333333333333,
+  "json": "0.3333333333333333",
+  "hash": "b74e2943"
+ },
+ {
+  "value": 1e+21,
+  "json": "1e+21",
+  "hash": "b6a7b1f5"
+ },
+ {
+  "value": 1e-7,
+  "json": "1e-7",
+  "hash": "5228e5cf"
+ },
+ {
+  "value": -2.5e-8,
+  "json": "-2.5e-8",
+  "hash": "fbc25433"
+ },
+ {
+  "value": 123.456,
+  "json": "123.456",
+  "hash": "c9bd189e"
+ },
+ {
+  "value": "a\"b\\c\n\t\u0001",
+  "json": "\"a\\\"b\\\\c\\n\\t\\u0001\"",
+  "hash": "aea32087"
+ },
+ {
+  "value": "กองไฟ สุดท้าย",
+  "json": "\"กองไฟ สุดท้าย\"",
+  "hash": "56e6c167"
+ },
+ {
+  "value": "",
+  "json": "\"\"",
+  "hash": "ffcaaa85"
+ },
+ {
+  "value": null,
+  "json": "null",
+  "hash": "77074ba4"
+ },
+ {
+  "value": true,
+  "json": "true",
+  "hash": "4db211e5"
+ },
+ {
+  "value": false,
+  "json": "false",
+  "hash": "0b069958"
+ },
+ {
+  "value": [],
+  "json": "[]",
+  "hash": "741638a5"
+ },
+ {
+  "value": {},
+  "json": "{}",
+  "hash": "5465b825"
+ },
+ {
+  "value": [
+   1,
+   [
+    2,
+    [
+     3
+    ]
+   ]
+  ],
+  "json": "[1,[2,[3]]]",
+  "hash": "d47b3d89"
+ },
+ {
+  "value": {
+   "2": 4,
+   "10": 3,
+   "b": 1,
+   "a": 2,
+   "a-b": 5,
+   "A": 6
+  },
+  "json": "{\"10\":3,\"2\":4,\"A\":6,\"a\":2,\"a-b\":5,\"b\":1}",
+  "hash": "038c5d5f"
+ },
+ {
+  "value": {
+   "y": null
+  },
+  "json": "{\"y\":null}",
+  "hash": "4b991f69"
+ },
+ {
+  "value": [
+   null,
+   1
+  ],
+  "json": "[null,1]",
+  "hash": "3b1682f3"
+ },
+ {
+  "value": {
+   "nested": {
+    "z": [
+     1,
+     2,
+     {
+      "k": "v"
+     }
+    ],
+    "a": "ข"
+   }
+  },
+  "json": "{\"nested\":{\"a\":\"ข\",\"z\":[1,2,{\"k\":\"v\"}]}}",
+  "hash": "48b01fef"
+ },
+ {
+  "value": "tab\tquote\"",
+  "json": "\"tab\\tquote\\\"\"",
+  "hash": "c44da3a8"
+ },
+ {
+  "value": " ",
+  "json": "\" \"",
+  "hash": "4266384f"
+ },
+ {
+  "value": "emoji 😀",
+  "json": "\"emoji 😀\"",
+  "hash": "4c3c75b8"
+ },
+ {
+  "value": 99999999999,
+  "json": "99999999999",
+  "hash": "f695eb82"
+ }
+]

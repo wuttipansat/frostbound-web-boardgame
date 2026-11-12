@@ -5,6 +5,9 @@
 import fs from 'node:fs';
 import { simulate } from '../src/ai/simulate.js';
 import { stateHash } from '../src/core/hash.js';
+import { vectors } from './godot/vectors.mjs';
+import { createGame } from '../src/core/state.js';
+import { reduce } from '../src/core/reducer.js';
 
 const OUT = 'godot/data';
 const MODULES = {
@@ -50,6 +53,7 @@ export async function exportData({ out = OUT, golden = 20, write = true } = {}) 
     files[`golden/${seed}.json`] = { seed, scenarioId: 'crawler', difficulty: 'normal', start: stateHash(simulate({ scenarioId: 'crawler', seed, maxSteps: 0 }).state),
       result: state.result ?? null, illegal: errors.length, steps };
   }
+  Object.assign(files, vectors());
   files['TODO-logic.md'] = `# Content logic to port by hand (GODOT-1)\n\nThese entries are functions in the web build; the JSON holds \`{"$fn": path}\` in their place.\n\n${fns.length ? fns.map((p) => `- \`${p}\``).join('\n') : '- (none)'}\n`;
   if (write) {
     fs.rmSync(out, { recursive: true, force: true });
@@ -61,7 +65,21 @@ export async function exportData({ out = OUT, golden = 20, write = true } = {}) 
   return { files, fns };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+/** The JS state of a golden game after `step` actions (0 = the start), for diffing a port that went astray. */
+export function goldenState(seed, step, out = OUT) {
+  const g = JSON.parse(fs.readFileSync(`${out}/golden/${seed}.json`, 'utf8'));
+  let s = createGame({ scenarioId: g.scenarioId, seed: g.seed, difficulty: g.difficulty, days: 40 });
+  for (const st of g.steps.slice(0, step)) s = reduce(s, st.action);
+  return s;
+}
+
+if (import.meta.url === `file://${process.argv[1]}` && process.argv[2] === '--state') {
+  const [seed, step] = process.argv.slice(3).map(Number);
+  fs.mkdirSync(`${OUT}/golden/states`, { recursive: true });
+  const f = `${OUT}/golden/states/${seed}-${step}.json`;
+  fs.writeFileSync(f, JSON.stringify(goldenState(seed, step), null, 1));
+  console.log(`wrote ${f}`);
+} else if (import.meta.url === `file://${process.argv[1]}`) {
   const t0 = Date.now();
   const { files, fns } = await exportData({ golden: Number(process.argv[2] ?? 20) });
   const mb = Object.values(files).reduce((a, d) => a + (typeof d === 'string' ? d : JSON.stringify(d)).length, 0) / 1e6;
