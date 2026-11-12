@@ -1,0 +1,219 @@
+{
+ "BOND": {
+  "MAX": 5,
+  "CLOSE": 3,
+  "HP_SAVED": 2
+ },
+ "BUILD_STEP": 20,
+ "DANGEROUS_LOCATIONS": [
+  "hospital",
+  "police"
+ ],
+ "DIFFICULTY": {
+  "easy": {
+   "food": 3,
+   "morale": 2,
+   "siege": -1
+  },
+  "normal": {
+   "food": 0,
+   "morale": 0,
+   "siege": 0
+  },
+  "hard": {
+   "food": -1,
+   "morale": -2,
+   "siege": 1
+  }
+ },
+ "ENERGY": {
+  "MAX": 100,
+  "STARVING": 20,
+  "HURT": 20,
+  "STORM": 4,
+  "COST": {
+   "move": 12,
+   "barricade": 19,
+   "lure": 11
+  },
+  "WALK_BASE": 14,
+  "WALK_BLOCK": 2,
+  "WALK_CAP": 40,
+  "SEARCH": 45,
+  "PER_SKILL": 2,
+  "CROWDED": 7,
+  "DANGEROUS": 7,
+  "HEAVY": 5,
+  "SKILLED": 5,
+  "CARD": 20,
+  "JUNK": 12
+ },
+ "FIGHT": {
+  "MELEE_AP": 15,
+  "GUN_AP": 10,
+  "WALKER": 110,
+  "BRUTE": 150,
+  "BRUTE_DAY": 21,
+  "ATK_PER_SKILL": 4,
+  "LEAVE_HP": 5,
+  "NIGHT_BITE": 5
+ },
+ "FOOD": {
+  "HUNGRY_HP": 15,
+  "HUNGRY_MORALE": 1,
+  "MEALS": 4
+ },
+ "GAME_DAYS": 40,
+ "ITEM_TYPES": [
+  "food",
+  "medicine",
+  "fuel",
+  "tools",
+  "weapon",
+  "armor",
+  "junk",
+  "survivor",
+  "book",
+  "gadget",
+  "consumable",
+  "material",
+  "map"
+ ],
+ "LOCATION_IDS": [
+  "colony",
+  "police",
+  "grocery",
+  "school",
+  "hospital",
+  "library",
+  "gas"
+ ],
+ "MISSIONS": [
+  {
+   "id": "hunt",
+   "stat": "kills",
+   "target": 6
+  },
+  {
+   "id": "scavenge",
+   "stat": "searches",
+   "target": 8
+  },
+  {
+   "id": "builder",
+   "stat": "builds",
+   "target": 1
+  },
+  {
+   "id": "maker",
+   "stat": "crafts",
+   "target": 2
+  }
+ ],
+ "MISSION_REWARD": 3,
+ "OUTSIDE_LOCATIONS": [
+  "police",
+  "grocery",
+  "school",
+  "hospital",
+  "library",
+  "gas"
+ ],
+ "PHASES": {
+  "DRAFT": "draft",
+  "CROSSROADS": "crossroads",
+  "TURN": "turn",
+  "COLONY": "colony",
+  "GAME_OVER": "gameOver"
+ },
+ "REST": {
+  "bed": {
+   "ap": 1,
+   "hp": 15
+  },
+  "floor": {
+   "ap": 0.7,
+   "hp": 5
+  },
+  "outside": {
+   "ap": 0.4,
+   "hp": 0
+  },
+  "guard": {
+   "ap": 0.5,
+   "hp": 0
+  },
+  "HUNGRY": 0.5,
+  "NAP_AP": 25,
+  "NAP_HP": 5
+ },
+ "RULES": {
+  "TEAM_START": 2,
+  "TEAM_MAX": 6,
+  "CRISIS_STEP_DAYS": 15,
+  "OVERRUN_HP": 30,
+  "DRAFT_OPTIONS": 6,
+  "STARTING_HAND": 3,
+  "PACK": 8,
+  "WOUNDS_TO_DIE": 3,
+  "BEDS": 2,
+  "HP_MAX": 100,
+  "MAX_LOG": 300
+ },
+ "SEARCH_SPAWN": {
+  "grocery": 0.1,
+  "school": 0.15,
+  "library": 0.1,
+  "gas": 0.15,
+  "police": 0.25,
+  "hospital": 0.2,
+  "warehouse": 0.15,
+  "motel": 0.15,
+  "apartment": 0.2,
+  "church": 0.1,
+  "farmhouse": 0.1,
+  "mall": 0.2,
+  "hardware": 0.15,
+  "military": 0.3,
+  "factory": 0.2,
+  "forest": 0.08,
+  "scrapyard": 0.12,
+  "spot-house": 0.05,
+  "spot-car": 0.05,
+  "spot-container": 0.05,
+  "EXTRA": 0.1,
+  "RING": 0.03,
+  "DOWNTOWN": 0.05
+ },
+ "SEASON": {
+  "COLD": 11,
+  "COLD_HP": 10,
+  "STORMS": 31
+ },
+ "SIEGE": {
+  "BASE": 1,
+  "EVERY": 4,
+  "GUARD": 1,
+  "HIT_HP": 10,
+  "NO_ONE_FOOD": 1
+ },
+ "TIMES": [
+  "dawn",
+  "day",
+  "dusk",
+  "night"
+ ],
+ "TRAITS": [
+  "strong",
+  "quick",
+  "scavenger",
+  "medic",
+  "nightOwl"
+ ],
+ "XP": {
+  "PER_LEVEL": 5,
+  "MAX_LEVEL": 3,
+  "ATK": 2,
+  "SEARCH_AP": 2
+ }
+}

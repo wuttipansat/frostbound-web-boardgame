@@ -1,0 +1,221 @@
+{
+ "BUILDINGS": {
+  "dorm": {
+   "id": "dorm",
+   "name": "Dorm",
+   "effect": "+2 beds per level",
+   "levels": [
+    {
+     "needs": {
+      "wood": 2
+     },
+     "ap": 20
+    },
+    {
+     "needs": {
+      "wood": 3,
+      "cloth": 1
+     },
+     "ap": 30
+    },
+    {
+     "needs": {
+      "wood": 3,
+      "cloth": 2,
+      "scrap": 1
+     },
+     "ap": 40
+    }
+   ]
+  },
+  "wall": {
+   "id": "wall",
+   "name": "Wall",
+   "effect": "Stops 1 zombie at the colony every night per level",
+   "levels": [
+    {
+     "needs": {
+      "wood": 2,
+      "scrap": 1
+     },
+     "ap": 25
+    },
+    {
+     "needs": {
+      "wood": 2,
+      "scrap": 2
+     },
+     "ap": 35
+    },
+    {
+     "needs": {
+      "wood": 2,
+      "scrap": 3
+     },
+     "ap": 45
+    }
+   ]
+  },
+  "greenhouse": {
+   "id": "greenhouse",
+   "name": "Greenhouse",
+   "effect": "+1 food every dawn per level",
+   "levels": [
+    {
+     "needs": {
+      "wood": 2,
+      "cloth": 1
+     },
+     "ap": 25
+    },
+    {
+     "needs": {
+      "wood": 2,
+      "cloth": 2
+     },
+     "ap": 35
+    },
+    {
+     "needs": {
+      "wood": 3,
+      "cloth": 2,
+      "scrap": 1
+     },
+     "ap": 45
+    }
+   ]
+  },
+  "workshop": {
+   "id": "workshop",
+   "name": "Workshop",
+   "effect": "Crafting needs it; levels 2–3: crafting costs 3 / 6 AP less",
+   "levels": [
+    {
+     "needs": {
+      "wood": 1,
+      "scrap": 1
+     },
+     "ap": 15
+    },
+    {
+     "needs": {
+      "wood": 1,
+      "scrap": 2
+     },
+     "ap": 30
+    },
+    {
+     "needs": {
+      "wood": 2,
+      "scrap": 3
+     },
+     "ap": 40
+    }
+   ]
+  },
+  "infirmary": {
+   "id": "infirmary",
+   "name": "Infirmary",
+   "effect": "+5 HP per level at night for everyone at the colony",
+   "levels": [
+    {
+     "needs": {
+      "wood": 1,
+      "cloth": 2
+     },
+     "ap": 20
+    },
+    {
+     "needs": {
+      "wood": 1,
+      "cloth": 3
+     },
+     "ap": 30
+    },
+    {
+     "needs": {
+      "wood": 1,
+      "cloth": 3,
+      "scrap": 1
+     },
+     "ap": 40
+    }
+   ]
+  },
+  "radio": {
+   "id": "radio",
+   "name": "Radio Tower",
+   "effect": "10% per level each dawn: a newcomer finds the colony",
+   "levels": [
+    {
+     "needs": {
+      "scrap": 2
+     },
+     "ap": 25
+    },
+    {
+     "needs": {
+      "scrap": 2,
+      "wood": 1,
+      "cloth": 1
+     },
+     "ap": 35
+    },
+    {
+     "needs": {
+      "scrap": 3,
+      "cloth": 1
+     },
+     "ap": 45
+    }
+   ]
+  }
+ },
+ "BUILDING_IDS": [
+  "dorm",
+  "wall",
+  "greenhouse",
+  "workshop",
+  "infirmary",
+  "radio"
+ ],
+ "CRAWLER": {
+  "id": "crawler",
+  "name": "Snow Crawler",
+  "stages": [
+   "frame",
+   "engine",
+   "heater",
+   "fuel"
+  ],
+  "levels": [
+   {
+    "needs": {
+     "scrap": 3,
+     "wood": 2
+    },
+    "ap": 100
+   },
+   {
+    "needs": {
+     "engine-part": 2,
+     "scrap": 1
+    },
+    "ap": 100
+   },
+   {
+    "needs": {
+     "heater-part": 2,
+     "cloth": 2
+    },
+    "ap": 100
+   },
+   {
+    "needs": {
+     "jerry-can": 3
+    },
+    "ap": 50
+   }
+  ]
+ }
+}

@@ -1,0 +1,1294 @@
+{
+ "ui": {
+  "app.tagline": "เกมเอาชีวิตรอดเล่นคนเดียวในโลกที่หนาวเหน็บ",
+  "setup.title": "เกมใหม่",
+  "setup.scenario": "ภารกิจหลัก",
+  "err.notEnoughEnergy": "พลังงานไม่พอ",
+  "itemPlay.gun": "สวมใส่ (ปืน {ammo} นัด): ยิงฆ่า {n} ตัว ไม่เสีย HP ใช้ 10 AP + กระสุน 1 นัด เสียงดังอาจเรียกซอมบี้ {p}%",
+  "itemShort.gun": "ปืน ×{n} · เสียง {p}%",
+  "itemPlay.armor": "สวมใส่ (เกราะ): เสีย HP น้อยลง {n} ทุกการต่อสู้",
+  "itemShort.armor": "−{n} HP ต่อการสู้",
+  "err.noAmmo": "กระสุนหมด",
+  "act.fight": "เสีย {hp} HP",
+  "act.shot": "มีโอกาส {p}% ซอมบี้โผล่ · กระสุน {ammo}",
+  "log.hurt": "{survivor} เสีย {n} HP (เหลือ {hp})",
+  "act.give": "ให้",
+  "pack.stockpile": "อยู่ในคลังของอาณานิคม",
+  "pack.carried": "อยู่ในเป้ของ {name} ({place})",
+  "pack.toStockpile": "เข้าคลัง",
+  "err.packFull": "เป้เต็มแล้ว (3 ช่อง)",
+  "err.notHome": "ต้องขนกลับอาณานิคมก่อน",
+  "err.notHere": "ของอยู่ที่อื่น",
+  "err.sameHolder": "ถือของชิ้นนี้อยู่แล้ว",
+  "log.give": "{survivor} ส่ง {card} ให้",
+  "log.unpack": "{survivor} เอาของ {count} ชิ้นเข้าคลัง",
+  "act.searchChance": "มีโอกาส {p}% ซอมบี้โผล่",
+  "item.gadget": "เครื่องมือ",
+  "item.consumable": "ของใช้",
+  "item.material": "วัสดุ",
+  "itemPlay.gadget": "สวมใส่ (ช่องเครื่องมือ): {text}",
+  "itemPlay.consumable": "ใช้กับคนที่อยู่ที่นี่: {text}",
+  "itemPlay.material": "วัสดุสำหรับคราฟต์ที่อาณานิคม",
+  "itemShort.gadget": "{text}",
+  "itemShort.consumable": "{text}",
+  "itemShort.material": "วัสดุ",
+  "itemPlay.permanent.gadget": "อุปกรณ์: สวมใส่ในช่องเครื่องมือ (ฟรี)",
+  "err.needGun": "ต้องถือปืนอยู่",
+  "err.craftInstead": "วัสดุใช้สำหรับคราฟต์",
+  "err.missingMaterials": "วัสดุในคลังไม่พอ",
+  "err.noSuchRecipe": "ไม่รู้จักสูตรนี้",
+  "act.craft": "คราฟต์ (ที่อาณานิคม)",
+  "log.craft": "{survivor} คราฟต์ {card}",
+  "item.tool": "เครื่องมือ",
+  "act.build": "อัปเกรดฐาน",
+  "build.max": "เลเวลสูงสุด",
+  "err.needWorkshop": "ต้องสร้างโรงงานก่อน",
+  "err.maxLevel": "ถึงเลเวล 3 แล้ว",
+  "log.built": "{building} ถึงเลเวล {level}",
+  "log.building": "{survivor} สร้าง{building} ({n} AP)",
+  "bld.dorm": "หอพัก",
+  "bld.wall": "กำแพง",
+  "bld.greenhouse": "เรือนกระจก",
+  "bld.workshop": "โรงงาน",
+  "bld.infirmary": "ห้องพยาบาล",
+  "bld.radio": "เสาวิทยุ",
+  "bld.dorm.fx": "+2 เตียงต่อเลเวล",
+  "bld.wall.fx": "กันซอมบี้ที่อาณานิคม 1 ตัวต่อคืนต่อเลเวล",
+  "bld.greenhouse.fx": "+1 อาหารทุกเช้าต่อเลเวล",
+  "bld.workshop.fx": "ต้องมีถึงจะคราฟต์ได้ เลเวล 2–3 คราฟต์ใช้ AP น้อยลง 3 / 6",
+  "bld.infirmary.fx": "+5 HP ต่อคืนต่อเลเวลที่อาณานิคม",
+  "bld.radio.fx": "10% ต่อเลเวลทุกเช้า: มีคนใหม่มาเข้าร่วม",
+  "bld.crawler": "รถลุยหิมะ",
+  "bld.crawler.fx": "เป้าหมายหลัก: โครง, เครื่องยนต์, ฮีตเตอร์, น้ำมัน",
+  "hud.season.early": "ต้นฤดูหนาว",
+  "hud.season.cold": "หนาวจัด (นอนข้างนอก −10 HP)",
+  "hud.season.brutes": "ซอมบี้ตัวใหญ่ (ความดุ 150)",
+  "hud.season.storms": "พายุทุกวัน",
+  "hud.siege": "คืนนี้",
+  "hud.siegeShort": "บุก {n} กันได้ {k}",
+  "hud.siegeHits": "กัด {n} ครั้ง (−{hp} HP)",
+  "tip.siege": "ซอมบี้บุกฐานทุกคืน กำแพง ({wall}) ยาม ({guards}) และสิ่งกีดขวาง ({barricades}) กันได้ก่อน ตัวที่เหลือกัดคนที่อยู่อาณานิคมตัวละ 10 HP ถ้าไม่มีใครอยู่ จะกินอาหารแทน",
+  "log.siege": "ซอมบี้บุกคืนนี้ {attackers} ตัว กันได้ {stopped} เข้ามาได้ {hits}",
+  "setup.difficulty": "ระดับความยาก",
+  "diff.easy": "ง่าย",
+  "diff.normal": "ปกติ",
+  "diff.hard": "ยาก",
+  "diff.easy.tip": "อาหาร +3 ขวัญกำลังใจ +2 ซอมบี้บุกน้อยลงคืนละ 1",
+  "diff.normal.tip": "เกมตามที่ออกแบบ",
+  "diff.hard.tip": "อาหาร −1 ขวัญกำลังใจ −2 ซอมบี้บุกเพิ่มคืนละ 1",
+  "over.days": "วัน",
+  "over.kills": "ซอมบี้ที่ฆ่า",
+  "over.searches": "ครั้งที่ค้น",
+  "over.builds": "เลเวลที่สร้าง",
+  "over.crafts": "ของที่คราฟต์",
+  "over.missions": "ภารกิจที่สำเร็จ",
+  "over.lost": "คนที่เสียไป",
+  "over.difficulty": "ความยาก",
+  "hud.mission": "ภารกิจ",
+  "tip.mission": "ภารกิจประจำสัปดาห์ เหลือ {days} วัน สำเร็จได้ขวัญกำลังใจ +{n}",
+  "mission.hunt": "ฆ่าซอมบี้ {n} ตัว",
+  "mission.scavenge": "ค้นของ {n} ครั้ง",
+  "mission.builder": "สร้างอัปเกรดเสร็จ {n} เลเวล",
+  "mission.maker": "คราฟต์ของ {n} ชิ้น",
+  "trait.strong": "แข็งแรง",
+  "trait.quick": "ว่องไว",
+  "trait.scavenger": "นักคุ้ย",
+  "trait.medic": "หมอสนาม",
+  "trait.nightOwl": "นกฮูก",
+  "trait.strong.tip": "ATK +4",
+  "trait.quick.tip": "เดินใช้ AP น้อยลง 2",
+  "trait.scavenger.tip": "ค้นแล้วซอมบี้โผล่น้อยลง 5%",
+  "trait.medic.tip": "ของใช้รักษา HP เพิ่มอีก 5",
+  "trait.nightOwl.tip": "เข้าเวรยามแล้วตื่นมาได้ AP 70% แทน 50%",
+  "xp.tip": "เลเวลทักษะจากประสบการณ์ (0–3): ต่อสู้ ATK +2 ค้นของ AP −2 ต่อเลเวล ใช้ 5 ครั้งต่อเลเวล",
+  "log.levelUp": "{survivor} เก่งขึ้นด้าน{kind} (เลเวล {level})",
+  "log.bond": "{a} กับ {b} สนิทกันแล้ว",
+  "log.missionNew": "ภารกิจประจำสัปดาห์ใหม่",
+  "log.missionDone": "ภารกิจประจำสัปดาห์สำเร็จ! ขวัญกำลังใจ +2",
+  "log.missionFailed": "ภารกิจประจำสัปดาห์หมดเวลา",
+  "xp.fight": "การต่อสู้",
+  "xp.search": "การค้นของ",
+  "view.left": "หมุนมุมมองซ้าย (Q)",
+  "view.right": "หมุนมุมมองขวา (E)",
+  "view.in": "ซูมเข้า (+)",
+  "view.out": "ซูมออก (−)",
+  "draft.atk": "ATK ตอนต่อสู้ (ยิ่งสูงยิ่งเสีย HP น้อย)",
+  "scene.noise": "(เสียงดังเรียกมาอีกตัว)",
+  "scene.spawned": "ซอมบี้โผล่!",
+  "scene.level": "เลเวล {n}!",
+  "scene.unpack": "{n} ชิ้นเข้าคลัง",
+  "colony.siege": "ซอมบี้บุก {n} ตัว กันได้ {k} เข้ามาได้ {hits} (−{hp} HP)",
+  "act.hpBadge": "−{n} HP",
+  "tut.day1": "วันที่ 1: ออกไปค้นของที่ใกล้ๆ (% บนปุ่มคือโอกาสที่ซอมบี้โผล่) แล้วเดินกลับบ้านก่อนค่ำ ของจะนับก็ต่อเมื่อถึงอาณานิคม",
+  "tut.day2": "วันที่ 2: ดูช่อง \"คืนนี้\" ยาม สิ่งกีดขวาง และกำแพงช่วยกันซอมบี้บุก ค้นหาไปเรื่อยๆ จะเจอแผนที่เมืองที่ช่วยขยายเมือง",
+  "tut.day3": "วันที่ 3: ขนไม้ เศษเหล็ก และผ้ากลับมาสร้างโรงงานและรถลุยหิมะ การต่อสู้เสีย HP ปุ่มบอกว่าเสียเท่าไร",
+  "sign.overrun": "ซอมบี้ยึด",
+  "err.placeOverrun": "ซอมบี้ยึดที่นี่แล้ว (6 ตัว) ต้องกำจัดก่อนถึงจะค้นได้",
+  "scene.siege": "บุก {n} · กันได้ {k}",
+  "view.reset": "กลับมุมมองเดิม",
+  "hud.today": "สรุปวันนี้",
+  "hud.menu": "เมนู",
+  "ring.info": "ข้อมูลสถานที่",
+  "ring.walk": "เดินไป{place}",
+  "ring.for": "{name} ที่{place}",
+  "act.cost": "ใช้ AP {n} (มี {have})",
+  "panel.energyTip": "{name}: AP {n}/{max} · คืนนี้: {sleep} ตื่นมามี {wake} AP",
+  "confirm.end.energy": "ทีมยังมี AP รวม {n} และยังทำอะไรได้อีก AP ที่เหลือยกไปพรุ่งนี้ การนอนจะเติมให้",
+  "loc.forecast": "ถ้าจบวันตอนนี้: ซอมบี้ +{n} ที่นี่",
+  "act.equip": "สวมใส่ (ฟรี)",
+  "act.equipShort": "สวมใส่",
+  "panel.gear": "อุปกรณ์",
+  "panel.gearEmpty": "{slot}: ว่าง สวมใส่ได้จากการ์ดในมือ",
+  "panel.costs": "ค่าพลังงานของคุณ: เดิน {move} · ค้นหา {search} · โจมตี {attack} (ฆ่า {kills})",
+  "err.notGear": "การ์ดนี้ไม่ใช่อุปกรณ์",
+  "err.equipInstead": "ต้องสวมใส่แทน",
+  "err.energyFull": "AP เต็มอยู่แล้ว",
+  "err.napping": "งีบอยู่วันนี้ ทำอะไรต่อไม่ได้",
+  "err.alreadyActed": "ทำได้เฉพาะก่อนลงมือทำอะไรในวันนี้",
+  "err.badRest": "ไม่รู้จักการพักแบบนี้",
+  "act.nap": "งีบ (+25 AP +5 HP ข้ามวันนี้)",
+  "act.guard": "เข้าเวรยามคืนนี้ (กันซอมบี้ที่อาณานิคม 1 ตัว ตื่นมา 50%)",
+  "act.unguard": "นอนคืนนี้แทนเข้าเวร",
+  "sleep.bed": "เตียง (AP 100% +15 HP)",
+  "sleep.floor": "นอนพื้น (AP 70% +5 HP)",
+  "sleep.outside": "นอนข้างนอก (AP 40%)",
+  "sleep.guard": "เข้าเวรยาม (AP 50%)",
+  "log.nap": "{survivor} งีบหลับ",
+  "log.sleep": "ทีมเข้านอน",
+  "draft.energy": "AP สูงสุด {n} นอนแล้วเติม: เตียง 100% พื้น 70% ข้างนอก 40%",
+  "draft.attackCost": "พลังงานที่ใช้โจมตี",
+  "draft.searchCost": "พลังงานที่ใช้ค้นหา",
+  "setup.start": "เริ่มเกม",
+  "setup.continue": "เล่นเกมที่บันทึกไว้ต่อ",
+  "setup.days": "{n} วัน",
+  "setup.morale": "ขวัญกำลังใจ {n}",
+  "difficulty.easy": "ง่าย",
+  "difficulty.medium": "ปานกลาง",
+  "difficulty.hard": "ยาก",
+  "settings.title": "ตั้งค่า",
+  "settings.language": "ภาษา",
+  "settings.graphics": "กราฟิก",
+  "settings.graphics.auto": "อัตโนมัติ",
+  "settings.graphics.high": "สูง",
+  "settings.graphics.saver": "ประหยัดแบต",
+  "boot.loading": "กำลังจุดไฟ…",
+  "settings.camera": "กล้องตาม",
+  "settings.camera.all": "เปิด",
+  "settings.camera.off": "ปิด",
+  "settings.speed": "ตาของคนอื่น",
+  "settings.speed.normal": "ปกติ",
+  "settings.speed.fast": "เร็ว",
+  "scene.skip": "คลิกเพื่อข้าม · กดค้างเพื่อเร่ง",
+  "scene.cards": "{n} ใบ",
+  "scene.moveTo": "ส่ง {name} มาที่นี่",
+  "scene.pickWho": "ใครจะไป{place}?",
+  "scene.fuel": "ใช้เชื้อเพลิง: ขับรถไป",
+  "settings.sound": "เสียง",
+  "settings.on": "เปิด",
+  "settings.off": "ปิด",
+  "settings.newGame": "ออกไปเริ่มเกมใหม่",
+  "settings.close": "ปิด",
+  "hud.morale": "ขวัญกำลังใจ",
+  "hud.day": "วัน",
+  "hud.food": "อาหาร",
+  "hud.foodDays": "อาหารพอ {n} วัน",
+  "hud.foodNeed": "ต้องใช้ {n}",
+  "hud.crisis": "วิกฤต",
+  "hud.crisisNeed": "{item} × {n}",
+  "hud.facedown": "คว่ำอยู่ {n} ใบ",
+  "hud.goal": "เป้าหมาย",
+  "hud.log": "บันทึก",
+  "hud.settings": "ตั้งค่า",
+  "hud.starvation": "อดอาหาร",
+  "panel.yourTurn": "ตาของคุณ",
+  "panel.survivors": "ผู้รอดชีวิต",
+  "panel.hand": "การ์ดในมือ",
+  "panel.handEmpty": "ไม่มีการ์ด",
+  "panel.endTurn": "จบวัน",
+  "panel.moved": "เดินแล้ว",
+  "panel.selectHint": "แตะรูปตัวละครข้างอาคารเพื่อส่งมาที่นี่",
+  "panel.dieAuto": "อัตโนมัติ",
+  "stat.attack": "โจมตี",
+  "stat.search": "ค้นหา",
+  "stat.influence": "อิทธิพล",
+  "stat.wounds": "บาดแผล",
+  "stat.frostbite": "หิมะกัด",
+  "loc.survivors": "ผู้รอดชีวิต",
+  "loc.zombies": "ซอมบี้",
+  "loc.barricades": "เครื่องกีดขวาง",
+  "loc.cards": "การ์ดที่เหลือ",
+  "loc.here": "อยู่ที่นี่",
+  "loc.nobody": "ไม่มีใครอยู่",
+  "loc.moveHere": "ย้าย {name} มาที่นี่",
+  "loc.moveFuel": "ใช้เชื้อเพลิง (ขับรถ)",
+  "loc.actionsFor": "{name} ทำได้:",
+  "loc.lureTo": "ล่อไปที่…",
+  "act.attack": "โจมตี",
+  "act.search": "ค้นหา",
+  "act.barricade": "สร้างเครื่องกีดขวาง",
+  "act.lure": "ล่อซอมบี้",
+  "act.ability": "ใช้ความสามารถ",
+  "act.play": "ใช้การ์ด",
+  "act.contribute": "ใส่ในวิกฤต",
+  "act.deposit": "ส่งเข้าภารกิจ",
+  "act.decline": "ปฏิเสธ",
+  "act.cancel": "ยกเลิก",
+  "act.confirm": "ยืนยัน",
+  "item.food": "อาหาร",
+  "item.medicine": "ยา",
+  "item.fuel": "เชื้อเพลิง",
+  "item.tools": "เครื่องมือ",
+  "item.weapon": "อาวุธ",
+  "item.armor": "เกราะ",
+  "item.junk": "ของจิปาถะ",
+  "tip.logPin": "เปิดประวัติค้างไว้",
+  "panel.handExpand": "แสดงการ์ดเต็ม",
+  "panel.handCompact": "ย่อการ์ดในมือ",
+  "panel.more": "แอคชันเพิ่มเติม",
+  "panel.hold": "กดค้าง",
+  "panel.tokenLabel": "{name}, {place}, พลังชีวิต {hp}/{max}",
+  "hud.crisisShort": "{k}/{n} {item} · ตัดสินตอนเย็น",
+  "err.notHost": "เจ้าของห้องเท่านั้นที่เริ่มเกมได้",
+  "err.seatsOpen": "ยังมีที่นั่งว่าง",
+  "err.notStarted": "เกมยังไม่เริ่ม",
+  "err.badMessage": "การเชื่อมต่อผิดพลาด",
+  "err.alreadyInRoom": "คุณอยู่ในห้องแล้ว",
+  "phase.day": "วันที่ {n}/{total}",
+  "phase.draft": "เลือกตัวละคร",
+  "phase.crossroads": "ทางแยก",
+  "phase.turn": "ตาของคุณ",
+  "phase.colony": "เฟสอาณานิคม",
+  "phase.draftWho": "เลือกผู้รอดชีวิตของคุณ",
+  "phase.crossroadsWho": "การ์ดทางแยก",
+  "phase.turnWho": "ตาของคุณ",
+  "phase.over": "จบเกม",
+  "card.permanent": "ถาวร",
+  "card.used": "ใช้แล้วตานี้",
+  "card.passive": "มีผลอัตโนมัติ",
+  "card.wild": "แทนได้ทุกอย่างในวิกฤต",
+  "card.consumable": "ใช้ครั้งเดียว",
+  "item.survivor": "ผู้รอดชีวิต",
+  "item.book": "หนังสือ",
+  "tier.1": "ธรรมดา",
+  "tier.2": "ดี",
+  "tier.3": "หายาก",
+  "item.any": "อะไรก็ได้",
+  "itemPlay.regenPlus": "สวมใส่ (หนังสือ): ต้นเทิร์นได้พลังงานเพิ่ม {n}",
+  "itemPlay.armorMove": "สวมใส่ (เกราะ): ค่าเดิน {mod}",
+  "itemPlay.permanent.armor": "อุปกรณ์: สวมใส่ในช่องเกราะ (ฟรี)",
+  "itemShort.regenPlus": "ฟื้น +{n}",
+  "itemShort.armorMove": "เดิน {mod}",
+  "itemPlay.food": "เพิ่มอาหาร {n} ให้อาณานิคม",
+  "itemPlay.fuel": "เผาตอนเดินทาง: ขับรถไป",
+  "itemPlay.junk": "แยกชิ้นส่วนเป็นพลังงาน {n}",
+  "itemPlay.medicine": "รักษา {n} ครั้ง (แผลหรือหิมะกัด ครั้งละ 1) ให้ผู้รอดชีวิตที่เลือก",
+  "itemPlay.tools": "เพิ่มเครื่องกีดขวาง {n} อันที่ฐานทันที (การ์ดต้องอยู่ที่ฐาน)",
+  "itemPlay.weapon": "สวมใส่ (ระยะประชิด): ATK +{n} โจมตีครั้งละ 1 ตัวแน่นอน ATK และ AP ที่เหลือยิ่งมากยิ่งเสีย HP น้อย",
+  "itemPlay.junkWild": "แยกชิ้นส่วนเป็นพลังงาน {n} ในวิกฤตนับเป็นไอเท็มที่ตรงกับความต้องการ",
+  "itemPlay.recruit": "ใช้: คนใหม่เข้าร่วมทีม (ขวัญกำลังใจ +1 ถ้าทีมเต็ม +2)",
+  "itemPlay.blueprint": "สวมใส่ (หนังสือ): ค้นหาที่{place} ได้การ์ดเพิ่ม 1 ใบ แล้วคืน 1 ใบ",
+  "itemPlay.foodSaver": "สวมใส่ (หนังสือ): อาณานิคมใช้อาหารน้อยลง 1 ทุกรอบ",
+  "itemPlay.barricadePlus": "สวมใส่ (หนังสือ): สร้างสิ่งกีดขวางเพิ่ม 1 ทุกครั้ง",
+  "itemPlay.permanent.weapon": "อุปกรณ์: สวมใส่ในช่องอาวุธ (ฟรี)",
+  "itemPlay.permanent.book": "อุปกรณ์: สวมใส่ในช่องหนังสือ (ฟรี)",
+  "setup.more": "ตัวเลือกเพิ่มเติม",
+  "draft.influence": "อิทธิพล",
+  "draft.health": "พลังชีวิต",
+  "draft.title": "เลือกผู้รอดชีวิต 2 คน",
+  "draft.confirm": "ออกเดินทางกับสองคนนี้",
+  "draft.pick": "เลือกอีก {n} คน",
+  "cross.title": "ทางแยก",
+  "cross.choose": "เลือก",
+  "over.title": "จบเกม",
+  "over.reason.objectiveComplete": "ภารกิจหลักสำเร็จ!",
+  "over.reason.moraleCollapse": "ขวัญกำลังใจพังทลาย อาณานิคมล่มสลาย",
+  "over.reason.timeOut": "หมดเวลา อาณานิคมล่มสลาย",
+  "over.epitaph.won": "กองไฟยังลุกโชน อาณานิคมจะได้เห็นฤดูใบไม้ผลิ",
+  "over.epitaph.lost": "หิมะกลบรั้วไม้จนมิด กองไฟมอดดับไปแล้ว",
+  "over.look": "ดูอาณานิคม",
+  "over.back": "ดูผลเกม",
+  "jr.tab": "บันทึก",
+  "jr.tabLog": "ล็อก",
+  "jr.empty": "ยังไม่มีอะไรในบันทึก วันแรกเพิ่งเริ่มต้น",
+  "jr.day": "วันที่ {n}",
+  "jr.title": "บันทึกอาณานิคม",
+  "jr.story": "เรื่องราวของเกมนี้",
+  "jr.search": "{name} ค้น{place} กลับมาพร้อมของ {n} ชิ้น",
+  "jr.kills": "{name} ล้มซากศพได้ {n} ตัวที่{place}",
+  "jr.death": "เราเสีย {name} ไปที่{place} ({cause})",
+  "jr.recruit": "{name} มาเข้าร่วมกับเราที่{place}",
+  "jr.overrun": "ซากศพบุกยึด{place}",
+  "jr.barricadeBroken": "สิ่งกีดขวางที่{place}พังลง",
+  "jr.infection": "เชื้อแพร่จาก {name} ไปสู่ {other}",
+  "jr.starvation": "อาหารไม่พอ ทุกคนต้องอดอยาก",
+  "jr.crisisOk": "เรารอดพ้นวิกฤต \"{crisis}\" มาได้",
+  "jr.crisisFail": "เรารับมือ \"{crisis}\" ไม่ไหว และต้องจ่ายราคา",
+  "jr.sum.deaths": "เสียชีวิต {n}",
+  "jr.sum.kills": "ฆ่าซอมบี้ {n}",
+  "jr.sum.found": "พบของ {n}",
+  "jr.sum.morale": "ขวัญกำลังใจ {n}",
+  "jr.sum.quiet": "วันที่เงียบสงบ",
+  "over.again": "เกมใหม่",
+  "eff.morale": "ขวัญกำลังใจ {d}",
+  "eff.food": "อาหาร {d}",
+  "eff.starvation": "อดอยาก {d}",
+  "eff.spawn": "ซอมบี้ {n} ตัวที่{where}",
+  "eff.removeZombies": "กำจัดซอมบี้ {n} ตัวที่{where}",
+  "eff.barricade": "เครื่องกีดขวาง {n} ที่{where}",
+  "eff.drawItem": "จั่วการ์ด {n} ใบ",
+  "eff.discard": "ทิ้ง{item} {n} ใบ",
+  "eff.wound": "ผู้รอดชีวิตของคุณบาดเจ็บ",
+  "eff.heal": "รักษาผู้รอดชีวิตของคุณ",
+  "eff.energy": "ทุกคน: พลังงาน {d}",
+  "eff.moveHome": "กลับอาณานิคม",
+  "eff.nothing": "ไม่มีอะไรเกิดขึ้น",
+  "where.here": "ตำแหน่งของคุณ",
+  "face.blank": "ปลอดภัย",
+  "face.wound": "บาดเจ็บ",
+  "face.frostbite": "หิมะกัด",
+  "face.bite": "ถูกกัด",
+  "cause.bite": "ถูกกัด",
+  "cause.wounds": "บาดแผล",
+  "cause.overrun": "ถูกบุกทะลวง",
+  "reason.survivorDied": "มีคนตาย",
+  "reason.starvation": "อดอยาก",
+  "reason.crisisFailed": "วิกฤตล้มเหลว",
+  "reason.crisisAverted": "ผ่านวิกฤต",
+  "reason.crossroads": "ทางแยก",
+  "reason.played": "ใช้การ์ด",
+  "reason.overrun": "ถูกบุกทะลวง",
+  "log.roundStart": "— วันที่ {round} — วิกฤต: {crisis}",
+  "log.turnStart": "ตาของคุณ",
+  "log.draftDone": "{names} ออกเดินทาง",
+  "log.move": "{survivor} → {to}",
+  "log.moveSafe": "{survivor} → {to} (ปลอดภัย)",
+  "log.wound": "{survivor} บาดเจ็บ ({n})",
+  "log.heal": "{survivor} ได้รับการรักษา",
+  "log.death": "☠ {survivor} เสียชีวิต ({cause})",
+  "log.infectionSpreads": "เชื้อแพร่ไปยัง {to}!",
+  "log.recruit": "{survivor} เข้าร่วมทีม",
+  "log.attack": "{survivor} ฆ่าซอมบี้ {n} ตัวที่{loc}",
+  "log.search": "{survivor} ค้นหา{loc}: ได้ {n} ใบ",
+  "log.barricade": "เครื่องกีดขวาง +{n} ที่{loc}",
+  "log.barricadeBroken": "เครื่องกีดขวางที่{loc}พัง",
+  "log.lure": "{survivor} ล่อซอมบี้ {n} ตัวไปที่{to}",
+  "log.spawn": "ซอมบี้ {n} ตัวโผล่ที่{loc}",
+  "log.overrun": "{loc}ถูกบุกทะลวง!",
+  "log.zombiesLeave": "ซอมบี้ {n} ตัวออกจาก{loc}",
+  "log.play": "ใช้ {card}",
+  "log.discard": "ทิ้ง {card}",
+  "log.contribute": "ใส่ {card} ในวิกฤต",
+  "log.deposit": "ส่ง {card} ({n})",
+  "log.morale": "ขวัญกำลังใจ {d} → {value} ({reason})",
+  "log.food": "อาหาร {d} → {value}",
+  "log.fed": "อาณานิคมกินอาหาร {n}",
+  "log.starvation": "อาหารไม่พอ! {n} คนอดอาหาร (−15 HP และ AP ครึ่งเดียวพรุ่งนี้)",
+  "log.crisisResolved": "{crisis}: {result} ({score}/{required})",
+  "log.crisisOk": "ผ่านได้",
+  "log.crisisFail": "ล้มเหลว",
+  "log.crossroadsTriggered": "ทางแยก: {title}",
+  "log.crossroadsChoice": "คุณเลือก: {choice}",
+  "log.gameOver": "จบเกม",
+  "err.wrongPhase": "ตอนนี้ทำแบบนั้นไม่ได้",
+  "err.noSuchSurvivor": "เลือกผู้รอดชีวิตของคุณก่อน",
+  "err.notYourSurvivor": "ผู้รอดชีวิตคนนี้ไม่ใช่ของคุณ",
+  "err.cardNotInHand": "การ์ดนี้ไม่อยู่ในมือคุณ",
+  "err.noZombiesHere": "ไม่มีซอมบี้ที่นี่",
+  "err.cannotSearchColony": "ค้นหาในอาณานิคมไม่ได้",
+  "err.deckEmpty": "ที่นี่ไม่มีอะไรให้หาแล้ว",
+  "err.noBarricadeSpace": "ไม่มีที่ว่างสำหรับเครื่องกีดขวาง",
+  "err.mustBeInColony": "ต้องมีผู้รอดชีวิตอยู่ในอาณานิคม",
+  "err.sameLocation": "อยู่ที่นี่อยู่แล้ว",
+  "err.alreadyMoved": "ผู้รอดชีวิตคนนี้เดินไปแล้วในตานี้",
+  "err.locationFull": "สถานที่นั้นเต็มแล้ว",
+  "err.needFuel": "การ์ดนี้ไม่ใช่เชื้อเพลิง",
+  "err.notWounded": "ไม่ได้บาดเจ็บ",
+  "err.fuelIsPlayedWhenMoving": "ใช้เชื้อเพลิงตอนเดินทาง",
+  "err.wrongItemType": "ประเภทไอเท็มไม่ถูกต้อง",
+  "err.noActiveAbility": "ไม่มีความสามารถที่ใช้ได้",
+  "err.abilityUsed": "ใช้ความสามารถไปแล้วในตานี้",
+  "err.targetNotHere": "เป้าหมายต้องอยู่ที่เดียวกัน",
+  "err.gameOver": "เกมจบแล้ว",
+  "err.scenarioHasNoDeposit": "ภารกิจนี้ไม่มีการส่งไอเท็ม",
+  "err.unknown": "ทำแบบนี้ไม่ได้",
+  "trig.always": "เกิดขึ้นกับใครก็ได้",
+  "trig.survivorAt": "คุณมีผู้รอดชีวิตอยู่ที่{loc}",
+  "trig.notInColony": "คุณมีผู้รอดชีวิตอยู่นอกอาณานิคม",
+  "trig.hasItem": "คุณถือ{item}",
+  "trig.moraleAtMost": "ขวัญกำลังใจไม่เกิน {n}",
+  "trig.moraleAtLeast": "ขวัญกำลังใจตั้งแต่ {n} ขึ้นไป",
+  "trig.foodAtMost": "อาหารไม่เกิน {n}",
+  "trig.foodAtLeast": "อาหารตั้งแต่ {n} ขึ้นไป",
+  "trig.dayAtLeast": "ตั้งแต่วันที่ {n}",
+  "trig.colonyZombiesAtLeast": "มีซอมบี้ที่ประตูอาณานิคม {n} ตัวขึ้นไป",
+  "trig.hasWounded": "ผู้รอดชีวิตของคุณมีคนบาดเจ็บ",
+  "trig.survivorCountAtLeast": "คุณควบคุมผู้รอดชีวิต {n} คนขึ้นไป",
+  "cross.because": "เกิดขึ้นเพราะ: {why}",
+  "cross.flip": "เปิดการ์ด",
+  "colony.title": "ตอนเย็นและกลางคืน · วันที่ {n}",
+  "colony.fed": "อาณานิคมกินอาหาร {n}",
+  "colony.starve": "อาหารไม่พอ! {n} คนอดอาหาร: −15 HP พรุ่งนี้ AP ครึ่งเดียว ขวัญกำลังใจ −1",
+  "colony.crisis": "วิกฤต: {name}",
+  "colony.needs": "ต้องใช้{item} {n} ใบ การ์ดที่ตรง +1 อย่างอื่น −1",
+  "colony.noCards": "ไม่มีใครใส่การ์ดเลย",
+  "colony.score": "คะแนน {score} / {required}",
+  "colony.averted": "ผ่านวิกฤตได้",
+  "colony.failed": "วิกฤตล้มเหลว",
+  "colony.bonus": "ชนะขาด 2 ขึ้นไป: ขวัญกำลังใจ +1",
+  "colony.spawns": "ซอมบี้มาถึง",
+  "colony.noSpawns": "คืนนี้ไม่มีซอมบี้ใหม่",
+  "colony.morale": "ขวัญกำลังใจตอนนี้ {n}",
+  "colony.continue": "ดำเนินการต่อ",
+  "fx.blank": "ปลอดภัย",
+  "fx.wound": "บาดเจ็บ",
+  "fx.frostbite": "หิมะกัด",
+  "fx.bite": "ถูกกัด",
+  "tut.card.title": "ใช้การ์ด",
+  "tut.card.text": "เปิดมือ แตะการ์ด: ใช้เลย หรือใส่ในวิกฤตแบบคว่ำ",
+  "tut.rules": "กติกาย่อ",
+  "settings.hints": "คำแนะนำตาต่อไป",
+  "hint.label": "แนะนำ",
+  "hint.show": "ชี้ให้ดู",
+  "hint.move": "ย้าย {sv} ไป{place}",
+  "hint.attackE": "{sv}: โจมตีที่{place} (พลังงาน {n})",
+  "hint.searchE": "{sv}: ค้นหาที่{place} (พลังงาน {n})",
+  "why.energy": "พลังงานที่เหลือเก็บไว้ได้ แต่สิ่งกีดขวางตอนนี้ช่วยกันซอมบี้คืนนี้",
+  "hint.equip": "สวมใส่ {card}",
+  "why.equip": "อุปกรณ์ช่วยลดค่าพลังงานหรือป้องกันตัว",
+  "hint.barricade": "{sv}: สร้างเครื่องกีดขวางที่{place}",
+  "hint.lure": "{sv}: ล่อซอมบี้ไป{place}",
+  "hint.ability": "{sv}: ใช้ความสามารถ",
+  "hint.play": "ใช้ {card}",
+  "hint.contribute": "ใส่ {card} ในวิกฤต",
+  "hint.deposit": "ฝาก {card} เพื่อภารกิจ",
+  "hint.end": "ไม่มีอะไรคุ้มทำแล้ว — จบตา",
+  "why.crisis": "วิกฤตต้องการ {item} {n} ใบ (ใส่แล้ว {k})",
+  "why.food": "อาหารไม่พอ: มี {have} จาก {need}",
+  "why.zombies": "มีซอมบี้ {n} ตัว",
+  "why.cards": "เหลือการ์ดให้ค้น {n} ใบ",
+  "check.title": "วันนี้",
+  "check.food": "อาหาร: มี {have} จาก {need}",
+  "check.crisis": "วิกฤต: ใส่แล้ว {k} จาก {n} ใบ",
+  "check.colony": "อาณานิคม: ซอมบี้ {z} ตัว",
+  "check.warn": "ยังไม่ปลอดภัย:",
+  "rules.title": "กติกาย่อ",
+  "rules.turn.title": "ตาของคุณ",
+  "rules.turn.text": "ผู้รอดชีวิตของคุณมีพลังงาน จะเดิน ค้นหา สู้ หรือสร้างสิ่งกีดขวางลำดับไหนก็ได้จนกว่าจะพอ พลังงานที่เหลือเก็บไว้ใช้เทิร์นหน้า",
+  "rules.turn.ex": "ย้าย Teodor, โจมตีด้วย 5, ใส่ยาในวิกฤต, จบตา",
+  "rules.dice.title": "พลังงานและอุปกรณ์",
+  "rules.dice.text": "ทุกแอคชันใช้พลังงาน (ตัวเลขบนปุ่ม) ทักษะของตัวละครกำหนดค่าโจมตีและค้นหา อาวุธ เกราะ และหนังสือที่สวมใส่จะเปลี่ยนค่าเหล่านี้",
+  "rules.dice.ex": "ค้นหา 21 เดิน 13: พลังงาน 66 พอสำหรับค้นหา เดิน และสู้หนึ่งครั้ง",
+  "rules.move.title": "การเดินทาง",
+  "rules.move.text": "การเดินใช้พลังงานและทำซ้ำได้ เชื้อเพลิงใช้ขับรถไปแทนได้",
+  "rules.move.ex": "การต่อสู้และความหนาวจะกลับมาอันตรายพร้อมระบบเลือด (เร็ว ๆ นี้)",
+  "rules.cards.title": "การ์ดไอเท็ม",
+  "rules.cards.text": "อาหารเลี้ยงอาณานิคม ยารักษา เชื้อเพลิงทำให้เดินปลอดภัย อาวุธฆ่าซอมบี้ อาวุธและหนังสือใช้ได้ถาวร",
+  "rules.cards.ex": "Glock 19: ฆ่าซอมบี้ 1 ตัว ตาละครั้ง เก็บไว้ได้",
+  "rules.crisis.title": "วิกฤต ตอนเย็น และกลางคืน",
+  "rules.crisis.text": "ทุกรอบวิกฤตต้องการการ์ดประเภทหนึ่ง เมื่อจบตา: อาณานิคมกินอาหาร นับวิกฤต ซอมบี้บุก",
+  "rules.crisis.ex": "ต้องการยา 2 ใบ: การ์ดผิดประเภทนับเป็นลบ",
+  "rules.morale.title": "ขวัญกำลังใจและอาหาร",
+  "rules.morale.text": "ขวัญกำลังใจเหลือ 0 = แพ้ อาหารไม่พอ วิกฤตล้มเหลว และการตาย ทำให้ขวัญกำลังใจลด",
+  "rules.morale.ex": "วิกฤตล้มเหลวอาจเสียขวัญกำลังใจ 1–2",
+  "rules.map.title": "แผนที่และการขยายเมือง",
+  "rules.map.text": "ตอนเริ่มรู้จักแค่ร้านขายของชำกับปั๊มน้ำมัน ค้นหาไปเรื่อยๆ จะเจอแผนที่เมืองแน่นอนภายในจำนวนครั้งที่กำหนด นำกลับฐานแล้วกดใช้ เมืองจะขยายหนึ่งสเตจ พร้อมสถานที่ใหม่ 2–3 แห่ง ยิ่งเมืองใหญ่ ยิ่งต้องค้นหามากขึ้น และที่ไกลก็เดินไกลและอันตรายกว่า ฤดูหนาวไม่มีวันจบ",
+  "rules.map.ex": "แผนที่ใบแรกเจอภายใน 3–4 ครั้งที่ค้นหา: ห้องสมุดกับโรงพยาบาลจะปรากฏ",
+  "hud.rules": "กติกาย่อ",
+  "tut.of": "บทสอน {i}/{n}",
+  "tut.next": "ถัดไป",
+  "tut.skip": "ข้ามบทสอน",
+  "tut.done": "เข้าใจแล้ว",
+  "setup.tutorial": "บทสอนวันแรก",
+  "tut.welcome.title": "ยินดีต้อนรับสู่ FROSTBOUND",
+  "tut.welcome.text": "นำผู้รอดชีวิตผ่านเมืองที่หนาวเหน็บ มาเล่นตาแรกด้วยกัน ทำทีละขั้นจริงๆ",
+  "tut.topbar.title": "ภาพรวมอาณานิคม",
+  "tut.topbar.text": "ขวัญกำลังใจคือหลอดชีวิต — ถ้าเหลือ 0 จะแพ้ คอยดูอาหาร (อาณานิคมกินทุกรอบ) ตัวนับรอบ และเป้าหมาย",
+  "tut.crisis.title": "วิกฤตของวันนี้",
+  "tut.crisis.text": "ทุกรอบวิกฤตต้องการไอเท็ม ใส่การ์ดที่ตรงประเภท การ์ดอื่นจะนับ ลบ คลิกที่วิกฤตเพื่อดูบทลงโทษ",
+  "tut.survivors.title": "ผู้รอดชีวิตของคุณ",
+  "tut.survivors.text": "ผู้รอดชีวิตของคุณมีพลังงาน ค่าโจมตีและค่าค้นหา พลังชีวิต ความสามารถพิเศษ และช่องอุปกรณ์ 3 ช่อง แตะที่หน้าตัวละครเพื่อดูทั้งหมด",
+  "tut.board.title": "เลือกจุดหมาย",
+  "tut.board.text": "คลิกอาคารบนกระดาน — ร้านขายของชำหรือปั๊มน้ำมันเป็นจุดเริ่มต้นที่ดี",
+  "tut.move.title": "เดินตัวละคร",
+  "tut.move.text": "แตะอาคาร แล้วแตะหน้าตัวละครของคุณข้างอาคาร",
+  "tut.actions.title": "ใช้พลังงาน",
+  "tut.actions.text": "โจมตีซอมบี้หรือค้นหาการ์ดที่นี่ ตัวเลขบนปุ่มคือพลังงานที่ใช้",
+  "tut.hand.title": "การ์ดของคุณ",
+  "tut.hand.text": "คลิกการ์ดเพื่อใช้ ใส่ในวิกฤต หรือส่งเข้าภารกิจ",
+  "tut.endTurn.title": "จบตาของคุณ",
+  "tut.endTurn.text": "พลังงานที่เหลือเก็บไว้ได้ จบเทิร์นเมื่อทำเสร็จ",
+  "tut.colony.title": "ตอนเย็นและกลางคืน",
+  "tut.colony.text": "อาณานิคมกินอาหาร เปิดการ์ดวิกฤต ซอมบี้บุก รอดให้ครบทุกรอบ!",
+  "tip.morale": "ขวัญกำลังใจ — ชีวิตของอาณานิคม ถ้าเหลือ 0 จะแพ้",
+  "tip.day": "จำนวนวันที่เหลือก่อนฤดูหนาวจะชนะ",
+  "tip.food": "อาหาร ทุกคนที่อยู่อาณานิคมกินวันละ 1 ถ้าไม่พอ คนที่ไม่ได้กินเสีย 15 HP พรุ่งนี้ได้ AP ครึ่งเดียว และขวัญกำลังใจ −1",
+  "tip.goal": "ภารกิจหลัก: {text}",
+  "tip.crisis": "วิกฤตของวันนี้ คลิกเพื่อดูรายละเอียด",
+  "tip.attack": "โจมตี: ใช้พลังงาน {n}",
+  "tip.search": "ค้นหา: ใช้พลังงาน {n}",
+  "tip.influence": "อิทธิพล (ความเป็นผู้นำ ใช้ตัดสินเมื่อเสมอ)",
+  "tip.health": "พลังชีวิต: รับบาดแผลได้อีก {n} ครั้งก่อนตาย",
+  "tip.frostbite": "หิมะกัด: เสียพลังชีวิตทุกรอบที่อยู่นอกอาณานิคม",
+  "tip.safe": "ปลอดภัย",
+  "tip.zombies": "ซอมบี้ {n} ตัวที่ทางเข้า",
+  "act.pickOnBoard": "เลือกบนกระดาน",
+  "act.pickTarget": "ใช้กับ:",
+  "act.close": "ปิด",
+  "act.scrollLeft": "เลื่อนไปซ้าย",
+  "act.scrollRight": "เลื่อนไปขวา",
+  "loc.pickDestination": "คลิกสถานที่ที่ไฮไลต์บนกระดาน — หรือเลือก:",
+  "loc.lurePick": "ล่อซอมบี้ไปที่…",
+  "confirm.end.title": "จบวันนี้เลยไหม?",
+  "confirm.end.yes": "จบวัน",
+  "confirm.end.no": "เล่นต่อ",
+  "confirm.end.skip": "ไม่ต้องถามอีกในเกมนี้",
+  "itemShort.food": "อาหาร +{n}",
+  "itemShort.fuel": "เดินปลอดภัย",
+  "itemShort.junk": "พลังงาน +{n}",
+  "itemShort.medicine": "รักษา {n}",
+  "itemShort.tools": "+{n} เครื่องกีดขวาง",
+  "itemShort.weapon": "ATK +{n}",
+  "itemShort.junkWild": "พลังงาน +{n} · ไวลด์",
+  "itemShort.recruit": "+1 ผู้รอดชีวิต",
+  "itemShort.blueprint": "เลือก 1 จาก 2",
+  "itemShort.foodSaver": "ใช้อาหาร -1",
+  "itemShort.barricadePlus": "+1 ต่อการกั้น",
+  "itemShort.zombiesHere": "ซอมบี้ {n} ตัว",
+  "act.pickPlace": "ยิงไปที่สถานที่ไหน?",
+  "act.playShort": "ใช้",
+  "act.contributeShort": "บริจาคให้วิกฤต",
+  "act.depositShort": "ภารกิจ",
+  "loc.moveShort": "ย้ายมาที่นี่",
+  "loc.fuelShort": "เชื้อเพลิง",
+  "pick.title": "แปลนอาคาร: เก็บของที่ดีกว่า",
+  "pick.text": "เลือกการ์ดที่จะคืนไว้ใต้กองของ{place}",
+  "pick.putBack": "คืนใบนี้",
+  "err.pickPending": "เลือกการ์ดที่จะคืนก่อน",
+  "err.notPicking": "ไม่มีการ์ดให้คืน",
+  "err.noSurvivorsLeft": "ไม่มีผู้รอดชีวิตเหลือให้รับเข้ากลุ่ม",
+  "reason.recruited": "รับเข้ากลุ่ม",
+  "panel.cardDetail": "การ์ด",
+  "panel.team": "ทีมของคุณ",
+  "panel.waitingColony": "กำลังดำเนินช่วงอาณานิคม…",
+  "over.team": "ผู้รอดชีวิตของคุณ",
+  "panel.endDay": "จบกลางวัน →",
+  "hud.storm": "พายุ",
+  "time.dawn": "เช้ามืด",
+  "time.day": "กลางวัน",
+  "time.dusk": "ตอนเย็น",
+  "time.night": "กลางคืน",
+  "hud.team": "ทีม",
+  "tip.team": "ผู้รอดชีวิตในทีม (สูงสุด {max} คน) การ์ดผู้รอดชีวิตและเหตุการณ์บางอย่างจะพาคนใหม่มา",
+  "eff.recruit": "มีคนใหม่เข้าร่วมทีม",
+  "bar.walk": "เดินไป",
+  "bar.drive": "ขับรถไป",
+  "bar.attack": "โจมตี",
+  "bar.search": "ค้นหา",
+  "bar.barricade": "กีดขวาง",
+  "bar.lure": "ล่อซอมบี้",
+  "bar.nap": "งีบ",
+  "bar.guard": "เข้าเวร",
+  "bar.unguard": "เลิกเวร",
+  "bar.build": "อัปเกรด",
+  "bar.ability": "ทักษะ",
+  "bar.here": "อยู่ที่นี่",
+  "bar.risk": "เสี่ยง {n}",
+  "bar.none": "ตอนนี้ทำอะไรที่นี่ไม่ได้",
+  "pack.tabStock": "คลังที่ฐาน",
+  "pack.myPack": "เป้",
+  "pack.headStock": "คลังที่ฐาน · {n} ชิ้น",
+  "pack.headPack": "เป้ของ {name} · {n}",
+  "pack.awayStock": "อยู่ที่ฐาน — ใช้ไม่ได้จากที่นี่",
+  "pack.awayPack": "ของคนอื่น — ดูได้อย่างเดียว",
+  "pack.empty": "ยังไม่มีของ",
+  "confirm.end.outside": "{name} ยังอยู่ที่{place} — จะนอนข้างนอกและตื่นมาเหนื่อย",
+  "toast.found": "ได้ของ: {items}",
+  "toast.foundNone": "ค้นแล้วไม่เจออะไร",
+  "loc.cardsShort": "ของที่เหลือ",
+  "loc.forecastShort": "ซอมบี้คืนนี้",
+  "build.working": "กำลังสร้าง",
+  "pack.far": "{name} อยู่ที่{place} หยิบไม่ถึง",
+  "act.contributeWhy": "บริจาคให้วิกฤต: ของชนิดที่ตรงนับ +1 ชนิดอื่น −1 ครบตามจำนวนก่อนค่ำจึงผ่าน",
+  "cross.youChose": "คุณเลือก",
+  "cross.who": "เกิดกับ {name}",
+  "build.shift": "ครั้งละ {n}",
+  "hud.siegeWho": "จะโดนกัด: {list} HP (คนเลือดมากสุดโดนก่อน)",
+  "hud.siegeFood": "ไม่มีใครอยู่ฐาน: เสียอาหาร {n}",
+  "log.spotsFound": "พบจุดค้นย่อย {count} แห่งในถนนใหม่",
+  "rules.spots.title": "จุดค้นย่อย",
+  "rules.spots.text": "บ้านร้าง รถทิ้งร้าง และตู้คอนเทนเนอร์บนแผนที่มีของไม่กี่ชิ้น ค้นครั้งเดียวได้ของทั้งหมด (2–4 ชิ้น) ใช้ AP น้อยกว่าและเรียกซอมบี้น้อยกว่าสถานที่ แล้วจะว่างไปตลอด ซูมเข้าใกล้จะเห็นไอคอนแว่นขยาย",
+  "rules.spots.ex": "เดินไปรถทิ้งร้างข้างบล็อก ค้นเร็วสองครั้งได้เศษเหล็กกับถังน้ำมัน",
+  "loc.finds": "ค้นได้อีกกี่ครั้ง: ค้นแต่ละครั้งได้ของ 2–4 ชิ้น",
+  "loc.findsShort": "ครั้ง",
+  "found.title": "พบของ {n} ชิ้น",
+  "found.who": "{name} เก็บใส่กระเป๋า",
+  "found.spawned": "เสียงดังเรียกซอมบี้มาที่นี่ 1 ตัว!",
+  "found.pack": "กระเป๋าว่าง {n} ช่อง",
+  "found.left": "ค้นได้อีก {n} ครั้ง",
+  "found.empty": "ที่นี่ไม่มีของเหลือแล้ว",
+  "found.ok": "เก็บของ",
+  "toast.mapFound": "พบแผนที่เมือง! นำกลับฐานแล้วกดใช้เพื่อขยายเมือง",
+  "toast.mapGrown": "เมืองขยาย! พบสถานที่ใหม่ {n} แห่ง",
+  "log.mapFound": "{name} พบแผนที่เมืองที่{place}",
+  "log.mapGrown": "เมืองขยายเป็นสเตจ {stage}: สถานที่ใหม่ {places}"
+ },
+ "content": {
+  "locations": {
+   "colony": {
+    "name": "อาณานิคม",
+    "blurb": "ค่ายล้อมรั้วรอบกองไฟที่ไม่ยอมมอด มีสี่ประตู และไม้กระดานไม่เคยพอ"
+   },
+   "police": {
+    "name": "สถานีตำรวจ",
+    "blurb": "สน. 9 ห้องเก็บของกลางยังส่งเสียงหึ่งจากแบตเตอรี่สำรอง"
+   },
+   "grocery": {
+    "name": "ร้านขายของชำ",
+    "blurb": "ฟรีชโค มาร์เก็ต ตู้แช่แข็งหมดความหมายไปหลายสัปดาห์แล้ว"
+   },
+   "school": {
+    "name": "โรงเรียน",
+    "blurb": "โรงเรียนประถมลาร์คสเปอร์ ภาพวาดสีเทียนยังติดเต็มประตูโรงยิม"
+   },
+   "hospital": {
+    "name": "โรงพยาบาล",
+    "blurb": "โรงพยาบาลเซนต์ออเรเลีย ไฟล็อบบี้กะพริบช้า ๆ เหมือนจังหวะหัวใจ"
+   },
+   "library": {
+    "name": "ห้องสมุด",
+    "blurb": "ห้องสมุดประชาชนแอชโกรฟ กระดาษเผาได้ แต่ความรู้ช่วยให้รอด"
+   },
+   "gas": {
+    "name": "ปั๊มน้ำมัน",
+    "blurb": "นอร์ธสตาร์ ฟิวแอนด์สแน็ค หัวจ่ายแห้ง แต่ถังใต้ดินยังไม่แห้ง"
+   },
+   "warehouse": {
+    "name": "โกดัง",
+    "blurb": "ประตูโหลดของแข็งค้างครึ่งบาน พาเลทจมอยู่ใต้กองหิมะ"
+   },
+   "motel": {
+    "name": "โมเต็ล",
+    "blurb": "ไพน์เรสต์โมเต็ล กุญแจห้องยังแขวนครบทุกดอก ยกเว้นดอกเดียว"
+   },
+   "apartment": {
+    "name": "อพาร์ตเมนต์",
+    "blurb": "หกชั้นของประตูที่ล็อกไว้ กับเสบียงของคนอื่น"
+   },
+   "church": {
+    "name": "โบสถ์",
+    "blurb": "โบสถ์เซนต์ไบรด์ เชือกระฆังแข็งเป็นน้ำแข็ง แต่ห้องใต้ดินยังแห้ง"
+   },
+   "farmhouse": {
+    "name": "บ้านไร่",
+    "blurb": "โรงนาสีแดงจมหิมะ ห้องเก็บของใต้ดินยังไม่มีใครเจอ"
+   },
+   "spot-house": {
+    "name": "บ้านร้าง",
+    "blurb": "ม่านปิด ประตูไม่ได้ล็อก ใครบางคนรีบออกไป"
+   },
+   "spot-car": {
+    "name": "รถทิ้งร้าง",
+    "blurb": "กุญแจยังเสียบอยู่ แบตหมดไปนานแล้ว"
+   },
+   "spot-container": {
+    "name": "ตู้คอนเทนเนอร์",
+    "blurb": "ซีลถูกตัด ข้างในมีพาเลท ผนังจับน้ำแข็ง"
+   },
+   "mall": {
+    "name": "ห้างสรรพสินค้า",
+    "blurb": "นอร์ธเกตมอลล์ บันไดเลื่อนแข็งค้างกลางขั้น แต่ศูนย์อาหารไม่เคยหยุด"
+   },
+   "hardware": {
+    "name": "ร้านวัสดุก่อสร้าง",
+    "blurb": "แบรนต์แอนด์ซันส์ ตะปูขายเป็นกิโล ถ้าหาตาชั่งเจอ"
+   },
+   "military": {
+    "name": "ค่ายทหาร",
+    "blurb": "ค่ายฮาลเดน แนวกักกันโรคยันอยู่ได้เก้าวัน"
+   },
+   "factory": {
+    "name": "โรงงาน",
+    "blurb": "เคลเลอร์แมชชีนเวิร์กส์ กะดึกไม่เคยได้ตอกบัตรออก"
+   },
+   "forest": {
+    "name": "ป่าสน",
+    "blurb": "ทางลากซุงเข้าไปในป่าสน ใครบางคนเรียงกองฟืนไว้อย่างเรียบร้อย"
+   },
+   "scrapyard": {
+    "name": "ลานเศษเหล็ก",
+    "blurb": "ซากรถซ้อนกันสามชั้น เครนยังคาบรถไว้คันหนึ่ง"
+   }
+  },
+  "items": {
+   "kitchen-knife": {
+    "name": "มีดทำครัว"
+   },
+   "crowbar": {
+    "name": "ชะแลง"
+   },
+   "baseball-bat": {
+    "name": "ไม้เบสบอล"
+   },
+   "hunting-bow": {
+    "name": "ธนูล่าสัตว์"
+   },
+   "scrap-plate": {
+    "name": "เกราะเศษเหล็ก"
+   },
+   "snow-suit": {
+    "name": "ชุดกันหิมะ",
+    "text": "พายุไม่ทำให้เสีย AP เพิ่ม"
+   },
+   "flashlight": {
+    "name": "ไฟฉาย",
+    "text": "ค้นของใช้ AP น้อยลง 5"
+   },
+   "city-map": {
+    "name": "แผนที่ทางลัด",
+    "text": "เดินใช้ AP น้อยลง 3"
+   },
+   "city-map-piece": {
+    "name": "แผนที่เมือง",
+    "text": "ใช้ที่ฐาน: เมืองขยายออกหนึ่งสเตจ"
+   },
+   "big-backpack": {
+    "name": "เป้ใบใหญ่",
+    "text": "เป้ +2 ช่อง"
+   },
+   "sled": {
+    "name": "เลื่อนหิมะ",
+    "text": "เป้ +3 ช่อง เดินใช้ AP เพิ่ม 2"
+   },
+   "tool-kit": {
+    "name": "ชุดเครื่องมือ",
+    "text": "สร้างสิ่งกีดขวางใช้ AP น้อยลง 5"
+   },
+   "bandage": {
+    "name": "ผ้าพันแผล",
+    "text": "+15 HP"
+   },
+   "first-aid-kit": {
+    "name": "ชุดปฐมพยาบาล",
+    "text": "+35 HP"
+   },
+   "painkillers": {
+    "name": "ยาแก้ปวด",
+    "text": "+10 HP +10 AP"
+   },
+   "coffee": {
+    "name": "กาแฟสำเร็จรูป",
+    "text": "+20 AP"
+   },
+   "chocolate": {
+    "name": "ช็อกโกแลต",
+    "text": "+10 AP +5 HP"
+   },
+   "ammo": {
+    "name": "กล่องกระสุน",
+    "text": "กระสุนปืน +6 นัด"
+   },
+   "firebomb": {
+    "name": "ระเบิดเพลิง",
+    "text": "ฆ่าซอมบี้ที่นี่ได้ถึง 3 ตัว"
+   },
+   "wood": {
+    "name": "ไม้กระดาน"
+   },
+   "scrap": {
+    "name": "เศษเหล็ก"
+   },
+   "cloth": {
+    "name": "ผ้า"
+   },
+   "engine-part": {
+    "name": "ชิ้นส่วนเครื่องยนต์"
+   },
+   "heater-part": {
+    "name": "ชิ้นส่วนฮีตเตอร์"
+   },
+   "canned-beans": {
+    "name": "ถั่วกระป๋อง"
+   },
+   "beef-jerky": {
+    "name": "เนื้อแห้งปั๊มน้ำมัน"
+   },
+   "rice-sack": {
+    "name": "กระสอบข้าวสาร"
+   },
+   "first-aid-pouch": {
+    "name": "กระเป๋าปฐมพยาบาล"
+   },
+   "antibiotics": {
+    "name": "ยาปฏิชีวนะ"
+   },
+   "jerry-can": {
+    "name": "แกลลอนน้ำมัน"
+   },
+   "duct-tape": {
+    "name": "เทปผ้า"
+   },
+   "zip-ties": {
+    "name": "เคเบิลไทร์"
+   },
+   "socket-set": {
+    "name": "ชุดบล็อกขันน็อต"
+   },
+   "riot-baton": {
+    "name": "กระบองปราบจลาจล"
+   },
+   "glock-19": {
+    "name": "Glock 19"
+   },
+   "remington-870": {
+    "name": "Remington 870"
+   },
+   "mosin-nagant": {
+    "name": "Mosin-Nagant"
+   },
+   "bedpan": {
+    "name": "กระโถนเหล็ก"
+   },
+   "motor-junk": {
+    "name": "เศษอะไหล่เครื่องยนต์"
+   },
+   "stranger-with-child": {
+    "name": "คนแปลกหน้ากับเด็ก"
+   },
+   "lone-wanderer": {
+    "name": "นักเดินทางผู้โดดเดี่ยว"
+   },
+   "blueprint-police": {
+    "name": "แปลนสถานีตำรวจ"
+   },
+   "blueprint-grocery": {
+    "name": "แปลนร้านขายของชำ"
+   },
+   "blueprint-school": {
+    "name": "แปลนโรงเรียน"
+   },
+   "blueprint-hospital": {
+    "name": "แปลนโรงพยาบาล"
+   },
+   "blueprint-library": {
+    "name": "แปลนห้องสมุด"
+   },
+   "blueprint-gas": {
+    "name": "แปลนปั๊มน้ำมัน"
+   },
+   "winter-cookbook": {
+    "name": "ตำราอาหารฤดูหนาว"
+   },
+   "field-manual": {
+    "name": "คู่มือสร้างเครื่องกีดขวาง"
+   },
+   "survival-guide": {
+    "name": "คู่มือเอาชีวิตรอดฤดูหนาว",
+    "text": "พักให้ถูก กินให้อุ่น ออกเดินตอนรุ่งสาง"
+   },
+   "fire-axe": {
+    "name": "ขวานดับเพลิง",
+    "text": "สีแดง คมกริบ เหวี่ยงหนักมือ"
+   },
+   "padded-parka": {
+    "name": "เสื้อพาร์กาบุขนเป็ด",
+    "text": "ขนห่านกับฮู้ดขนสัตว์"
+   },
+   "winter-boots": {
+    "name": "รองเท้าบูตกันหนาว",
+    "text": "ผูกเชือกแน่น ข้างในแห้งสนิท"
+   },
+   "riot-vest": {
+    "name": "เสื้อเกราะปราบจลาจล",
+    "text": "แผ่นเคฟลาร์ ฟันกัดไม่เข้า"
+   }
+  },
+  "survivors": {
+   "maren-holt": {
+    "occupation": "คนขับรถบรรทุกถนนน้ำแข็ง",
+    "abilityText": "รู้จักทางลัดทุกเส้น: เดินทางใช้พลังงานน้อยลง 5"
+   },
+   "osei-vance": {
+    "occupation": "ศัลยแพทย์ห้องฉุกเฉิน",
+    "abilityText": "ตาละครั้ง (ฟรี): รักษาบาดแผลหรือหิมะกัด 1 ให้ผู้รอดชีวิตที่อยู่ที่เดียวกัน"
+   },
+   "pim-arunrat": {
+    "occupation": "แม่ค้าอาหารริมทาง",
+    "abilityText": "ขณะพิมอยู่ในอาณานิคม อาณานิคมใช้อาหารน้อยลง 1 ต่อรอบ"
+   },
+   "ilse-brandt": {
+    "occupation": "อดีตพลซุ่มยิง",
+    "abilityText": "ยิงจากระยะไกล: โจมตีใช้พลังงานน้อยลง 5"
+   },
+   "teodor-rusu": {
+    "occupation": "การ์ดไนต์คลับ",
+    "abilityText": "โจมตีสำเร็จแต่ละครั้งฆ่าซอมบี้ 2 ตัว"
+   },
+   "nia-calloway": {
+    "occupation": "ช่างกุญแจ",
+    "abilityText": "สร้างเครื่องกีดขวางครั้งละ 2 อัน"
+   },
+   "wren-okafor": {
+    "occupation": "ภารโรงกะดึก",
+    "abilityText": "ถนัดงานช่าง: สร้างเครื่องกีดขวางใช้พลังงานน้อยลง 5"
+   },
+   "lio-fontaine": {
+    "occupation": "ตัวตลกโรดิโอ",
+    "abilityText": "ล่อซอมบี้ได้ครั้งละสูงสุด 2 ตัว"
+   },
+   "hattie-moss": {
+    "occupation": "พนักงานร้านขายของชำ",
+    "abilityText": "จั่ว 2 ใบเมื่อค้นหาร้านขายของชำ"
+   },
+   "rafael-quist": {
+    "occupation": "ผู้ช่วยเภสัชกร",
+    "abilityText": "จั่ว 2 ใบเมื่อค้นหาโรงพยาบาล"
+   },
+   "agnes-pell": {
+    "occupation": "บรรณารักษ์ใหญ่",
+    "abilityText": "จั่ว 2 ใบเมื่อค้นหาห้องสมุด"
+   },
+   "corwin-daly": {
+    "occupation": "ตำรวจสายตรวจ",
+    "abilityText": "จั่ว 2 ใบเมื่อค้นหาสถานีตำรวจ"
+   },
+   "juno-barrera": {
+    "occupation": "ช่างประจำพิทสต็อป",
+    "abilityText": "จั่ว 2 ใบเมื่อค้นหาปั๊มน้ำมัน"
+   },
+   "kanya-srisuk": {
+    "occupation": "ครูอนุบาล",
+    "abilityText": "เมื่อผ่านวิกฤตได้ขณะกันยายังมีชีวิต ขวัญกำลังใจ +1"
+   },
+   "bo-lindqvist": {
+    "occupation": "นักดำน้ำใต้น้ำแข็ง",
+    "abilityText": "ชินกับความหนาว: ทำแอคชันข้างนอกตอนกลางคืนไม่เสียพลังงานเพิ่ม"
+   },
+   "ezra-kade": {
+    "occupation": "นักเล่นไพ่",
+    "abilityText": "ใช้เศษของคุ้มที่สุด: ของจิปาถะให้พลังงาน 2 เท่า"
+   },
+   "greta-vos": {
+    "occupation": "อดีตนักมวย",
+    "abilityText": "ตายเมื่อมีบาดแผล 4 แทน 3"
+   },
+   "silas-thorn": {
+    "occupation": "ไกด์นำล่าสัตว์",
+    "abilityText": "ซอมบี้เกิดน้อยลง 1 ตัวที่ตำแหน่งของไซลัส (นอกอาณานิคม)"
+   },
+   "dot-ferreira": {
+    "occupation": "แมสเซนเจอร์จักรยาน",
+    "abilityText": "ไม่รู้จักเหนื่อย: ต้นเทิร์นได้พลังงานเพิ่ม 15"
+   },
+   "ambrose-lark": {
+    "occupation": "ประติมากรเศษเหล็ก",
+    "abilityText": "ของจิปาถะที่ใส่ในวิกฤตนับเป็นไอเท็มที่ตรงกัน ขณะแอมโบรสยังมีชีวิต"
+   }
+  },
+  "scenarios": {
+   "crawler": {
+    "name": "สร้างรถลุยหิมะ",
+    "text": "มีรถลุยหิมะเก่าจอดอยู่ในลานอาณานิคม ซ่อมให้เสร็จ 4 ขั้นแล้วพาทุกคนลงใต้ก่อนวันที่ 40",
+    "goalText": "สร้างรถลุยหิมะให้ครบ 4 ขั้น: โครง เครื่องยนต์ ฮีตเตอร์ น้ำมัน"
+   },
+   "beacon": {
+    "name": "จุดประภาคารบนสันเขา",
+    "text": "ขบวนกู้ภัยจะผ่านสันเขาก็ต่อเมื่อเห็นไฟ ขนเชื้อเพลิงมาที่อาณานิคมแล้วกองให้ทันเวลา",
+    "goalText": "ส่งการ์ดเชื้อเพลิง 15 ใบเข้าประภาคาร"
+   },
+   "stores": {
+    "name": "เติมห้องเก็บเสบียง",
+    "text": "ความหนาวเย็นขั้นสุดกำลังมา สะสมอาหารให้พอผ่านไปได้ และรักษาประตูให้ปลอดภัย",
+    "goalText": "ตอนเย็น มีอาหารอย่างน้อย 60 และซอมบี้ที่อาณานิคมไม่เกิน 3"
+   },
+   "purge": {
+    "name": "กวาดล้างกองหิมะ",
+    "text": "ฝูงซอมบี้หลับอยู่ใต้หิมะ ลดจำนวนมันลงก่อนหิมะละลายปลุกทั้งหมดขึ้นมาพร้อมกัน",
+    "goalText": "ฆ่าซอมบี้รวม 60 ตัว"
+   }
+  },
+  "crises": {
+   "whiteout": {
+    "name": "พายุหิมะขาวโพลน",
+    "text": "พายุกลืนขอบฟ้า เติมไฟให้ลุกโชนไม่อย่างนั้นจะผ่านคืนนี้ไปไม่ได้"
+   },
+   "fever-ward": {
+    "name": "เรือนไข้",
+    "text": "อาการไอลามไปตามเตียง ทีละคน"
+   },
+   "empty-pantry": {
+    "name": "ตู้กับข้าวว่างเปล่า",
+    "text": "มีคนนับกระป๋องซ้ำสองรอบ ตัวเลขก็ยังเท่าเดิม"
+   },
+   "fence-collapse": {
+    "name": "รั้วพัง",
+    "text": "น้ำแข็งทำให้เสาด้านเหนือแตก รั้วฝั่งตะวันออกเอียงทั้งแนว"
+   },
+   "howling-pack": {
+    "name": "ฝูงเสียงหอน",
+    "text": "บางอย่างที่มีเสียงมากเกินไปวนรอบรั้วหลังมืด"
+   },
+   "frozen-pipes": {
+    "name": "ท่อน้ำแข็งตัว",
+    "text": "ท่อห้องน้ำแตก ไม่มีใครอยากพูดถึงมัน"
+   },
+   "generator-cough": {
+    "name": "เครื่องปั่นไฟสะอึก",
+    "text": "เครื่องปั่นไฟเก่าสะดุด ตู้แช่เงียบลง"
+   },
+   "raiders-at-gate": {
+    "name": "โจรที่ประตู",
+    "text": "ไฟหน้ารถบนถนนสันเขา พวกมันต้องการสิ่งที่คุณมี"
+   },
+   "sick-bay-overflow": {
+    "name": "ห้องพยาบาลล้น",
+    "text": "นิ้วดำจากหิมะกัด ริมฝีปากแตก ไข้ที่ไม่ยอมลด"
+   },
+   "ration-riot": {
+    "name": "จลาจลแย่งเสบียง",
+    "text": "การผลักกันในแถวรับอาหารกลายเป็นเรื่องที่แย่กว่านั้น"
+   }
+  },
+  "crossroads": {
+   "xr-frozen-child": {
+    "title": "เด็กชายในตู้แช่",
+    "text": "หลังตู้แช่เนื้อ เด็กชายในชุดกันหนาวกำที่เปิดกระป๋องไว้แน่นและไม่ยอมปล่อย",
+    "choices": [
+     "พาเขากลับบ้าน",
+     "เอาที่เปิดกระป๋องไป ทิ้งถั่วไว้ให้เขา"
+    ]
+   },
+   "xr-evidence-locker": {
+    "title": "ห้องเก็บของกลาง",
+    "text": "ล็อกเกอร์ถูกคล้องกุญแจ กุญแจอยู่ที่เข็มขัด และเข็มขัดอยู่บนตัวคนที่ยังขยับอยู่",
+    "choices": [
+     "ปล้ำแย่งกุญแจมา",
+     "ไม่คุ้ม เดินจากไป"
+    ]
+   },
+   "xr-nurse-notes": {
+    "title": "บันทึกจนวินาทีสุดท้าย",
+    "text": "คลิปบอร์ดของพยาบาลมีรายชื่อคนไข้ทุกคนในวอร์ด รายการสุดท้ายคือชื่อของเธอเอง",
+    "choices": [
+     "อ่านบันทึกเพื่อหาที่เก็บเวชภัณฑ์",
+     "ฝังเธอในหิมะอย่างสมเกียรติ"
+    ]
+   },
+   "xr-story-time": {
+    "title": "ชั่วโมงเล่านิทาน",
+    "text": "ผู้รอดชีวิตสิบสองคนนั่งเบียดกันในมุมอ่านหนังสือ พวกเขาถามว่าคุณรู้จักนิทานที่จบดีบ้างไหม",
+    "choices": [
+     "ชวนพวกเขามาอยู่ที่อาณานิคม",
+     "แลกนิทานกับเสบียง"
+    ]
+   },
+   "xr-school-bell": {
+    "title": "ระฆังโรงเรียน",
+    "text": "เชือกระฆังยังอยู่ดี ถ้าตีมันจะเรียกซอมบี้ทั้งย่านมาที่นี่",
+    "choices": [
+     "ตีระฆังแล้วล่อพวกมันออกจากอาณานิคม",
+     "ตัดเชือกทิ้ง เงียบไว้ปลอดภัยกว่า"
+    ]
+   },
+   "xr-pump-handle": {
+    "title": "ปั๊มมือ",
+    "text": "ปั๊มมือฉุกเฉินยังใช้ได้ แต่มันก็ส่งเสียงแหลมเหมือนสัตว์บาดเจ็บ",
+    "choices": [
+     "ปั๊มไปเลย",
+     "เอาเสื้อโค้ทอุดเสียงไว้ แล้วค่อย ๆ ปั๊ม"
+    ]
+   },
+   "xr-hungry-dog": {
+    "title": "หมาหิวโซ",
+    "text": "ฮัสกี้ผอมโซเดินตามคุณมา หางตก มันนั่งลงทุกครั้งที่คุณหยุด",
+    "choices": [
+     "ให้อาหารมัน ใคร ๆ ก็ต้องการเพื่อน",
+     "ไล่มันไป"
+    ]
+   },
+   "xr-trade-caravan": {
+    "title": "พ่อค้าเลื่อนหิมะ",
+    "text": "พ่อค้าสองคนบนเลื่อนสุนัขรับทุกอย่างที่แวววาว",
+    "choices": [
+     "แลกของจิปาถะกับของที่มีประโยชน์",
+     "ส่งพวกเขาไปตามทาง"
+    ]
+   },
+   "xr-wounded-stranger": {
+    "title": "คนแปลกหน้าริมทาง",
+    "text": "ผู้หญิงคนหนึ่งนั่งอยู่ในกองหิมะ กุมสีข้างไว้ เธอบอกว่าแค่ล้ม เธออาจโกหก หรืออาจไม่ได้โกหก",
+    "choices": [
+     "ทำแผลให้แล้วพาเข้ามา",
+     "ทิ้งเธอไว้ คุณเสี่ยงไม่ได้"
+    ]
+   },
+   "xr-low-spirits": {
+    "title": "หน้าเศร้า",
+    "text": "ไม่มีใครหัวเราะตอนกินข้าวอีกแล้ว มีคนเสนอให้จัดงานฉลองด้วยอาหารดี ๆ ที่เหลืออยู่",
+    "choices": [
+     "จัดงานเลี้ยง",
+     "เสบียงก็คือเสบียง"
+    ]
+   },
+   "xr-gate-rattle": {
+    "title": "เสียงเขย่าประตู",
+    "text": "ประตูทิศใต้สั่นทั้งคืน โซ่เริ่มยืดแล้ว",
+    "choices": [
+     "เสริมความแข็งแรงเดี๋ยวนี้",
+     "ภาวนาให้โซ่ทนไหว"
+    ]
+   },
+   "xr-empty-plates": {
+    "title": "จานว่างเปล่า",
+    "text": "เด็ก ๆ หิว มีอาสาสมัครเสนอตัวออกไปล่าสัตว์คนเดียวตอนมืด",
+    "choices": [
+     "ให้เขาไป",
+     "ไปเอง"
+    ]
+   },
+   "xr-rotting-pile": {
+    "title": "กองขยะ",
+    "text": "กองขยะหลังเรือนนอนเริ่มส่งกลิ่น แม้อากาศจะหนาวขนาดนี้",
+    "choices": [
+     "เผามันทิ้ง",
+     "ปล่อยไว้อีกสักพัก"
+    ]
+   },
+   "xr-old-friend": {
+    "title": "เพื่อนเก่า",
+    "text": "หน้าคุ้นเคยที่รั้ว เขาซีดเผือด และสาบานว่าไม่ได้ถูกกัด",
+    "choices": [
+     "ให้เขาเข้ามา",
+     "ปิดประตูไว้"
+    ]
+   },
+   "xr-limp": {
+    "title": "ขากะเผลก",
+    "text": "แผลของคุณร้อนและตึง มีคนบอกว่าโรงพยาบาลยังมียาฆ่าเชื้อเหลืออยู่",
+    "choices": [
+     "พักข้างกองไฟ",
+     "ฝืนต่อไป"
+    ]
+   },
+   "xr-crowded-bunks": {
+    "title": "เรือนนอนแออัด",
+    "text": "ปากท้องมีมากกว่าเตียง ผู้มาใหม่บางคนเสนอตัวเข้าเวรยามแลกที่พัก",
+    "choices": [
+     "ให้พวกเขาขึ้นกำแพง",
+     "ขอให้พวกเขาไปหาที่พักที่อื่น"
+    ]
+   },
+   "xr-crowd": {
+    "title": "ครอบครัวใหญ่",
+    "text": "คนของคุณเถียงกันว่าใครควรเข้าเวรกลางคืน",
+    "choices": [
+     "เข้าเวรเอง",
+     "จับฉลาก"
+    ]
+   },
+   "xr-snow-angel": {
+    "title": "นางฟ้าหิมะ",
+    "text": "หิมะใหม่และท้องฟ้าแจ่มใส เด็ก ๆ อยากออกไปเล่นข้างนอกเป็นครั้งแรกในรอบหลายสัปดาห์",
+    "choices": [
+     "ให้พวกเขาไปเล่น คุณจะเฝ้ายามให้",
+     "อันตรายเกินไป"
+    ]
+   },
+   "xr-radio-voice": {
+    "title": "เสียงทางวิทยุ",
+    "text": "สัญญาณวิทยุแตกพร่าสัญญาว่ามีเขตปลอดภัยทางใต้ มันออกอากาศซ้ำทุกชั่วโมง คำต่อคำ",
+    "choices": [
+     "เผาเชื้อเพลิงเพื่อฟังต่อ",
+     "ปิดมันซะ ความหวังมีราคาแพง"
+    ]
+   },
+   "xr-black-ice": {
+    "title": "น้ำแข็งดำ",
+    "text": "ถนนวาวเหมือนกระจก ก้าวผิดก้าวเดียวคุณจะล้มอย่างแรง",
+    "choices": [
+     "อ้อมไปทางไกล",
+     "เสี่ยงดู"
+    ]
+   },
+   "xr-stashed-rations": {
+    "title": "เสบียงที่ซ่อนไว้",
+    "text": "คุณสังเกตว่ากระป๋องในคลังอาณานิคมหายไป แล้วก็เจอว่ามันไปอยู่ไหน ใต้เตียงของเพื่อนร่วมห้องคุณเอง",
+    "choices": [
+     "เอาไปคืนเงียบ ๆ",
+     "เก็บไว้เองสักสองสามกระป๋อง"
+    ]
+   },
+   "xr-thin-ice": {
+    "title": "น้ำแข็งบาง",
+    "text": "ทุกคนกำลังใจดี มีคนเสนอให้ออกไปตกปลาบนทะเลสาบ",
+    "choices": [
+     "ไปตกปลา",
+     "ไม่ใช่วันนี้"
+    ]
+   },
+   "xr-final-rounds": {
+    "title": "นับวัน",
+    "text": "มีคนขีดเส้นเพิ่มอีกเส้นบนวงกบประตู ที่ว่างสำหรับเส้นเริ่มจะหมดแล้ว",
+    "choices": [
+     "ทำงานตลอดคืน",
+     "นอนซะ คุณต้องการมัน"
+    ]
+   },
+   "xr-weapons-cache": {
+    "title": "กระท่อมนักล่า",
+    "text": "แนวกับดักพาไปถึงกระท่อม เจ้าของหายไป ประตูเปิดอยู่ และมีบางอย่างข้างในกำลังหายใจ",
+    "choices": [
+     "เข้าไป โดยยื่นอาวุธนำ",
+     "จดตำแหน่งไว้ในแผนที่ก่อน"
+    ]
+   },
+   "xr-snowed-in": {
+    "title": "หิมะปิดทาง",
+    "text": "กองหิมะฝังประตูทิศตะวันตกข้ามคืน ขุดออกต้องใช้เวลาทั้งเช้า",
+    "choices": [
+     "ขุดออก",
+     "ปล่อยไว้ กำแพงหิมะก็ยังเป็นกำแพง"
+    ]
+   },
+   "xr-fuel-thief": {
+    "title": "ใครเอาเชื้อเพลิงไป?",
+    "text": "มีคนเห็นคุณถือแกลลอนออกมาจากโรงเก็บ อาณานิคมต้องการคำอธิบาย",
+    "choices": [
+     "ส่งคืนคลังกลาง",
+     "ปฏิเสธทุกอย่าง"
+    ]
+   },
+   "xr-garden-seeds": {
+    "title": "ซองเมล็ดพันธุ์",
+    "text": "กล่องเมล็ดพันธุ์กับชุดกระบะเพาะ ถ้ามีเครื่องมือที่เหมาะ คุณอาจปลูกอะไรได้",
+    "choices": [
+     "สร้างกระบะเพาะ",
+     "เก็บเครื่องมือไว้ซ่อมรั้ว"
+    ]
+   },
+   "xr-sleepwalker": {
+    "title": "คนละเมอ",
+    "text": "ตีสาม พบชาวอาณานิคมคนหนึ่งยืนเท้าเปล่าฮัมเพลงอยู่ที่ประตู",
+    "choices": [
+     "ให้คนคอยเฝ้าเขา",
+     "ขังเขาไว้ในโรงเก็บของตอนกลางคืน"
+    ]
+   },
+   "xr-frost-fever": {
+    "title": "ไข้หิมะ",
+    "text": "นิ้วของคุณหยุดเจ็บไปตั้งแต่ชั่วโมงที่แล้ว นั่นไม่ใช่สัญญาณที่ดี",
+    "choices": [
+     "กลับไปที่กองไฟทันที",
+     "ทำงานให้เสร็จก่อน"
+    ]
+   },
+   "xr-noise-upstairs": {
+    "title": "เสียงฝีเท้าชั้นบน",
+    "text": "เสียงฝีเท้าช้า ๆ เดินข้ามพื้นเหนือหัวคุณ แล้วหยุดตรงเหนือหัวคุณพอดี",
+    "choices": [
+     "ขึ้นไปจัดการ",
+     "ปิดกั้นบันได"
+    ]
+   }
+  }
+ }
+}

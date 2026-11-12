@@ -4,4 +4,5 @@ export * from './actions.js';
 export { createGame, STATE_VERSION } from './state.js';
 export { reduce, tryReduce, serialize, deserialize } from './reducer.js';
 export { RuleError } from './errors.js';
+export { stateHash, stableJson, fnv1a } from './hash.js';
 export * as selectors from './selectors.js';
