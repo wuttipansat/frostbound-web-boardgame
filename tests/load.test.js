@@ -66,7 +66,7 @@ test('the baked pack stays small (when built)', () => {
   const f = `public/${PACK_FILE}`;
   if (!fs.existsSync(f)) return;
   const gz = Buffer.from(fs.readFileSync(f, 'utf8'), 'base64');
-  assert.ok(gz.length <= 4.3e6, `pack ${gz.length} bytes gzip`); // MAP-6/7/VOXEL-2/MAP-9: 4.3 MB (refined pieces, cottages and places up close, more buildings)
+  assert.ok(gz.length <= 4.6e6, `pack ${gz.length} bytes gzip`); // MAP-6/7/VOXEL-2/MAP-9/12: 4.6 MB (refined pieces, cottages and places up close, more buildings, landmarks)
   assert.ok(decodePack(zlib.gunzipSync(gz)).size > 50, 'pack decodes');
 });
 

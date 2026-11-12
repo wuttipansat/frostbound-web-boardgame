@@ -51,7 +51,7 @@ function audit(board, map, seed, stage) {
     { // MAP-6: nothing stands on the river ice but its bridge parapets
       const rv = riverLine(map); const ac = rv.axis === 'x' ? [it.box.min.z, it.box.max.z] : [it.box.min.x, it.box.max.x];
       const al = rv.axis === 'x' ? c.x : c.z; const here = has(...(rv.axis === 'x' ? [gridOf(al), rv.r] : [rv.r, gridOf(al)]));
-      if (here && !/^(parapet|lamp-bridge|boat|fishing)/.test(it.kind) && ac[0] < rv.c + 2.2 && ac[1] > rv.c - 2.2) note('on the river', seed, stage, it.kind, at);
+      if (here && !/^(parapet|truss|lamp-bridge|boat|fishing)/.test(it.kind) && ac[0] < rv.c + 2.2 && ac[1] > rv.c - 2.2) note('on the river', seed, stage, it.kind, at);
     }
   }
   for (const it of items) {

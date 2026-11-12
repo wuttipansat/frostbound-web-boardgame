@@ -158,6 +158,28 @@ export function riverLine(m) {
   const r = (axis === 'z' ? dx : dz) > 0 ? 2 : -2;
   return { axis, r, c: blockPos(r), look, river: true };
 }
+/**
+ * MAP-12: a landmark on a decoration block, or null. One candidate block per 3×3 superblock (picked from its
+ * coordinates only, so growth never moves it), in a zone that fits it, never in a rail / river row or on a place.
+ */
+export function landmarkOf(b, bx, bz, m) {
+  if (!b || b.kind === 'place' || b.kind === 'colony') return null;
+  const look = m?.look ?? 0;
+  if ([railLine(m), riverLine(m)].some((l) => (l.axis === 'x' ? bz : bx) === l.r)) return null;
+  const sx = Math.floor((bx + 1) / 3); const sz = Math.floor((bz + 1) / 3);
+  // Two candidate blocks per superblock: the first takes the main landmark of its zone, the second a civic one.
+  const at = (h) => { const p = Math.floor(h * 9); return [sx * 3 - 1 + (p % 3), sz * 3 - 1 + Math.floor(p / 3)]; };
+  const [ax, az] = at(hash3(sx, 131, sz + look)); let [cx, cz] = at(hash3(sx, 135, sz + look));
+  if (cx === ax && cz === az) [cx, cz] = [sx * 3 - 1 + ((ax - (sx * 3 - 1) + 1) % 3), az];
+  const zone = zoneOf(bx, bz, look);
+  if (bx === ax && bz === az) {
+    if (zone === 'commercial') return townDepth(bx, bz, look) >= 2.4 ? 'skyscraper' : 'cityhall';
+    if (zone === 'industrial' && hash3(sx, 139, sz + look) < 0.5) return 'powerplant';
+  }
+  if (bx === cx && bz === cz && zone === 'commercial') return hash3(sx, 133, sz + look) < 0.5 ? 'carpark' : 'cityhall';
+  return null;
+}
+export const LANDMARKS = { skyscraper: city.skyscraper, cityhall: city.cityHall, carpark: city.carParkTower, powerplant: city.powerPlant };
 /** The corridors that cut through block rows: the railway and the river. */
 export const cutLines = (m) => [railLine(m), riverLine(m)];
 
@@ -737,6 +759,14 @@ export function createBoard({ progressive = false } = {}) {
       model.name = b.placeId;
       locationGroups[b.placeId] = model;
       addPick(L);
+    } else if (landmarkOf(b, bx, bz, map)) {
+      const lm = landmarkOf(b, bx, bz, map);
+      model = lodModel(`lm-${lm}`, LANDMARKS[lm], false, false); // (seen from afar: the authored level up close keeps the pack small)
+      const size = lodExtent(`lm-${lm}`, LANDMARKS[lm]);
+      model.scale.setScalar(Math.min(1, (2 * (blockHalf(bx) - ROAD.walk) - 0.4) / Math.max(size.x, size.z)));
+      model.position.set(blockPos(bx), GROUND, blockPos(bz));
+      model.rotation.y = { z: 0, x: Math.PI / 2, '-z': Math.PI, '-x': -Math.PI / 2 }[b.front ?? 'z'];
+      model.name = `landmark ${lm}`; landmarks.set(key, { kind: lm, model });
     } else if (FILLER_MODELS[b.kind]) {
       model = lodModel(`filler-${b.kind}`, FILLER_MODELS[b.kind]);
       model.position.set(blockPos(bx), GROUND, blockPos(bz));
@@ -769,6 +799,7 @@ export function createBoard({ progressive = false } = {}) {
     for (const key of keys) {
       const b = map.blocks[key];
       const [bx, bz] = parse(key);
+      if (landmarkOf(b, bx, bz, map)) continue; // MAP-12: a landmark fills its block
       if (RECIPES[b.kind] || b.kind === 'place') {
         // MAP-1b/c: a block is 3×3 chunks. A place (or a decoration block's centrepiece) takes some on the street
         // side; the rest hold small buildings, shops, trees, cars, container stacks, ruins or clutter.
@@ -958,6 +989,7 @@ export function createBoard({ progressive = false } = {}) {
   const courtyards = []; // MAP-5: courtyard spots { p, face, what }
   const crowPerches = []; const BASE_CHIMNEYS = 3; // the colony's two houses + the dorm
   const detailNodes = []; // MAP-7: hidden in Battery saver
+  const landmarks = new Map(); // MAP-12: block key → { kind, model }
   root.add(decor);
   let flickers = []; let pools = null;
   function buildStreetDecor() {
@@ -1234,6 +1266,7 @@ export function createBoard({ progressive = false } = {}) {
     crowPerches.splice(40);
     // Smoke from a few chimneys and burn barrels in the city (the colony's chimneys stay first).
     fx.chimneys.splice(BASE_CHIMNEYS);
+    for (const { kind, model } of landmarks.values()) if (kind === 'powerplant' && model.parent) for (const lx of [-15, 13]) fx.chimneys.push(new THREE.Vector3(lx * 0.3, 47 * 0.3, -12 * 0.3).multiplyScalar(model.scale.x).applyAxisAngle(new THREE.Vector3(0, 1, 0), model.rotation.y).add(model.position)); // MAP-12: steam from the cooling towers
     houseSpots.forEach((hs, i) => { if (fx.chimneys.length < BASE_CHIMNEYS + 5 && hash3(i, 11, rail.look) < 0.08) fx.chimneys.push(hs.roof.clone().add(new THREE.Vector3(0, 0.6, 0))); });
     // MAP-5 courtyards: a camp or a washing line with a snowman inside the blocks.
     for (const c of courtyards) {
@@ -1324,7 +1357,7 @@ export function createBoard({ progressive = false } = {}) {
         const yaw = r.axis === 'x' ? 0 : Math.PI / 2;
         const kind = Math.floor(hash3(st, k, rail.look + 43) * 4);
         if (kind === 0) { // a fallen pine across the lane, a gap cut through it
-          const [x, z] = at(-0.8); if (!clear(x, z, true)) continue;
+          const [x, z] = at(-0.8); if (!clear(x, z, true) || !offRiver(x, z, 6)) continue; // (the trunk is long: keep it off the ice)
           add('tree-1', () => treeModelHD(1, 1), 0.25, x, 0.3, z, yaw, Math.PI / 2 - 0.05, 'z');
         } else if (kind === 1) { // a burnt-out car
           const [x, z] = at(1.4); if (!clear(x, z, true)) continue;
@@ -1474,6 +1507,11 @@ export function createBoard({ progressive = false } = {}) {
         for (const s2 of [-1, 1]) { // MAP-7: a (dark) lamp post at each bridge, its arm over the road
           const [lx, lz] = rv.axis === 'x' ? [(t0 + t1) / 2 + s2 * (ROAD.half + 0.45), rv.c + 3.0 * s2] : [rv.c + 3.0 * s2, (t0 + t1) / 2 + s2 * (ROAD.half + 0.45)];
           add('lamp-bridge', () => lampModel(true), 0.1, lx, GROUND, lz, rv.axis === 'x' ? (s2 > 0 ? Math.PI : 0) : (s2 > 0 ? Math.PI / 2 : -Math.PI / 2));
+        }
+        const aveR = avenueLine(map);
+        if (aveR.axis !== rv.axis && Math.abs((t0 + t1) / 2 - aveR.c) < 0.6) { // MAP-12: the avenue crosses on a steel truss bridge
+          for (const s2 of [-1, 1]) add('truss', city.trussModel, 0.1, ...(rv.axis === 'x' ? [(t0 + t1) / 2 + s2 * (ROAD.half + 0.45), GROUND, rv.c] : [rv.c, GROUND, (t0 + t1) / 2 + s2 * (ROAD.half + 0.45)]), rv.axis === 'x' ? Math.PI / 2 : 0);
+          continue;
         }
         for (const s2 of [-1, 1]) add('parapet', bridgeParapetModel, 0.1, ...(rv.axis === 'x' ? [(t0 + t1) / 2 + s2 * (ROAD.half + 0.45), GROUND, rv.c] : [rv.c, GROUND, (t0 + t1) / 2 + s2 * (ROAD.half + 0.45)]), rv.axis === 'x' ? Math.PI / 2 : 0); // along the street, at its kerbs
         continue;
@@ -1835,7 +1873,7 @@ export function createBoard({ progressive = false } = {}) {
         glowMats.length = 0;
         lodNodes.length = 0;
         queue.length = 0;
-        houseSpots.length = 0; courtyards.length = 0;
+        houseSpots.length = 0; courtyards.length = 0; landmarks.clear();
         map = null;
         snap = true;
       }
@@ -1904,6 +1942,7 @@ export function createBoard({ progressive = false } = {}) {
         }
       });
       for (const [id, g] of Object.entries(locationGroups)) if (id !== 'colony') out.push({ kind: `place:${id}`, box: new THREE.Box3().setFromObject(g), group: 'place' });
+      for (const [k, { kind, model }] of landmarks) if (model.parent) out.push({ kind: `place:lm-${kind}@${k}`, box: new THREE.Box3().setFromObject(model), group: 'place' });
       return out;
     },
     /** LOAD-1: models still waiting to be made (progressive start). */

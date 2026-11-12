@@ -547,3 +547,10 @@ hand from the Actions tab). One-time setup: Settings → Pages → Source: GitHu
 - Growth (core/map.js growRoads): every side a new block shares with another block is a street, so new blocks always have streets between them, like the first 3×3 (before: 47% of shared edges between blocks were flush joins with no street). Old blocks and saves keep their streets.
 - Balance (300 crawler-normal games): 18% won (17% before).
 - Render: a vehicle parked at a place's kerb keeps its whole length off the railway (the school bus overhung a level crossing).
+
+### MAP-12 — big structures (items 6, 1, 3, 5 done)
+- Landmarks fill a whole decoration block (landmarkOf in board.js): two candidate blocks per 3×3 superblock, picked from coordinates only (growth never moves them), never in a rail / river row or on a place. Downtown core: a skyscraper (a podium, 14 floors of curtain wall in long glass bands, a stepped crown, a spire with aviation lights); other commercial candidates: city hall (a portico, a pediment, steps, a clock tower with a stopped clock, flagpoles) or a multi-storey car park (six decks, a ramp, parked cars, a P sign, a pay booth); industrial: a power plant (two cooling towers with steam from the chimney puffs, a turbine hall, a brick chimney, a switchyard, a POWER sign).
+- The avenue crosses the river on a steel truss bridge (verticals, diagonals, a top chord, rivets) instead of plain parapets.
+- Draw calls: each landmark is one model (one level shown at a time), so no merge pass was needed: stage 4 310 calls (guard raised to 340). The skyscraper's facade was rebuilt as glass bands so it meshes into long quads (the window-grid version alone was 0.95 MB raw).
+- Pack 4.57 MB gzip (limit raised to 4.6 MB; landmarks reuse their authored level up close and skip the colour noise). Stage 4 0.94 M triangles. Gallery: docs/ref/gallery/landmarks.jpg. Audit 0 (landmarks count as places for overlaps); 173 tests.
+- Not built (items 2, 4, 7 partly): stadium, cathedral, hospital tower, silos, container terminal, radio mast, reservoir, barn complex, the elevated highway; a city may get two of a kind (no global uniqueness).

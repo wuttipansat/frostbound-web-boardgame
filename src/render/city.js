@@ -1520,3 +1520,85 @@ export function workshop(v = 0) {
   for (let x = -12; x < 12; x += 3) m.box(x, 1, 11, 1, 5, 1, C.metalDark); for (let x = -12; x < 12; x++) if (x < -3 || x > 2) { m.set(x, 3, 11, 0x9aa3ad); m.set(x, 5, 11, 0x9aa3ad); } // yard fence with a gate gap
   return fin(m, v + 13, { noise: false });
 }
+
+// ---------------------------------------------------------------- MAP-12: landmarks (a whole block each, 0.3 world per voxel)
+
+/** The skyscraper: 14 floors on a podium, a setback crown, a spire with an aviation light; a plaza at its foot. */
+export function skyscraper() {
+  const m = new VoxelModel();
+  pad(m, -30, -30, 60, 60, 240);
+  block(m, { x0: -26, z0: -20, w: 52, d: 40, floors: 2, wall: C.greyDark, seed: 241, shop: true });
+  // A curtain wall: a band of glass on every floor between slab edges (long strips: few quads), mullions every 7.
+  const H = 14 * FH + 2 * FH;
+  m.box(-14, 2 * FH + 1, -14, 28, H - 2 * FH, 28, (x, y, z) => {
+    if (x > -14 && x < 13 && z > -14 && z < 13) return null;
+    const f = y % FH; const along = x === -14 || x === 13 ? z : x;
+    return f === 0 ? C.trim : f >= 2 && f <= 8 ? ((along + 14) % 7 === 0 ? 0x4b525a : C.glass) : 0x8a96a6;
+  });
+  for (let f = 3; f < 16; f++) m.box(-13, f * FH, -13, 26, 1, 26, C.roofDark); // floors (hide the hollow)
+  const top = new VoxelModel(); block(top, { x0: -9, z0: -9, w: 18, d: 18, floors: 3, wall: 0x7a8696, seed: 243 }); m.merge(top, 0, H, 0);
+  const T = H + 3 * FH;
+  for (let k = 0; k < 4; k++) m.box(-6 + k, T + 1 + k * 2, -6 + k, 12 - 2 * k, 2, 12 - 2 * k, C.metalDark); // crown steps
+  m.box(0, T + 9, 0, 1, 26, 1, C.metal); m.set(0, T + 35, 0, C.neonRed, true); m.set(0, T + 20, 0, C.neonRed, true);
+  for (const [x, z] of [[-24, 24], [20, 24]]) { m.box(x, 1, z, 4, 2, 4, C.grey); m.box(x + 1, 3, z + 1, 2, 4, 2, 0x3a5a3a); } // planters
+  return fin(m, 3, { noise: false });
+}
+
+/** City hall: a classical three-storey hall, a portico of columns, a clock tower, steps and flagpoles on a plaza. */
+export function cityHall() {
+  const m = new VoxelModel();
+  pad(m, -30, -30, 60, 60, 244);
+  block(m, { x0: -26, z0: -18, w: 52, d: 26, floors: 3, wall: C.cream, trim: C.creamDark, seed: 245 });
+  for (let x = -14; x < 14; x += 4) m.box(x, 1, 8, 2, 28, 2, C.trim); // portico columns
+  m.box(-16, 29, 7, 32, 2, 5, C.creamDark); for (let k = 0; k < 6; k++) m.box(-16 + k * 3, 31 + k, 7, 32 - k * 6, 1, 5, C.cream); // pediment
+  for (let k = 0; k < 4; k++) m.box(-18 + k, k, 10 + k * 2, 36 - 2 * k, 1, 3, C.grey); // steps
+  m.walls(-6, 31, -12, 12, 30, 12, C.cream); m.box(-7, 61, -13, 14, 2, 14, C.creamDark); // clock tower
+  for (const [x, z] of [[0, 0]]) { for (let a = 0; a < 24; a++) m.set(Math.round(Math.cos(a / 3.8) * 3), 52 + Math.round(Math.sin(a / 3.8) * 3), z, 0xf0eadc); m.box(0, 52, z, 1, 3, 1, 0x1c1f24); m.box(0, 52, z, 2, 1, 1, 0x1c1f24); } // a clock face (stopped)
+  for (let k = 0; k < 6; k++) m.box(-6 + k, 63 + k, -12 + k, 12 - 2 * k, 1, 12 - 2 * k, C.roofDark);
+  for (const x of [-22, 22]) { m.box(x, 1, 22, 1, 22, 1, C.metal); m.box(x + 1, 18, 22, 5, 3, 1, x < 0 ? 0x2b4a8c : 0x8a2a2a); } // flagpoles
+  return fin(m, 4, { noise: false });
+}
+
+/** A multi-storey car park over a whole block: five decks on columns, ramps, cars, a pay booth. */
+export function carParkTower() {
+  const m = new VoxelModel();
+  for (let d = 0; d < 6; d++) {
+    m.box(-28, d * 9, -24, 56, 1, 48, C.grey);
+    for (let x = -28; x < 28; x++) { m.set(x, d * 9 + 1, -24, C.trim); m.set(x, d * 9 + 1, 23, C.trim); }
+    for (let z = -20; z < 20; z += 6) for (let x = -24; x < 24; x += 4) if (d > 0 && hash3(x, d, z) < 0.18) { m.box(x, d * 9 + 1, z, 3, 2, 5, [0xa63a2e, 0x2b4170, 0xd8b03a, 0x6c7580][(x + z + d) & 3]); m.box(x, d * 9 + 3, z + 1, 3, 1, 3, C.glass); }
+  }
+  for (let x = -28; x <= 27; x += 9) for (const z of [-24, 23]) m.box(x, 1, z, 2, 45, 1, C.greyDark);
+  for (let k = 0; k < 9; k++) m.box(20 + Math.floor(k / 3), 1 + k, -18 + k, 6, 1, 3, C.grey); // a ramp
+  m.box(-28, 46, -24, 8, 5, 1, 0x2b4a8c); m.set(-24, 48, -25, 0xf0f0ea); // the P sign
+  m.box(22, 1, 25, 5, 6, 4, C.cream); m.box(22, 7, 25, 5, 1, 4, C.roofDark); // pay booth
+  return fin(m, 5, { noise: false });
+}
+
+/** A power plant: two cooling towers, a turbine hall with a tall chimney, a switchyard of gantries. */
+export function powerPlant() {
+  const m = new VoxelModel();
+  for (let x = -30; x < 30; x++) for (let z = -30; z < 30; z++) m.set(x, 0, z, hash3(x >> 2, 246, z >> 2) < 0.4 ? 0x6a6458 : P.snow);
+  for (const cx of [-15, 13]) { // hyperbolic towers
+    for (let y = 1; y < 46; y++) {
+      const r = 12 - 6 * Math.sin((y / 46) * Math.PI * 0.9) + (y > 40 ? (y - 40) * 0.4 : 0);
+      for (let a = 0; a < 80; a++) { const x = Math.round(cx + Math.cos(a / 12.7) * r); const z = Math.round(-12 + Math.sin(a / 12.7) * r); m.set(x, y, z, y % 6 === 0 ? 0x9a9c9e : y < 4 ? 0x7a7c7e : 0xb4b8bc); }
+    }
+  }
+  m.walls(-26, 1, 6, 30, 18, 16, 0x8a6a4a); for (let k = 0; k < 3; k++) m.box(-27, 19 + k, 5 + k, 32, 1, 18 - 2 * k, C.roofDark); // turbine hall
+  m.box(-24, 1, 21, 26, 10, 1, 0x7a5a3a); for (let x = -22; x < 0; x += 5) m.box(x, 4, 22, 3, 4, 1, C.glass);
+  m.box(8, 1, 10, 4, 60, 4, C.brick); for (let y = 50; y < 60; y += 3) m.box(8, y, 10, 4, 1, 4, 0xe0e0e0); // chimney
+  for (let x = 16; x < 29; x += 6) for (let z = 8; z < 28; z += 9) { m.box(x, 1, z, 1, 14, 1, C.metalDark); m.box(x - 2, 14, z, 5, 1, 1, C.metalDark); m.box(x - 1, 6, z - 1, 3, 4, 3, 0x6c7580); } // switchyard
+  m.box(-8, 22, 12, 10, 3, 1, 0x1e2126); paint(m, 'POWER', -3, 22, 13, 0xd8b03a);
+  return fin(m, 6, { noise: false });
+}
+
+/** A steel truss bridge side (0.1 world per voxel): a deck edge, verticals and diagonals, a top chord, rivets. */
+export function trussModel() {
+  const m = new VoxelModel(); const L = 60;
+  m.box(-L / 2, 0, -1, L, 3, 3, 0x5a6470);
+  for (let x = -L / 2; x <= L / 2; x += 10) m.box(x, 3, 0, 1, 22, 1, 0x4a5562);
+  m.box(-L / 2 + 5, 25, 0, L - 10, 2, 1, 0x4a5562);
+  for (let x = -L / 2; x < L / 2; x += 10) for (let k = 0; k < 10; k++) m.set(x + k, 3 + Math.round(k * 2.2), 0, 0x56616e);
+  for (let x = -L / 2; x <= L / 2; x += 5) m.set(x, 1, 2, 0x8e979f);
+  return m.snowCap(P.snow, 1, 2);
+}
