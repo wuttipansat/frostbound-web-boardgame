@@ -43,9 +43,21 @@ const RECIPES = {
   rail: [['yard', 60], ['car', 15], ['clutter', 25]],
 };
 // A big piece some decoration blocks put on their street side: [model key, wide, deep].
-/** MAP-6: place companions (one chunk): a school's playground, a hospital's pharmacy, … */
-const PLACE_EXTRAS = { school: 'playground', hospital: 'pharmacy', police: 'impound', church: 'graveyard', gas: 'diner', motel: 'diner' };
+/**
+ * MAP-6 companions / MAP-8 grounds: a place uses its whole block. Its free chunks fill, nearest first, with what
+ * belongs to it (car park, loading dock, bus loop, …) and one story of the fall (a looted shopfront, a last stand,
+ * a shelter, an overrun field clinic); chunks left over keep a tree or open snow.
+ */
+export const PLACE_GROUNDS = {
+  grocery: ['dock', 'looted', 'lot'], gas: ['tow', 'lot'], police: ['impound', 'laststand', 'lot'],
+  hospital: ['triage', 'pharmacy', 'lot'], school: ['busloop', 'schoolyard', 'playground', 'shelter'], library: ['garden', 'lot'],
+  mall: ['lot', 'foodvan', 'looted', 'lot'], military: ['convoy', 'laststand'], factory: ['siding', 'truckyard'],
+  forest: ['logs', 'clump'], scrapyard: ['wrecks', 'tow'], motel: ['diner', 'lot'], church: ['graveyard', 'shelter', 'garden'],
+  warehouse: ['truckyard', 'dock'], apartment: ['lot', 'garden'], farmhouse: ['field', 'field'], hardware: ['lot', 'truckyard'],
+};
+const GROUND_KINDS = ['lot', 'dock', 'tow', 'triage', 'busloop', 'schoolyard', 'garden', 'convoy', 'siding', 'truckyard', 'logs', 'wrecks', 'foodvan', 'laststand', 'shelter', 'looted'];
 const EXTRA_MODELS = { playground: city.playground, pharmacy: city.pharmacy, impound: city.impound, graveyard: city.graveyard, diner: city.diner, watertower: city.waterTower, substation: city.substation };
+for (const k of GROUND_KINDS) EXTRA_MODELS[k] = () => city.groundsPiece(k);
 const CENTERPIECE = { parking: ['parking', 2, 2], plaza: ['fountain', 1, 1], park: ['fountain', 1, 1], ruins: ['ruinBig', 1, 1] };
 /** MAP-6: fountains only stand in town parks and squares (an outskirts "park" is woodland, an industrial one a lot). */
 export const centerpieceOf = (kind, district) => (CENTERPIECE[kind]?.[0] === 'fountain' && district !== 'downtown' && district !== 'residential' ? null : CENTERPIECE[kind] ?? null);
@@ -264,16 +276,16 @@ export function blockPieces(b, bx, bz, plan, recipe = null, district = null) {
   const used = new Set();
   const take = (i, j, what, span = 1) => { out.push([i, j, what, span]); for (let k = 0; k < span; k++) used.add(`${i},${j + k}`); };
   const open = openBlock(b, bx, bz, district);
-  // MAP-6 clusters: a place brings its companion into a free chunk of its block (front row first, beside it).
-  const extra = b.kind === 'place' && PLACE_EXTRAS[b.type ?? b.placeId];
-  if (extra) {
+  // MAP-8: a place's block is its grounds (see PLACE_GROUNDS), nearest chunks first.
+  const grounds = b.kind === 'place' ? PLACE_GROUNDS[b.type ?? b.placeId] ?? ['lot'] : null;
+  if (grounds) {
     const cols = plan.covered.map((c) => +c.split(',')[1]);
     const order = [];
-    for (let i = 0; i < plan.rows; i++) for (let j = 0; j < plan.cols; j++) if (free(i, j)) order.push([i, j, i * 10 + Math.min(...cols.map((c) => Math.abs(c - j)))]);
+    for (let i = 0; i < plan.rows; i++) for (let j = 0; j < plan.cols; j++) if (free(i, j)) order.push([i, j, i * 10 + Math.min(...cols.map((c) => Math.abs(c - j))) + hash3(bx + j, 111, bz + i) * 0.5]);
     order.sort((a, c) => a[2] - c[2]);
-    if (order.length) take(order[0][0], order[0][1], extra);
+    order.slice(0, grounds.length).forEach(([i, j], k) => take(i, j, grounds[k]));
   }
-  const dense = !open && (district === 'downtown' || district === 'residential') && b.kind !== 'park';
+  const dense = !grounds && !open && (district === 'downtown' || district === 'residential') && b.kind !== 'park';
   if (dense) {
     const back = plan.rows - 1;
     for (const i of [0, back]) {
@@ -298,7 +310,7 @@ export function blockPieces(b, bx, bz, plan, recipe = null, district = null) {
       // MAP-6: washing lines hang behind houses (residential); downtown courtyards hold a camp.
       if (!court && hash3(bx + j, 87, bz + i) < 0.5) { take(i, j, district === 'residential' ? 'laundry' : 'camp'); court = true; } else take(i, j, 'alley');
     }
-  } else if (!open) {
+  } else if (!open && !grounds) {
     // Industrial / other decoration blocks: a 3×2 window at the street side, yards with a shed now and then.
     const cols = plan.covered.map((c) => +c.split(',')[1]);
     const first = cols.length ? Math.max(0, Math.max(...cols) - 2) : 0;
@@ -368,6 +380,9 @@ function pickBy(list, r) {
 /** A soft glowing ring texture for hover/selection halos. */
 const POOL_GEO = new THREE.PlaneGeometry(1, 1);
 const WHITE = new THREE.Color(1, 1, 1);
+// MAP-8: names on kerb boards and direction signs; places that still have light run a generator.
+const PLACE_NAMES = { grocery: 'GROCERY', gas: 'GAS', police: 'POLICE', hospital: 'HOSPITAL', school: 'SCHOOL', library: 'LIBRARY', warehouse: 'DEPOT', motel: 'MOTEL', apartment: 'APTS', church: 'CHURCH', farmhouse: 'FARM', mall: 'MALL', hardware: 'HARDWARE', military: 'ARMY', factory: 'FACTORY', forest: 'WOODS', scrapyard: 'SCRAP' };
+const GENERATOR = new Set(['grocery', 'gas', 'police', 'hospital', 'school', 'library', 'military']);
 // MAP-7: walls take a district tone (instance colour), each building a little different from its neighbours.
 const DISTRICT_TINT = { downtown: [0.94, 0.96, 1.0], residential: [1.04, 0.99, 0.93], industrial: [1.04, 0.94, 0.87], outskirts: [1.02, 0.99, 0.95] };
 export function tintOf(district, x, z) {
@@ -1154,7 +1169,7 @@ export function createBoard({ progressive = false } = {}) {
       // Parked at the kerb, shifted along the street until no lamp arm hangs over it.
       const park = (key, make, along, i = 0, room = 5.2) => {
         let p = null; // no free spot at this kerb: leave it out
-        for (const d of [0, 3, -3, 6, -6, 9, -9]) { const q = front(L, along + d, kerbLane); if (offRiver(q.x, q.z, 2) && !lamps.some((l) => Math.hypot(l.x - q.x, l.z - q.z) < room) && !parked.some((o) => o.distanceTo(q) < 5.5)) { p = q; break; } }
+        for (const d of [0, 3, -3, 6, -6, 9, -9]) { const q = front(L, along + d, kerbLane); if (offRiver(q.x, q.z, 2) && onRoadOk(q.x, q.z) && !lamps.some((l) => Math.hypot(l.x - q.x, l.z - q.z) < room) && !parked.some((o) => o.distanceTo(q) < 5.5)) { p = q; break; } }
         if (!p) return;
         parked.push(p);
         add(key, make, 0.15, p.x, 0.05, p.z, yawAlong(L) + i * 0.04);
@@ -1174,6 +1189,36 @@ export function createBoard({ progressive = false } = {}) {
         const y = yieldsOf(type, ITEMS);
         const show = [['woodpile', woodpileModel, y.wood], ['scrapheap', scrapHeapModel, y.metal], ['crates', cratesModel, y.food]].filter((e) => e[2]).slice(0, 2);
         show.forEach(([k, mk], n) => { const p = front(L, (n ? -1 : 1) * (half - 1.1), 1.1); if (!taken(p.x, p.z, 0.6) && !lamps.some((l) => Math.hypot(l.x - p.x, l.z - p.z) < 1.5)) add(k, mk, 0.1, p.x, GROUND, p.z, yawF + Math.PI / 2); });
+      }
+      // MAP-8 the approach: a driveway at the door, a name board at the kerb beside the building, a generator with its
+      // cable where the place still has light, a queue of abandoned cars at the gas station.
+      if (L.plan.fw >= 2 && type !== 'gas' && type !== 'grocery' && type !== 'hospital') { const p = front(L, 0, 1.25); add('apron', apron, 0.1, p.x, GROUND - 0.06, p.z, yawF); }
+      const name = PLACE_NAMES[type]; const lit = GENERATOR.has(type);
+      const freeAt = (p, r) => ground(p.x, p.z) && !taken(p.x, p.z, r) && !lamps.some((l) => Math.hypot(l.x - p.x, l.z - p.z) < 1.6);
+      if (name) for (const a of [half + 0.8, -(half + 0.8)]) { const p = front(L, a, 1.6); if (freeAt(p, 0.9)) { add(`name-${type}`, () => city.nameBoard(name, lit), 0.1, p.x, GROUND, p.z, yawF); break; } }
+      if (lit) for (const a of [-(half + 0.9), half + 0.9]) {
+        const p = front(L, a, 0.5); if (!freeAt(p, 0.8)) continue;
+        add('generator', city.generatorModel, 0.1, p.x, GROUND, p.z, yawF + Math.PI / 2);
+        const wall = front(L, Math.sign(a) * (half - 0.5), -0.4); wall.y = GROUND + 1.8; sag(new THREE.Vector3(p.x, GROUND + 0.7, p.z), wall);
+        break;
+      }
+      if (type === 'gas') [[-half - 3.5, 0], [-half - 8, 1], [-half - 12.5, 2]].forEach(([a, i]) => park(`car4-${i}`, () => carModel(i), a, i, 4.4));
+    }
+    // MAP-8 wayfinding: at the avenue junction nearest each place, a green sign names it with an arrow toward it.
+    const aveJ = junctions.filter((n) => onAve(n) && !onRail(n));
+    for (const L of Object.values(layout)) {
+      if (!L.plan) continue;
+      const type = map.blocks[Object.keys(map.blocks).find((k) => map.blocks[k].placeId === L.id)]?.type ?? L.id;
+      const name = PLACE_NAMES[type]; if (!name) continue;
+      let best = null; let bd = 70;
+      for (const n of aveJ) { const d = Math.hypot(n.x - L.center.x, n.z - L.center.z); if (d < bd && d > 14) { bd = d; best = n; } }
+      if (!best) continue;
+      const dx = L.center.x - best.x; const dz = L.center.z - best.z;
+      const yaw = Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? 0 : Math.PI) : (dz > 0 ? -Math.PI / 2 : Math.PI / 2);
+      for (const [sx, sz] of [[-1, 1], [1, -1], [-1, -1], [1, 1]]) {
+        const x = best.x + sx * (ROAD.kerb + 0.5); const z = best.z + sz * (ROAD.walk + 2.8);
+        if (!ground(x, z) || taken(x, z, 1.2)) continue;
+        add(`dsign-${type}`, () => city.placeSign(name), 0.1, x, GROUND, z, yaw); break;
       }
     }
     // Small stories, 1–2 per stage, away from place entrances, gates and the evacuation route.

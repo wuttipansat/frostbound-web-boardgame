@@ -29,7 +29,17 @@ const GLYPH = {
   I: ['111', '010', '010', '010', '111'], K: ['101', '110', '100', '110', '101'], L: ['100', '100', '100', '100', '111'],
   M: ['101', '111', '111', '101', '101'], O: ['010', '101', '101', '101', '010'], P: ['110', '101', '110', '100', '100'],
   R: ['110', '101', '110', '101', '101'], S: ['011', '100', '010', '001', '110'], T: ['111', '010', '010', '010', '010'],
+  // MAP-8: for place names and direction signs.
+  D: ['110', '101', '101', '101', '110'], N: ['101', '111', '111', '111', '101'], U: ['101', '101', '101', '101', '111'],
+  Y: ['101', '101', '010', '010', '010'], W: ['101', '101', '111', '111', '101'], F: ['111', '100', '110', '100', '100'],
+  '>': ['100', '010', '001', '010', '100'],
 };
+/** MAP-8: painted letters (no glow) on the plane z, centred on cx, bottom at y. */
+export function paint(m, text, cx, y, z, color, k = 1) {
+  const w = text.length * 4 * k - k; const x0 = Math.round(cx - w / 2);
+  [...text].forEach((ch, i) => GLYPH[ch]?.forEach((row, r) => [...row].forEach((bit, c) => { if (bit === '1') m.box(x0 + (i * 4 + c) * k, y + (4 - r) * k, z, k, k, 1, color); })));
+  return w;
+}
 
 /** Neon letters on a dark board on the front plane z, centred on cx, bottom at y. Letter `dead` (or every index in a list) is unlit. */
 export function neon(m, text, cx, y, z, color, dead = -1, k = 1) {
@@ -1242,4 +1252,161 @@ export function substation() {
   for (const z of [-8, 6]) { m.box(-9, 1, z, 1, 14, 1, C.metalDark); m.box(8, 1, z, 1, 14, 1, C.metalDark); m.box(-9, 14, z, 18, 1, 1, C.metalDark); }
   m.box(-3, 1, 5, 6, 2, 3, 0x1c1f24); // a burnt-out transformer
   return dust(m);
+}
+
+
+// ---------------------------------------------------------------- MAP-8: place grounds and stories (one chunk each, SMALL_SCALE)
+
+function lotGround(m, seed, lines = true) {
+  for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) m.set(x, 0, z, lines && (x + 12) % 6 === 0 && z > -7 && z < 4 ? C.paint : hash3(x >> 2, seed, z >> 2) < 0.4 ? P.snow : C.asphalt);
+}
+function snowGround(m) { for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) m.set(x, 0, z, P.snow); }
+function truck(m, x, z, body, cab, len = 14) { m.box(x, 1, z, 7, 9, len, body); m.box(x, 1, z + len, 7, 6, 4, cab); m.box(x, 5, z + len + 3, 7, 2, 1, C.glass); for (const dz of [1, len - 3, len + 1]) m.box(x - 1, 0, z + dz, 9, 2, 2, 0x1c1f24); }
+function tent(m, x, z, w, d, color, cross = false) {
+  for (let k = 0; k < 5; k++) m.box(x + k, 1 + k, z, w - 2 * k, 1, d, color);
+  if (cross) { m.box(x + Math.floor(w / 2) - 1, 6, z + Math.floor(d / 2) - 2, 2, 1, 5, C.red); m.box(x + Math.floor(w / 2) - 3, 6, z + Math.floor(d / 2) - 1, 6, 1, 2, C.red); }
+}
+
+/** One chunk of a place's grounds or of its story. */
+export function groundsPiece(kind) {
+  const m = new VoxelModel();
+  switch (kind) {
+    case 'lot': { // a car park: snowed cars, a trolley
+      lotGround(m, 171);
+      carShell(m, -11, 1, -6, 0xa63a2e, false); carShell(m, 1, 1, -6, 0x6c7580, false);
+      m.box(7, 1, 6, 3, 2, 2, C.metal); m.box(7, 3, 6, 1, 2, 2, C.metalDark);
+      break;
+    }
+    case 'dock': { // a loading dock with a delivery truck backed up to it, pallets
+      lotGround(m, 172, false);
+      m.box(-12, 1, -12, 24, 4, 5, C.grey); for (let x = -10; x < 12; x += 6) m.box(x, 2, -7, 2, 2, 1, 0x1c1f24);
+      truck(m, -9, -6, 0xe8e4d8, 0xa63a2e, 12); m.box(-8, 5, -6, 5, 3, 1, 0x2b4170);
+      for (const [x, z] of [[4, -4], [5, 2], [8, -2]]) m.box(x, 1, z, 4, 2, 4, 0x8a5a2b);
+      break;
+    }
+    case 'tow': { // a tow truck with a car on its hook
+      lotGround(m, 173, false);
+      m.box(-4, 1, -11, 7, 6, 5, 0xd8b03a); m.box(-4, 5, -7, 7, 2, 1, C.glass); m.box(-4, 1, -6, 7, 3, 9, C.metal);
+      m.box(-1, 4, -1, 1, 5, 1, C.metalDark); m.box(-1, 8, 0, 1, 1, 5, C.metalDark);
+      carShell(m, -3, 2, 4, 0x2b4170, false);
+      break;
+    }
+    case 'triage': { // a field clinic in the car park, overrun: one tent standing, one down, gurneys, tape
+      lotGround(m, 174, false);
+      tent(m, -11, -11, 12, 9, 0xe8e4d8, true);
+      m.box(1, 1, -10, 10, 1, 8, 0xd8d2c2); m.box(4, 2, -8, 3, 1, 2, C.red); // a collapsed tent
+      for (const [x, z] of [[-9, 3], [-3, 4], [4, 2]]) { m.box(x, 1, z, 2, 2, 5, C.metal); m.box(x, 3, z, 2, 1, 5, 0xf0f0ea); }
+      for (let x = -12; x < 12; x += 4) { m.box(x, 1, 10, 1, 3, 1, C.metalDark); m.box(x, 3, 10, 4, 1, 1, 0xd8b03a); }
+      break;
+    }
+    case 'busloop': { // a bus loop with a school bus and a flagpole
+      for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) m.set(x, 0, z, Math.abs(z) < 5 || Math.abs(x) > 8 ? C.asphalt : P.snow);
+      m.box(-10, 1, -3, 20, 7, 6, 0xd8b03a); for (let x = -8; x < 8; x += 3) m.box(x, 5, -3, 2, 2, 6, C.glass); m.box(-10, 1, -3, 20, 1, 6, 0x1c1f24); m.box(-10, 3, -4, 20, 1, 1, 0x1c1f24);
+      m.box(9, 1, 9, 1, 18, 1, C.metal); m.box(5, 15, 9, 4, 3, 1, 0x2b4170);
+      break;
+    }
+    case 'schoolyard': { // a school yard: court markings, a hoop, hopscotch
+      for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) { const line = (Math.abs(x) === 10 || Math.abs(z) === 10 || z === 0) && Math.abs(x) <= 10 && Math.abs(z) <= 10; m.set(x, 0, z, line ? C.paint : hash3(x >> 2, 175, z >> 2) < 0.5 ? P.snow : C.tile); }
+      m.box(0, 1, -11, 1, 11, 1, C.metal); m.box(-2, 10, -10, 5, 4, 1, 0xf0f0ea); m.box(0, 9, -9, 1, 1, 2, 0xd04a3a);
+      for (let k = 0; k < 4; k++) m.box(-8, 0, 4 + k * 2, 2, 1, 1, 0xd8b03a);
+      break;
+    }
+    case 'garden': { // a reading garden: hedges, a path, benches, a bird bath
+      snowGround(m);
+      for (let x = -12; x < 12; x++) { m.set(x, 0, 0, 0xccd3db); m.set(0, 0, x, 0xccd3db); }
+      for (const [x, z, w, d] of [[-11, -11, 9, 3], [3, -11, 9, 3], [-11, 8, 9, 3], [3, 8, 9, 3]]) { m.box(x, 1, z, w, 3, d, 0x3a5a3a); m.box(x, 4, z, w, 1, d, P.snow); }
+      for (const [x, z] of [[-8, -4], [4, 2]]) { m.box(x, 2, z, 5, 1, 2, 0x7a5a3a); m.box(x, 3, z - 1, 5, 2, 1, 0x7a5a3a); m.box(x, 1, z, 1, 1, 2, C.metalDark); m.box(x + 4, 1, z, 1, 1, 2, C.metalDark); }
+      m.box(-1, 1, -1, 2, 3, 2, C.grey); m.box(-2, 4, -2, 4, 1, 4, C.grey);
+      break;
+    }
+    case 'convoy': { // an army convoy and a floodlight tower
+      snowGround(m);
+      for (const [x, z] of [[-11, -11], [-2, -11]]) truck(m, x, z, 0x46512b, 0x5d6b3a, 12);
+      m.box(5, 1, 4, 6, 4, 9, 0x5d6b3a); m.box(5, 5, 4, 6, 1, 3, C.glass);
+      m.box(-9, 1, 6, 1, 20, 1, C.metalDark); m.box(-11, 20, 5, 5, 2, 3, C.metalDark); m.box(-11, 20, 8, 5, 2, 1, 0xfff2c0, true);
+      break;
+    }
+    case 'siding': { // a rail siding: a short track, a box wagon, a buffer stop
+      snowGround(m);
+      for (let z = -12; z < 12; z += 2) m.box(-6, 0, z, 12, 1, 1, 0x5a4a3a);
+      for (const x of [-3, 2]) m.box(x, 1, -12, 1, 1, 24, C.metal);
+      m.box(-5, 2, -10, 10, 9, 16, RUST); m.box(-5, 3, -3, 10, 6, 1, 0x7a3a22);
+      m.box(-4, 1, 9, 8, 4, 2, C.red);
+      break;
+    }
+    case 'truckyard': { // a semi-trailer, pallets, a forklift
+      lotGround(m, 176, false);
+      m.box(-11, 2, -10, 7, 8, 20, 0xe0dcd2); for (const z of [-8, 6]) m.box(-12, 0, z, 9, 2, 2, 0x1c1f24);
+      for (const [x, z] of [[1, -9], [1, -4], [6, -9]]) m.box(x, 1, z, 4, 3, 4, 0x8a5a2b);
+      m.box(2, 1, 4, 5, 4, 6, 0xd8b03a); m.box(2, 5, 4, 1, 6, 1, C.metalDark); m.box(6, 5, 4, 1, 6, 1, C.metalDark); m.box(2, 11, 4, 5, 1, 6, C.metalDark); m.box(3, 1, 10, 3, 1, 3, C.metalDark);
+      break;
+    }
+    case 'logs': { // a log trailer and stacked trunks
+      snowGround(m);
+      m.box(-11, 2, -11, 8, 1, 20, C.metalDark); for (const z of [-9, 5]) m.box(-12, 0, z, 10, 2, 2, 0x1c1f24);
+      for (let k = 0; k < 5; k++) m.box(-11 + (k % 3) * 3 - (k > 2 ? -1 : 0), 3 + (k > 2 ? 2 : 0), -11, 2, 2, 20, (x, y, z) => (z === -11 || z === 8 ? 0xb08a5a : 0x6a4a30));
+      for (let y = 0; y < 3; y++) for (let k = 0; k < 4 - y; k++) m.box(1 + k * 3 + y, 1 + y * 2, -6, 2, 2, 14, (x, yy, z) => (z === -6 || z === 7 ? 0xb08a5a : 0x5a3e28));
+      break;
+    }
+    case 'wrecks': { // wrecks along the fence, stacked two high
+      for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) m.set(x, 0, z, hash3(x >> 2, 177, z >> 2) < 0.5 ? 0x6a6458 : P.snow);
+      [RUST, 0x6c7580, 0xa63a2e, 0x2b4170].forEach((c, k) => { m.box(-11 + (k % 2) * 11, 1 + Math.floor(k / 2) * 3, -10 + (k % 2), 10, 3, 5, c); });
+      m.box(-6, 1, 2, 8, 3, 5, 0x5d6b3a); m.box(4, 1, 4, 5, 1, 5, 0x1c1f24);
+      break;
+    }
+    case 'foodvan': { // an overturned food van, spilled crates
+      lotGround(m, 178);
+      m.box(-9, 1, -4, 14, 6, 6, 0xf0f0ea); m.box(-9, 4, -4, 14, 1, 6, 0xc0392b); m.box(-9, 1, -4, 14, 6, 1, 0xdcd6c8); m.box(5, 1, -4, 4, 5, 6, 0xd8d2c2);
+      for (const [x, z, c] of [[-6, 4, 0xa07a4a], [-1, 6, 0xd8b03a], [3, 3, 0xa07a4a], [7, 7, 0x86b04a]]) m.box(x, 1, z, 3, 2, 3, c);
+      break;
+    }
+    case 'laststand': { // a last stand: a sandbag arc, a burnt cruiser, spent casings
+      lotGround(m, 179, false);
+      for (let a = 0; a < 14; a++) { const x = Math.round(Math.cos(a / 4.5) * 9) - 2; const z = Math.round(Math.sin(a / 4.5) * 7); m.box(x, 1, z, 3, 3 + (a % 2), 2, 0x938466); }
+      m.box(4, 1, -10, 7, 3, 4, 0x2a2a2a); m.box(6, 4, -10, 3, 2, 4, 0x1c1c1c); m.box(4, 1, -10, 1, 2, 4, 0x4a3a2a);
+      for (let k = 0; k < 9; k++) m.set(-6 + Math.floor(hash3(k, 1, 2) * 8), 1, -2 + Math.floor(hash3(k, 3, 4) * 6), 0xc9a040);
+      break;
+    }
+    case 'shelter': { // a shelter by the door: cots and blankets under a lean-to, a painted SAFE board
+      for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) m.set(x, 0, z, C.tile);
+      m.box(-11, 1, -11, 1, 9, 1, 0x5a4030); m.box(10, 1, -11, 1, 9, 1, 0x5a4030); m.box(-12, 9, -12, 24, 1, 10, C.roofDark);
+      for (let k = 0; k < 4; k++) { m.box(-10 + k * 5, 1, -9, 4, 2, 7, C.metalDark); m.box(-10 + k * 5, 3, -9, 4, 1, 7, [0x7a2a2a, 0x2b4170, 0x5d6b3a, 0x8a6a44][k]); }
+      m.box(-7, 1, 6, 1, 8, 1, 0x5a4030); m.box(6, 1, 6, 1, 8, 1, 0x5a4030); m.box(-8, 5, 7, 16, 7, 1, 0xf0f0ea); paint(m, 'SAFE', 0, 6, 8, C.red);
+      break;
+    }
+    case 'looted': { // a looted shopfront: a car through the window, glass and goods on the snow
+      lotGround(m, 180, false);
+      m.box(-12, 1, -12, 24, 12, 2, C.cream); m.clearBox(-6, 1, -11, 12, 8, 1); m.box(-6, 9, -11, 12, 1, 1, C.trim);
+      carShell(m, -3, 1, -10, 0x6c7580, false);
+      for (let k = 0; k < 14; k++) m.set(-10 + Math.floor(hash3(k, 5, 6) * 20), 1, -5 + Math.floor(hash3(k, 7, 8) * 12), k % 2 ? 0xbcd8e8 : [0xd8b03a, 0xa07a4a, 0x86b04a, 0xc0392b][k % 4]);
+      break;
+    }
+    default: snowGround(m);
+  }
+  return dust(m);
+}
+
+/** MAP-8: a name board at the kerb (0.1 world per voxel): a dark board on two posts, painted (or lit) letters. */
+export function nameBoard(text, lit = false) {
+  const m = new VoxelModel();
+  const w = text.length * 4 + 5; const x0 = -Math.ceil(w / 2);
+  for (const x of [x0 + 1, x0 + w - 2]) m.box(x, 0, 0, 1, 12, 1, C.metalDark);
+  m.box(x0, 11, 0, w, 9, 1, 0x1e2126);
+  if (lit) neon(m, text, 0, 13, 0, C.neonWarm); else paint(m, text, 0, 13, 1, 0xd8d2c2);
+  return m.snowCap(P.snow, 1, 2);
+}
+/** MAP-8: a direction sign (0.1 world per voxel): a pole with a green board, a place name and an arrow (local +x). */
+export function placeSign(text) {
+  const m = new VoxelModel();
+  const w = text.length * 4 + 7;
+  m.box(-1, 0, 0, 1, 26, 1, C.metalDark);
+  m.box(0, 19, 0, w, 8, 1, 0x2f6b4a); paint(m, `${text}>`, Math.floor(w / 2), 21, 1, 0xf0f0ea);
+  return m.snowCap(P.snow, 1, 2);
+}
+/** MAP-8: a generator by a place that still has light: a housing, an exhaust, a fuel can. */
+export function generatorModel() {
+  const m = new VoxelModel();
+  m.box(-4, 0, -3, 8, 5, 6, 0x5d6b3a); m.box(-3, 5, -2, 6, 1, 4, 0x46512b); m.box(2, 5, 0, 1, 4, 1, 0x2a2d31); m.set(-4, 3, 3, 0xff9a3c, true);
+  m.box(5, 0, -2, 2, 3, 2, C.red);
+  return m.snowCap(P.snow, 1, 2);
 }

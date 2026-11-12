@@ -33,6 +33,7 @@ test('calm blocks: built things fit a 3×2 window at the front; places fit their
       for (const c of plan.covered) { const [i, j] = c.split(',').map(Number); assert.ok(i < plan.rows && j < plan.cols, `${k} covers ${c}`); }
       const built = [...plan.covered, ...blockPieces(b, bx, bz, plan).filter(([, , w]) => !OPEN.has(w)).map(([i, j]) => `${i},${j}`)];
       assert.equal(new Set(built).size, built.length, `${k}: no chunk used twice`);
+      if (b.kind === 'place') { assert.ok(built.length >= plan.covered.length); continue; } // MAP-8: a place uses its whole block
       assert.ok(built.length <= 6, `${k} builds on ${built.length} chunks`);
       const rows = built.map((c) => +c.split(',')[0]); const cols = built.map((c) => +c.split(',')[1]);
       if (built.length) {

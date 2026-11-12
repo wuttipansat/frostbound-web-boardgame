@@ -224,7 +224,7 @@ export function growMap(s, makePlace) {
   }
   // 5. Each block keeps the front it gets now (its look never depends on streets added later).
   const roadSet = new Set(m.roads);
-  for (const k of added) m.blocks[k].front = frontOf(roadSet, ...parse(k));
+  for (const k of added) m.blocks[k].front = m.blocks[k].kind === 'place' ? busiestFront(roadSet, ...parse(k)) : frontOf(roadSet, ...parse(k)); // MAP-8: a place faces its busiest street
   return added;
 }
 
@@ -232,6 +232,15 @@ export function growMap(s, makePlace) {
 export function frontOf(roads, bx, bz) {
   const sides = { z: `${bx},${bz + 1},h`, x: `${bx + 1},${bz},v`, '-z': `${bx},${bz},h`, '-x': `${bx},${bz},v` };
   return ['z', 'x', '-z', '-x'].find((f) => roads.has(sides[f])) ?? 'z';
+}
+
+/** MAP-8: the side of a block on the street with the most connections at its two corners (ties: the camera's sides first). */
+export function busiestFront(roads, bx, bz) {
+  const deg = (x, z) => [`${x},${z},h`, `${x - 1},${z},h`, `${x},${z},v`, `${x},${z - 1},v`].filter((r) => roads.has(r)).length;
+  const sides = { z: [`${bx},${bz + 1},h`, [bx, bz + 1], [bx + 1, bz + 1]], x: [`${bx + 1},${bz},v`, [bx + 1, bz], [bx + 1, bz + 1]], '-z': [`${bx},${bz},h`, [bx, bz], [bx + 1, bz]], '-x': [`${bx},${bz},v`, [bx, bz], [bx, bz + 1]] };
+  let best = null; let score = -1;
+  for (const f of ['z', 'x', '-z', '-x']) { const [seg, a, b] = sides[f]; if (!roads.has(seg)) continue; const sc = deg(...a) + deg(...b); if (sc > score) { score = sc; best = f; } }
+  return best ?? 'z';
 }
 
 /** New streets: extend dead ends outward, then link every new block to the network, plus a few spurs. */
