@@ -58,7 +58,32 @@ export const PLACE_GROUNDS = {
 const GROUND_KINDS = ['lot', 'dock', 'tow', 'triage', 'busloop', 'schoolyard', 'garden', 'convoy', 'siding', 'truckyard', 'logs', 'wrecks', 'foodvan', 'laststand', 'shelter', 'looted'];
 // VOXEL-2: vehicles parked in place grounds: [prop, x, z (piece voxels, front = +z), yaw]; the filler buildings
 // (offices, towers, …) keep the authored level up close.
-const BIG_FILLER = /^(tower|office|cinema|garage|shed|rows|tall)-/;
+const BIG_FILLER = /^(tower|office|cinema|garage|shed|rows|tall|sub|mixed|mid|work)-/;
+/**
+ * MAP-9: which building stands on a chunk: [key, make, roof height (world)] or null for the older small buildings.
+ * Suburbs (near the colony) are detached houses with garages; deeper in town row houses, corner shops with flats,
+ * apartment blocks behind; downtown corner towers stay (handled by the caller), mid-block shops with flats and
+ * apartment blocks in the back rows; industrial blocks have workshops. `n` steps the variant along the row.
+ */
+function pickBuilding(district, depth, what, front, back, corner, n, r) {
+  const sub = (k) => { const v = k % 4; return [`sub-${v}`, () => city.suburbanHouse(v), v % 2 ? 6.9 : 4.4]; };
+  const mixed = (k) => { const v = k % 2; return [`mixed-${v}`, () => city.mixedUse(v), 7.9]; };
+  const mid = () => { const v = 0; return [`mid-${v}`, () => city.midrise(v), 13.2]; };
+  const work = (k) => { const v = k % 2; return [`work-${v}`, () => city.workshop(v), 3.6]; };
+  if (district === 'industrial') return work(n);
+  if (district === 'residential') {
+    if (depth < 1.3) return sub(n);                          // the suburban band: houses with gardens and garages
+    if (front && corner) return mixed(n);                     // a corner shop with flats over it
+    if (back && r < 0.4) return mid(n);
+    return what === 'rows' ? null : r < 0.5 ? sub(n) : null; // row houses / older houses / detached
+  }
+  if (district === 'downtown') {
+    if (front && corner) return null;                         // the corner towers (caller)
+    if (front) return r < 0.55 ? mixed(n) : null;
+    if (back) return r < 0.6 ? mid(n) : null;
+  }
+  return null;
+}
 const VEHICLE_PROPS = {
   car: (v) => [`car4-${v}`, () => carModel(v)], burnt: (v) => [`car-burnt-${v}`, () => burntCarModel(v)],
   bus: () => ['veh-bus-1', () => vehicleModel('bus', 1)], trailer: () => ['veh-trailer', () => vehicleModel('trailer')],
@@ -263,7 +288,7 @@ const DISTRICT_RECIPES = {
   downtown: [['shop', 55], ['house', 30], ['car', 8], ['clutter', 7]],
   residential: [['house', 55], ['trees', 22], ['car', 15], ['clutter', 8]],
   industrial: [['yard', 50], ['ruin', 15], ['car', 15], ['house', 10], ['clutter', 10]],
-  outskirts: [['house', 50], ['trees', 38], ['car', 6], ['rocks', 6]], // MAP-6: cottages, woodland, a car in a drive
+  outskirts: [['house', 55], ['trees', 45]], // MAP-6/9: cottages facing the road, woodland
 };
 // Small building variants by district (city.smallBuilding: floors = 2 + v mod 3; even v with ≤ 3 floors have shopfronts).
 const DISTRICT_SMALL = { downtown: [2, 4, 5, 7, 1], residential: [0, 3, 6, 1], industrial: [3, 6, 0] };
@@ -293,10 +318,19 @@ export function blockPieces(b, bx, bz, plan, recipe = null, district = null) {
   const grounds = b.kind === 'place' ? PLACE_GROUNDS[b.type ?? b.placeId] ?? ['lot'] : null;
   if (grounds) {
     const cols = plan.covered.map((c) => +c.split(',')[1]);
+    // MAP-9: a place's grounds stay on its side of a railway or river cut (never across the tracks or the ice).
+    const rows = plan.covered.map((c) => +c.split(',')[0]);
+    const sameSide = (i, j) => !plan.railCut || ((plan.railCut.row === undefined || (i < plan.railCut.row) === (Math.max(...rows) < plan.railCut.row)) && (plan.railCut.col === undefined || (j < plan.railCut.col) === (Math.max(...cols) < plan.railCut.col)));
     const order = [];
-    for (let i = 0; i < plan.rows; i++) for (let j = 0; j < plan.cols; j++) if (free(i, j)) order.push([i, j, i * 10 + Math.min(...cols.map((c) => Math.abs(c - j))) + hash3(bx + j, 111, bz + i) * 0.5]);
+    for (let i = 0; i < plan.rows; i++) for (let j = 0; j < plan.cols; j++) if (free(i, j) && sameSide(i, j)) order.push([i, j, i * 10 + Math.min(...cols.map((c) => Math.abs(c - j))) + hash3(bx + j, 111, bz + i) * 0.5]);
     order.sort((a, c) => a[2] - c[2]);
     order.slice(0, grounds.length).forEach(([i, j], k) => take(i, j, grounds[k]));
+    // Across the cut: an ordinary piece of the district (a house, a yard, trees), not the place's own things.
+    let far = 0;
+    for (let i = 0; i < plan.rows; i++) for (let j = 0; j < plan.cols; j++) {
+      if (!free(i, j) || sameSide(i, j) || used.has(`${i},${j}`) || far >= 2) continue;
+      take(i, j, district === 'downtown' || district === 'residential' ? 'house' : district === 'industrial' ? 'yard' : 'trees'); far++;
+    }
   }
   const dense = !grounds && !open && (district === 'downtown' || district === 'residential') && b.kind !== 'park';
   if (dense) {
@@ -339,7 +373,9 @@ export function blockPieces(b, bx, bz, plan, recipe = null, district = null) {
       // MAP-6: an industrial yard now and then has a water tower or a power substation.
       if (district === 'industrial' && b.kind !== 'place' && k === 0 && h(5) < 0.35) { take(i, j, h(6) < 0.5 ? 'watertower' : 'substation'); continue; }
       if (district === 'industrial' && free(i, j + 1) && !used.has(`${i},${j + 1}`) && win.some(([a, c]) => a === i && c === j + 1) && hash3(bx + j, 91, bz + i) < 0.4) { take(i, j, 'shed', 2); continue; }
-      take(i, j, pickBy(recipe, hash3(bx * 3 + j, 61 + i, bz * 3 + i)));
+      let what = pickBy(recipe, hash3(bx * 3 + j, 61 + i, bz * 3 + i));
+      if (district === 'outskirts' && what === 'house' && i > 0) what = 'trees'; // MAP-9: cottages face the road; behind them, woods
+      take(i, j, what);
     }
   }
   // Open chunks: one bench or one tree in some of them.
@@ -349,6 +385,7 @@ export function blockPieces(b, bx, bz, plan, recipe = null, district = null) {
     const r = hash3(bx * 11 + j, 79 + i, bz * 11 + i);
     // MAP-7: the outskirts are land: woods in clumps, small fields, a frozen pond, drifts.
     if (district === 'outskirts') {
+      if (i === 0) { if (r < 0.4) out.push([i, j, 'clump', 1]); else if (r < 0.7) out.push([i, j, 'drift', 1]); continue; } // MAP-9: fields and ponds lie behind
       if (r < 0.3) out.push([i, j, 'clump', 1]);
       else if (r < 0.48) out.push([i, j, 'field', 1]);
       else if (r < 0.56 && !out.some((o) => o[2] === 'pond')) out.push([i, j, 'pond', 1]);
@@ -766,6 +803,18 @@ export function createBoard({ progressive = false } = {}) {
             continue;
           }
           const corner = i === 0 && (j === 0 || j === plan.cols - 1); // MAP-7: corner buildings stand taller
+          // MAP-9: the building that fits here (district, how deep into town, front / back row, corner), never the same
+          // variant as its neighbour in the row.
+          if (what === 'rows' || what === 'house' || what === 'shop') {
+            const pick = pickBuilding(district, townDepth(bx, bz, map.look), what, i === 0, backRow, corner, j + i * 2 + Math.floor(hash3(bx, 121, bz) * 7), hash3(bx * 5 + j, 123 + i, bz * 5));
+            if (pick) {
+              const [key, make, h] = pick;
+              pushT((big[key] ??= { make, list: [] }).list, matrixAt(p, face, city.SMALL_SCALE), tintOf(district, p.x, p.z));
+              houseSpots.push({ roof: p.clone().setY(GROUND + h) });
+              if (district === 'residential' && i === 0 && key.startsWith('sub-')) put(fences.picket, p.clone().addScaledVector(plan.fwd, CHUNK / 2 - 0.25), face0);
+              continue;
+            }
+          }
           if (what === 'rows' || (what === 'shop' && district === 'downtown' && ((plan.core && hash3(bx + j, 93 + i, bz) < 0.3) || corner))) {
             const isRows = what === 'rows'; const v = isRows ? Math.floor(r2 * 2) : [0, 1, 3][Math.floor(r2 * 3)]; // (MAP-6: 3 tall variants keep the pack small)
             pushT((big[`${isRows ? 'rows' : 'tall'}-${v}`] ??= { make: () => (isRows ? city.rowHouses(v) : city.tallBuilding(v)), list: [] }).list, matrixAt(p, face, city.SMALL_SCALE), tintOf(district, p.x, p.z));
@@ -1037,6 +1086,7 @@ export function createBoard({ progressive = false } = {}) {
         if (kind === 'busstop') { if (busStop || !aveRun) kind = 'bin'; else busStop = true; } // the bus route runs on the avenue
         const [dx, dz] = r.axis === 'x' ? [0, -1] : [-1, 0];
         if (kind) add(`furn-${kind}`, () => furnitureModel(kind), 0.1, x, GROUND, z, yawTo(dx, dz));
+        else if (zoneHere === 'residential' && !taken(x, z, 1)) add('tree-street', () => treeModelHD(2, 0), 0.16, x, GROUND, z, h * 9, 0, 'x', true); // MAP-9: street trees
         // Street clutter (cones, crates, barrels, bags, barriers) halfway between furniture spots, same side.
         const tc = t + 4.5; const [cx, cz] = r.axis === 'x' ? [tc, r.c + lat] : [r.c + lat, tc];
         const hc = hash3(Math.round(tc), ri, rail.look + 19);

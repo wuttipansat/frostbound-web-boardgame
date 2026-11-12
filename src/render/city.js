@@ -232,7 +232,7 @@ function graffiti(m, x, y, z, seed) {
 
 function dust(m) { return m.snowCap(P.snow, 1, 2); }
 /** VOXEL-2: the finish pass (noise, grime, edge light), icicles under eaves, then the snow cap. */
-function fin(m, seed = 0) { finish(m, seed); m.snowCap(P.snow, 1, 2); return addIcicles(m, { minY: 6, p: 0.1, seed }); }
+function fin(m, seed = 0, opts) { finish(m, seed, opts); m.snowCap(P.snow, 1, 2); return addIcicles(m, { minY: 6, p: 0.1, seed }); }
 
 // ---------------------------------------------------------------- the six places
 
@@ -1459,4 +1459,64 @@ export function generatorModel() {
   m.box(5, 0, -2, 2, 3, 2, C.red); m.set(5, 3, -2, 0x2a2d31); // fuel can
   m.box(-7, 0, -1, 2, 3, 3, 0xd8b03a); m.box(-7, 1, 0, 2, 1, 1, 0x1c1f24); // cable reel
   return m.snowCap(P.snow, 1, 2);
+}
+
+// ---------------------------------------------------------------- MAP-9: more buildings (one chunk each, SMALL_SCALE; front = +z)
+
+const HOUSE_WALLS = [0xb9a48a, 0x8fa3b8, C.cream, 0xa7b5a0, 0xc8b8a0, 0x9b8b9e];
+/** A detached suburban house: 1–2 floors, gable or hip roof, an attached garage, a porch with steps, a lawn and a drive. */
+export function suburbanHouse(v = 0) {
+  const m = new VoxelModel();
+  for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) m.set(x, 0, z, x >= 4 && x <= 9 && z > 3 ? 0xccd3db : P.snow); // lawn and drive
+  const floors = 1 + (v % 2); const wall = HOUSE_WALLS[v % HOUSE_WALLS.length]; const roof = [C.roofDark, 0x6a3a2e, 0x4b525a, C.roof][v % 4];
+  const H = block(m, { x0: -10, z0: -8, w: 13, d: 11, floors, wall, seed: 200 + v });
+  m.clearBox(-10, H + 1, -8, 13, 3, 11);
+  const hip = v % 3 === 2;
+  for (let k = 0; k <= 6; k++) m.box(-11 + (hip ? k : 0), H + 1 + k, -9 + k, 15 - (hip ? 2 * k : 0), 1, 13 - 2 * k, k % 2 ? roof : C.roofDark);
+  if (!hip) for (const x of [-10, 2]) for (let k = 0; k < 5; k++) m.box(x, H + 1 + k, -8 + k, 1, 1, 11 - 2 * k, wall);
+  m.box(-7, H + 2, -6, 2, 7, 2, C.brick); // chimney
+  m.box(3, 1, -6, 7, 8, 9, wall); m.box(3, 9, -7, 8, 1, 11, roof); m.box(4, 1, 2, 5, 6, 1, (x, y) => (y % 2 ? 0xd8d2c2 : 0xc0bab0)); // garage + door
+  m.clearBox(-6, 1, 2, 3, 6, 1); m.box(-6, 1, 1, 3, 6, 1, [0x6b4a30, 0x2f4f6f, 0x7a2a2a][v % 3]);
+  m.box(-9, 1, 3, 8, 1, 3, 0x9a9488); m.box(-9, 7, 3, 8, 1, 4, C.roofDark); for (const x of [-9, -2]) m.box(x, 2, 5, 1, 5, 1, C.trim); // porch
+  m.box(-6, 0, 6, 3, 1, 2, C.greyDark); // steps
+  m.box(10, 1, 9, 1, 4, 1, 0x5a4a3a); m.box(9, 5, 9, 3, 2, 2, 0x2b4170); // mailbox
+  if (v % 2 === 0) for (let x = -11; x < 3; x++) m.box(x, 1, 10, 1, 2 + (x % 2), 1, 0x3a5a3a); // a hedge along the front
+  return fin(m, v, { noise: false });
+}
+
+const SHOP_NAMES = ['CAFE', 'DELI', 'BAR', 'BOOKS', 'BAKERY'];
+/** Mixed use: a shop on the ground floor (awning, a painted fascia), two floors of flats with balconies above. */
+export function mixedUse(v = 0) {
+  const m = new VoxelModel();
+  const wall = [C.brick, 0xb9a48a, 0x8fa3b8, C.sage][v % 4];
+  const H = block(m, { x0: -10, z0: -8, w: 20, d: 15, floors: 3, wall, seed: 210 + v, shop: true, balconies: true });
+  m.box(-10, FH - 3, 7, 20, 3, 1, 0x1e2126); paint(m, SHOP_NAMES[v % SHOP_NAMES.length], 0, FH - 3, 8, 0xd8d2c2); // fascia
+  for (let x = -10; x < 10; x++) m.box(x, FH - 4, 8, 1, 1, 3, Math.floor((x + 10) / 2) % 2 ? [0x7a2a2a, 0x2f5a6a, 0x5d6b3a, 0x8a6a3a][v % 4] : 0xd8d2c2); // a faded striped awning
+  m.box(-9, 1, 9, 2, 3, 2, 0x2a2d31); m.box(6, 1, 9, 3, 2, 3, 0xa07a4a); // a bin, crates
+  m.box(-8, H + 1, -5, 5, 4, 5, C.greyDark); m.box(4, H + 1, -4, 3, 3, 3, C.metal); // stair hut, AC
+  return fin(m, v + 7, { noise: false });
+}
+
+/** A mid-rise apartment block (5 floors): balconies, an entrance canopy, a stair hut and a water tank. */
+export function midrise(v = 0) {
+  const m = new VoxelModel();
+  const wall = [0x9aa6b2, C.cream, 0xb9a48a][v % 3];
+  const H = block(m, { x0: -10, z0: -8, w: 20, d: 16, floors: 5, wall, seed: 220 + v, balconies: true });
+  m.clearBox(-2, 1, 7, 4, 7, 1); m.box(-2, 1, 6, 4, 7, 1, C.glass); m.box(-3, 8, 8, 6, 1, 3, C.roofDark); // entrance + canopy
+  m.box(-7, H + 1, -5, 5, 5, 5, C.greyDark); for (const [dx, dz] of [[0, 0], [3, 0], [0, 3], [3, 3]]) m.box(3 + dx, H + 1, -5 + dz, 1, 4, 1, C.metalDark); m.box(2, H + 5, -6, 6, 5, 6, 0x7a5a3a); // stair hut, tank
+  return fin(m, v + 11, { noise: false });
+}
+
+/** A workshop: a low brick or metal shed with a roller door, a painted sign, drums and a fenced yard. */
+export function workshop(v = 0) {
+  const m = new VoxelModel();
+  for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) m.set(x, 0, z, z > 4 ? (hash3(x >> 1, 231, z >> 1) < 0.5 ? 0x6a6458 : P.snow) : P.snow);
+  const wall = v % 2 ? 0x6c7580 : C.brick;
+  m.walls(-10, 1, -10, 20, 11, 14, wall); m.box(-9, 11, -9, 18, 1, 12, C.roofDark);
+  for (let k = 0; k < 3; k++) m.box(-11, 12 + k, -11 + k, 22, 1, 16 - 2 * k, k % 2 ? C.roof : C.roofDark);
+  m.clearBox(-7, 1, 3, 9, 8, 1); for (let y = 1; y < 9; y++) m.box(-7, y, 3, 9, 1, 1, y % 2 ? C.metal : C.metalDark); // roller door
+  m.box(3, 1, 3, 3, 6, 1, 0x3a3f46); m.box(-8, 9, 4, 14, 3, 1, 0x1e2126); paint(m, v % 2 ? 'WELD' : 'AUTO', -1, 9, 5, 0xd8b03a);
+  for (const [x, z] of [[6, 7], [8, 9], [-10, 8]]) m.box(x, 1, z, 2, 3, 2, x > 0 ? 0x2b4170 : RUST);
+  for (let x = -12; x < 12; x += 3) m.box(x, 1, 11, 1, 5, 1, C.metalDark); for (let x = -12; x < 12; x++) if (x < -3 || x > 2) { m.set(x, 3, 11, 0x9aa3ad); m.set(x, 5, 11, 0x9aa3ad); } // yard fence with a gate gap
+  return fin(m, v + 13, { noise: false });
 }

@@ -99,3 +99,28 @@ test('new place types have a model and Thai text; an unknown type from a save fa
   s.locations.grocery.type = 'removed-type';
   assert.equal(locDef(s, 'grocery').id, 'grocery');
 });
+
+// ---------------------------------------------------------------- MAP-9
+import { PLACE_GROUNDS, cutLines } from '../src/render/board.js';
+
+test('a place keeps its grounds on its own side of the railway / river; outskirts cottages face the road', () => {
+  let cut = 0;
+  for (let seed = 1; seed <= 8; seed++) {
+    const s = grown(seed, 5);
+    const roads = new Set(s.map.roads); const layout = computeLayout(s.map);
+    for (const [k, b] of Object.entries(s.map.blocks)) {
+      if (b.kind === 'colony') continue;
+      const [bx, bz] = k.split(',').map(Number); const d = districtOf(bx, bz, s.map.look);
+      const plan = b.kind === 'place' ? layout[b.placeId].plan : placePlan(`${b.kind}@`, b.kind, bx, bz, roads, [0, 0], b.front, cutLines(s.map));
+      const pieces = blockPieces(b, bx, bz, plan, undefined, d);
+      if (d === 'outskirts' && b.kind !== 'place') for (const [i, , what] of pieces) if (what === 'house') assert.equal(i, 0, `${seed} ${k}: a cottage behind the front row`);
+      if (b.kind !== 'place' || !plan.railCut) continue;
+      cut++;
+      const own = new Set(PLACE_GROUNDS[b.type ?? b.placeId] ?? []);
+      const side = (i, j) => [plan.railCut.row === undefined ? 0 : Math.sign(i - plan.railCut.row), plan.railCut.col === undefined ? 0 : Math.sign(j - plan.railCut.col)].join();
+      const [ci, cj] = plan.covered[0].split(',').map(Number);
+      for (const [i, j, what] of pieces) if (own.has(what)) assert.equal(side(i, j), side(ci, cj), `${seed} ${k}: ${what} across the cut`);
+    }
+  }
+  assert.ok(cut > 0, 'some places sit in a cut row');
+});
