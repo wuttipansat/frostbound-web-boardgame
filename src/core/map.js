@@ -85,7 +85,7 @@ const byArray = new WeakMap();
 function cacheOf(m) {
   let c = byArray.get(m.roads);
   if (c) return c;
-  const k = `${m.stage}|${m.roads.join(';')}`;
+  const k = `${m.stage}|${m.roads.join(';')}|${Object.keys(m.spots ?? {}).join(';')}`;
   c = caches.get(k);
   if (!c) {
     const graph = new Map();
@@ -96,6 +96,7 @@ function cacheOf(m) {
       graph.get(a).push(b); graph.get(b).push(a);
     }
     const index = new Map(Object.entries(m.blocks).map(([bk, b]) => [b.placeId ?? bk, bk]));
+    for (const [id, sp] of Object.entries(m.spots ?? {})) index.set(id, sp.block); // GAME-1: search spots sit on a block
     c = { graph, index, dists: new Map() };
     caches.set(k, c);
     if (caches.size > 8) caches.delete(caches.keys().next().value);
@@ -115,6 +116,39 @@ function roadSteps(g, from, to) {
     frontier = next;
   }
   return Infinity;
+}
+
+// ---------------------------------------------------------------- GAME-1: search spots
+
+/** Is this location a small search spot (a house, a car, a container)? */
+export const isSpot = (s, id) => !!s.map?.spots?.[id];
+/** A small deterministic generator for spots (kept off the game's RNG so spots never shift other draws). */
+function spotRand(seed) { let x = (seed | 0) || 1; return () => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; return ((x >>> 0) % 1e6) / 1e6; }; }
+/** The kind of spot a block holds, by its zone and kind. */
+function spotKind(b, zone, r) {
+  if (b.kind === 'containers' || b.kind === 'rail' || zone === 'industrial') return r < 0.6 ? 'spot-container' : 'spot-car';
+  if (b.kind === 'parking') return 'spot-car';
+  return r < 0.75 ? 'spot-house' : 'spot-car';
+}
+/**
+ * Add search spots on some of these blocks (never on a place or the colony): `count` of them, each made by
+ * makeSpot(type, blockKey, i, rand) which returns the new location id. Returns the new ids.
+ */
+export function addSpots(s, keys, count, makeSpot) {
+  const m = s.map; if (!m) return [];
+  m.spots ??= {};
+  const rand = spotRand((m.look ?? 0) * 7919 + m.stage * 104729 + keys.length);
+  const free = keys.filter((k) => m.blocks[k] && m.blocks[k].kind !== 'place' && m.blocks[k].kind !== 'colony');
+  const out = [];
+  for (let n = 0; n < count && free.length; n++) {
+    const k = free.splice(Math.floor(rand() * free.length), 1)[0];
+    const i = Object.values(m.spots).filter((sp) => sp.block === k).length;
+    const type = spotKind(m.blocks[k], zoneOf(...parse(k), m.look ?? 0), rand());
+    const id = makeSpot(type, k, i, rand);
+    m.spots[id] = { block: k, kind: type, i };
+    out.push(id);
+  }
+  return out;
 }
 
 /** Road distance between two places, in blocks (1 = next door). */

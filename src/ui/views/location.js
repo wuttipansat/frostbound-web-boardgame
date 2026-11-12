@@ -9,6 +9,7 @@ import { h, mount } from '../dom.js';
 import { icon } from '../icons.js';
 import { t, c } from '../../i18n/index.js';
 import { LOCATIONS } from '../../content/locations.js';
+import { locDef, isSpot } from '../../core/map.js';
 import { survivorsAt, survivorDef, aliveSurvivors, spawnForecast, searchSpawnChance, nextLevel } from '../../core/selectors.js';
 import { flashTip } from '../tooltip.js';
 import { survivorOptions, lureTargets } from '../options.js';
@@ -22,7 +23,7 @@ export function renderLocationPanel(el, ctx) {
   el.classList.toggle('hidden', !id);
   document.body.classList.toggle('loc-open', !!id);
   if (!id) return;
-  const def = LOCATIONS[id];
+  const def = locDef(s, id); // (typed places and search spots: 'police-2', 'spot-house-3')
   const loc = s.locations[id];
   // Step 17: a location at its zombie limit gets blood on its panel.
   el.classList.toggle('overrun', loc.zombies >= def.zombieSlots);
@@ -32,7 +33,7 @@ export function renderLocationPanel(el, ctx) {
   const stats = h('div', { class: 'stats inline' },
     h('span', { class: 'stat warm', tip: t('loc.survivors'), tabindex: '0' }, icon('person'), h('b', {}, `${here.length}/${def.survivorSlots ?? '∞'}`), h('small', {}, t('loc.survivors'))),
     h('span', { class: 'stat danger', tip: `${t('loc.zombies')} — ${t('tip.zombies', { n: loc.zombies })}`, tabindex: '0' }, icon('skull'), h('b', {}, `${loc.zombies}/${def.zombieSlots}`), h('small', {}, t('loc.zombies'))),
-    h('span', { class: 'stat', tip: t('loc.barricades'), tabindex: '0' }, icon('barricade'), h('b', {}, loc.barricades), h('small', {}, t('loc.barricades'))),
+    isSpot(s, id) ? null : h('span', { class: 'stat', tip: t('loc.barricades'), tabindex: '0' }, icon('barricade'), h('b', {}, loc.barricades), h('small', {}, t('loc.barricades'))),
     loc.deck ? h('span', { class: 'stat', tip: t('loc.cards'), tabindex: '0' }, icon('search'), h('b', {}, loc.deck.deckCount ?? loc.deckCount ?? loc.deck.length), h('small', {}, t('loc.cardsShort'))) : null,
     // Step 23: threat forecast — zombies this place gets if the round ended now.
     spawnForecast(s)[id] ? h('span', { class: 'stat danger forecast', tip: t('loc.forecast', { n: spawnForecast(s)[id] }), tabindex: '0' }, icon('crisis'), h('b', {}, `+${spawnForecast(s)[id]}`), h('small', {}, t('loc.forecastShort'))) : null);

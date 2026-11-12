@@ -273,7 +273,28 @@ export function computeLayout(map = LEGACY_MAP, into = {}) {
     into[b.placeId] = placeLayout(b.placeId, b.type ?? b.placeId, ...parse(k), roads, b.front, rail);
   }
   into.colony ??= colonyLayout();
+  for (const [id, sp] of Object.entries(map.spots ?? {})) if (!into[id] && map.blocks[sp.block]) into[id] = spotLayout(id, sp, map, roads, rail);
   return into;
+}
+
+/**
+ * GAME-1: where a search spot stands: on a piece of its block that matches it (a house, a car, a container yard),
+ * picked by its index; otherwise the block's front middle. Survivors stand in front of it, zombies by its door.
+ */
+function spotLayout(id, sp, map, roads, rail) {
+  const [bx, bz] = parse(sp.block); const b = map.blocks[sp.block];
+  const district = districtOf(bx, bz, map.look); const cp = centerpieceOf(b.kind, district);
+  const plan = placePlan(`${b.kind}@`, b.kind, bx, bz, roads, cp ? [cp[1], cp[2]] : [0, 0], b.front, rail);
+  const want = { 'spot-house': ['house', 'shop', 'rows'], 'spot-car': ['car', 'lot', 'yard'], 'spot-container': ['yard', 'car'] }[sp.kind] ?? [];
+  const pieces = landmarkOf(b, bx, bz, map) ? [] : blockPieces(b, bx, bz, plan, null, district).filter(([, , w]) => want.includes(w));
+  const pick = pieces.length ? pieces[sp.i % pieces.length] : null;
+  const [i, j] = pick ? [pick[0], pick[1]] : [0, (sp.i + 1) % plan.cols];
+  const c = chunkCenter(plan, i, j); if (pick?.[3] === 2) c.add(chunkCenter(plan, i, j + 1)).multiplyScalar(0.5);
+  const at = (f, l) => c.clone().addScaledVector(plan.fwd, f).addScaledVector(plan.side, l);
+  return {
+    id, spot: true, theta: Math.atan2(bz, bx), center: c, facing: Math.atan2(plan.fwd.x, plan.fwd.z), label: c.clone().setY(5),
+    zombieSlots: [at(1.6, -1.8), at(1.6, 1.8)], survivorSlots: [at(2.6, -0.9), at(2.6, 0.9)], hitRadius: CHUNK / 2 - 0.3,
+  };
 }
 
 // ---------------------------------------------------------------- streets
@@ -1841,8 +1862,24 @@ export function createBoard({ progressive = false } = {}) {
       skyline.visible = v.dot(skyDir) > 0.15; // only while it stands behind the city
     };
   };
+  // GAME-1: a searched-out spot looks ransacked: goods and boxes spilled in front of it.
+  const ransacked = new THREE.Group(); ransacked.name = 'ransacked'; root.add(ransacked);
+  let ransackedKey = '';
   const api = {
     root,
+    /** GAME-1: which search spots are empty (searched out). */
+    setSpots(empty = []) {
+      const key = empty.slice().sort().join('|'); if (key === ransackedKey) return; ransackedKey = key;
+      for (const o of ransacked.children) o.traverse((x) => x.geometry?.dispose?.());
+      ransacked.clear();
+      const lists = [[], [], []];
+      for (const id of empty) {
+        const L = layout[id]; if (!L) continue;
+        const f = new THREE.Vector3(Math.sin(L.facing), 0, Math.cos(L.facing)); const sd = new THREE.Vector3(-f.z, 0, f.x);
+        for (let k = 0; k < 4; k++) { tmp.position.copy(L.center).addScaledVector(f, 1.9 + (k % 2) * 0.5).addScaledVector(sd, (k - 1.5) * 0.8); tmp.position.y = GROUND; tmp.rotation.set(0, k * 1.7, 0); tmp.scale.setScalar(1); tmp.updateMatrix(); lists[k % 3].push(tmp.matrix.clone()); }
+      }
+      lists.forEach((list, k) => { if (list.length) ransacked.add(instanced(() => clutterModel(k + 1), 0.12, list, { cacheKey: `clutter-${k + 1}`, jitter: 0, castShadow: false })); });
+    },
     layout,
     fx,
     pickTargets,
@@ -1885,6 +1922,7 @@ export function createBoard({ progressive = false } = {}) {
       const oldRoads = new Set(map?.roads ?? []);
       map = next;
       computeLayout(map, layout);
+      for (const L of Object.values(layout)) if (L.spot && !rings[L.id]) addPick(L); // GAME-1: search spots can be tapped
       streets = streetSegments(map.roads, layout);
       const newStreets = streets.filter(([, , seg]) => seg === 'gate' ? !oldRoads.size : !oldRoads.has(seg));
       // Old blocks next to new ones (or new streets) get fresh terrain: their rim is now inside the city.

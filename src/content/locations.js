@@ -143,6 +143,29 @@ export const LOCATIONS = {
 };
 
 /**
+ * GAME-1: small search spots — a house, a car, a container on the map. No barricades, few survivors, a short deck
+ * (2–4 cards drawn from these weights when the spot is made), cheaper to search, a smaller zombie chance. A spot
+ * that has been searched out stays empty.
+ */
+export const SPOT_TYPES = {
+  'spot-house': {
+    id: 'spot-house', name: 'Abandoned House', blurb: 'Curtains drawn, door unlocked. Someone left in a hurry.', survivorSlots: 2, zombieSlots: 2, spot: true,
+    deck: { 'canned-beans': 3, cloth: 3, bandage: 2, chocolate: 2, coffee: 1, 'kitchen-knife': 1, 'padded-parka': 1, painkillers: 1, 'winter-boots': 1, flashlight: 1 },
+  },
+  'spot-car': {
+    id: 'spot-car', name: 'Abandoned Car', blurb: 'Keys in the ignition, battery long dead.', survivorSlots: 2, zombieSlots: 2, spot: true,
+    deck: { scrap: 3, 'jerry-can': 3, 'duct-tape': 1, crowbar: 1, 'socket-set': 1, chocolate: 1, 'city-map': 1, 'motor-junk': 1 },
+  },
+  'spot-container': {
+    id: 'spot-container', name: 'Shipping Container', blurb: 'The seal is cut. Pallets inside, frost on the walls.', survivorSlots: 2, zombieSlots: 2, spot: true,
+    deck: { scrap: 3, wood: 3, 'zip-ties': 1, 'tool-kit': 1, cloth: 1, 'rice-sack': 1 },
+  },
+};
+Object.assign(LOCATIONS, SPOT_TYPES);
+/** GAME-1 balance knobs for spots. */
+export const SPOT_RULES = { CARDS: [2, 4], AP_SHARE: 0.6, SPAWN: 0.05, START: ['1,1', '-1,1', '0,1'], PER_GROWTH: [2, 4] };
+
+/**
  * MAP-6: where a place type may stand and from which stage: tier 1 from the start, tier 2 from stage 2, tier 3 from
  * stage 3. Zones: core/zones.js.
  */

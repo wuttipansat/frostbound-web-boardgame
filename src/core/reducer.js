@@ -3,6 +3,8 @@ import { PHASES } from './constants.js';
 import { A } from './actions.js';
 import { RuleError, assert } from './errors.js';
 import * as turn from './rules/turn.js';
+import { activeSets } from './selectors.js';
+import { log } from './rules/helpers.js';
 import { draftPick, resolveCrossroads, checkImmediateEnd } from './rules/flow.js';
 
 const HANDLERS = {
@@ -32,9 +34,18 @@ export function reduce(state, action) {
   const handler = HANDLERS[action?.type];
   assert(handler, 'unknownAction', action?.type);
   const s = structuredClone(state);
+  const fullBefore = fullSets(s);
   handler(s, action);
+  // GAME-1: say when a survivor completes a set.
+  for (const [svId, ids] of Object.entries(fullSets(s))) for (const id of ids) if (!fullBefore[svId]?.includes(id)) log(s, 'setComplete', { survivorId: svId, setId: id });
   checkImmediateEnd(s);
   return s;
+}
+
+function fullSets(s) {
+  const out = {};
+  for (const id of s.team?.survivors ?? []) if (s.survivors[id]?.alive) out[id] = activeSets(s, id).filter((x) => x.full).map((x) => x.id);
+  return out;
 }
 
 /** Like reduce, but returns { ok, state, error } instead of throwing on illegal actions. */

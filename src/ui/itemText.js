@@ -18,3 +18,15 @@ function effect(item) {
 
 export const itemPlay = (item) => { const [k, p] = effect(item); return [`itemPlay.${k}`, p]; };
 export const itemShort = (item) => { const [k, p] = effect(item); return [`itemShort.${k}`, p]; };
+
+// GAME-1: item set bonuses as short text.
+import { t as tt } from '../i18n/index.js';
+export function setBonusText(b) {
+  if (!b) return '';
+  const parts = [];
+  for (const [k, v] of Object.entries(b)) {
+    if (k === 'coldProof') { if (v) parts.push(tt('set.b.coldProof')); continue; }
+    if (v) parts.push(tt(`set.b.${k}`, { n: v > 0 ? `+${v}` : `${v}` }));
+  }
+  return parts.join(', ');
+}

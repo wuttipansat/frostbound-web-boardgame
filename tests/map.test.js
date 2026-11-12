@@ -4,7 +4,7 @@ import { reduce, tryReduce } from '../src/core/reducer.js';
 import * as a from '../src/core/actions.js';
 import { createGame } from '../src/core/state.js';
 import { growCity } from '../src/core/rules/city.js';
-import { mapRange, allReachable, outsideOf, roadDistance, START_MAP } from '../src/core/map.js';
+import { mapRange, allReachable, outsideOf, roadDistance, START_MAP, isSpot } from '../src/core/map.js';
 import { walkCost } from '../src/core/selectors.js';
 import { simulate } from '../src/ai/simulate.js';
 import { startedGame, setSurvivors, setEnergy, patch } from './_helpers.js';
@@ -15,9 +15,9 @@ test('map: stage 1 is the 3×3 town with the colony, grocery and gas station; ev
   const s = createGame({ seed: 1 });
   assert.equal(s.map.stage, 1);
   assert.equal(Object.keys(s.map.blocks).length, 9);
-  assert.deepEqual(Object.keys(s.locations).sort(), ['colony', 'gas', 'grocery']);
+  assert.deepEqual(Object.keys(s.locations).filter((id) => !isSpot(s, id)).sort(), ['colony', 'gas', 'grocery']); // (GAME-1: plus a few search spots)
   assert.ok(allReachable(s));
-  for (const id of outsideOf(s)) assert.equal(walkCost(s, 'colony', id), 16);
+  for (const id of outsideOf(s)) if (!isSpot(s, id)) assert.equal(walkCost(s, 'colony', id), 16);
 });
 
 test('map: growth keeps old blocks, stays connected, every place has a road (fuzz, stages 2–5)', () => {
@@ -25,9 +25,10 @@ test('map: growth keeps old blocks, stays connected, every place has a road (fuz
     const s = createGame({ seed });
     for (let n = 2; n <= 5; n++) {
       const before = JSON.stringify(s.map.blocks);
-      const placesBefore = Object.keys(s.locations).length;
+      const places = () => Object.keys(s.locations).filter((id) => !isSpot(s, id)).length;
+      const placesBefore = places();
       growCity(s);
-      const gained = Object.keys(s.locations).length - placesBefore;
+      const gained = places() - placesBefore;
       assert.ok(gained >= 2 && gained <= 3, `seed ${seed} stage ${n}: ${gained} new places`);
       if (n === 2) for (const id of ['library', 'hospital']) assert.ok(s.locations[id], `seed ${seed}: ${id} at stage 2`);
       if (n === 3) for (const id of ['library', 'police', 'school', 'hospital']) assert.ok(s.locations[id], `seed ${seed}: ${id} by stage 3`);

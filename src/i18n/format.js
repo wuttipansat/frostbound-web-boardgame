@@ -43,6 +43,8 @@ export function formatLog(e, state) {
     case 'lure': return t('log.lure', p);
     case 'unpack': return t('log.unpack', { ...p, count: e.count });
     case 'mapFound': return t('log.mapFound', { name: survivorDef(e.survivorId)?.name ?? '', place: c('locations', e.locationId, 'name') });
+    case 'spotsFound': return t('log.spotsFound', { count: e.count });
+    case 'setComplete': return t('log.setComplete', { name: survivorDef(e.survivorId)?.name ?? '', set: t(`set.${e.setId}`) }); // GAME-1
     case 'mapGrown': return t('log.mapGrown', { stage: e.stage, places: (e.places ?? []).map((l) => c('locations', l, 'name')).join(', ') });
     case 'built': return t('log.built', { building: t(`bld.${e.buildingId}`), level: e.level });
     case 'building': return t('log.building', { ...p, building: t(`bld.${e.buildingId}`), n: e.n });

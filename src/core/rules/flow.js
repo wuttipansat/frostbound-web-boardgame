@@ -7,6 +7,7 @@ import { CRISES_BY_ID } from '../../content/crises.js';
 import {
   aliveSurvivors, foodNeeded, colonyPopulation, crisisRequirement, itemOf, scenarioDef, scenarioTarget,
   focusSurvivor, teamHasAbility, crisisMatches, baseLevel, siegeForecast, bondKey, missionStatus, apMax, sleepPlan, spawnForecast, outsideOf, locDef, ringOf } from '../selectors.js';
+import { isSpot } from '../map.js';
 import {
   log, changeMorale, giveTrait, changeFood, recruitSurvivor, healHp, damageSurvivor, unpack, drawFromDeck, addZombies, woundSurvivor, newSurvivor, drawItems,
 } from './helpers.js';
@@ -247,7 +248,7 @@ export function restock(s) {
   if (s.day <= 1) return;
   // MAP-1: only places within one ring past the furthest survivor (keeps a big city cheap).
   const reach = 1 + Math.max(1, ...Object.values(s.survivors).filter((v) => v.alive).map((v) => ringOf(s, v.location)));
-  const near = outsideOf(s).filter((loc) => locDef(s, loc).deck && ringOf(s, loc) <= reach);
+  const near = outsideOf(s).filter((loc) => locDef(s, loc).deck && !isSpot(s, loc) && ringOf(s, loc) <= reach); // (GAME-1: a searched-out spot stays empty)
   // MAP-1c: the town turns up at least RESTOCK_MIN items a day, even while only a few places are known.
   const picks = near.slice();
   for (let i = 0; near.length && picks.length < RESTOCK_MIN; i++) picks.push(near[i % near.length]);

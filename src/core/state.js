@@ -1,9 +1,9 @@
 // createGame(config) -> a fresh, fully JSON-serializable GameState.
 import { PHASES, RULES, DIFFICULTY } from './constants.js';
-import { newMap, mapPlaces } from './map.js';
+import { newMap, mapPlaces, addSpots } from './map.js';
 import { random, normalizeSeed, shuffle } from './rng.js';
 import { assert } from './errors.js';
-import { LOCATIONS } from '../content/locations.js';
+import { LOCATIONS, SPOT_RULES } from '../content/locations.js';
 import { SURVIVORS } from '../content/survivors.js';
 import { SCENARIOS_BY_ID } from '../content/scenarios.js';
 import { CRISES } from '../content/crises.js';
@@ -59,6 +59,8 @@ export function createGame(config = {}) {
 
   // Item decks: one card instance per copy, keyed by a unique uid.
   for (const locId of mapPlaces(s.map)) s.locations[locId] = stockPlace(s, locId, locId, 'c');
+  // GAME-1: a few search spots near the colony (new games only; the old six-place town has none).
+  if (!config.fullTown) addSpots(s, SPOT_RULES.START, SPOT_RULES.START.length, (type, block, i, rand) => makeSpot(s, type, rand));
 
   s.crisisDeck = shuffle(s, CRISES.map((c) => c.id));
   s.crossroadsDeck = shuffle(s, CROSSROADS.map((c) => c.id));
@@ -84,6 +86,21 @@ export function createGame(config = {}) {
 }
 
 /** A fresh place of `type`: zombies, barricades and its shuffled item pile (uids prefixed so they stay unique). */
+/** GAME-1: a search spot: a new location with a short deck (2–4 cards by weight). Returns its id. */
+export function makeSpot(s, type, rand) {
+  let id = type; for (let k = 2; s.locations[id]; k++) id = `${type}-${k}`;
+  const weights = Object.entries(LOCATIONS[type].deck);
+  const total = weights.reduce((a, [, w]) => a + w, 0);
+  const [lo, hi] = SPOT_RULES.CARDS; const n = lo + Math.floor(rand() * (hi - lo + 1));
+  const deck = [];
+  for (let k = 0; k < n; k++) {
+    let r = rand() * total; const itemId = (weights.find(([, w]) => (r -= w) < 0) ?? weights[0])[0];
+    const uid = `s${id}.${k}`; s.cards[uid] = itemId; deck.push(uid);
+  }
+  s.locations[id] = { zombies: 0, barricades: 0, deck, type };
+  return id;
+}
+
 export function stockPlace(s, id, type, prefix, zombies = 0) {
   const def = LOCATIONS[type];
   const deck = [];

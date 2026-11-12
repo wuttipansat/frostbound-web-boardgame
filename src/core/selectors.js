@@ -2,10 +2,12 @@ import { BUILDINGS, CRAWLER } from '../content/buildings.js';
 // Read-only derived queries over GameState. Safe to use from UI/renderer.
 import { SURVIVORS_BY_ID } from '../content/survivors.js';
 import { ITEMS } from '../content/items.js';
+import { SETS, SET_CAPS } from '../content/sets.js';
 import { SCENARIOS_BY_ID } from '../content/scenarios.js';
 import { CRISES_BY_ID } from '../content/crises.js';
 import { RULES, ENERGY, REST, FIGHT, SEASON, SIEGE, XP, BOND, DIFFICULTY, SEARCH_SPAWN } from './constants.js';
-import { locDef, typeOf, outsideOf, roadDistance, ringOf, mapOf, mapRange } from './map.js';
+import { locDef, typeOf, outsideOf, roadDistance, ringOf, mapOf, mapRange, isSpot } from './map.js';
+import { SPOT_RULES } from '../content/locations.js';
 import { zoneOf } from './zones.js';
 import { blockOf } from './map.js';
 
@@ -38,6 +40,31 @@ export function gearOf(s, survivorId = null) {
   const g = sv?.gear ?? {};
   const def = (uid) => (uid ? ITEMS[s.cards[uid]] ?? null : null);
   return { weapon: def(g.weapon), armor: def(g.armor), book: def(g.book), tool: def(g.tool) };
+}
+
+// ---------------------------------------------------------------- GAME-1: item sets
+
+/** The item ids a survivor carries or wears (backpack + equipped gear; each id once). */
+export function carriedIds(s, survivorId) {
+  const sv = s.survivors[survivorId];
+  if (!sv) return new Set();
+  return new Set([...(sv.pack ?? []), ...Object.values(sv.gear ?? {})].filter(Boolean).map((uid) => s.cards[uid]).filter(Boolean));
+}
+/** Sets with 2+ pieces held: [{ id, have, of, full }]. */
+export function activeSets(s, survivorId) {
+  const held = carriedIds(s, survivorId);
+  return SETS.map((x) => ({ id: x.id, have: x.items.filter((i) => held.has(i)).length, of: x.items.length }))
+    .filter((x) => x.have >= 2).map((x) => ({ ...x, full: x.have === x.of }));
+}
+/** The summed, capped bonus from a survivor's sets. */
+export function setBonus(s, survivorId) {
+  const out = { atk: 0, searchAp: 0, moveAp: 0, barricadeAp: 0, hpSaved: 0, pack: 0, regen: 0, coldProof: false };
+  for (const a of activeSets(s, survivorId)) {
+    const def = SETS.find((x) => x.id === a.id);
+    for (const b of [def.bonus2, a.full ? def.bonusFull : null]) if (b) for (const [k, v] of Object.entries(b)) { if (k === 'coldProof') out.coldProof ||= v; else out[k] += v; }
+  }
+  for (const [k, cap] of Object.entries(SET_CAPS)) out[k] = cap < 0 ? Math.max(cap, out[k]) : Math.min(cap, out[k]);
+  return out;
 }
 
 /** How many living survivors have a book with this passive equipped (books help the whole team). */
@@ -155,6 +182,9 @@ export function actionCost(s, survivorId, kind, to = null) {
   if (kind === 'search') cost += (gear.tool?.searchMod ?? 0) - XP.SEARCH_AP * xpLevel(sv, 'search');
   if (kind === 'barricade') cost += gear.tool?.barricadeMod ?? 0;
   if (!sv) return cost;
+  if (kind === 'search' && isSpot(s, sv.location)) cost = Math.round(cost * SPOT_RULES.AP_SHARE); // GAME-1: a spot is a quick search
+  const sb = setBonus(s, survivorId); // GAME-1
+  if (kind === 'search') cost += sb.searchAp; else if (kind === 'move') cost += sb.moveAp; else if (kind === 'barricade') cost += sb.barricadeAp;
   const here = sv.location;
   const zombies = s.locations[here]?.zombies ?? 0;
   if ((kind === 'search' || kind === 'barricade') && zombies >= 2) cost += ENERGY.CROWDED;
@@ -163,7 +193,7 @@ export function actionCost(s, survivorId, kind, to = null) {
   const cheaper = { move: 'roadRunner', attack: 'sharpshooter', barricade: 'handy' }[kind];
   if (cheaper && def?.ability.type === cheaper) cost -= ENERGY.SKILLED;
   const outside = kind === 'move' ? to && to !== 'colony' : here !== 'colony';
-  if (isStorm(s) && outside && def?.ability.type !== 'coldProof' && !gear.armor?.coldProof) cost += ENERGY.STORM;
+  if (isStorm(s) && outside && def?.ability.type !== 'coldProof' && !gear.armor?.coldProof && !sb.coldProof) cost += ENERGY.STORM;
   return Math.max(1, cost);
 }
 
@@ -195,7 +225,7 @@ export function placeOfItem(s, uid) {
 }
 
 /** Backpack slots: 3, more with a big backpack or a sled. */
-export const packSize = (s, survivorId) => RULES.PACK + (s.survivors[survivorId] ? gearOf(s, survivorId).tool?.pack ?? 0 : 0);
+export const packSize = (s, survivorId) => RULES.PACK + (s.survivors[survivorId] ? (gearOf(s, survivorId).tool?.pack ?? 0) + setBonus(s, survivorId).pack : 0);
 export const packFree = (s, survivorId) => packSize(s, survivorId) - (s.survivors[survivorId]?.pack?.length ?? 0);
 
 /** Zombies one attack kills: a gun's value (shotgun 2); melee 1, +1 for Teodor. */
@@ -213,7 +243,7 @@ export function atkOf(s, survivorId) {
   const w = gearOf(s, survivorId).weapon;
   const sv = s.survivors[survivorId];
   return (7 - (survivorDef(survivorId)?.attack ?? 4)) * FIGHT.ATK_PER_SKILL + (w && !w.gun ? (w.atk ?? 0) : 0)
-    + XP.ATK * xpLevel(sv, 'fight') + (sv?.trait === 'strong' ? 4 : 0);
+    + XP.ATK * xpLevel(sv, 'fight') + (sv?.trait === 'strong' ? 4 : 0) + (sv ? setBonus(s, survivorId).atk : 0);
 }
 
 /** What one attack would do now: { cost, kills, hp (lost), gun, spawn (chance), ammo }. */
@@ -226,7 +256,7 @@ export function fightPreview(s, survivorId) {
   const left = Math.max(0, (sv?.ap ?? 0) - cost);
   const raw = Math.ceil(Math.max(0, ferocity(s) - (left + atkOf(s, survivorId))) / 3);
   const bond = closeBond(s, survivorId) ? BOND.HP_SAVED : 0;
-  return { cost, kills, hp: Math.max(0, raw - (gear.armor?.value ?? 0) - bond), gun: false, spawn: 0, ammo: 0 };
+  return { cost, kills, hp: Math.max(0, raw - (gear.armor?.value ?? 0) - bond - (sv ? setBonus(s, survivorId).hpSaved : 0)), gun: false, spawn: 0, ammo: 0 };
 }
 
 /** HP lost walking out of a place with zombies. */
@@ -262,7 +292,7 @@ export function sleepPlan(s) {
   for (const sv of alive) {
     const kind = sv.location !== 'colony' ? 'outside' : sv.rest === 'guard' ? 'guard' : beds.has(sv.id) ? 'bed' : 'floor';
     const max = apMax(s, sv.id);
-    const extra = bonus + (survivorDef(sv.id).ability.type === 'extraDie' ? 15 : 0);
+    const extra = bonus + (survivorDef(sv.id).ability.type === 'extraDie' ? 15 : 0) + setBonus(s, sv.id).regen;
     const share = kind === 'guard' && sv.trait === 'nightOwl' ? 0.7 : REST[kind].ap;
     let ap = Math.max(0, Math.min(max, apOf(s, sv.id) + Math.round(max * share) + extra));
     if (sv.hungry) ap = Math.round(ap * REST.HUNGRY); // went to bed hungry: half AP tomorrow

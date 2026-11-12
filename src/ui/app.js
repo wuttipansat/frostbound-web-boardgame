@@ -139,6 +139,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
     if (added.some((e) => e.k === 'mapFound')) toast(t('toast.mapFound'), 'good');
     const grown = added.find((e) => e.k === 'mapGrown');
     if (grown) toast(t('toast.mapGrown', { n: grown.places?.length ?? 0 }), 'good');
+    for (const e of added.filter((x) => x.k === 'setComplete')) toast(t('toast.setComplete', { set: t(`set.${e.setId}`) }), 'good'); // GAME-1
     for (const e of added) onLogEntry(e);
     present(added);
     for (const q of ui.queue) if (q.type === 'colony' && q.morale == null) q.morale = state.morale;

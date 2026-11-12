@@ -4,13 +4,14 @@ import { h, mount } from '../dom.js';
 import { icon, heart } from '../icons.js';
 import { t, c, getLang } from '../../i18n/index.js';
 import { flashTip } from '../tooltip.js';
-import { aliveSurvivors, survivorDef, itemOf, woundLimit, holderOf, apMax, sleepPlan, atkOf, xpLevel, gearOf, actionCost, killsPerAttack, heroOf } from '../../core/selectors.js';
+import { aliveSurvivors, survivorDef, itemOf, woundLimit, holderOf, apMax, sleepPlan, atkOf, xpLevel, gearOf, actionCost, killsPerAttack, heroOf, carriedIds, activeSets } from '../../core/selectors.js';
+import { SET_OF, SETS_BY_ID } from '../../content/sets.js';
 import {
   cardOptions, endTurnOption, cardNeeds, cardTargets, giveTargets, allItems, shouldConfirmEndTurn, cardUsable, actingSurvivors,
 } from '../options.js';
 import * as act from '../../core/actions.js';
 import { RULES } from '../../core/constants.js';
-import { itemPlay, itemShort } from '../itemText.js';
+import { itemPlay, itemShort, setBonusText } from '../itemText.js';
 import { isPermanent } from '../../content/items.js';
 
 /** A small round target: a portrait without a name (the name and the reason are in the tooltip).
@@ -67,6 +68,7 @@ function cardDetail(ctx, shown, uid) {
           h('span', { class: 'ic-tier', 'aria-label': t(`tier.${item.tier}`) }, Array.from({ length: item.tier }, () => h('i'))),
           isPermanent(item) ? icon('lock') : null))),
     h('p', { class: 'cd-rule' }, t(...itemPlay(item))),
+    setLine(s, uid, item),
     where,
     picker,
     giveRow,
@@ -76,6 +78,18 @@ function cardDetail(ctx, shown, uid) {
       onclick: (ev) => (o.ok ? go(o.action, o.id) : flashTip(ev.currentTarget)),
     }, icon(CARD_ACTION_ICON[o.id] ?? 'check'), h('span', {}, t(`act.${o.id}Short`))))),
     opts.some((o) => o.id === 'contribute') ? h('small', { class: 'cd-why' }, t('act.contributeWhy')) : null);
+}
+
+/** GAME-1: the set this item belongs to, how many pieces its carrier holds, and the bonuses. */
+function setLine(s, uid, item) {
+  const setId = SET_OF[item.id]; if (!setId) return null;
+  const set = SETS_BY_ID[setId]; const holder = holderOf(s, uid);
+  const held = holder && holder !== 'stockpile' ? carriedIds(s, holder) : new Set();
+  const have = set.items.filter((i) => held.has(i)).length;
+  return h('p', { class: `cd-set${have >= 2 ? ' on' : ''}` }, icon('goal'),
+    h('b', {}, t('set.line', { name: t(`set.${setId}`), have, of: set.items.length })), ' ',
+    h('small', {}, `${t('set.two')}: ${setBonusText(set.bonus2)}${Object.keys(set.bonusFull).length ? ` · ${t('set.full')}: ${setBonusText(set.bonusFull)}` : ''}`),
+    h('small', { class: 'cd-set-items' }, set.items.map((i) => `${held.has(i) ? '✓' : '·'} ${c('items', i, 'name')}`).join('  ')));
 }
 
 /** Put the sheet next to the card it belongs to (phones use a low bottom sheet instead). */
@@ -291,7 +305,8 @@ function updateCard(el, ctx, shown, uid, { isActor, compact }) {
   el.tabIndex = compact ? -1 : 0;
   if (compact) el.setAttribute('aria-hidden', 'true'); else el.removeAttribute('aria-hidden');
   // The face stays short; the full rule, flavour and why it can't be used now are in the tooltip.
-  const tip = compact ? '' : usable.ok ? `${t(...itemPlay(item))} — ${c('items', item.id, 'text')}` : t(`err.${usable.reason}`);
+  const setTag = SET_OF[item.id] ? ` · ${t('set.line', { name: t(`set.${SET_OF[item.id]}`), have: '', of: '' }).replace(/\s*\/?\s*$/, '')}` : '';
+  const tip = compact ? '' : usable.ok ? `${t(...itemPlay(item))} — ${c('items', item.id, 'text')}${setTag}` : t(`err.${usable.reason}`);
   if (tip) el.dataset.tip = tip; else delete el.dataset.tip;
   const sig = `${item.id}|${used}|${getLang()}`;
   if (el.dataset.sig !== sig) {
@@ -374,5 +389,10 @@ function survivorToken(ctx, sv, { canAct = false, color = '#888' } = {}) {
       const g = gearOf(ctx.state, sv.id);
       const worn = ['weapon', 'armor', 'book', 'tool'].map((k) => g[k]).filter(Boolean);
       return worn.length ? h('span', { class: 'tok-gear' }, icon('hand'), worn.map((it) => c('items', it.id, 'name')).join(' · ')) : null;
+    })(),
+    // GAME-1: active item sets and what they give.
+    (() => {
+      const sets = activeSets(ctx.state, sv.id);
+      return sets.length ? h('span', { class: 'tok-sets', tip: sets.map((a) => `${t(`set.${a.id}`)}: ${setBonusText(SETS_BY_ID[a.id].bonus2)}${a.full ? `, ${setBonusText(SETS_BY_ID[a.id].bonusFull)}` : ''}`).join(' · ') }, icon('goal'), sets.map((a) => `${t(`set.${a.id}`)} ${a.have}/${a.of}`).join(' · ')) : null;
     })()));
 }

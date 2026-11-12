@@ -97,7 +97,7 @@ export function checklistView(s, { onlyBad = false } = {}) {
     icon(r.ok ? 'check' : 'exposure'), h('span', {}, r.text))));
 }
 
-const RULE_CARDS = [['turn', 'hand'], ['dice', 'dice'], ['move', 'snowflake'], ['cards', 'lock'], ['crisis', 'crisis'], ['morale', 'morale'], ['map', 'map']];
+const RULE_CARDS = [['turn', 'hand'], ['dice', 'dice'], ['move', 'snowflake'], ['cards', 'lock'], ['crisis', 'crisis'], ['morale', 'morale'], ['map', 'map'], ['sets', 'goal'], ['spots', 'search']];
 
 /** Quick rules: six small cards. Opening them does not pause the game. */
 export function rulesModal(ctx) {

@@ -127,6 +127,15 @@ function refreshLabels(state) {
     el.className = 'loc-label pin';
     if (!state) { el.classList.add('empty'); continue; }
     if (!state.locations[id]) { el.classList.add('empty'); continue; }
+    if (board.layout[id]?.spot) { // GAME-1: a search spot: a small search icon while it has something, nothing once empty
+      const left = state.locations[id].deck?.length ?? 0; const people = Object.values(state.survivors).filter((v) => v.alive && v.location === id).length;
+      el.classList.add('spot'); el.classList.toggle('empty', !left && !people && !state.locations[id].zombies);
+      el.append(icon(left ? 'search' : 'person'));
+      if (state.locations[id].zombies) { const b = document.createElement('span'); b.className = 'pz'; b.append(icon('skull'), String(state.locations[id].zombies)); el.append(b); }
+      el.setAttribute('aria-label', c('locations', id, 'name'));
+      el.onclick = (ev) => { ev.stopPropagation(); app?.onBoardPick({ locationId: id }); };
+      continue;
+    }
     const z = state.locations[id].zombies;
     const people = Object.values(state.survivors).filter((v) => v.alive && v.location === id).length;
     el.classList.toggle('overrun', isOverrun(state, id));
@@ -236,6 +245,7 @@ const app = createApp({
       // While the night report is on screen, the board shows night.
       updateWinter(state && app?.ui.queue[0]?.type === 'colony' ? { ...state, time: 'night' } : state);
       refreshLabels(state);
+      if (state?.map?.spots) board.setSpots(Object.keys(state.map.spots).filter((id) => !state.locations[id]?.deck?.length)); // GAME-1: searched-out spots
       placeRing();
       document.getElementById('view-ctl')?.classList.toggle('hidden', !state || state.phase === 'draft' || state.phase === 'gameOver');
     },
@@ -314,7 +324,7 @@ stage.onFrame(() => {
     // Labels hang above their anchor (translate -100%): keep the whole pill below the top bar.
     // MAP-2 D: pins off screen are hidden and skip the layout reads below.
     const off = v.z > 1 || x < -60 || x > w + 60 || ((1 - v.y) / 2) * h < -40 || ((1 - v.y) / 2) * h > h + 40;
-    labels[id].classList.toggle('offscreen', off);
+    labels[id].classList.toggle('offscreen', off || (board.layout[id]?.spot && stage.camera.zoom < 1.3)); // GAME-1: spot pins only up close
     if (off) continue;
     const y = Math.max(((1 - v.y) / 2) * h, barBottom + 30);
     labels[id].style.left = `${x}px`;

@@ -73,7 +73,7 @@ export const FIGHT = Object.freeze({
   NIGHT_BITE: 5,          // sleeping outside: HP per zombie there
 });
 // The chance a search makes a zombie appear, by place type (+RING per ring past the first).
-export const SEARCH_SPAWN = Object.freeze({ grocery: 0.1, school: 0.15, library: 0.1, gas: 0.15, police: 0.25, hospital: 0.2, warehouse: 0.15, motel: 0.15, apartment: 0.2, church: 0.1, farmhouse: 0.1, mall: 0.2, hardware: 0.15, military: 0.3, factory: 0.2, forest: 0.08, scrapyard: 0.12, EXTRA: 0.1, RING: 0.03, DOWNTOWN: 0.05 }); // MAP-6: downtown is busier
+export const SEARCH_SPAWN = Object.freeze({ grocery: 0.1, school: 0.15, library: 0.1, gas: 0.15, police: 0.25, hospital: 0.2, warehouse: 0.15, motel: 0.15, apartment: 0.2, church: 0.1, farmhouse: 0.1, mall: 0.2, hardware: 0.15, military: 0.3, factory: 0.2, forest: 0.08, scrapyard: 0.12, 'spot-house': 0.05, 'spot-car': 0.05, 'spot-container': 0.05, EXTRA: 0.1, RING: 0.03, DOWNTOWN: 0.05 }); // MAP-6: downtown is busier
 // ---------------------------------------------------------------- food (every day)
 export const FOOD = Object.freeze({ HUNGRY_HP: 15, HUNGRY_MORALE: 1, MEALS: 4 }); // a food card feeds 4 × its value
 // Seasons get harsher: cold nights (sleeping outside −10 HP), brutes (FIGHT.BRUTE_DAY), daily storms.
