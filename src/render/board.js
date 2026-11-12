@@ -50,12 +50,12 @@ const RECIPES = {
  */
 export const PLACE_GROUNDS = {
   grocery: ['dock', 'looted', 'lot'], gas: ['tow', 'lot'], police: ['impound', 'laststand', 'lot'],
-  hospital: ['triage', 'pharmacy', 'lot'], school: ['busloop', 'schoolyard', 'playground', 'shelter'], library: ['garden', 'lot'],
+  hospital: ['triage', 'wing', 'pharmacy', 'lot'], school: ['busloop', 'schoolyard', 'playground', 'shelter'], library: ['garden', 'lot'],
   mall: ['lot', 'foodvan', 'looted', 'lot'], military: ['convoy', 'laststand'], factory: ['siding', 'truckyard'],
   forest: ['logs', 'clump'], scrapyard: ['wrecks', 'tow'], motel: ['diner', 'lot'], church: ['graveyard', 'shelter', 'garden'],
   warehouse: ['truckyard', 'dock'], apartment: ['lot', 'garden'], farmhouse: ['field', 'field'], hardware: ['lot', 'truckyard'],
 };
-const GROUND_KINDS = ['lot', 'dock', 'tow', 'triage', 'busloop', 'schoolyard', 'garden', 'convoy', 'siding', 'truckyard', 'logs', 'wrecks', 'foodvan', 'laststand', 'shelter', 'looted'];
+const GROUND_KINDS = ['wing', 'lot', 'dock', 'tow', 'triage', 'busloop', 'schoolyard', 'garden', 'convoy', 'siding', 'truckyard', 'logs', 'wrecks', 'foodvan', 'laststand', 'shelter', 'looted'];
 // VOXEL-2: vehicles parked in place grounds: [prop, x, z (piece voxels, front = +z), yaw]; the filler buildings
 // (offices, towers, …) keep the authored level up close.
 const BIG_FILLER = /^(tower|office|cinema|garage|shed|rows|tall|sub|mixed|mid|work)-/;
@@ -175,11 +175,14 @@ export function landmarkOf(b, bx, bz, m) {
   if (bx === ax && bz === az) {
     if (zone === 'commercial') return townDepth(bx, bz, look) >= 2.4 ? 'skyscraper' : 'cityhall';
     if (zone === 'industrial' && hash3(sx, 139, sz + look) < 0.5) return 'powerplant';
+    if (zone === 'residential') return townDepth(bx, bz, look) >= 1.3 ? 'stadium' : 'cathedral';      // MAP-12 part 2
+    if (zone === 'outskirts' && hash3(sx, 141, sz + look) < 0.7) return ['mast', 'reservoir', 'barns'][Math.floor(hash3(sx, 143, sz + look) * 3)];
   }
   if (bx === cx && bz === cz && zone === 'commercial') return hash3(sx, 133, sz + look) < 0.5 ? 'carpark' : 'cityhall';
+  if (bx === cx && bz === cz && zone === 'residential' && hash3(sx, 145, sz + look) < 0.4) return 'cathedral';
   return null;
 }
-export const LANDMARKS = { skyscraper: city.skyscraper, cityhall: city.cityHall, carpark: city.carParkTower, powerplant: city.powerPlant };
+export const LANDMARKS = { skyscraper: city.skyscraper, cityhall: city.cityHall, carpark: city.carParkTower, powerplant: city.powerPlant, stadium: city.stadium, cathedral: city.cathedral, mast: city.radioMast, reservoir: city.reservoir, barns: city.barnComplex };
 /** The corridors that cut through block rows: the railway and the river. */
 export const cutLines = (m) => [railLine(m), riverLine(m)];
 

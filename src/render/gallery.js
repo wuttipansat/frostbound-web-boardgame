@@ -11,11 +11,11 @@ const P = (key, make, size = 0.1) => ['prop', key, size, make];
 export function galleryList() {
   const out = [];
   for (const t of ['grocery', 'police', 'mall', 'hardware', 'military', 'factory', 'forest', 'scrapyard', 'farmhouse']) out.push(['places', t, ...L0(`place-${t}`, LOCATION_BUILDERS_HD[t]).slice(1)]);
-  for (const k of ['lot', 'dock', 'tow', 'triage', 'busloop', 'schoolyard', 'garden', 'convoy', 'siding', 'truckyard', 'logs', 'wrecks', 'foodvan', 'laststand', 'shelter', 'looted']) out.push(['grounds', k, ...L0(`b5-${k}`, () => city.groundsPiece(k)).slice(1)]);
+  for (const k of ['wing', 'lot', 'dock', 'tow', 'triage', 'busloop', 'schoolyard', 'garden', 'convoy', 'siding', 'truckyard', 'logs', 'wrecks', 'foodvan', 'laststand', 'shelter', 'looted']) out.push(['grounds', k, ...L0(`b5-${k}`, () => city.groundsPiece(k)).slice(1)]);
   for (const [k, mk] of [['playground', city.playground], ['pharmacy', city.pharmacy], ['impound', city.impound], ['graveyard', city.graveyard], ['diner', city.diner], ['watertower', city.waterTower], ['substation', city.substation]]) out.push(['companions', k, ...L0(`b5-${k}`, mk).slice(1)]);
   const L1 = (key, make) => ['lod1', key, 0.3, () => city.lod(1, key, make)];
   for (const [n, f, k] of [[4, city.suburbanHouse, 'sub'], [2, city.mixedUse, 'mixed'], [1, city.midrise, 'mid'], [2, city.workshop, 'work']]) for (let v = 0; v < n; v++) out.push(['buildings', `${k}-${v}`, ...L1(`b5-${k}-${v}`, () => f(v)).slice(1)]);
-  for (const [k, f] of [['skyscraper', city.skyscraper], ['cityhall', city.cityHall], ['carpark', city.carParkTower], ['powerplant', city.powerPlant]]) out.push(['landmarks', k, ...L1(`lm-${k}`, f).slice(1)]);
+  for (const [k, f] of [['skyscraper', city.skyscraper], ['cityhall', city.cityHall], ['carpark', city.carParkTower], ['powerplant', city.powerPlant], ['stadium', city.stadium], ['cathedral', city.cathedral], ['mast', city.radioMast], ['reservoir', city.reservoir], ['barns', city.barnComplex]]) out.push(['landmarks', k, ...L1(`lm-${k}`, f).slice(1)]);
   out.push(['landmarks', 'truss', 'gal-truss', 0.1, city.trussModel]);
   for (let v = 0; v < city.COTTAGE_VARIANTS; v++) out.push(['outskirts', `cottage-${v}`, ...L0(`cottage-${v}`, () => city.cottage(v)).slice(1)]);
   for (let v = 0; v < 3; v++) out.push(['outskirts', `field-${v}`, ...L0(`b5-b7-field-${v}`, () => city.fieldPiece(v)).slice(1)]);

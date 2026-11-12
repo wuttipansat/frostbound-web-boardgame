@@ -1423,6 +1423,13 @@ export function groundsPiece(kind) {
       for (let k = 0; k < 14; k++) m.set(-10 + Math.floor(hash3(k, 5, 6) * 20), 1, -5 + Math.floor(hash3(k, 7, 8) * 12), k % 2 ? 0xbcd8e8 : [0xd8b03a, 0xa07a4a, 0x86b04a, 0xc0392b][k % 4]);
       break;
     }
+    case 'wing': { // MAP-12: a hospital ward tower on its grounds: 7 floors, a red cross on the roof, an ambulance canopy
+      lotGround(m, 190, false);
+      const H = block(m, { x0: -9, z0: -9, w: 18, d: 15, floors: 7, wall: C.trim, seed: 191 });
+      m.box(-3, H + 1, -3, 6, 2, 1, C.red); m.box(-1, H + 1, -5, 2, 6, 1, C.red); m.box(-1, H + 3, -5, 2, 2, 5, C.red);
+      m.box(-8, 8, 6, 16, 1, 5, C.roofDark); for (const x of [-8, 7]) m.box(x, 1, 10, 1, 7, 1, C.metalDark);
+      break;
+    }
     default: snowGround(m);
   }
   return fin(m);
@@ -1601,4 +1608,90 @@ export function trussModel() {
   for (let x = -L / 2; x < L / 2; x += 10) for (let k = 0; k < 10; k++) m.set(x + k, 3 + Math.round(k * 2.2), 0, 0x56616e);
   for (let x = -L / 2; x <= L / 2; x += 5) m.set(x, 1, 2, 0x8e979f);
   return m.snowCap(P.snow, 1, 2);
+}
+
+// ---------------------------------------------------------------- MAP-12 part 2: civic and outskirts landmarks
+
+/** A stadium: an oval of stands rising outward, a snowed pitch with faint lines, gates, floodlight masts, a scoreboard. */
+export function stadium() {
+  const m = new VoxelModel();
+  for (let x = -30; x < 30; x++) for (let z = -30; z < 30; z++) {
+    const e = Math.hypot(x / 21, z / 15);
+    if (e < 1) { m.set(x, 0, z, x === 0 || Math.abs(e - 0.45) < 0.03 || Math.abs(Math.abs(x) - 17) < 0.5 ? 0xd8dde2 : P.snow); continue; }
+    if (e < 1.42) {
+      const h = Math.round(((e - 1) / 0.42) * 12) + 1;
+      m.box(x, 0, z, 1, h, 1, (vx, y) => (y === h - 1 ? ((Math.floor(Math.atan2(z, x) * 6) & 1) ? 0x7a2a2a : 0x2b4170) : 0x8d949e));
+    } else if (e < 1.5) m.box(x, 0, z, 1, 14, 1, (vx, y) => (y % 4 === 3 ? C.trim : 0x9aa3ad));
+    else m.set(x, 0, z, e < 1.68 ? (hash3(x, 250, z) < 0.3 ? P.snow : C.tile) : P.snow); // a paved concourse round the stands
+  }
+  for (const x of [-4, 3]) m.clearBox(x - 1, 1, 22, 3, 7, 3); // gates
+  for (const [x, z] of [[-27, -24], [26, -24], [-27, 23], [26, 23]]) { m.box(x, 1, z, 1, 34, 1, C.metalDark); m.box(x - 2, 34, z - 1, 5, 3, 1, 0x3a3f46); for (let k = 0; k < 4; k++) m.set(x - 2 + k, 35, z, k === 1 ? 0xfff2c0 : 0x5a5f66, k === 1); }
+  m.box(-6, 14, -24, 12, 6, 1, 0x1e2126); paint(m, '0-0', 0, 15, -23, 0xd8b03a); m.box(-1, 1, -24, 1, 13, 1, C.metalDark);
+  return fin(m, 7, { noise: false });
+}
+
+/** A cathedral: a nave with buttresses and a steep roof, twin spires over the west front, a rose window, steps, graves. */
+export function cathedral() {
+  const m = new VoxelModel();
+  pad(m, -30, -30, 60, 60, 251);
+  m.walls(-10, 1, -24, 20, 20, 42, C.creamDark);
+  for (let k = 0; k <= 11; k++) m.box(-11 + k, 21 + k, -25, 22 - 2 * k, 1, 44, k % 3 ? C.roof : C.roofDark);
+  for (let z = -20; z < 14; z += 6) for (const x of [-12, 11]) { m.box(x, 1, z, 2, 14, 2, C.cream); for (let y = 5; y < 16; y++) m.set(x === -12 ? -10 : 9, y, z + 1, y > 12 ? C.glassLit : C.glass, y > 12); } // buttresses, tall windows
+  for (const x of [-12, 4]) { m.walls(x, 1, 14, 8, 44, 8, C.cream); for (let k = 0; k < 4; k++) m.box(x + k, 45 + k * 4, 14 + k, 8 - 2 * k, 4, 8 - 2 * k, C.roofDark); m.box(x + 3, 61, 17, 2, 5, 2, C.trim); } // spires
+  for (let a = 0; a < 40; a++) { const r = 4 + (a % 2); m.set(Math.round(Math.cos(a / 6.4) * r), 30 + Math.round(Math.sin(a / 6.4) * r), 18, a % 5 ? 0x5a3a8a : 0xd8b03a); } // rose window
+  m.clearBox(-2, 1, 18, 4, 12, 4); m.box(-2, 1, 17, 4, 11, 1, 0x4a2a1a);
+  for (let k = 0; k < 3; k++) m.box(-8 + k, k, 22 + k * 2, 16 - 2 * k, 1, 3, C.grey); // steps
+  for (let r = 0; r < 2; r++) for (let k = 0; k < 6; k++) { const x = -26 + k * 4; const z = -26 + r * 8; m.box(x, 1, z, 2, 3 + (k % 2), 1, 0x9a9c9e); }
+  return fin(m, 8, { noise: false });
+}
+
+/** A radio / TV mast: a tapering lattice, guy wires to three anchors, red lights, an equipment hut behind a fence. */
+export function radioMast() {
+  const m = new VoxelModel();
+  for (let x = -30; x < 30; x++) for (let z = -30; z < 30; z++) m.set(x, 0, z, P.snow);
+  const H = 120;
+  for (let y = 1; y < H; y++) {
+    const r = Math.max(1, Math.round(4 - (y / H) * 3));
+    for (const [dx, dz] of [[-r, -r], [r, -r], [0, r]]) m.set(dx, y, dz, 0xb04a3a ^ ((Math.floor(y / 12) & 1) ? 0 : 0x4f3a2a)); // red / white bands
+    if (y % 6 === 0) { for (let k = -r; k <= r; k++) { m.set(k, y, -r, 0x8e979f); m.set(Math.round(k / 2) - r / 2, y, k, 0x8e979f); } }
+  }
+  for (const y of [40, 80, H]) { m.set(0, y, 0, C.neonRed, true); m.set(1, y, -1, C.neonRed, true); }
+  for (const [ax, az] of [[-24, -20], [24, -20], [0, 26]]) { m.box(ax - 1, 0, az - 1, 3, 2, 3, C.grey); for (let k = 0; k < 40; k++) { const t = k / 40; m.set(Math.round(ax * (1 - t)), Math.round(2 + t * 78), Math.round(az * (1 - t)), 0x3a3f46); } } // guy wires
+  m.box(8, 1, 8, 8, 6, 6, C.grey); m.box(8, 7, 8, 8, 1, 6, C.roofDark); m.box(10, 3, 14, 2, 3, 1, 0x3a3f46);
+  for (let x = 4; x < 20; x++) { if (x % 3 === 0) m.box(x, 1, 4, 1, 5, 1, C.metalDark); m.set(x, 4, 4, 0x9aa3ad); }
+  return fin(m, 9, { noise: false });
+}
+
+/** A water reservoir: a frozen basin held by a concrete dam wall with a spillway and a valve house. */
+export function reservoir() {
+  const m = new VoxelModel();
+  for (let x = -30; x < 30; x++) for (let z = -30; z < 30; z++) {
+    const e = Math.hypot(x / 26, (z + 4) / 20) + (hash3(x >> 2, 252, z >> 2) - 0.5) * 0.1;
+    m.set(x, 0, z, e < 0.95 ? (hash3(x, 253, z) < 0.05 ? 0xd7e4ee : e < 0.6 ? 0x6f8a9c : 0x87a2b4) : P.snow);
+    if (e >= 0.95 && e < 1.05 && hash3(x, 254, z) < 0.25) m.box(x, 1, z, 1, 2 + Math.floor(hash3(x, 255, z) * 3), 1, 0xb8a46a); // reeds
+  }
+  m.box(-28, 1, 17, 56, 10, 4, (x, y) => (y % 3 === 0 ? 0x8d949e : 0xa3adb8)); m.box(-28, 11, 16, 56, 1, 6, 0x6c7580); // the dam
+  for (let y = 1; y < 10; y++) m.box(-3, y, 21 + Math.floor(y / 3), 6, 1, 1, 0xcfe6f7); // a frozen spillway
+  m.box(16, 12, 15, 8, 7, 8, C.cream); m.box(15, 19, 14, 10, 1, 10, C.roofDark); m.box(18, 12, 23, 3, 5, 1, 0x3a3f46); // valve house
+  for (let x = -28; x < 28; x += 4) m.box(x, 12, 21, 1, 3, 1, C.metalDark); for (let x = -28; x < 28; x++) m.set(x, 14, 21, C.metalDark);
+  return fin(m, 10, { noise: false });
+}
+
+/** A barn complex: two gambrel-roofed barns, a silo, grain bins, a fenced paddock, a tractor. */
+export function barnComplex() {
+  const m = new VoxelModel();
+  for (let x = -30; x < 30; x++) for (let z = -30; z < 30; z++) m.set(x, 0, z, Math.abs(x + 4) < 3 && z > 0 ? 0xccd3db : P.snow);
+  const barn = (x0, z0, w, d, col) => {
+    m.walls(x0, 1, z0, w, 12, d, col); for (let x = x0; x < x0 + w; x += 2) m.box(x, 1, z0 + d - 1, 1, 12, 1, shadeOf(col, 0.85));
+    for (let k = 0; k < 10; k++) { const inset = k < 5 ? Math.floor(k / 2) : 2 + (k - 5) * 2; m.box(x0 - 1 + inset, 13 + k, z0 - 1, w + 2 - 2 * inset, 1, d + 2, k % 2 ? C.roof : C.roofDark); }
+    m.clearBox(x0 + Math.floor(w / 2) - 4, 1, z0 + d - 1, 8, 9, 1);
+    for (let y = 1; y < 10; y++) for (let x = x0 + Math.floor(w / 2) - 4; x < x0 + Math.floor(w / 2) + 4; x++) if (x === x0 + Math.floor(w / 2) - 4 || x === x0 + Math.floor(w / 2) + 3 || y === 9 || Math.abs(x - (x0 + Math.floor(w / 2) - 4) - (y - 1)) < 1) m.set(x, y, z0 + d - 1, C.trim);
+  };
+  barn(-26, -26, 20, 26, C.brick); barn(2, -24, 16, 20, 0x8a3a2a);
+  for (let y = 1; y < 34; y++) for (let a = 0; a < 30; a++) m.set(24 + Math.round(Math.cos(a / 4.8) * 4), y, 6 + Math.round(Math.sin(a / 4.8) * 4), y % 5 ? 0xa3adb8 : 0x8d949e); // silo
+  for (let k = 0; k < 4; k++) m.box(20 + k, 34 + k, 2 + k, 9 - 2 * k, 1, 9 - 2 * k, C.metalDark);
+  for (const x of [8, 16]) for (let y = 1; y < 12; y++) for (let a = 0; a < 20; a++) m.set(x + Math.round(Math.cos(a / 3.2) * 3), y, 14 + Math.round(Math.sin(a / 3.2) * 3), y % 3 ? 0xb8bcc0 : 0x9aa0a6); // grain bins
+  for (let x = -28; x < 0; x += 4) m.box(x, 1, 26, 1, 5, 1, 0x5a4030); for (let x = -28; x < 0; x++) { m.set(x, 3, 26, 0x7a5a3a); m.set(x, 5, 26, 0x7a5a3a); }
+  m.box(-14, 1, 12, 9, 3, 5, 0x3a7a3a); m.box(-8, 4, 12, 3, 4, 5, 0x3a7a3a); for (const x of [-14, -7]) m.box(x, 0, 11, 3, 3, 7, 0x1c1f24); // tractor
+  return fin(m, 11, { noise: false });
 }
