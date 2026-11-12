@@ -9,14 +9,15 @@ const { chromium } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
 const zlib = require('node:zlib');
-const BUDGET = { entry: 155, three: 135, initial: 320 }; // KB gzip (MAP-3 E / MAP-4 / MAP-5 scenery and building kinds; MAP-6 places, river, zones)
+const BUDGET = { entry: 165, three: 135, initial: 320 }; // KB gzip (MAP-3 E … MAP-6; VOXEL-2: entry now counts props + detail chunks, and the finer models)
 (async () => {
   const problems = [];
   const dir = 'dist/assets';
   const gz = (f) => zlib.gzipSync(fs.readFileSync(path.join(dir, f))).length / 1024;
   const files = fs.readdirSync(dir);
   const pick = (re) => files.filter((f) => re.test(f));
-  const entry = pick(/^index-.*\.js$/).reduce((a, f) => a + gz(f), 0);
+  // (VOXEL-2: the gallery's dynamic import split props.js and detail.js out of the index chunk; they still load at start)
+  const entry = pick(/^(index|props|detail)-.*\.js$/).reduce((a, f) => a + gz(f), 0);
   const three = pick(/^three-.*\.js$/).reduce((a, f) => a + gz(f), 0);
   const css = pick(/\.css$/).reduce((a, f) => a + gz(f), 0);
   const post = pick(/^post-.*\.js$/);

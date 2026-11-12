@@ -29,7 +29,7 @@ export const BOARD = {
 // a 'rail' block is an industrial yard built from chunks like the other decoration blocks.
 const FILLER_MODELS = {};
 // MAP-6: places whose close-up level reuses the authored model (big yards and woods: the refine pass adds little; keeps the pack small).
-const COARSE_PLACES = new Set(['farmhouse', 'mall', 'military', 'factory', 'forest', 'scrapyard', 'hardware']);
+const COARSE_PLACES = new Set(); // VOXEL-2: every place gets its refined close-up level
 const PLACE_SCALE = 1; // MAP-3: places and small buildings fill their chunks (0.3 world units per authored voxel)
 // What fills a free chunk, by block kind: [content, weight].
 const RECIPES = {
@@ -56,6 +56,19 @@ export const PLACE_GROUNDS = {
   warehouse: ['truckyard', 'dock'], apartment: ['lot', 'garden'], farmhouse: ['field', 'field'], hardware: ['lot', 'truckyard'],
 };
 const GROUND_KINDS = ['lot', 'dock', 'tow', 'triage', 'busloop', 'schoolyard', 'garden', 'convoy', 'siding', 'truckyard', 'logs', 'wrecks', 'foodvan', 'laststand', 'shelter', 'looted'];
+// VOXEL-2: vehicles parked in place grounds: [prop, x, z (piece voxels, front = +z), yaw]; the filler buildings
+// (offices, towers, …) keep the authored level up close.
+const BIG_FILLER = /^(tower|office|cinema|garage|shed|rows|tall)-/;
+const VEHICLE_PROPS = {
+  car: (v) => [`car4-${v}`, () => carModel(v)], burnt: (v) => [`car-burnt-${v}`, () => burntCarModel(v)],
+  bus: () => ['veh-bus-1', () => vehicleModel('bus', 1)], trailer: () => ['veh-trailer', () => vehicleModel('trailer')],
+  cab: () => ['veh-cab', () => vehicleModel('cab')], ambulance: () => ['veh-ambulance', () => vehicleModel('ambulance')], police: () => ['veh-police', () => vehicleModel('police')],
+};
+const PIECE_VEHICLES = {
+  lot: [['car', -8, -2, Math.PI / 2], ['car', 4, -2, Math.PI / 2]], impound: [['car', -7, -2, Math.PI / 2], ['car', 0, -2, Math.PI / 2], ['car', 7, -2, Math.PI / 2]],
+  laststand: [['burnt', 4, 7, 0.3]], looted: [['car', 0, -4, -Math.PI / 2 + 0.1]],
+  triage: [['ambulance', 0, 6, 0.2]], tow: [['car', 7, -1, Math.PI / 2 + 0.2]],
+};
 const EXTRA_MODELS = { playground: city.playground, pharmacy: city.pharmacy, impound: city.impound, graveyard: city.graveyard, diner: city.diner, watertower: city.waterTower, substation: city.substation };
 for (const k of GROUND_KINDS) EXTRA_MODELS[k] = () => city.groundsPiece(k);
 const CENTERPIECE = { parking: ['parking', 2, 2], plaza: ['fountain', 1, 1], park: ['fountain', 1, 1], ruins: ['ruinBig', 1, 1] };
@@ -707,7 +720,7 @@ export function createBoard({ progressive = false } = {}) {
     const put = (list, p, rotY, scale = 1, tint = null) => { tmp.position.copy(p); tmp.rotation.set(0, rotY, 0); tmp.scale.setScalar(scale); tmp.updateMatrix(); list.push(tmp.matrix.clone()); if (tint) (list.tints ??= [])[list.length - 1] = tint; };
     const pushT = (list, mx, tint) => { list.push(mx); if (tint) (list.tints ??= [])[list.length - 1] = tint; };
     const birches = [[], []]; const stumps = []; const drifts = [[], []]; const ruins = [[], []]; const pieces = { parking: [], fountain: [] }; const fences = { picket: [], chain: [] };
-    const big = {}; const courts = [];
+    const big = {}; const courts = []; const pieceVehicles = {}; const by0 = 113;
     const matrixAt = (p, rotY, scale) => { tmp.position.copy(p); tmp.rotation.set(0, rotY, 0); tmp.scale.setScalar(scale); tmp.updateMatrix(); return tmp.matrix.clone(); }; const clutter = Array.from({ length: CLUTTER_KINDS }, () => []);
     const roadSet = new Set(map.roads);
     for (const key of keys) {
@@ -735,7 +748,18 @@ export function createBoard({ progressive = false } = {}) {
           const backRow = i === plan.rows - 1 && plan.rows > 2;
           const face = i === 0 ? face0 : backRow ? face0 + Math.PI : span === 2 ? face0 : Math.floor(r2 * 4) * (Math.PI / 2); // wide ones lie along the street
           const BIG = { tower: [city.landmarkTower, 1], office: [city.officeBlock, 2], cinema: [() => city.cinema(), 1], garage: [() => city.parkingGarage(), 1], shed: [city.shedBuilding, 2] };
-          if (EXTRA_MODELS[what]) { (big[what] ??= { make: EXTRA_MODELS[what], list: [] }).list.push(matrixAt(p, i === 0 ? face0 : face, city.SMALL_SCALE)); continue; }
+          if (EXTRA_MODELS[what]) {
+            const fy = i === 0 ? face0 : face;
+            (big[what] ??= { make: EXTRA_MODELS[what], list: [] }).list.push(matrixAt(p, fy, city.SMALL_SCALE));
+            // VOXEL-2: the vehicles of a piece are the detailed props, not boxes in the piece.
+            for (const [vk, lx, lz, vy] of PIECE_VEHICLES[what] ?? []) {
+              const u = 0.3 * city.SMALL_SCALE; const c = Math.cos(fy); const sn = Math.sin(fy);
+              const at = p.clone().add(new THREE.Vector3((lx * c + lz * sn) * u, 0.12, (-lx * sn + lz * c) * u));
+              const [key, make] = VEHICLE_PROPS[vk](Math.floor(hash3(bx + lx, by0, bz + lz) * 4));
+              (pieceVehicles[key] ??= { make, scale: 0.15, list: [] }).list.push(matrixAt(at, fy + vy, 1));
+            }
+            continue;
+          }
           if (BIG[what]) {
             const [mk, nv] = BIG[what]; const v = Math.floor(r2 * nv);
             pushT((big[`${what}-${v}`] ??= { make: () => mk(v), list: [] }).list, matrixAt(p, face, city.SMALL_SCALE), tintOf(district, p.x, p.z));
@@ -839,7 +863,7 @@ export function createBoard({ progressive = false } = {}) {
     });
     trees.forEach((list, k) => { if (list.length) group.add(lodProp(`tree-${k}`, () => treeModelHD(k, 1), 0.25, list)); });
     houses.forEach((list, v) => { if (list.length) group.add(lodInstanced(`small-${v}`, () => city.smallBuilding(v), list, false)); });
-    cottages.forEach((list, v) => { if (list.length) group.add(lodInstanced(`cottage-${v}`, () => city.cottage(v), list, false)); });
+    cottages.forEach((list, v) => { if (list.length) group.add(lodInstanced(`cottage-${v}`, () => city.cottage(v), list)); }); // VOXEL-2: refined up close
     ruins.forEach((list, v) => { if (list.length) group.add(lodInstanced(`ruin-${v}`, () => city.ruinSmall(v), list)); });
     if (pieces.parking.length) group.add(lodInstanced('parking-small', city.parkingSmall, pieces.parking));
     if (pieces.fountain.length) group.add(lodInstanced('fountain', city.fountain, pieces.fountain));
@@ -856,7 +880,8 @@ export function createBoard({ progressive = false } = {}) {
     rocks.forEach((list, k) => { if (list.length) group.add(lazyLod('near', () => instanced(() => rockModelHD(k), 0.25, list, { cacheKey: `rock-${k}`, jitter: 0 }))); });
     cars.forEach((list, v) => { if (list.length) group.add(lazyLod('near', () => instanced(() => carModel(v), 0.15, list, { cacheKey: `car4-${v}`, jitter: 0, castShadow: false }))); });
     yards.forEach((list, k) => { if (list.length) group.add(lodProp(`container-${k}`, () => containerModel(k, 1 + (k % 2)), 0.2, list)); });
-    for (const [k, { make, list }] of Object.entries(big)) { const g = lodInstanced(`b5-${k}`, make, list, false); if (k.startsWith('b7-')) detail(g); group.add(g); }
+    for (const [k, { make, list }] of Object.entries(big)) { const g = lodInstanced(`b5-${k}`, make, list, !BIG_FILLER.test(k)); if (k.startsWith('b7-')) detail(g); group.add(g); } // VOXEL-2: filler buildings stay coarse up close (pack); pieces are refined
+    for (const [k, { make, scale, list }] of Object.entries(pieceVehicles)) group.add(lazyLod('near', () => instanced(make, scale, list, { cacheKey: k, jitter: 0, castShadow: false })));
     courtyards.push(...courts);
     for (const [k, list] of Object.entries(fences)) if (list.length) group.add(lazyLod('near', () => instanced(() => fenceModel(k), 0.1, list, { cacheKey: `fence-${k}`, jitter: 0, castShadow: false })));
     if (attach) root.add(group);

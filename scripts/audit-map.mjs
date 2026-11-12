@@ -20,7 +20,7 @@ const { growCity } = await import('../src/core/rules/city.js');
 
 const SEEDS = +(process.argv[2] ?? 6); const STAGES = +(process.argv[3] ?? 4);
 const RAIL_KINDS = /^(crossing|wagon|buffer)/;
-const NO_CLASH = /^(apron|wires|tree|drift|birch|stump)/;            // ground decals and tree clusters may touch others
+const NO_CLASH = /^(apron|wires|tree|drift|birch|stump|b5-(lot|dock|tow|triage|busloop|schoolyard|garden|convoy|siding|truckyard|logs|wrecks|foodvan|laststand|shelter|looted|impound))/; // (VOXEL-2: ground pieces hold their own parked vehicles)            // ground decals and tree clusters may touch others
 const issues = [];
 const note = (type, seed, stage, what, at) => issues.push({ type, seed, stage, what, at: at.map((v) => +v.toFixed(1)) });
 

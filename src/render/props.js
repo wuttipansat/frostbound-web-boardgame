@@ -355,7 +355,8 @@ export function snowHeapModel(v = 0) {
 /** A sandbag wall (downtown barricade): three courses, staggered, with a sheet of plywood. */
 export function sandbagModel() {
   const m = new VoxelModel();
-  for (let c = 0; c < 3; c++) for (let k = -3; k < 3; k++) m.box(k * 6 + (c % 2) * 3 - 1, c * 3, -2, 5, 3, 4, (x, y, z) => (hash3(x, y + c, z) < 0.3 ? 0x7d6f52 : 0x938466));
+  // VOXEL-2: rounded sacks (trimmed corners), staggered, two tones.
+  for (let c = 0; c < 3; c++) for (let k = -3; k < 3; k++) { const x0 = k * 6 + (c % 2) * 3 - 1; m.box(x0, c * 3, -2, 5, 3, 4, (x, y, z) => ((x === x0 || x === x0 + 4) && (y === c * 3 + 2 || z === -2 || z === 1) ? null : hash3(x, y + c, z) < 0.3 ? 0x7d6f52 : 0x938466)); m.box(x0 + 2, c * 3 + 1, 2, 1, 1, 1, 0x6a5a40); }
   m.box(-8, 9, -1, 12, 8, 1, 0x8a6a44);
   return m.snowCap(P.snow, 1, 2);
 }
@@ -390,7 +391,7 @@ export function scrapHeapModel() {
 /** Food crates: a stack of wooden crates and sacks under a tarp. */
 export function cratesModel() {
   const m = new VoxelModel();
-  for (const [x, y, z] of [[-6, 0, -3], [-1, 0, -3], [-4, 4, -3], [3, 0, -2]]) { m.box(x, y, z, 5, 4, 5, 0xa07a4a); m.box(x, y + 1, z + 5, 5, 1, 1, 0x7a5532); }
+  for (const [x, y, z] of [[-6, 0, -3], [-1, 0, -3], [-4, 4, -3], [3, 0, -2]]) m.box(x, y, z, 5, 4, 5, (vx, vy, vz) => ((vx === x || vx === x + 4) && (vz === z || vz === z + 4) ? 0x4b525a : (vy - y) % 2 ? 0xa07a4a : 0x8a6a40)); // planks + corner irons
   m.box(4, 4, -2, 4, 2, 4, 0xd8c08a);
   return m.snowCap(P.snow, 1, 2);
 }

@@ -431,7 +431,7 @@ if (params.get('play')) {
 window.addEventListener('pointerdown', () => sound.unlock());
 document.addEventListener('click', (ev) => { if (ev.target.closest?.('button')) sound.play('ui'); });
 
-window.__frostbound = { rig, stage, atmosphere, footprints, groundAt, ray, board, pieces, tweens, app, art, tryReduce, itemType: (defId) => ITEMS[defId]?.type };
+window.__frostbound = { rig, stage, atmosphere, footprints, groundAt, ray, board, pieces, tweens, app, art, tryReduce, itemType: (defId) => ITEMS[defId]?.type, gallery: () => import('./render/gallery.js') }; // VOXEL-2: the model gallery (dev review, loaded on demand)
 
 // Step 22: the first frame is on screen — drop the loading screen. A hidden tab draws nothing and
 // pauses the ambience.

@@ -225,3 +225,20 @@ export function downsample(src) {
   }
   return out;
 }
+
+/**
+ * VOXEL-2 finish pass for authored models (before the snow cap): colour noise in 3-voxel cells (±4% value, so big
+ * faces still merge into a few quads), grime on the two lowest rows, lighter outer vertical edges.
+ */
+export function finish(m, seed = 0) {
+  const H = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  for (const v of m.voxels.values()) {
+    if (v.glow || materialOf(v.color) === 'snow' || v.y === 0) continue;
+    let k = 1 + (hash3(Math.floor(v.x / 3) + seed, Math.floor(v.y / 3), Math.floor(v.z / 3)) - 0.5) * 0.08;
+    if (v.y <= 2) k *= 0.86;                                  // grime at the foot
+    const out = H.filter(([dx, dz]) => !m.get(v.x + dx, v.y, v.z + dz));
+    if (out.length >= 2 && out.some(([dx]) => dx) && out.some(([, dz]) => dz)) k *= 1.08; // an outer corner catches the light
+    if (Math.abs(k - 1) > 0.01) v.color = shadeHex(v.color, k);
+  }
+  return m;
+}

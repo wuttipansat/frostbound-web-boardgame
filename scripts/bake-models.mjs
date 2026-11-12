@@ -11,7 +11,8 @@ const rec = new Map();
 recordQuads(rec);
 await collect();
 // Left out (meshed at runtime when needed): the flame, and the fine level of upgraded colony walls (rare, big).
-const keep = new Map([...rec].filter(([ck]) => !ck.startsWith('flame|') && !/^lod0-colony-w[123]\|/.test(ck) ));
+// VOXEL-2: and the close-up level of rare places (made when you first zoom in on one: ~0.1–0.2 s).
+const keep = new Map([...rec].filter(([ck]) => !ck.startsWith('flame|') && !/^lod0-colony-w[123]\|/.test(ck) && !/^lod0-place-(farmhouse|forest|military|factory|scrapyard|hardware)\|/.test(ck)));
 const raw = encodePack(keep);
 const gz = zlib.gzipSync(raw, { level: 9 });
 fs.mkdirSync('public', { recursive: true });

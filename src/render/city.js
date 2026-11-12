@@ -5,7 +5,7 @@
 // Front (door side) faces +z; the board turns each model so its front faces a side the camera sees.
 import { VoxelModel, hash3 } from './voxel.js';
 import { P } from './palette.js';
-import { refineCity, tagMaterial, downsample } from './detail.js';
+import { refineCity, tagMaterial, downsample, finish, addIcicles } from './detail.js';
 
 export const C = {
   sage: 0xa7b5a0, sageDark: 0x8a9884, cream: 0xddd5bc, creamDark: 0xbcb399, ochre: 0xdca04c, ochreDark: 0xb27d33,
@@ -231,6 +231,8 @@ function graffiti(m, x, y, z, seed) {
 }
 
 function dust(m) { return m.snowCap(P.snow, 1, 2); }
+/** VOXEL-2: the finish pass (noise, grime, edge light), icicles under eaves, then the snow cap. */
+function fin(m, seed = 0) { finish(m, seed); m.snowCap(P.snow, 1, 2); return addIcicles(m, { minY: 6, p: 0.1, seed }); }
 
 // ---------------------------------------------------------------- the six places
 
@@ -871,7 +873,7 @@ export function cottage(v = 0) {
   const gapX = (v % 2 ? 4 : w - 5) + x0 + 10; // the gate opens on the path
   railFence(m, -11, 10, 22, true, dead ? null : [gapX - 1, gapX + 2], dead ? 9 : -1);
   railFence(m, -11, -11, 21, false, null, dead ? 6 : -1); railFence(m, 10, -11, 21, false);
-  return dust(m);
+  return fin(m);
 }
 
 /** MAP-7 fields (one chunk): v0 fence rows and hay bales; v1 a tractor under a tarp; v2 a lean-to with firewood. */
@@ -882,7 +884,7 @@ export function fieldPiece(v = 0) {
   if (v === 0) for (const [x, z] of [[-4, -2], [3, 3], [6, -5]]) { m.box(x, 1, z, 4, 3, 3, 0xd8b03a); m.box(x, 2, z, 4, 1, 3, 0xb8902a); }
   if (v === 1) { m.box(-3, 1, -1, 9, 3, 5, 0xa63a2e); m.box(3, 4, -1, 3, 4, 5, 0xa63a2e); for (const x of [-3, 4]) m.box(x, 0, -2, 3, 3, 7, 0x1c1f24); m.box(-4, 4, -2, 11, 2, 7, 0x2f5a6a); } // tractor + tarp
   if (v === 2) { m.box(-6, 1, -6, 1, 9, 1, 0x5a4030); m.box(5, 1, -6, 1, 9, 1, 0x5a4030); m.box(-7, 9, -8, 14, 1, 6, C.roofDark); for (let y = 1; y < 6; y++) m.box(-5, y, -7, 10, 1, 3, (x) => ((x + y) % 2 ? 0x7a5532 : 0xa07a4a)); }
-  return dust(m);
+  return fin(m);
 }
 
 /** MAP-7: a frozen pond (one chunk): dark ice with lighter cracks, reeds at the edge, a rowing boat frozen in. */
@@ -1095,14 +1097,18 @@ function pine(m, x, z, h = 14, seed = 0) {
 /** Tier 2: a shopping mall on 2×2 chunks: a two-storey box with a glass entrance, a pylon sign, a car park in front. */
 export function mall() {
   const m = new VoxelModel();
-  for (let x = -21; x < 21; x++) for (let z = 2; z < 21; z++) m.set(x, 0, z, (x + 21) % 6 === 0 && z > 4 && z < 11 ? C.paint : hash3(x >> 2, 3, z >> 2) < 0.6 ? P.snow : C.asphalt); // the car park, mostly snowed
+  for (let x = -21; x < 21; x++) for (let z = 2; z < 21; z++) { // the car park: drifts at its edges, faded bays, oil (VOXEL-2)
+    const edge = Math.min(x + 21, 20 - x, 20 - z); let c = edge < 2 + hash3(x >> 1, 3, z >> 1) * 2.5 ? P.snow : C.asphalt;
+    if (c === C.asphalt && (x + 21) % 6 === 0 && z > 4 && z < 11 && hash3(x, 4, z) < 0.7) c = 0xa9adb2; else if (c === C.asphalt && hash3(x >> 1, 5, z >> 1) < 0.04) c = 0x1e2024;
+    m.set(x, 0, z, c);
+  }
   block(m, { x0: -20, z0: -20, w: 40, d: 22, floors: 2, wall: C.cream, trim: C.creamDark, seed: 150, shop: true });
   m.clearBox(-7, 1, 1, 14, 9, 1); m.box(-7, 1, 1, 14, 9, 1, C.glass); m.box(-8, 10, 2, 16, 1, 3, C.trim); // glass entrance + canopy
   neon(m, 'MALL', 0, 22, 2, C.neonBlue, 2, 2);
   m.box(12, 1, 18, 2, 22, 2, C.metalDark); m.box(4, 23, 18, 18, 8, 2, 0x2b4a8c); neon(m, 'SALE', 13, 25, 19, C.neonWarm, [0, 3]); // pylon sign
   for (const [x, z, c] of [[-18, 6, 0xa63a2e], [-10, 12, 0x2b4170], [4, 6, 0x6c7580]]) carShell(m, x, 1, z, c);
   m.box(8, 1, 14, 6, 3, 2, C.metal); for (let x = 8; x < 14; x += 2) m.box(x, 4, 14, 1, 1, 2, C.metalDark); // trolley corral
-  return dust(m);
+  return fin(m);
 }
 
 /** Tier 2: a hardware store on one chunk: a low shop, a TOOLS sign, a lumber rack and gas cages outside. */
@@ -1113,7 +1119,7 @@ export function hardware() {
   neon(m, 'TOOLS', 0, 12, 6, C.neonRed, 3);
   m.box(-10, 1, 7, 6, 1, 3, C.metalDark); for (let y = 2; y < 7; y++) m.box(-10, y, 7 + (y % 2), 6, 1, 1, y % 2 ? 0xc9a066 : 0xa07a4a); // lumber rack
   m.box(5, 1, 7, 4, 5, 3, C.metal); for (let x = 5; x < 9; x++) m.set(x, 3, 9, 0xd04a3a); // gas cage
-  return dust(m);
+  return fin(m);
 }
 
 /** Tier 3: an army base on 3×2 chunks: a fence with a gate, two watchtowers, barracks, trucks, a helipad. */
@@ -1136,7 +1142,7 @@ export function military() {
   for (const [x, z] of [[14, -12], [14, -6], [19, -12]]) m.box(x, 1, z, 1, 1, 7, 0xd8d2c2); m.box(14, 1, -9, 6, 1, 1, 0xd8d2c2);
   for (const [x, z] of [[-24, 4], [-12, 4]]) { m.box(x, 1, z, 10, 5, 5, OLIVE_DARK); m.box(x + 7, 1, z, 3, 7, 5, OLIVE); m.box(x + 9, 4, z, 1, 2, 5, C.glass); for (const dx of [1, 6]) m.box(x + dx, 0, z - 1, 2, 2, 7, 0x1c1f24); } // trucks
   for (let k = 0; k < 8; k++) m.box(-6 + k * 2, 1, 17 + (k % 2), 2, 3, 2, 0x938466); // sandbags by the gate
-  return dust(m);
+  return fin(m);
 }
 
 /** Tier 3: a factory on 2×2 chunks: a sawtooth-roof hall, two brick chimneys, a yard of drums and pallets. */
@@ -1150,8 +1156,8 @@ export function factory() {
   for (const x of [-15, 10]) { m.box(x, 1, -16, 4, 38, 4, C.brick); for (let y = 30; y < 38; y += 3) m.box(x, y, -16, 4, 1, 4, 0x6a3a2e); }
   neon(m, 'WORKS', 0, 22, 6, C.neonWarm, [0, 1, 4]);
   for (const [x, z] of [[-18, 10], [-14, 12], [12, 9], [15, 13]]) m.box(x, 1, z, 3, 4, 3, hash3(x, z, 1) < 0.5 ? 0x2b4170 : RUST); // drums
-  for (const [x, z] of [[-4, 12], [2, 14]]) m.box(x, 1, z, 5, 2, 4, 0x8a5a2b); // pallets
-  return dust(m);
+  for (const [x, z] of [[-4, 12], [2, 14]]) pallet(m, x, z, 2); // pallets
+  return fin(m);
 }
 
 /** Resource area (wood): pine woods on 2×2 chunks: a logging track, stumps, a long woodpile, a shed with an axe. */
@@ -1167,13 +1173,13 @@ export function forest() {
   for (let y = 1; y < 5; y++) for (let x = -14; x < -4; x++) m.box(x, y, 14 + (y % 2), 1, 1, 3, (x + y) % 2 ? 0x7a5532 : 0xb08a5a); // woodpile
   m.walls(8, 1, 10, 9, 7, 7, 0x6a4a30); m.box(7, 8, 9, 11, 1, 9, C.roofDark); m.box(10, 1, 16, 3, 5, 1, 0x3a2a1a); // shed
   m.box(-2, 1, 12, 4, 2, 1, 0x7a5532); m.box(0, 3, 12, 1, 3, 1, 0x7a5532); m.box(0, 6, 12, 2, 1, 1, C.metal); // chopping block + axe
-  return dust(m);
+  return fin(m);
 }
 
 /** Resource area (metal): a scrapyard on 2×2 chunks: wrecks stacked three high, a crane with a car, an office hut. */
 export function scrapyard() {
   const m = new VoxelModel();
-  for (let x = -21; x < 21; x++) for (let z = -21; z < 21; z++) m.set(x, 0, z, hash3(x >> 2, 9, z >> 2) < 0.5 ? 0x6a6458 : P.snow);
+  for (let x = -21; x < 21; x++) for (let z = -21; z < 21; z++) m.set(x, 0, z, gravel(x, z, Math.min(x + 21, 20 - x, z + 21, 20 - z)));
   chainFence(m, -21, 20, 42, true, 7, [6, 16]); chainFence(m, -21, -21, 42, true, 7); chainFence(m, -21, -21, 41, false, 7); chainFence(m, 20, -21, 41, false, 7);
   const tones = [RUST, 0x6c7580, 0xa63a2e, 0x2b4170, 0x5d6b3a, 0x8e979f];
   for (let row = 0; row < 3; row++) for (let k = 0; k < 4; k++) {
@@ -1184,7 +1190,7 @@ export function scrapyard() {
   m.box(-1, 18, -15, 1, 8, 1, C.metalDark); carShell(m, -4, 13, -16, 0x2b4170, true);
   for (let k = 0; k < 3; k++) m.box(4 + k * 3, 1 + k, 4 - k, 8 - k * 2, 2, 6 - k, k % 2 ? RUST : C.metalDark); // a scrap heap
   m.walls(10, 1, 8, 9, 7, 7, 0x2f6b6b); m.box(9, 8, 7, 11, 1, 9, C.roofDark); m.box(12, 3, 14, 3, 2, 1, C.glassLit, true); // office hut
-  return dust(m);
+  return fin(m);
 }
 
 // ---------------------------------------------------------------- MAP-6: companions of places (one chunk each, SMALL_SCALE)
@@ -1196,21 +1202,20 @@ export function playground() {
   for (const x of [-7, -3]) { m.box(x, 4, -6, 1, 5, 1, C.metalDark); m.box(x - 1, 3, -7, 3, 1, 3, 0x2b4170); }
   for (let k = 0; k < 7; k++) m.box(3 + k, 8 - k, 2, 1, 1, 3, 0xd8b03a); m.box(2, 1, 2, 1, 8, 3, C.metal);
   for (let y = 1; y < 8; y += 3) m.box(-8, y, 4, 7, 1, 5, 0x2f6b6b); for (const [x, z] of [[-8, 4], [-2, 4], [-8, 8], [-2, 8]]) m.box(x, 1, z, 1, 7, 1, 0x2f6b6b);
-  return dust(m);
+  return fin(m);
 }
 /** A pharmacy beside a hospital: a small shop with a green cross. */
 export function pharmacy() {
   const m = new VoxelModel();
   block(m, { x0: -9, z0: -8, w: 18, d: 15, floors: 2, wall: C.trim, seed: 161, shop: true });
   m.box(-2, 13, 7, 4, 2, 1, C.neonGreen, true); m.box(-1, 12, 7, 2, 4, 1, C.neonGreen, true);
-  return dust(m);
+  return fin(m);
 }
 /** An impound lot behind a police station: towed cars inside a chain fence. */
 export function impound() {
   const m = new VoxelModel(); pad(m, -11, -11, 22, 22, 162);
   chainFence(m, -11, -11, 22, true); chainFence(m, -11, 10, 22, true, 7, [8, 14]); chainFence(m, -11, -11, 22, false); chainFence(m, 10, -11, 22, false);
-  for (const [x, z, c] of [[-9, -8, 0x6c7580], [1, -8, RUST], [-9, 1, 0x2b4170]]) carShell(m, x, 1, z, c);
-  return dust(m);
+  return fin(m);
 }
 /** A graveyard beside a church: rows of stones and a picket fence. */
 export function graveyard() {
@@ -1226,14 +1231,14 @@ export function graveyard() {
     m.box(x - 1, 0, z + 1, 3, 1, 3, 0xd8dde2); // the grave under snow
   }
   m.box(8, 1, -9, 1, 12, 1, 0x4a3a2c); for (const [dx, y, dz] of [[1, 8, 0], [-1, 10, 1], [2, 11, -1], [0, 12, 1]]) m.box(8 + Math.min(0, dx), y, -9 + Math.min(0, dz), Math.abs(dx) + 1, 1, Math.abs(dz) + 1, 0x4a3a2c); // a bare tree
-  return dust(m);
+  return fin(m);
 }
 /** A roadside diner beside a gas station or motel: a long low box, a counter window, a DINER sign with dead letters. */
 export function diner() {
   const m = new VoxelModel();
   block(m, { x0: -10, z0: -6, w: 20, d: 12, floors: 1, wall: 0xb8c4c8, trim: 0xc0392b, seed: 164, shop: true });
   neon(m, 'DINER', 0, 12, 6, C.neonPink, [1, 2, 4]);
-  return dust(m);
+  return fin(m);
 }
 /** An industrial water tower: a tank on four legs with a ladder. */
 export function waterTower() {
@@ -1242,7 +1247,7 @@ export function waterTower() {
   for (let y = 22; y < 32; y++) for (let a = 0; a < 40; a++) m.set(Math.round(Math.cos(a / 6.4) * 6), y, Math.round(Math.sin(a / 6.4) * 6), y % 3 ? 0x8fa3b8 : 0x6c7580);
   for (let k = 0; k <= 6; k++) m.box(-6 + k, 32 + Math.floor(k / 2), -6 + k, 13 - 2 * k, 1, 13 - 2 * k, C.roofDark);
   for (let y = 1; y < 22; y += 2) m.set(6, y, 0, C.metal);
-  return dust(m);
+  return fin(m);
 }
 /** A power substation: transformers behind a fence, insulator gantries (the reason the lights are out). */
 export function substation() {
@@ -1251,19 +1256,59 @@ export function substation() {
   for (const x of [-7, 1]) { m.box(x, 1, -4, 6, 6, 5, 0x6c7580); for (let k = 0; k < 3; k++) m.box(x + 1 + k * 2, 7, -2, 1, 3, 1, 0xd8d2c2); }
   for (const z of [-8, 6]) { m.box(-9, 1, z, 1, 14, 1, C.metalDark); m.box(8, 1, z, 1, 14, 1, C.metalDark); m.box(-9, 14, z, 18, 1, 1, C.metalDark); }
   m.box(-3, 1, 5, 6, 2, 3, 0x1c1f24); // a burnt-out transformer
-  return dust(m);
+  return fin(m);
 }
 
 
 // ---------------------------------------------------------------- MAP-8: place grounds and stories (one chunk each, SMALL_SCALE)
 
+/**
+ * VOXEL-2 lots: asphalt with snow drifted along the edges (a ragged band), a cleared lane, faded bay lines, oil stains
+ * and packed tyre tracks — no checkerboard.
+ */
 function lotGround(m, seed, lines = true) {
-  for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) m.set(x, 0, z, lines && (x + 12) % 6 === 0 && z > -7 && z < 4 ? C.paint : hash3(x >> 2, seed, z >> 2) < 0.4 ? P.snow : C.asphalt);
+  for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) {
+    const edge = Math.min(12 + x, 11 - x, 12 + z, 11 - z);
+    const drift = 2 + hash3(x >> 1, seed, z >> 1) * 2.5 + (hash3(x, seed + 1, z) < 0.15 ? 1 : 0);
+    let c = edge < drift ? P.snow : C.asphalt;
+    if (c === C.asphalt) {
+      if (lines && (x + 12) % 6 === 0 && z > -7 && z < 3 && hash3(x, seed + 2, z) < 0.7) c = 0xa9adb2; // faded bay lines
+      else if (hash3(x >> 1, seed + 3, z >> 1) < 0.04) c = 0x1e2024; // oil
+      else if ((Math.abs(z - 6) === 1 || Math.abs(z - 6) === 3) && hash3(x, seed + 4, z) < 0.8) c = 0x8a8f96; // packed tracks along the lane
+      else if (hash3(x, seed + 5, z) < 0.05) c = 0x34373d;
+    }
+    m.set(x, 0, z, c);
+  }
 }
+/** VOXEL-2: a gravel yard: drifts along the edges, mottled stone, a few snow specks (no checkerboard). */
+function gravel(x, z, edge) { return edge < 2 + hash3(x >> 1, 181, z >> 1) * 2 ? P.snow : hash3(x, 183, z) < 0.1 ? P.snow : hash3(x >> 1, 185, z >> 1) < 0.35 ? 0x5a5448 : 0x6a6458; }
 function snowGround(m) { for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) m.set(x, 0, z, P.snow); }
-function truck(m, x, z, body, cab, len = 14) { m.box(x, 1, z, 7, 9, len, body); m.box(x, 1, z + len, 7, 6, 4, cab); m.box(x, 5, z + len + 3, 7, 2, 1, C.glass); for (const dz of [1, len - 3, len + 1]) m.box(x - 1, 0, z + dz, 9, 2, 2, 0x1c1f24); }
+/** A box truck facing +z: a ribbed body, a cab with a windscreen, mirrors, lights, a grille and a plate, wheels with hubs. */
+function truck(m, x, z, body, cab, len = 14) {
+  m.box(x, 2, z, 7, 8, len, body); for (let k = 1; k < len; k += 3) for (const sx of [x, x + 6]) m.box(sx, 2, z + k, 1, 8, 1, shadeOf(body, 0.88)); // ribs
+  m.box(x, 2, z + len, 7, 6, 4, cab); m.box(x + 1, 5, z + len + 3, 5, 2, 1, C.glass); m.box(x, 7, z + len, 7, 1, 4, shadeOf(cab, 0.85));
+  m.box(x + 1, 2, z + len + 4, 5, 2, 1, 0x2a2d31); m.set(x, 3, z + len + 4, 0xfff2c0); m.set(x + 6, 3, z + len + 4, 0xfff2c0); m.box(x + 2, 1, z + len + 4, 3, 1, 1, 0xd8d2c2); // grille, lights, plate
+  m.set(x - 1, 6, z + len + 2, C.metalDark); m.set(x + 7, 6, z + len + 2, C.metalDark); // mirrors
+  for (const dz of [1, len - 3, len + 1]) for (const dx of [-1, 7]) { m.box(x + dx, 0, z + dz, 1, 3, 3, 0x1c1f24); m.set(x + dx, 1, z + dz + 1, 0x8e979f); } // wheels with hubs
+}
+/** A slatted pallet (4×4), optionally with a load of sacks or boxes. */
+function pallet(m, x, z, load = 0) {
+  for (let k = 0; k < 4; k += 3) m.box(x, 1, z + k, 4, 1, 1, 0x6a4a2a);
+  for (let k = 0; k < 4; k++) m.box(x + k, 2, z, 1, 1, 4, k % 2 ? 0x9a7046 : 0x8a6038);
+  if (load === 1) for (let k = 0; k < 2; k++) m.box(x, 3 + k, z, 4, 1, 4, k ? 0xd8c08a : 0xc8b07a);
+  if (load === 2) { m.box(x, 3, z, 4, 3, 4, 0xa07a4a); m.box(x, 4, z, 4, 1, 4, 0x8a6a40); }
+}
+/** A planked crate (s×s×s) with darker corner irons. */
+function crate(m, x, y, z, s = 3) {
+  m.box(x, y, z, s, s, s, (vx, vy, vz) => ((vx === x || vx === x + s - 1) && (vz === z || vz === z + s - 1) ? 0x4b525a : (vy - y) % 2 ? 0xa07a4a : 0x8a6a40));
+}
+/** A rounded sandbag 4 long along x (ends trimmed). */
+function sack(m, x, y, z) { m.box(x, y, z, 4, 2, 2, (vx, vy) => (vx === x || vx === x + 3) && vy === y + 1 ? null : 0x938466); }
+const shadeOf = (hex, k) => { const r = Math.min(255, ((hex >> 16) & 255) * k) | 0; const g = Math.min(255, ((hex >> 8) & 255) * k) | 0; const b = Math.min(255, (hex & 255) * k) | 0; return (r << 16) | (g << 8) | b; };
 function tent(m, x, z, w, d, color, cross = false) {
-  for (let k = 0; k < 5; k++) m.box(x + k, 1 + k, z, w - 2 * k, 1, d, color);
+  for (let k = 0; k < 5; k++) m.box(x + k, 1 + k, z, w - 2 * k, 1, d, (vx, vy, vz) => ((vz - z) % 4 === 0 ? shadeOf(color, 0.9) : color)); // canvas, sagging seams
+  for (const dz of [-1, d]) { m.box(x + Math.floor(w / 2), 1, z + dz, 1, 6, 1, 0x5a4030); m.set(x - 1, 1, z + dz, 0x5a4030); m.set(x + w, 1, z + dz, 0x5a4030); } // poles and pegs
+  for (let k = 1; k < 4; k++) { m.set(x - 1 + Math.floor(k / 2), k, z - 1, 0xc8c0a8); m.set(x + w - Math.floor(k / 2), k, z + d, 0xc8c0a8); } // guy ropes
   if (cross) { m.box(x + Math.floor(w / 2) - 1, 6, z + Math.floor(d / 2) - 2, 2, 1, 5, C.red); m.box(x + Math.floor(w / 2) - 3, 6, z + Math.floor(d / 2) - 1, 6, 1, 2, C.red); }
 }
 
@@ -1273,7 +1318,6 @@ export function groundsPiece(kind) {
   switch (kind) {
     case 'lot': { // a car park: snowed cars, a trolley
       lotGround(m, 171);
-      carShell(m, -11, 1, -6, 0xa63a2e, false); carShell(m, 1, 1, -6, 0x6c7580, false);
       m.box(7, 1, 6, 3, 2, 2, C.metal); m.box(7, 3, 6, 1, 2, 2, C.metalDark);
       break;
     }
@@ -1281,14 +1325,13 @@ export function groundsPiece(kind) {
       lotGround(m, 172, false);
       m.box(-12, 1, -12, 24, 4, 5, C.grey); for (let x = -10; x < 12; x += 6) m.box(x, 2, -7, 2, 2, 1, 0x1c1f24);
       truck(m, -9, -6, 0xe8e4d8, 0xa63a2e, 12); m.box(-8, 5, -6, 5, 3, 1, 0x2b4170);
-      for (const [x, z] of [[4, -4], [5, 2], [8, -2]]) m.box(x, 1, z, 4, 2, 4, 0x8a5a2b);
+      for (const [x, z, l] of [[4, -4, 1], [5, 2, 2], [8, -2, 0]]) pallet(m, x, z, l);
       break;
     }
     case 'tow': { // a tow truck with a car on its hook
       lotGround(m, 173, false);
       m.box(-4, 1, -11, 7, 6, 5, 0xd8b03a); m.box(-4, 5, -7, 7, 2, 1, C.glass); m.box(-4, 1, -6, 7, 3, 9, C.metal);
       m.box(-1, 4, -1, 1, 5, 1, C.metalDark); m.box(-1, 8, 0, 1, 1, 5, C.metalDark);
-      carShell(m, -3, 2, 4, 0x2b4170, false);
       break;
     }
     case 'triage': { // a field clinic in the car park, overrun: one tent standing, one down, gurneys, tape
@@ -1301,7 +1344,8 @@ export function groundsPiece(kind) {
     }
     case 'busloop': { // a bus loop with a school bus and a flagpole
       for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) m.set(x, 0, z, Math.abs(z) < 5 || Math.abs(x) > 8 ? C.asphalt : P.snow);
-      m.box(-10, 1, -3, 20, 7, 6, 0xd8b03a); for (let x = -8; x < 8; x += 3) m.box(x, 5, -3, 2, 2, 6, C.glass); m.box(-10, 1, -3, 20, 1, 6, 0x1c1f24); m.box(-10, 3, -4, 20, 1, 1, 0x1c1f24);
+      for (const x of [-9, 1]) { m.box(x, 1, -10, 1, 7, 1, C.metalDark); m.box(x + 7, 1, -10, 1, 7, 1, C.metalDark); } m.box(-10, 8, -11, 19, 1, 4, 0x2f6b4a); m.box(-9, 1, -11, 16, 6, 1, 0x9fb8c8); m.box(-8, 2, -9, 14, 1, 2, 0x7a5a3a); // a bus shelter
+      for (let x = -11; x < 11; x += 3) m.set(x, 0, 2, 0xd8b03a); // the bus bay
       m.box(9, 1, 9, 1, 18, 1, C.metal); m.box(5, 15, 9, 4, 3, 1, 0x2b4170);
       break;
     }
@@ -1314,7 +1358,7 @@ export function groundsPiece(kind) {
     case 'garden': { // a reading garden: hedges, a path, benches, a bird bath
       snowGround(m);
       for (let x = -12; x < 12; x++) { m.set(x, 0, 0, 0xccd3db); m.set(0, 0, x, 0xccd3db); }
-      for (const [x, z, w, d] of [[-11, -11, 9, 3], [3, -11, 9, 3], [-11, 8, 9, 3], [3, 8, 9, 3]]) { m.box(x, 1, z, w, 3, d, 0x3a5a3a); m.box(x, 4, z, w, 1, d, P.snow); }
+      for (const [x, z, w, d] of [[-11, -11, 9, 3], [3, -11, 9, 3], [-11, 8, 9, 3], [3, 8, 9, 3]]) for (let u = 0; u < w; u++) { const h = 2 + Math.floor(hash3(x + u, z, 3) * 3); m.box(x + u, 1, z, 1, h, d, hash3(x + u, z, 5) < 0.5 ? 0x3a5a3a : 0x2f4a30); m.box(x + u, 1 + h, z, 1, 1, d, P.snow); }
       for (const [x, z] of [[-8, -4], [4, 2]]) { m.box(x, 2, z, 5, 1, 2, 0x7a5a3a); m.box(x, 3, z - 1, 5, 2, 1, 0x7a5a3a); m.box(x, 1, z, 1, 1, 2, C.metalDark); m.box(x + 4, 1, z, 1, 1, 2, C.metalDark); }
       m.box(-1, 1, -1, 2, 3, 2, C.grey); m.box(-2, 4, -2, 4, 1, 4, C.grey);
       break;
@@ -1337,7 +1381,7 @@ export function groundsPiece(kind) {
     case 'truckyard': { // a semi-trailer, pallets, a forklift
       lotGround(m, 176, false);
       m.box(-11, 2, -10, 7, 8, 20, 0xe0dcd2); for (const z of [-8, 6]) m.box(-12, 0, z, 9, 2, 2, 0x1c1f24);
-      for (const [x, z] of [[1, -9], [1, -4], [6, -9]]) m.box(x, 1, z, 4, 3, 4, 0x8a5a2b);
+      for (const [x, z, l] of [[1, -9, 2], [1, -4, 1], [6, -9, 0]]) pallet(m, x, z, l);
       m.box(2, 1, 4, 5, 4, 6, 0xd8b03a); m.box(2, 5, 4, 1, 6, 1, C.metalDark); m.box(6, 5, 4, 1, 6, 1, C.metalDark); m.box(2, 11, 4, 5, 1, 6, C.metalDark); m.box(3, 1, 10, 3, 1, 3, C.metalDark);
       break;
     }
@@ -1349,7 +1393,7 @@ export function groundsPiece(kind) {
       break;
     }
     case 'wrecks': { // wrecks along the fence, stacked two high
-      for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) m.set(x, 0, z, hash3(x >> 2, 177, z >> 2) < 0.5 ? 0x6a6458 : P.snow);
+      for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) m.set(x, 0, z, gravel(x, z, Math.min(x + 12, 11 - x, z + 12, 11 - z)));
       [RUST, 0x6c7580, 0xa63a2e, 0x2b4170].forEach((c, k) => { m.box(-11 + (k % 2) * 11, 1 + Math.floor(k / 2) * 3, -10 + (k % 2), 10, 3, 5, c); });
       m.box(-6, 1, 2, 8, 3, 5, 0x5d6b3a); m.box(4, 1, 4, 5, 1, 5, 0x1c1f24);
       break;
@@ -1357,13 +1401,12 @@ export function groundsPiece(kind) {
     case 'foodvan': { // an overturned food van, spilled crates
       lotGround(m, 178);
       m.box(-9, 1, -4, 14, 6, 6, 0xf0f0ea); m.box(-9, 4, -4, 14, 1, 6, 0xc0392b); m.box(-9, 1, -4, 14, 6, 1, 0xdcd6c8); m.box(5, 1, -4, 4, 5, 6, 0xd8d2c2);
-      for (const [x, z, c] of [[-6, 4, 0xa07a4a], [-1, 6, 0xd8b03a], [3, 3, 0xa07a4a], [7, 7, 0x86b04a]]) m.box(x, 1, z, 3, 2, 3, c);
+      for (const [x, z] of [[-6, 4], [3, 3]]) crate(m, x, 1, z); for (const [x, z, c] of [[-1, 6, 0xd8b03a], [7, 7, 0x86b04a]]) m.box(x, 1, z, 3, 2, 2, c);
       break;
     }
     case 'laststand': { // a last stand: a sandbag arc, a burnt cruiser, spent casings
       lotGround(m, 179, false);
-      for (let a = 0; a < 14; a++) { const x = Math.round(Math.cos(a / 4.5) * 9) - 2; const z = Math.round(Math.sin(a / 4.5) * 7); m.box(x, 1, z, 3, 3 + (a % 2), 2, 0x938466); }
-      m.box(4, 1, -10, 7, 3, 4, 0x2a2a2a); m.box(6, 4, -10, 3, 2, 4, 0x1c1c1c); m.box(4, 1, -10, 1, 2, 4, 0x4a3a2a);
+      for (let a = 0; a < 10; a++) { const x = Math.round(Math.cos(a / 3.2) * 6) - 4; const z = Math.round(Math.sin(a / 3.2) * 4) - 5; sack(m, x, 1, z); sack(m, x + (a % 2) * 2 - 1, 3, z); }
       for (let k = 0; k < 9; k++) m.set(-6 + Math.floor(hash3(k, 1, 2) * 8), 1, -2 + Math.floor(hash3(k, 3, 4) * 6), 0xc9a040);
       break;
     }
@@ -1377,13 +1420,12 @@ export function groundsPiece(kind) {
     case 'looted': { // a looted shopfront: a car through the window, glass and goods on the snow
       lotGround(m, 180, false);
       m.box(-12, 1, -12, 24, 12, 2, C.cream); m.clearBox(-6, 1, -11, 12, 8, 1); m.box(-6, 9, -11, 12, 1, 1, C.trim);
-      carShell(m, -3, 1, -10, 0x6c7580, false);
       for (let k = 0; k < 14; k++) m.set(-10 + Math.floor(hash3(k, 5, 6) * 20), 1, -5 + Math.floor(hash3(k, 7, 8) * 12), k % 2 ? 0xbcd8e8 : [0xd8b03a, 0xa07a4a, 0x86b04a, 0xc0392b][k % 4]);
       break;
     }
     default: snowGround(m);
   }
-  return dust(m);
+  return fin(m);
 }
 
 /** MAP-8: a name board at the kerb (0.1 world per voxel): a dark board on two posts, painted (or lit) letters. */
@@ -1392,6 +1434,8 @@ export function nameBoard(text, lit = false) {
   const w = text.length * 4 + 5; const x0 = -Math.ceil(w / 2);
   for (const x of [x0 + 1, x0 + w - 2]) m.box(x, 0, 0, 1, 12, 1, C.metalDark);
   m.box(x0, 11, 0, w, 9, 1, 0x1e2126);
+  for (let x = x0; x < x0 + w; x++) { m.set(x, 11, 1, 0x6c7580); m.set(x, 19, 1, 0x6c7580); } for (const x of [x0, x0 + w - 1]) m.box(x, 11, 1, 1, 9, 1, 0x6c7580); // a border
+  for (const [x, y] of [[x0 + 1, 12], [x0 + w - 2, 12], [x0 + 1, 18], [x0 + w - 2, 18]]) m.set(x, y, 1, 0xb0b8c0); // bolts
   if (lit) neon(m, text, 0, 13, 0, C.neonWarm); else paint(m, text, 0, 13, 1, 0xd8d2c2);
   return m.snowCap(P.snow, 1, 2);
 }
@@ -1401,12 +1445,18 @@ export function placeSign(text) {
   const w = text.length * 4 + 7;
   m.box(-1, 0, 0, 1, 26, 1, C.metalDark);
   m.box(0, 19, 0, w, 8, 1, 0x2f6b4a); paint(m, `${text}>`, Math.floor(w / 2), 21, 1, 0xf0f0ea);
+  for (let x = 0; x < w; x++) { m.set(x, 19, 1, 0xd8e0d8); m.set(x, 26, 1, 0xd8e0d8); } m.box(0, 19, 1, 1, 8, 1, 0xd8e0d8); m.box(w - 1, 19, 1, 1, 8, 1, 0xd8e0d8); // a white border
+  m.box(-1, 20, 1, 1, 1, 1, 0xb0b8c0); m.box(-1, 25, 1, 1, 1, 1, 0xb0b8c0); // clamps
   return m.snowCap(P.snow, 1, 2);
 }
 /** MAP-8: a generator by a place that still has light: a housing, an exhaust, a fuel can. */
 export function generatorModel() {
   const m = new VoxelModel();
-  m.box(-4, 0, -3, 8, 5, 6, 0x5d6b3a); m.box(-3, 5, -2, 6, 1, 4, 0x46512b); m.box(2, 5, 0, 1, 4, 1, 0x2a2d31); m.set(-4, 3, 3, 0xff9a3c, true);
-  m.box(5, 0, -2, 2, 3, 2, C.red);
+  m.box(-4, 0, -3, 8, 1, 6, 0x2a2d31); m.box(-4, 1, -3, 8, 4, 6, 0x5d6b3a); m.box(-3, 5, -2, 6, 1, 4, 0x46512b); // skid, housing, lid
+  for (let x = -3; x < 3; x += 2) m.box(x, 2, 3, 1, 2, 1, 0x2a2d31); // vents
+  m.box(1, 2, -4, 2, 2, 1, 0x1c1f24); m.set(1, 3, -5, 0xff9a3c, true); m.set(2, 3, -5, 0x86ffa2, true); // panel with two lamps
+  m.box(2, 5, 0, 1, 4, 1, 0x2a2d31); m.box(2, 9, 0, 2, 1, 1, 0x2a2d31); // exhaust
+  m.box(5, 0, -2, 2, 3, 2, C.red); m.set(5, 3, -2, 0x2a2d31); // fuel can
+  m.box(-7, 0, -1, 2, 3, 3, 0xd8b03a); m.box(-7, 1, 0, 2, 1, 1, 0x1c1f24); // cable reel
   return m.snowCap(P.snow, 1, 2);
 }
