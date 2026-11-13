@@ -12,6 +12,14 @@ const t0 = Date.now();
 const rec = new Map();
 recordQuads(rec);
 await collect({ seeds: Array.from({ length: seeds }, (_, i) => i + 1), stages });
+// GODOT-3: the characters (pieces.js builds them unkeyed): survivors, zombie variants, a barricade.
+{
+  const ch = await import('../../src/render/characters.js');
+  const { SURVIVORS } = await import('../../src/content/survivors.js');
+  for (const def of SURVIVORS) ch.survivorModelHD(def).buildGeometries({ size: 0.075, jitter: 0, cacheKey: `char-${def.id}` });
+  for (let v = 0; v < 5; v++) ch.zombieModelHD(v).buildGeometries({ size: 0.075, jitter: 0, cacheKey: `zombie-${v}` });
+  ch.barricadeModelHD().buildGeometries({ size: 0.11, jitter: 0, cacheKey: 'barricade' });
+}
 const raw = encodePack(rec);
 const gz = zlib.gzipSync(raw, { level: 9 });
 fs.mkdirSync('godot/assets', { recursive: true });

@@ -220,17 +220,17 @@ static func _pkey(m: Array) -> String:
 	return "%d,%d,%d" % [JS.round_(m[12] * 100), JS.round_(m[13] * 100), JS.round_(m[14] * 100)]
 
 
-func _multimesh(mesh: Mesh, mats: Array, tints, shadow: bool) -> MultiMeshInstance3D:
+func _multimesh(mesh: Mesh, mats: Array, tints, shadow: bool, force_colors := false) -> MultiMeshInstance3D:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
-	var colored: bool = tints != null and tints.any(func(t): return t != null)
+	var colored: bool = force_colors or (tints != null and tints.any(func(t): return t != null))
 	mm.use_colors = colored
 	mm.mesh = mesh
 	mm.instance_count = mats.size()
 	for i in mats.size():
 		mm.set_instance_transform(i, V.to_transform(mats[i]))
 		if colored:
-			var t = tints[i]
+			var t = tints[i] if tints != null and i < tints.size() else null
 			mm.set_instance_color(i, Color(t[0], t[1], t[2]) if t != null else Color.WHITE)
 	var mmi := MultiMeshInstance3D.new()
 	mmi.multimesh = mm
@@ -315,14 +315,11 @@ func _custom(e: Dictionary) -> void:
 		mesh = b
 	else:
 		return
-	var mmi := _multimesh(mesh, e.mats, null, shadow)
+	var mmi := _multimesh(mesh, e.mats, null, shadow, e.key == "lamp-pools")
 	mmi.name = e.key
 	if e.key == "lamp-pools":
 		pools_mm = mmi.multimesh
-		pools_mm.use_colors = true
-		pools_mm.instance_count = e.mats.size()
 		for i in e.mats.size():
-			pools_mm.set_instance_transform(i, V.to_transform(e.mats[i]))
 			pools_mm.set_instance_color(i, Color.WHITE)
 		pool_flickers = e.get("flickers", [])
 	(lod_nodes[e.lod] as Node3D).add_child(mmi)

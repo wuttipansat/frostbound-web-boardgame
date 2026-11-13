@@ -4,6 +4,8 @@ extends Node3D
 
 var stage: Stage
 var board: Board
+var pieces: Pieces
+var fx: Fx
 var game: Dictionary
 var bot_opts: Dictionary
 var info: Label
@@ -15,7 +17,14 @@ func _ready() -> void:
 	add_child(stage)
 	board = Board.new()
 	add_child(board)
-	board.built_board.connect(func(b): stage.fit(b, last_stage <= 1))
+	pieces = Pieces.new(board)
+	add_child(pieces)
+	fx = Fx.new(stage, board)
+	add_child(fx)
+	board.built_board.connect(func(b):
+		stage.fit(b, last_stage <= 1)
+		fx.set_chimneys(Fx.colony_chimneys() + board.desc.fx.get("city_chimneys", []))
+		pieces.sync(game, false))
 	stage.zoom_changed.connect(func(z): board.set_zoom(z))
 	_ui()
 	_new_game()
@@ -63,7 +72,8 @@ func _sync() -> void:
 		var snap := last_stage == 0
 		last_stage = game.map.stage
 		board.set_map(game.map, game.base, snap)
-	board.set_fire(clampf(game.morale / 7.0, 0.1, 1.4))
+	pieces.sync(game, true)
+	fx.set_state(game)
 	_show()
 
 
@@ -71,7 +81,12 @@ func _bot_step() -> void:
 	if game.phase == "gameOver":
 		return
 	var a = Bot.bot_action(game, bot_opts)
+	var before := game
 	var r := Reducer.try_reduce(game, a if a != null else {"type": "END_TURN"})
+	if r.ok and a != null and a.type == "MOVE" and board.desc.layout.has(before.survivors[a.survivorId].location) and board.desc.layout.has(a.toLocation):
+		var f: Array = board.desc.layout[before.survivors[a.survivorId].location].center
+		var tt: Array = board.desc.layout[a.toLocation].center
+		fx.walk(Vector3(f[0], 0, f[2]), Vector3(tt[0], 0, tt[2]))
 	game = r.state if r.ok else Reducer.try_reduce(game, {"type": "END_TURN"}).state
 	_sync()
 
