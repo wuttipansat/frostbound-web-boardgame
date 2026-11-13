@@ -1,0 +1,106 @@
+{
+ "place-police": {
+  "x": 15.899999999999999,
+  "z": 12
+ },
+ "place-grocery": {
+  "x": 15.6,
+  "z": 11.4
+ },
+ "place-school": {
+  "x": 15,
+  "z": 12
+ },
+ "place-hospital": {
+  "x": 16.8,
+  "z": 15
+ },
+ "place-library": {
+  "x": 16.2,
+  "z": 12
+ },
+ "place-gas": {
+  "x": 15,
+  "z": 10.799999999999999
+ },
+ "place-warehouse": {
+  "x": 16.2,
+  "z": 12.6
+ },
+ "place-motel": {
+  "x": 14.399999999999999,
+  "z": 10.2
+ },
+ "place-apartment": {
+  "x": 12.6,
+  "z": 13.2
+ },
+ "place-church": {
+  "x": 6.6,
+  "z": 13.799999999999999
+ },
+ "place-farmhouse": {
+  "x": 16.8,
+  "z": 14.399999999999999
+ },
+ "place-mall": {
+  "x": 13.5,
+  "z": 13.2
+ },
+ "place-hardware": {
+  "x": 7.199999999999999,
+  "z": 6.3
+ },
+ "place-military": {
+  "x": 19.2,
+  "z": 12.6
+ },
+ "place-factory": {
+  "x": 12.6,
+  "z": 12.6
+ },
+ "place-forest": {
+  "x": 14.7,
+  "z": 14.1
+ },
+ "place-scrapyard": {
+  "x": 13.2,
+  "z": 13.2
+ },
+ "lm-skyscraper": {
+  "x": 18,
+  "z": 18
+ },
+ "lm-cityhall": {
+  "x": 18,
+  "z": 18
+ },
+ "lm-carpark": {
+  "x": 16.8,
+  "z": 16.2
+ },
+ "lm-powerplant": {
+  "x": 18.3,
+  "z": 18
+ },
+ "lm-stadium": {
+  "x": 18,
+  "z": 18
+ },
+ "lm-cathedral": {
+  "x": 18,
+  "z": 18
+ },
+ "lm-mast": {
+  "x": 18,
+  "z": 18
+ },
+ "lm-reservoir": {
+  "x": 18,
+  "z": 18
+ },
+ "lm-barns": {
+  "x": 18,
+  "z": 18
+ }
+}

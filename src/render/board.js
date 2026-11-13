@@ -1107,7 +1107,7 @@ export function createBoard({ progressive = false } = {}) {
       // MAP audit: remember what went into the merged mesh and where (world box).
       const box = (g.lit ?? g.glow).boundingBox.clone().applyMatrix4(mx);
       if (g.glow && g.lit) box.union(g.glow.boundingBox.clone().applyMatrix4(mx));
-      debugItems.push({ kind: key.replace(/-\d+$/, ''), box });
+      debugItems.push({ kind: key.replace(/-\d+$/, ''), box, call: [key, x, y, z, yaw, tilt, tiltAxis, detail] }); // (GODOT-2: the call, for the port's scene check)
     };
     const yawTo = (dx, dz) => Math.atan2(dx, dz); // local +z faces (dx, dz)
     const taken = (x, z, r) => debugItems.some((d) => x > d.box.min.x - r && x < d.box.max.x + r && z > d.box.min.z - r && z < d.box.max.z + r);

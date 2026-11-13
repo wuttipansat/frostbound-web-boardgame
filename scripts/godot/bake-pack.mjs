@@ -22,5 +22,21 @@ const keys = [...rec.keys()];
 const miss = [];
 for (const t of Object.keys(LOCATION_BUILDERS_HD)) for (const L of [0, 1, 2]) if (!keys.some((k) => k.startsWith(`lod${L}-place-${t}|`))) miss.push(`lod${L}-place-${t}`);
 for (const t of Object.keys(LANDMARKS)) for (const L of [0, 1, 2]) if (!keys.some((k) => k.startsWith(`lod${L}-lm-${t}|`))) miss.push(`lod${L}-lm-${t}`);
+// lodExtent (board.js) for every place and landmark: the board scales them to fit their chunks.
+const city = await import('../../src/render/city.js');
+const { packedBounds, usePack } = await import('../../src/render/voxel.js');
+const { decodePack } = await import('../../src/render/pack.js');
+usePack(decodePack(raw));
+const LOD_SIZE = [0.15, 0.3, 0.6];
+const extents = {};
+for (const [key, make] of [...Object.entries(LOCATION_BUILDERS_HD).map(([t, mk]) => [`place-${t}`, mk]), ...Object.entries(LANDMARKS).map(([t, mk]) => [`lm-${t}`, mk])]) {
+  let x = 0; let z = 0;
+  for (let L = 0; L < 3; L++) {
+    const { min, max } = packedBounds(`lod${L}-${key}`, { size: LOD_SIZE[L], jitter: 0, ao: L < 2 }) ?? city.lod(L, key, make).bounds();
+    x = Math.max(x, (max[0] - min[0]) * LOD_SIZE[L]); z = Math.max(z, (max[2] - min[2]) * LOD_SIZE[L]);
+  }
+  extents[key] = { x, z };
+}
+fs.writeFileSync('godot/data/extents.json', JSON.stringify(extents, null, 1));
 console.log(`godot pack: ${rec.size} models, ${(raw.length / 1e6).toFixed(1)} MB raw, ${(gz.length / 1e6).toFixed(2)} MB gzip, ${Date.now() - t0} ms`);
 if (miss.length) console.log(`missing: ${miss.join(', ')}`);
