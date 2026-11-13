@@ -13,6 +13,7 @@
     "balance": "node scripts/balance.mjs",
     "e2e": "node scripts/e2e/smoke.cjs desktop && node scripts/e2e/smoke.cjs phone",
     "e2e:layout": "node scripts/e2e/hud-layout.cjs",
+    "e2e:ui2": "node scripts/e2e/ui2.cjs",
     "e2e:perf": "node scripts/e2e/perf.cjs",
     "export:godot": "node scripts/godot/bake-pack.mjs && node scripts/export-data.mjs && node scripts/godot/mesh-vectors.mjs && node scripts/godot/copy-art.mjs",
     "export:godot-glb": "node scripts/export-glb.mjs"

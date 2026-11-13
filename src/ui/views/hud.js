@@ -138,6 +138,9 @@ function feedLine(e, s, ctx, { age = null } = {}) {
  * Top-centre feed: the last few actions fade in and out; hovering, focusing or pinning (log button)
  * opens the history.
  */
+const LOG_LOOT = new Set(['search', 'draw', 'mapFound', 'mapGrown', 'craft', 'unpack', 'food', 'recruit', 'deposit', 'give', 'equip', 'built']);
+const LOG_DANGER = new Set(['attack', 'spawn', 'hurt', 'wound', 'death', 'overrun', 'siege', 'infectionSpreads', 'starvation', 'barricadeBroken', 'zombiesLeave', 'lure', 'crisisResolved']);
+
 export function renderLog(el, ctx) {
   const { state: s, ui } = ctx;
   const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -148,11 +151,28 @@ export function renderLog(el, ctx) {
   el.setAttribute('aria-label', t('hud.log'));
   const recent = feed.items.slice(-FEED_MAX).reverse()
     .map((x) => feedLine(x.e, s, ctx, { age: now - x.at })).filter(Boolean);
-  const history = [];
-  for (let i = s.log.length - 1; i >= 0 && history.length < 40; i--) {
-    const li = feedLine(s.log[i], s, ctx);
-    if (li) history.push(li);
+  // UI-2: the history groups by day (today open, earlier days fold to one line) and filters to loot / danger.
+  const filter = ui.logFilter ?? 'all';
+  const keep = (e) => filter === 'all' || (filter === 'loot' ? LOG_LOOT : LOG_DANGER).has(e.k);
+  const days = new Map();
+  let shown = 0;
+  for (let i = s.log.length - 1; i >= 0 && shown < 60; i--) {
+    const e = s.log[i];
+    if (!keep(e)) continue;
+    const li = feedLine(e, s, ctx);
+    if (!li) continue;
+    shown += 1;
+    if (!days.has(e.r)) days.set(e.r, []);
+    days.get(e.r).push(li);
   }
+  const history = [...days].map(([day, lines]) => {
+    const open = day === s.day || ui.logDay === day;
+    return h('li', { class: `log-day${open ? ' open' : ''}` },
+      h('button', { class: 'log-day-head', 'aria-expanded': open ? 'true' : 'false', onclick: () => ctx.set({ logDay: open ? null : day }) },
+        t('log.dayHead', { n: day }), open ? null : h('small', {}, ` ${t('log.more', { n: lines.length })}`)),
+      open ? h('ol', {}, lines) : null);
+  });
+  const chip = (id) => h('button', { class: `log-chip${filter === id ? ' on' : ''}`, 'aria-pressed': filter === id ? 'true' : 'false', onclick: () => ctx.set({ logFilter: id }) }, t(`log.${id}`));
   const journal = ui.logTab === 'journal';
   const tab = (id, label) => h('button', { class: `feed-tab${(ui.logTab ?? 'log') === id ? ' on' : ''}`, role: 'tab', 'aria-selected': (ui.logTab ?? 'log') === id ? 'true' : 'false', onclick: () => ctx.set({ logTab: id }) }, label);
   mount(el,
@@ -160,7 +180,8 @@ export function renderLog(el, ctx) {
     h('div', { class: 'feed-history' },
       h('div', { class: 'feed-head' }, h('span', { class: 'feed-tabs', role: 'tablist' }, tab('log', t('jr.tabLog')), tab('journal', t('jr.tab'))),
         h('button', { class: `icon-btn pin${ui.logOpen ? ' on' : ''}`, tip: t('tip.logPin'), 'aria-label': t('tip.logPin'), 'aria-pressed': ui.logOpen ? 'true' : 'false', onclick: () => ctx.set({ logOpen: !ui.logOpen }) }, icon('log'))),
-      journal ? journalView(s) : h('ol', {}, history)));
+      journal ? null : h('div', { class: 'log-chips', role: 'group' }, chip('all'), chip('loot'), chip('danger')),
+      journal ? journalView(s) : h('ol', { class: 'log-days' }, history)));
 }
 
 /** Step 21: the diary — newest day first, each with its one-line summary. */

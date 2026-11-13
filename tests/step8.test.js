@@ -1,3 +1,4 @@
+import { usefulActionLeft } from '../src/core/ux.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
@@ -51,7 +52,8 @@ test('acting survivors and the end-turn confirmation follow the energy left', ()
   s = setSurvivors(s, { 'corwin-daly': 'colony' });
   s = setEnergy(s, 60);
   assert.deepEqual(actingSurvivors(s), ['corwin-daly']);
-  assert.equal(shouldConfirmEndTurn(s), true);
+  // UI-2: asks only when something useful is left (fight, search, heal, barricade against tonight's attack, build).
+  assert.equal(shouldConfirmEndTurn(s), !!usefulActionLeft(s));
   assert.equal(shouldConfirmEndTurn(s, { skip: true }), false);
   s = setEnergy(s, 2);
   assert.equal(shouldConfirmEndTurn(s), false, 'nothing affordable: just end');

@@ -631,4 +631,12 @@ export default {
   'found.title': 'Found {n} item(s)', 'found.who': '{name} puts them in the backpack', 'found.spawned': 'The noise drew a zombie here!', 'found.pack': 'Backpack: {n} slot(s) free', 'found.left': '{n} more find(s) here', 'found.empty': 'Nothing left here', 'found.ok': 'Take them',
   'toast.mapFound': 'A city map! Bring it home and use it to grow the city', 'toast.mapGrown': 'The city grows! {n} new places',
   'log.mapFound': '{name} found a city map at {place}', 'log.mapGrown': 'The city grows to stage {stage}: new {places}',
+  // UI-2: next-step line, reasons, end-turn check, log filter, keys
+  'nh.ap': '{n} AP left', 'nh.attack': '{sv} can fight at {place}', 'nh.search': '{sv} can search {place}', 'nh.heal': '{sv} can treat a wound', 'nh.build': '{sv} can build: {bld}', 'nh.barricade': '{sv} can barricade the colony', 'nh.end': 'Nothing useful left — end the day',
+  'nh.food': 'food {have}/{need} for tonight', 'nh.crisis': 'crisis {k}/{n}', 'nh.siege': '{n} zombie(s) get in tonight',
+  'ux.energy': 'Needs {need} AP, has {have}.', 'ux.packFull': 'The backpack is full ({n} slots).',
+  'confirm.end.useful': 'You can still do something useful: {what}.',
+  'log.all': 'All', 'log.loot': 'Loot', 'log.danger': 'Danger', 'log.dayHead': 'Day {n}', 'log.more': '+{n} more',
+  'keys.title': 'Keys', 'keys.list': 'M walk · S search · A fight · B build · E end day · 1–4 survivor · Esc close',
+  'pack.full': 'Backpack full',
 };

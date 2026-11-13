@@ -9,6 +9,9 @@ import { actionCost, leaveDamage, searchSpawnChance, survivorDef, aliveSurvivors
 import * as act from '../../core/actions.js';
 
 import { survivorOptions, moveOption, actingSurvivors, lureTargets, check } from '../options.js';
+import { whyText, likelyLoot, nextHintText } from '../uxText.js';
+
+const LOOT_ICON = { weapon: 'attack', armor: 'barricade', food: 'food', medicine: 'heal', consumable: 'heal', fuel: 'fuel', tools: 'settings', gadget: 'star', book: 'log', junk: 'goal', material: 'goal', map: 'map' };
 
 const ICON = { walk: 'move', drive: 'fuel', attack: 'attack', search: 'search', barricade: 'barricade', lure: 'lure', ability: 'heal', nap: 'hourglass', guard: 'door', unguard: 'door', build: 'goal', info: 'log' };
 const COLONY_ONLY = ['nap', 'guard', 'unguard', 'barricade'];
@@ -68,15 +71,17 @@ export function renderRadial(el, ctx) {
   const loc = s.locations[at];
   const people = aliveSurvivors(s).filter((v) => v.location === at).length;
   // Re-build only when something on it changed, so the slide-in plays once.
-  const key = [at, svId, luring, loc.zombies, people, ...aliveSurvivors(s).map((v) => `${v.id}:${v.ap}`), ...items.map((it) => `${it.id}:${it.ok}:${it.cost ?? ''}:${it.risk ?? ''}`), ...lures.map((l) => `${l.to}:${l.ok}`)].join('|');
+  const next = s.phase === 'turn' ? nextHintText(s) : '';
+  const key = [next, at, svId, luring, loc.zombies, people, ...aliveSurvivors(s).map((v) => `${v.id}:${v.ap}`), ...items.map((it) => `${it.id}:${it.ok}:${it.cost ?? ''}:${it.risk ?? ''}`), ...lures.map((l) => `${l.to}:${l.ok}`)].join('|');
   if (el.dataset.key === key) return;
   el.dataset.key = key;
   const ap = svId ? s.survivors[svId].ap : 0;
+  const loot = at !== 'colony' ? likelyLoot(s, at) : [];
   const off = (ev, it) => { ev.stopPropagation(); if (!it.ok) { flashTip(ev.currentTarget); return true; } return false; };
   const button = (it) => {
     const risk = it.risk ? (it.risk.endsWith('%') ? t('bar.risk', { n: it.risk }) : h('span', { class: 'hp' }, icon('heartIco'), it.risk)) : null;
     const meta = it.cost || risk ? [it.cost ? h('span', { class: 'ap' }, icon('bolt'), String(it.cost)) : null, it.cost && risk ? ' · ' : null, risk].filter(Boolean) : [];
-    const tip = [it.label, it.cost != null ? t('act.cost', { n: it.cost, have: ap }) : null, !it.ok ? t(`err.${it.error}`) : null].filter(Boolean).join(' · ');
+    const tip = [it.label, it.ok ? (it.cost != null ? t('act.cost', { n: it.cost, have: ap }) : null) : (it.action && whyText(s, it.action)) || t(`err.${it.error}`)].filter(Boolean).join(' · ');
     return h('button', {
       class: `rd-btn${it.ok ? '' : ' off'}${it.move ? ' move' : ''}`, dataset: { act: it.id, sv: it.face ?? '' },
       tip: it.ok ? null : tip, 'aria-label': tip, 'aria-disabled': it.ok ? null : 'true',
@@ -93,12 +98,17 @@ export function renderRadial(el, ctx) {
     meta.length ? h('span', { class: `rd-meta${it.risk ? ' risky' : ''}` }, ...meta) : null);
   };
   mount(el,
+    // UI-2: the next-step line rides on top of the bar (the floating one is hidden while the bar is up).
+    next ? h('div', { class: 'ab-next', role: 'status' }, icon('bolt'), h('span', {}, next)) : null,
     h('div', { class: 'ab-head' },
       h('div', { class: 'ab-title' },
         h('b', {}, luring ? t('loc.lurePick') : c('locations', at, 'name')),
         h('span', { class: 'ab-counts' },
           h('span', { class: loc.zombies ? 'z' : '' }, icon('skull'), String(loc.zombies)),
-          h('span', {}, icon('person'), String(people)))),
+          h('span', {}, icon('person'), String(people)),
+          // UI-2: what this place's finds tend to be, while there are finds left.
+          loc.deck?.length && at !== 'colony' ? h('span', { class: 'ab-loot', tip: t('loc.finds'), 'aria-label': loot.map((x) => t(`item.${x}`)).join(', ') },
+            ...loot.map((x) => icon(LOOT_ICON[x] ?? 'goal')), h('b', {}, String(loc.batches?.length ?? Math.ceil(loc.deck.length / 3)))) : null)),
       h('button', { class: 'ab-icon', dataset: { act: 'info' }, 'aria-label': t('ring.info'), tip: t('ring.info'), onclick: (ev) => { ev.stopPropagation(); ctx.set({ locInfo: true, picking: null }); } }, h('b', {}, 'i')),
       h('button', { class: 'ab-icon ab-close', 'aria-label': t('settings.close'), onclick: (ev) => { ev.stopPropagation(); ctx.set({ picking: null }); ctx.selectLocation(null); } }, icon('close'))),
     // Who acts: tap a face to switch.
@@ -109,7 +119,7 @@ export function renderRadial(el, ctx) {
     v.id === svId ? h('small', {}, v.location === at ? t('bar.here') : c('locations', v.location, 'name')) : null))) : null,
     h('div', { class: 'ab-row' }, luring
       ? [...lures.map((tg) => h('button', {
-        class: `rd-btn${tg.ok ? '' : ' off'}`, dataset: { act: 'lure-to', to: tg.to }, tip: tg.ok ? null : t(`err.${tg.error}`), 'aria-disabled': tg.ok ? null : 'true',
+        class: `rd-btn${tg.ok ? '' : ' off'}`, dataset: { act: 'lure-to', to: tg.to }, tip: tg.ok ? null : whyText(s, tg.action) || t(`err.${tg.error}`), 'aria-disabled': tg.ok ? null : 'true',
         onclick: (ev) => { if (off(ev, tg)) return; if (ctx.dispatch(tg.action)) ctx.set({ picking: null }); },
       }, icon('lure'), h('span', { class: 'rd-label' }, c('locations', tg.to, 'name')))),
       h('button', { class: 'rd-btn', dataset: { act: 'cancel' }, onclick: (ev) => { ev.stopPropagation(); ctx.set({ picking: null }); } }, icon('close'), h('span', { class: 'rd-label' }, t('act.cancel')))]

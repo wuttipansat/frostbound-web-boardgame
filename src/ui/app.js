@@ -4,7 +4,9 @@ import { createGame } from '../core/state.js';
 import { tryReduce } from '../core/reducer.js';
 import { PHASES } from '../core/constants.js';
 import { t, c, setLang, getLang } from '../i18n/index.js';
-import { itemOf, mapOf } from '../core/selectors.js';
+import { itemOf, mapOf, aliveSurvivors } from '../core/selectors.js';
+import * as act from '../core/actions.js';
+import { whyText } from './uxText.js';
 import { formatLog } from '../i18n/format.js';
 import { sound, soundForLog } from '../audio/sound.js';
 import { mount } from './dom.js';
@@ -121,7 +123,7 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
   function dispatch(action) {
     const res = tryReduce(state, action);
     if (!res.ok) {
-      toast(t(`err.${res.error}`) === `err.${res.error}` ? t('err.unknown') : t(`err.${res.error}`), 'bad');
+      toast(whyText(state, action) || (t(`err.${res.error}`) === `err.${res.error}` ? t('err.unknown') : t(`err.${res.error}`)), 'bad');
       sound.play('error');
       return false;
     }
@@ -397,6 +399,19 @@ export function createApp({ dom, pieces, board, art, fx = {}, scene = {}, sceneS
     // Space / Esc skip the scene of someone else's move that is on screen.
     if ((ev.key === ' ' || ev.key === 'Escape') && director.watching && !ev.target.closest?.('input, textarea, button, [role="button"]')) {
       ev.preventDefault(); director.skip(); return;
+    }
+    // UI-2: keys for the common moves on your turn (M walk to the selected place, S search, A fight, B build, E end day, 1–4 survivor).
+    const typing = ev.target.closest?.('input, textarea, select');
+    if (!typing && !ev.ctrlKey && !ev.metaKey && !ev.altKey && state.phase === PHASES.TURN && !ui.modal && !ui.queue.length && !director.watching) {
+      const k = ev.key.toLowerCase();
+      const svId = ringSurvivor(state, ui);
+      const run = (action) => { ev.preventDefault(); dispatch(action); };
+      if (/^[1-4]$/.test(k)) { const sv = aliveSurvivors(state)[Number(k) - 1]; if (sv) { ev.preventDefault(); selectSurvivor(sv.id); } return; }
+      if (k === 'e') { ev.preventDefault(); document.querySelector('#pp-actions .btn.end-turn')?.click(); return; }
+      if (svId && k === 's') return run(act.search(svId));
+      if (svId && k === 'a') return run(act.attack(svId));
+      if (svId && k === 'm' && ui.selLoc && ui.selLoc !== state.survivors[svId].location) return run(act.move(svId, ui.selLoc));
+      if (k === 'b') { ev.preventDefault(); selectLocation('colony'); set({ locInfo: true }); return; }
     }
     if (ev.key !== 'Escape') return;
     if (ui.infoOpen || ui.topMore) set({ infoOpen: false, topMore: false });

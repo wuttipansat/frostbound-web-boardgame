@@ -5,6 +5,7 @@ import { t, c } from '../../i18n/index.js';
 import { botAction } from '../../ai/simpleBot.js';
 import { itemOf, survivorDef, foodNeeded, crisisDef, crisisRequirement, actionCost } from '../../core/selectors.js';
 import { LOCATIONS } from '../../content/locations.js';
+import { nextHintText } from '../uxText.js';
 
 const fixedRandom = () => 0.5;
 let cache = { state: null, hint: null };
@@ -44,23 +45,47 @@ function describe(s, a) {
   }
 }
 
-/** Floating bar with the suggested next move; "Show me" points at the place, survivor, die or card. */
-const hintSeen = { day: 0, keys: new Set(), timer: null };
+/**
+ * Floating bar above the action bar. A fresh suggestion from the bot logic shows for 6 seconds
+ * (once a day each, with "Show me"); the rest of the time it is the UI-2 next-step line
+ * ("12 AP left · Mara can search the pharmacy · food 2/3 for tonight").
+ */
+const hintSeen = { day: 0, keys: new Set(), timer: null, ctx: null };
 
 export function renderHint(el, ctx) {
+  hintSeen.ctx = { el, ctx };
   const { state: s, ui } = ctx;
-  const hint = s && ctx.canAct && ui.hints !== false && !ctx.watching && !ui.selCard ? suggestion(s) : null;
-  el.classList.toggle('hidden', !hint || (el.dataset.gone === `${hint.text}|${hint.why}`)); // faded ones stay hidden
-  if (!hint) { mount(el); el.dataset.key = ''; return; }
-  const key = `${hint.text}|${hint.why}`;
-  if (el.dataset.key === key) return;
-  el.dataset.key = key;
-  // UI-7: a suggestion shows for 6 seconds, and the same one only once a day.
-  if (hintSeen.day !== s.day) { hintSeen.day = s.day; hintSeen.keys.clear(); }
-  if (hintSeen.keys.has(key)) { el.dataset.gone = key; el.classList.add('hidden'); mount(el); return; }
-  hintSeen.keys.add(key);
-  clearTimeout(hintSeen.timer);
-  hintSeen.timer = setTimeout(() => { if (el.dataset.key === key) { el.dataset.gone = key; el.classList.add('hidden'); mount(el); } }, 6000);
+  const live = !!(s && ctx.canAct && !ctx.watching && !ui.selCard);
+  const hint = live && ui.hints !== false ? suggestion(s) : null;
+  const key = hint ? `${hint.text}|${hint.why}` : '';
+  if (hint && el.dataset.key !== key) {
+    el.dataset.key = key;
+    // UI-7: a suggestion shows for 6 seconds, and the same one only once a day.
+    if (hintSeen.day !== s.day) { hintSeen.day = s.day; hintSeen.keys.clear(); }
+    if (hintSeen.keys.has(key)) el.dataset.gone = key;
+    else {
+      hintSeen.keys.add(key);
+      clearTimeout(hintSeen.timer);
+      hintSeen.timer = setTimeout(() => {
+        if (el.dataset.key !== key) return;
+        el.dataset.gone = key;
+        const last = hintSeen.ctx;
+        if (last?.el === el) renderHint(el, last.ctx);
+      }, 6000);
+    }
+  }
+  if (!hint) el.dataset.key = '';
+  const showHint = !!hint && el.dataset.gone !== key;
+  const status = live && !showHint ? nextHintText(s) : '';
+  el.classList.toggle('hidden', !showHint && !status);
+  el.classList.toggle('status', !showHint && !!status);
+  const sig = showHint ? `h:${key}` : `s:${status}`;
+  if (el.dataset.sig === sig) return;
+  el.dataset.sig = sig;
+  if (!showHint) {
+    mount(el, status ? [h('span', { class: 'hint-ico', 'aria-hidden': 'true' }, icon('bolt')), h('span', { class: 'hint-line' }, status)] : null);
+    return;
+  }
   const show = () => {
     const pt = hint.point;
     if (pt.end) { const b = document.querySelector('#pp-actions .btn.end-turn'); b?.classList.remove('nudge'); void b?.offsetWidth; b?.classList.add('nudge'); b?.focus(); return; }
@@ -108,5 +133,6 @@ export function rulesModal(ctx) {
       h('div', { class: 'rule-cards' }, RULE_CARDS.map(([id, ico]) => h('section', { class: 'rule-card', dataset: { rule: id } },
         h('h3', {}, icon(ico), t(`rules.${id}.title`)),
         h('p', {}, t(`rules.${id}.text`)),
-        h('p', { class: 'ex' }, t(`rules.${id}.ex`)))))));
+        h('p', { class: 'ex' }, t(`rules.${id}.ex`))))),
+      h('p', { class: 'keys-line muted small' }, h('b', {}, t('keys.title')), ' ', t('keys.list'))));
 }

@@ -1972,3 +1972,30 @@ body.radial-open #toasts { bottom: 250px; }
 .dialog.found .found-warn { color: #ff8a7a; font-weight: 700; }
 @keyframes found-in { from { opacity: 0; transform: translateY(16px) scale(.85) rotate(-4deg); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .dialog.found .found-card { animation: none; } }
+
+/* UI-2: the next-step line (in the hint bar's place), loot icons, pack badge, log days and filters, phone hit targets */
+#hint.status { padding: 6px 12px 6px 6px; gap: 8px; max-width: min(460px, calc(100vw - 2 * var(--hud-pad))); animation: none; font-size: 12.5px; line-height: 1.3; }
+#hint.status .hint-ico { width: 22px; height: 22px; background: transparent; color: #f2b33d; }
+#hint.status .hint-line { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ab-loot { display: inline-flex; align-items: center; gap: 2px; color: var(--muted); }
+.ab-loot .icon { width: 13px; height: 13px; }
+.ab-loot b { margin-left: 3px; color: var(--text, #e8e2d6); }
+.tok-pack { position: absolute; right: -6px; top: -4px; font: 700 10px/1 var(--font, sans-serif); padding: 2px 4px; border-radius: 6px; background: #1b1d1e; color: #cfd8e3; box-shadow: 0 0 0 1px #000; pointer-events: none; }
+.tok-pack.full { background: #b8433a; color: #fff; }
+.log-chips { display: flex; gap: 6px; padding: 4px 0 6px; }
+.log-chip { border: 1px solid var(--frost-line, #556); background: transparent; color: var(--muted); border-radius: 12px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+.log-chip.on { background: #f2b33d; color: #1b1d1e; border-color: #f2b33d; }
+.log-days { list-style: none; margin: 0; padding: 0; }
+.log-day > ol { list-style: none; margin: 0; padding: 0; }
+.log-day-head { display: block; width: 100%; text-align: left; border: 0; background: transparent; color: var(--muted); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: 6px 0 3px; cursor: pointer; }
+.log-day-head small { text-transform: none; letter-spacing: 0; }
+.confirm-end .useful, .dialog .useful { color: #f2b33d; }
+.keys-line { margin-top: 10px; }
+@media (pointer: coarse) {
+  .rd-btn, .ab-icon, .ab-face, .log-chip, .log-day-head, #hint .btn.small-btn, #hint .close, .dialog .btn { min-height: 48px; }
+  .rd-btn, .ab-icon, #hint .close { min-width: 48px; }
+  .sv-token { width: 48px !important; height: 48px !important; }
+}
+#radial .ab-next { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 1.3; color: #f2d9a8; padding: 0 2px 6px; }
+#radial .ab-next .icon { width: 13px; height: 13px; flex: none; color: #f2b33d; }
+#radial .ab-next span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

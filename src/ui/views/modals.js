@@ -1,4 +1,6 @@
 // Full-screen screens and dialogs (solo game): setup, settings, draft, crossroads, colony phase, game over.
+import { usefulActionLeft } from '../../core/ux.js';
+import { uxText } from '../uxText.js';
 import { h, mount, TYPE_REP } from '../dom.js';
 import { icon } from '../icons.js';
 import { t, c, LANGUAGES, getLang, crossChoice, signed } from '../../i18n/index.js';
@@ -348,6 +350,7 @@ export function confirmEndModal(ctx) {
   const me = ctx.state.team;
   return dialog('confirm-end',
     h('h2', {}, t('confirm.end.title')),
+    (() => { const u = usefulActionLeft(ctx.state); if (!u) return null; const params = { sv: u.survivorId, place: u.locationId }; if (u.buildingId) params.bld = u.buildingId; return h('p', { class: 'useful' }, icon('bolt'), ' ', t('confirm.end.useful', { what: uxText({ key: `nh.${u.kind}`, params }) })); })(),
     h('p', {}, t('confirm.end.energy', { n: me.survivors.reduce((a, id) => a + (ctx.state.survivors[id]?.alive ? ctx.state.survivors[id].ap : 0), 0) })),
     (() => { const out = me.survivors.filter((id) => ctx.state.survivors[id]?.alive && ctx.state.survivors[id].location !== 'colony'); return out.length ? h('div', { class: 'warn-box outside' }, out.map((id) => h('p', {}, ctx.art.portrait(id, 's', { alt: '' }), ' ', t('confirm.end.outside', { name: survivorDef(id).name, place: c('locations', ctx.state.survivors[id].location, 'name') })))) : null; })(),
     // Step 18: what is still unsafe this round, before the colony phase.

@@ -614,4 +614,12 @@ export default {
   'found.title': 'พบของ {n} ชิ้น', 'found.who': '{name} เก็บใส่กระเป๋า', 'found.spawned': 'เสียงดังเรียกซอมบี้มาที่นี่ 1 ตัว!', 'found.pack': 'กระเป๋าว่าง {n} ช่อง', 'found.left': 'ค้นได้อีก {n} ครั้ง', 'found.empty': 'ที่นี่ไม่มีของเหลือแล้ว', 'found.ok': 'เก็บของ',
   'toast.mapFound': 'พบแผนที่เมือง! นำกลับฐานแล้วกดใช้เพื่อขยายเมือง', 'toast.mapGrown': 'เมืองขยาย! พบสถานที่ใหม่ {n} แห่ง',
   'log.mapFound': '{name} พบแผนที่เมืองที่{place}', 'log.mapGrown': 'เมืองขยายเป็นสเตจ {stage}: สถานที่ใหม่ {places}',
+  // UI-2
+  'nh.ap': 'เหลือ {n} AP', 'nh.attack': '{sv} สู้ได้ที่{place}', 'nh.search': '{sv} ค้น{place}ได้', 'nh.heal': '{sv} รักษาแผลได้', 'nh.build': '{sv} สร้าง{bld}ได้', 'nh.barricade': '{sv} เสริมกำแพงฐานได้', 'nh.end': 'ไม่มีอะไรน่าทำแล้ว — จบวันได้',
+  'nh.food': 'อาหาร {have}/{need} สำหรับคืนนี้', 'nh.crisis': 'วิกฤต {k}/{n}', 'nh.siege': 'คืนนี้ซอมบี้บุกเข้าได้ {n} ตัว',
+  'ux.energy': 'ต้องใช้ {need} AP มีอยู่ {have}', 'ux.packFull': 'กระเป๋าเต็ม ({n} ช่อง)',
+  'confirm.end.useful': 'ยังทำสิ่งที่มีประโยชน์ได้: {what}',
+  'log.all': 'ทั้งหมด', 'log.loot': 'ของ', 'log.danger': 'อันตราย', 'log.dayHead': 'วันที่ {n}', 'log.more': '+อีก {n}',
+  'keys.title': 'ปุ่มลัด', 'keys.list': 'M เดิน · S ค้น · A สู้ · B สร้าง · E จบวัน · 1–4 เลือกคน · Esc ปิด',
+  'pack.full': 'กระเป๋าเต็ม',
 };

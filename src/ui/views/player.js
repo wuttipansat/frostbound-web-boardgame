@@ -355,6 +355,8 @@ function survivorToken(ctx, sv, { canAct = false, color = '#888' } = {}) {
   sv.frostbite ? h('span', { class: 'tok-frost', 'aria-hidden': 'true' }, icon('snowflake')) : null,
   canAct ? h('span', { class: 'tok-ready', 'aria-hidden': 'true' }) : null,
   h('span', { class: 'tok-ap', 'aria-hidden': 'true' }, icon('bolt'), `${sv.ap}`),
+  // UI-2: backpack count on the face (red when full).
+  h('span', { class: `tok-pack${(sv.pack?.length ?? 0) >= packSize(ctx.state, sv.id) ? ' full' : ''}`, 'aria-hidden': 'true' }, `${sv.pack?.length ?? 0}/${packSize(ctx.state, sv.id)}`),
   h('span', { class: `tok-hpbar ${(sv.hp ?? 100) > 60 ? 'ok' : (sv.hp ?? 100) >= 30 ? 'mid' : 'low'}`, 'aria-hidden': 'true' }, h('i', { style: { width: `${sv.hp ?? 100}%` } })),
   h('span', { class: 'tok-card', 'aria-hidden': 'true' },
     h('b', {}, d.name),

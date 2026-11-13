@@ -2,6 +2,7 @@
 // rules engine itself (tryReduce), so the UI can never offer an illegal move or hide a legal one.
 import * as act from '../core/actions.js';
 import { tryReduce } from '../core/reducer.js';
+import { usefulActionLeft } from '../core/ux.js';
 import { survivorDef, itemOf, scenarioDef, actionCost, fightPreview } from '../core/selectors.js';
 import { gearSlot } from '../content/items.js';
 import { placesOf, roadDistance } from '../core/map.js';
@@ -143,8 +144,12 @@ export function hasEnergyLeft(state) {
 }
 
 /** Ask before ending a turn while something can still be done (unless the player opted out this game). */
+// UI-2: only when something useful is left (a fight, a search, healing, building), or someone
+// outside could still walk home before night.
 export function shouldConfirmEndTurn(state, { skip = false } = {}) {
-  return !skip && hasEnergyLeft(state);
+  if (skip || state.phase !== 'turn') return false;
+  if (usefulActionLeft(state)) return true;
+  return state.team.survivors.some((id) => state.survivors[id]?.alive && state.survivors[id].location !== 'colony' && check(state, act.move(id, 'colony')).ok);
 }
 
 // ---------------------------------------------------------------- step 11: card availability
