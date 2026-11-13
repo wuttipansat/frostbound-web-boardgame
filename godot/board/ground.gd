@@ -284,47 +284,187 @@ static func heightmap(n: int, cell: float, column: Callable, side: Callable, bot
 	return m
 
 
-## terrain.js buildTerrainHD (a block-sized piece): o = {center, half, edge_dist, dist_road, clip, cell}
+## terrain.js buildTerrainHD for one block (the street surface under the slabs), written out without closures
+## (the generic heightmap mesher with callbacks was ~80 ms a block in GDScript). Same quads, same order.
+## o = {center: [x, z], half, cell, gaps: [[bx, bz] missing neighbours], segs: [[ax, az, bx, bz]], key: [bx, bz]}
 static func terrain(o: Dictionary) -> Dictionary:
 	var cell: float = o.get("cell", 0.5)
 	var ox := JS.round_(o.center[0] / cell)
 	var oz := JS.round_(o.center[1] / cell)
 	var n := ceili(o.half / cell) + 1
-	var edge_dist: Callable = o.edge_dist
-	var dist_road: Callable = o.dist_road
-	var clip: Callable = o.clip
-	var strata := func(lx: int, lz: int, y: int) -> int:
+	var W := 2 * n + 1
+	var gaps: Array = o.gaps
+	var gx := PackedFloat64Array()
+	for g in gaps:
+		gx.append_array([BL.block_pos(g[0]), BL.block_half(g[0]), BL.block_pos(g[1]), BL.block_half(g[1])])
+	var segs: Array = o.segs
+	var sg := PackedFloat64Array()
+	for s in segs:
+		sg.append_array(s)
+	var kbx: int = o.key[0]
+	var kbz: int = o.key[1]
+	var H := PackedInt32Array()
+	H.resize(W * W)
+	H.fill(-32768)
+	var TOP := PackedInt32Array()
+	TOP.resize(W * W)
+	var road_lim := BL.ROAD_HALF + 0.25
+	for lx in range(-n, n + 1):
 		var x := lx + ox
-		var z := lz + oz
-		var w := y * cell
-		if w >= -1.5:
-			return P_SNOW_SHADE if bayer(x, y, z) < 0.3 else P_SNOW_BLUE
-		if w >= -2.5:
-			return mix_hex(P_DIRT, 0x5a4638, BL.hash3(x, y, z) * 0.6)
-		if y % 5 == 0:
-			return shade_hex(P_ROCK, 0.72)
-		return P_ROCK if BL.hash3(floori(x / 2.0), y, floori(z / 2.0)) > 0.5 else P_ROCK_LIGHT
-	var column := func(lx: int, lz: int):
-		var x := lx + ox
-		var z := lz + oz
 		var wx := (x + 0.5) * cell
-		var wz := (z + 0.5) * cell
-		if edge_dist.call(wx, wz) < 3:
-			return null
-		if not clip.call(wx, wz):
-			return null
-		var road_d: float = dist_road.call(wx, wz)
-		var tp := P_SNOW
-		if road_d < BL.ROAD_HALF + 0.25:
-			var t := BL.hash3(floori(x / 3.0), 5, floori(z / 3.0))
-			tp = 0x2c3038 if t < 0.06 else P_ASPHALT
-			if BL.hash3(x, 5, z) < 0.025:
-				tp = 0x1c1f25
-			if road_d > BL.ROAD_HALF - 0.6 and BL.hash3(x, 7, z) < 0.55:
-				tp = P_SLUSH
-		return {"h": 0, "top": tp}
-	var m := heightmap(n, cell, column, strata, -12)
-	if ox or oz:
-		for i in m.pos.size():
-			m.pos[i] = [m.pos[i][0] + ox * cell, m.pos[i][1], m.pos[i][2] + oz * cell]
-	return m
+		for lz in range(-n, n + 1):
+			var z := lz + oz
+			var wz := (z + 0.5) * cell
+			# rim: Chebyshev distance to the nearest missing neighbour block
+			var rim := INF
+			for gi in range(0, gx.size(), 4):
+				var ex := maxf(0.0, absf(wx - gx[gi]) - gx[gi + 1])
+				var ez := maxf(0.0, absf(wz - gx[gi + 2]) - gx[gi + 3])
+				rim = minf(rim, maxf(ex, ez))
+			if rim < 3:
+				continue
+			if BL.grid_of(wx) != kbx or BL.grid_of(wz) != kbz:
+				continue
+			var road_d := INF
+			for si in range(0, sg.size(), 4):
+				var ax := sg[si]
+				var az := sg[si + 1]
+				var abx := sg[si + 2] - ax
+				var abz := sg[si + 3] - az
+				var t := maxf(0.0, minf(1.0, ((wx - ax) * abx + (wz - az) * abz) / (abx * abx + abz * abz)))
+				var ddx := wx - (ax + abx * t)
+				var ddz := wz - (az + abz * t)
+				road_d = minf(road_d, sqrt(ddx * ddx + ddz * ddz))
+			var tp := P_SNOW
+			if road_d < road_lim:
+				var th := BL.hash3(floori(x / 3.0), 5, floori(z / 3.0))
+				tp = 0x2c3038 if th < 0.06 else P_ASPHALT
+				if BL.hash3(x, 5, z) < 0.025:
+					tp = 0x1c1f25
+				if road_d > BL.ROAD_HALF - 0.6 and BL.hash3(x, 7, z) < 0.55:
+					tp = P_SLUSH
+			H[(lx + n) * W + (lz + n)] = 0
+			TOP[(lx + n) * W + (lz + n)] = tp
+	var pos := PackedVector3Array()
+	var nrm := PackedVector3Array()
+	var cols := PackedColorArray()
+	var idx := PackedInt32Array()
+	var ao_s := 0.4
+	var AO := [1 - ao_s, 1 - ao_s * 0.6, 1 - ao_s * 0.25, 1.0]
+	var up := Vector3(0, 1, 0)
+	var dirs := [[1, 0], [-1, 0], [0, 1], [0, -1]]
+	for x in range(-n, n + 1):
+		for z in range(-n, n + 1):
+			var h: int = H[(x + n) * W + (z + n)]
+			if h == -32768:
+				continue
+			# Top face AO: a neighbour higher than h occludes (all ground is flat here, so the AO is full light,
+			# but keep the general rule).
+			var ao := [3, 3, 3, 3]
+			var corners := [[-1, -1], [-1, 1], [1, 1], [1, -1]]
+			for ci in 4:
+				var sx: int = corners[ci][0]
+				var sz: int = corners[ci][1]
+				var s1 := 1 if _h(H, W, n, x + sx, z) > h else 0
+				var s2 := 1 if _h(H, W, n, x, z + sz) > h else 0
+				var cc := 1 if _h(H, W, n, x + sx, z + sz) > h else 0
+				ao[ci] = 0 if s1 and s2 else 3 - (s1 + s2 + cc)
+			var rgb := lin(TOP[(x + n) * W + (z + n)])
+			var base: int = pos.size()
+			var X0 := (x + ox) * cell
+			var X1 := (x + 1 + ox) * cell
+			var Z0 := (z + oz) * cell
+			var Z1 := (z + 1 + oz) * cell
+			var Y := h * cell
+			pos.append(Vector3(X0, Y, Z0))
+			pos.append(Vector3(X0, Y, Z1))
+			pos.append(Vector3(X1, Y, Z1))
+			pos.append(Vector3(X1, Y, Z0))
+			for i in 4:
+				nrm.append(up)
+				var a: float = AO[ao[i]]
+				cols.append(Color(rgb[0] * a, rgb[1] * a, rgb[2] * a))
+			if ao[0] + ao[2] < ao[1] + ao[3]:
+				idx.append_array([base, base + 1, base + 3, base + 1, base + 2, base + 3])
+			else:
+				idx.append_array([base, base + 1, base + 2, base, base + 2, base + 3])
+			for d in dirs:
+				var dx: int = d[0]
+				var dz: int = d[1]
+				var nh := _h(H, W, n, x + dx, z + dz)
+				if nh == -32768:
+					nh = -12
+				if nh >= h:
+					continue
+				var y := nh
+				while y < h:
+					var c0 := _strata(x + ox, z + oz, y, cell)
+					var y1 := y + 1
+					while y1 < h and _strata(x + ox, z + oz, y1, cell) == c0:
+						y1 += 1
+					var k := 0.84 if dx != 0 else 0.76
+					var l := lin(c0)
+					var col := [l[0] * k, l[1] * k, l[2] * k]
+					var fx := x + 1 if dx > 0 else x
+					var fz := z + 1 if dz > 0 else z
+					var q: Array
+					if dx != 0:
+						q = [[fx, y, z], [fx, y1, z], [fx, y1, z + 1], [fx, y, z + 1]]
+					else:
+						q = [[x, y, fz], [x + 1, y, fz], [x + 1, y1, fz], [x, y1, fz]]
+					var e1: Array = V.sub(q[1], q[0])
+					var e2: Array = V.sub(q[2], q[0])
+					var cr := [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]
+					if cr[0] * dx + cr[2] * dz < 0:
+						q.reverse()
+					var b2: int = pos.size()
+					for p in q:
+						pos.append(Vector3((p[0] + ox) * cell, p[1] * cell, (p[2] + oz) * cell))
+						nrm.append(Vector3(dx, 0, dz))
+						cols.append(Color(col[0], col[1], col[2]))
+					idx.append_array([b2, b2 + 1, b2 + 2, b2, b2 + 2, b2 + 3])
+					y = y1
+	return {"pos": pos, "nrm": nrm, "col": cols, "idx": idx}
+
+
+static func _h(H: PackedInt32Array, W: int, n: int, x: int, z: int) -> int:
+	if x < -n or x > n or z < -n or z > n:
+		return -32768
+	return H[(x + n) * W + (z + n)]
+
+
+static func _strata(x: int, z: int, y: int, cell: float) -> int:
+	var w := y * cell
+	if w >= -1.5:
+		return P_SNOW_SHADE if bayer(x, y, z) < 0.3 else P_SNOW_BLUE
+	if w >= -2.5:
+		return mix_hex(P_DIRT, 0x5a4638, BL.hash3(x, y, z) * 0.6)
+	if y % 5 == 0:
+		return shade_hex(P_ROCK, 0.72)
+	return P_ROCK if BL.hash3(floori(x / 2.0), y, floori(z / 2.0)) > 0.5 else P_ROCK_LIGHT
+
+
+## A mesh made of [x, y, z] / [r, g, b] arrays -> packed arrays (what the board renders and the test fingerprints).
+static func packed(m: Dictionary) -> Dictionary:
+	if m.pos is PackedVector3Array:
+		return m
+	var pos := PackedVector3Array()
+	var nrm := PackedVector3Array()
+	var col := PackedColorArray()
+	pos.resize(m.pos.size())
+	col.resize(m.pos.size())
+	var has_n: bool = m.nrm.size() == m.pos.size()
+	if has_n:
+		nrm.resize(m.pos.size())
+	for i in m.pos.size():
+		var p: Array = m.pos[i]
+		pos[i] = Vector3(p[0], p[1], p[2])
+		var c: Array = m.col[i]
+		col[i] = Color(c[0], c[1], c[2])
+		if has_n:
+			var q: Array = m.nrm[i]
+			nrm[i] = Vector3(q[0], q[1], q[2])
+	var out := {"pos": pos, "nrm": nrm, "col": col, "idx": PackedInt32Array(m.idx)}
+	if m.get("computed_normals"):
+		out.computed_normals = true
+	return out

@@ -80,10 +80,10 @@ static func fingerprint(m: Dictionary) -> Array:
 	out[0] = m.pos.size()
 	out[1] = m.idx.size()
 	for i in m.pos.size():
-		var p: Array = m.pos[i]
-		out[2] += p[0]; out[3] += p[1]; out[4] += p[2]; out[8] += p[0] * p[2] * 0.01
-		var c: Array = m.col[i]
-		out[5] += c[0]; out[6] += c[1]; out[7] += c[2]
+		var p: Vector3 = m.pos[i]
+		out[2] += p.x; out[3] += p.y; out[4] += p.z; out[8] += p.x * p.z * 0.01
+		var c: Color = m.col[i]
+		out[5] += c.r; out[6] += c.g; out[7] += c.b
 	return out
 
 

@@ -115,6 +115,7 @@ func lod_model(key: String, mat: Array, fine := true) -> void:
 func add_mesh(name: String, lod: String, mesh: Dictionary) -> void:
 	if mesh.pos.is_empty():
 		return
+	mesh = Ground.packed(mesh)
 	var k := name + "@" + lod
 	if not desc.meshes.has(k):
 		desc.meshes[k] = []
@@ -177,13 +178,13 @@ func terrain_for(key: String, far := false) -> Dictionary:
 	var hx := BL.block_half(bx)
 	var hz := BL.block_half(bz)
 	var near := streets.filter(func(s): return minf(s[0][0], s[1][0]) < cx + hx + 4 and maxf(s[0][0], s[1][0]) > cx - hx - 4 and minf(s[0][2], s[1][2]) < cz + hz + 4 and maxf(s[0][2], s[1][2]) > cz - hz - 4)
-	var geo := Ground.terrain({"center": [cx, cz], "half": maxf(hx, hz), "edge_dist": edge_dist(bx, bz), "cell": cell,
-		"clip": func(x: float, z: float) -> bool: return cell_of(x, z) == key,
-		"dist_road": func(x: float, z: float) -> float:
-			var d := INF
-			for s in near:
-				d = minf(d, dist_to_segment(x, z, s[0], s[1]))
-			return d})
+	var gaps := []
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			if (dx or dz) and not has_block(bx + dx, bz + dz):
+				gaps.append([bx + dx, bz + dz])
+	var geo := Ground.terrain({"center": [cx, cz], "half": maxf(hx, hz), "cell": cell, "gaps": gaps, "key": [bx, bz],
+		"segs": near.map(func(s): return [s[0][0], s[0][2], s[1][0], s[1][2]])})
 	var k: Dictionary = map.blocks[key]
 	var lot: bool = BL.open_block(k, bx, bz) and k.kind != "plaza" and BL.hash3(bx, 77, bz) < 0.5
 	var snowy: bool = k.kind == "park" or k.kind == "colony" or lot
@@ -195,11 +196,12 @@ func terrain_for(key: String, far := false) -> Dictionary:
 	var e := func(o: bool) -> float: return 0.0 if o else BL.ROAD_HALF
 	var slab := Ground.block_slab({"x0": cx - hx + e.call(op.x0), "x1": cx + hx - e.call(op.x1), "z0": cz - hz + e.call(op.z0), "z1": cz + hz - e.call(op.z1),
 		"walk": BL.ROAD_WALK - BL.ROAD_KERB, "surface": "snow" if snowy else "paved", "detail": not far, "seed": [bx, bz], "open": op})
+	var sp := Ground.packed(slab)
 	var base: int = geo.pos.size()
-	geo.pos.append_array(slab.pos)
-	geo.nrm.append_array(slab.nrm)
-	geo.col.append_array(slab.col)
-	for i in slab.idx:
+	geo.pos.append_array(sp.pos)
+	geo.nrm.append_array(sp.nrm)
+	geo.col.append_array(sp.col)
+	for i in sp.idx:
 		geo.idx.append(i + base)
 	return geo
 
