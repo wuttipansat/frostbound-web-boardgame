@@ -178,13 +178,14 @@ func _create_survivor(id: String) -> Dictionary:
 	var big := Node3D.new()
 	big.scale = Vector3.ONE * SURVIVOR_SCALE
 	var mesh = ModelPack.combined(ModelPack.key_of("char-" + id, {"size": CHAR, "jitter": 0}))
-	if mesh != null:
+	if mesh != null and OS.get_environment("NOOUTLINE") == "":
 		var outline := MeshInstance3D.new()
 		outline.mesh = mesh
 		outline.material_override = _outline_mat
 		outline.scale = Vector3.ONE * 1.07
 		outline.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		big.add_child(outline)
+	if mesh != null:
 		var mi := MeshInstance3D.new()
 		mi.mesh = mesh
 		big.add_child(mi)

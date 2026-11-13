@@ -235,6 +235,10 @@ func _after_change(animate: bool) -> void:
 	if ui.sel_survivor != "" and not state.survivors.get(ui.sel_survivor, {}).get("alive", false):
 		ui.sel_survivor = ""
 	main.on_state(state, animate)
+	main.pieces.set_acting(Options.acting_survivors(state))
+	main.pieces.set_highlight(ui.sel_survivor)
+	if state.map.get("spots") != null:
+		main.board.set_spots(state.map.spots.keys().filter(func(id): return state.locations.has(id) and state.locations[id].deck.is_empty()))
 	var a = Fx.atmosphere_for(state)
 	sound.set_weather(a.storm, a.fire)
 	_save()
@@ -262,12 +266,14 @@ func select_survivor(id: String) -> void:
 	ui.picking = ""
 	if id != "":
 		ui.sel_loc = state.survivors[id].location
+		main.board.set_selected(ui.sel_loc)
 	main.pieces.set_highlight(id)
 	render()
 
 
 func select_location(id: String) -> void:
 	ui.sel_loc = id
+	main.board.set_selected(id)
 	ui.loc_info = false
 	ui.picking = ""
 	render()

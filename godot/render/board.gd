@@ -485,6 +485,67 @@ func _animate(dt: float) -> void:
 			pools_mm.set_instance_color(pool_flickers[n], Color(f, f, f))
 
 
+# ---------------------------------------------------------------- spots and the selected place
+
+var _ransacked: Node3D
+var _ransacked_key := ""
+var _sel_ring: MeshInstance3D
+
+
+## GAME-1: a searched-out spot looks ransacked: goods and boxes spilled in front of it.
+func set_spots(empty: Array) -> void:
+	var key := "|".join(PackedStringArray(empty))
+	if key == _ransacked_key and _ransacked != null:
+		return
+	_ransacked_key = key
+	if _ransacked != null:
+		_ransacked.queue_free()
+	_ransacked = Node3D.new()
+	add_child(_ransacked)
+	var lists := [[], [], []]
+	for id in empty:
+		var L = desc.get("layout", {}).get(id)
+		if L == null:
+			continue
+		var f := [sin(L.facing), 0.0, cos(L.facing)]
+		var sd := [-f[2], 0.0, f[0]]
+		for k in 4:
+			var p := V.adds(V.adds(L.center, f, 1.9 + (k % 2) * 0.5), sd, (k - 1.5) * 0.8)
+			p[1] = BL.GROUND
+			lists[k % 3].append(V.compose(p, 0, k * 1.7, 0, 1))
+	for k in 3:
+		if lists[k].is_empty():
+			continue
+		var mesh = ModelPack.combined(ModelPack.key_of("clutter-%d" % (k + 1), {"size": 0.12, "jitter": 0}))
+		if mesh != null:
+			_ransacked.add_child(_multimesh(mesh, lists[k], null, false))
+
+
+## A soft warm ring under the selected place.
+func set_selected(id: String) -> void:
+	if _sel_ring == null:
+		_sel_ring = MeshInstance3D.new()
+		var q := QuadMesh.new()
+		q.size = Vector2(1, 1)
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		m.albedo_texture = _radial(128, [[0.0, 0.0], [0.53, 0.0], [0.62, 0.95], [0.72, 0.35], [1.0, 0.0]])
+		m.albedo_color = Color(1.0, 0.77, 0.42, 0.9)
+		m.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+		q.material = m
+		_sel_ring.mesh = q
+		_sel_ring.rotation.x = -PI / 2
+		add_child(_sel_ring)
+	var L = desc.get("layout", {}).get(id) if id != "" else null
+	_sel_ring.visible = L != null
+	if L != null:
+		var r: float = (L.hitRadius + 2.2) * 2
+		_sel_ring.scale = Vector3(r, r, 1)
+		_sel_ring.position = Vector3(L.center[0], BL.GROUND + 0.06, L.center[2])
+
+
 # ---------------------------------------------------------------- queries
 
 ## World extents of the open blocks: {x0, x1, z0, z1, block}.

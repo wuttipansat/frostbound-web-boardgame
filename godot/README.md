@@ -1,38 +1,46 @@
-# FROSTBOUND — Godot port
+# FROSTBOUND — Godot version
 
-GODOT-0 adds the port's starting point. The web game in `../src` stays the reference: content, balance and rules
-are made there first, then exported here.
+A full Godot 4 version of the web game: the same rules (bit-exact), the same city (the same scene for the
+same map), the same models, characters, effects, UI (English and Thai) and sound. The web game in `../src`
+stays the reference; content and models are exported from it.
 
-## Open it
-1. Install Godot 4.3 or newer (standard build, not .NET).
-2. From the repo root run the exporters (Node 18+, about 1.5 minutes):
+## Play it
+1. Install Godot 4.3 or newer (standard build) and Node 18+.
+2. From the repo root, export the models, data and portraits (about 3 minutes):
    ```bash
    npm install && npm run export:godot
    ```
-   - **`godot/assets/models/`:** about 350 `.glb` files (about 86 MB). They are generated and not in git.
-   - **`godot/data/`:** JSON. It is in git.
-3. Open `godot/project.godot` in Godot.
-   - The first open imports the models, which takes a few minutes.
-   - Run it (F5). You should see the colony and six places on the snow, and you can drag or pinch to orbit.
-4. Headless check (loads every model and data file):
-   ```bash
-   godot --headless --path godot --script res://scripts/check.gd
-   ```
+3. Open `godot/project.godot` in Godot and press F5.
 
-## What is here
+Controls: drag to pan, wheel / pinch to zoom, tap a place for its action bar, tap a survivor to select them,
+"i" on the action bar for the place panel (base upgrades and crafting at the colony), the team button for items.
+
+## What is where
 | Path | What |
 |---|---|
-| `assets/models/<lod>/*.glb`, `index.json` | Every model build. `lod1` is the middle and `lod2` the far level of detail. The close-up level `lod0` is left out: all levels together are 178 MB. Voxel scale is 0.3 / 0.6 world units per voxel, Y up. Glowing parts are an unlit second surface. |
-| `data/*.json` | Content and tunables: constants, locations, items, buildings, crises, crossroads, scenarios, survivors. |
-| `data/i18n/{en,th}.json` | UI text, plus Thai content names. Loaded as `Translation`s with dotted keys, e.g. `tr("content.locations.colony.name")`. |
-| `data/golden/<seed>.json` | 20 bot games (crawler, normal), with every action and the state hash after it (`stateHash` in `src/core/hash.js`: sorted-key JSON, then FNV-1a). |
-| `data/TODO-logic.md` | Content functions that must be ported by hand. |
-| `scripts/data.gd` | The `Data` autoload. |
-| `scripts/models.gd` | Loads a model: the imported scene, else the raw .glb at runtime. Vertex colours are used as albedo. |
-| `scripts/boot.gd`, `orbit_camera.gd` | The demo scene. |
-| `export_presets.cfg` | Android (arm64) and Web presets. Keystores are set in the editor and never committed. |
+| `core/`, `ai/` | The rules engine and the bot, ported file for file from `src/core` and `src/ai` (GODOT-1). |
+| `render/pack.gd` | The web build's model pack (quad records, `assets/models-pack.bin`) meshed on demand (GODOT-2). |
+| `board/` | The board's layout and composition (`board.js`, `streets.js`, `terrain.js`, `ground.js`) as a pure description. |
+| `render/board.gd`, `stage.gd` | Draws the description (MultiMeshes, LOD by zoom, lights, pop-in on growth, composed on a worker thread); the diorama camera and light. |
+| `render/pieces.gd`, `fx.gd` | Survivors, zombies, barricades, puffs; embers, smoke, snow, footprints, weather (GODOT-3). |
+| `ui/` | The UI: i18n (en/th, log lines), the look, options, the controller and every modal (GODOT-4). |
+| `audio/sound.gd` | The procedural sound, synthesised into sample buffers. |
+| `tests/` | Parity tests against the web build (below). |
 
-**Thai font:** Godot falls back to system fonts, which covers Thai on Android and desktop. Before release, bundle Noto Sans Thai (OFL) in a Theme so every platform looks the same.
+## Tests (all run headless)
+```bash
+godot --headless --path godot --script res://tests/run.gd      # rules: 546 vectors + 20 golden games, every action's state hash
+godot --headless --path godot --script res://tests/bot.gd      # the bot: same actions as the JS bot in the 20 golden games
+godot --headless --path godot --script res://tests/pack.gd     # meshes from the pack = the web mesher's
+godot --headless --path godot --script res://tests/scene.gd    # the board for 4 maps (stage 1–5) = the web board's scene
+```
+`scripts/godot/scene-dump.mjs` writes the web board's scenes; `scripts/godot/mesh-vectors.mjs` the mesh vectors.
+
+## Differences from the web version (not ported yet)
+- The step-by-step tutorial (the Godot version shows the day 1–3 tips) and the camera "director" that follows each move.
+- Crows, landing puffs and the bloom glow (the Compatibility renderer's glow lights the backdrop; it is off).
+- The graphics governor: only the Battery saver switch (details off) exists.
+- Item cards show names (the web shows empty frames too: there is no item art yet).
 
 ## Rules engine (GODOT-1)
 `core/` is a GDScript port of `src/core`, file for file, and `ai/bot.gd` ports the bot (`src/ai/simpleBot.js`, `simulate.js`).
