@@ -48,6 +48,9 @@ static func render(app: App) -> void:
 		scroll.custom_minimum_size = Vector2(w - 36, minf(vp.y - 80, 660.0 if kind != "found" else 420.0))
 		scroll.add_child(v)
 		p.add_child(scroll)
+		var maxh = minf(vp.y - 80, 660.0)
+		# (fit the box to its content once laid out)
+		v.resized.connect(func(): if is_instance_valid(scroll): scroll.custom_minimum_size.y = minf(v.size.y + 4, maxh))
 	else:
 		p.add_child(v)
 	match kind:
@@ -235,7 +238,10 @@ static func _pick(app: App, v: VBoxContainer) -> void:
 
 static func _confirm_end(app: App, v: VBoxContainer) -> void:
 	_title(v, "", I18n.t("confirm.end.title"))
-	v.add_child(Kit.label(I18n.t("confirm.end.energy"), 14, Kit.DIM, true))
+	var ap = 0
+	for id in Options.acting_survivors(app.state):
+		ap += app.state.survivors[id].ap
+	v.add_child(Kit.label(I18n.t("confirm.end.energy", {"n": ap}), 14, Kit.DIM, true))
 	var row = Kit.hbox()
 	row.add_child(Kit.button(I18n.t("confirm.end.yes"), func():
 		app.ui.modal = ""
@@ -285,6 +291,20 @@ static func _settings(app: App, v: VBoxContainer) -> void:
 		app.save_settings()
 		app.render(), not app.settings.hints))
 	v.add_child(hints)
+	var snd = Kit.hbox()
+	snd.add_child(Kit.label(I18n.t("settings.sound"), 15))
+	snd.add_child(Kit.button(I18n.t("settings.on"), func():
+		app.settings.sound = true
+		app.sound.set_enabled(true)
+		app.sound.set_ambient(true)
+		app.save_settings()
+		app.render(), app.settings.sound))
+	snd.add_child(Kit.button(I18n.t("settings.off"), func():
+		app.settings.sound = false
+		app.sound.set_enabled(false)
+		app.save_settings()
+		app.render(), not app.settings.sound))
+	v.add_child(snd)
 	var gfx = Kit.hbox()
 	gfx.add_child(Kit.label(I18n.t("settings.graphics"), 15))
 	gfx.add_child(Kit.button(I18n.t("settings.graphics.high"), func():

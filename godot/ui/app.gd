@@ -25,6 +25,7 @@ var modal_layer: Control
 var hint_box: PanelContainer
 var labels := {}
 var toasts := []
+var sound: Sound
 
 
 func _init(m: Node) -> void:
@@ -34,6 +35,9 @@ func _init(m: Node) -> void:
 
 func _ready() -> void:
 	_load_settings()
+	sound = Sound.new()
+	add_child(sound)
+	sound.set_enabled(settings.sound)
 	root = Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -139,6 +143,8 @@ func start_game() -> void:
 	var cfg: Dictionary = ui.setup
 	state = GameState.create_game({"scenarioId": cfg.scenarioId, "difficulty": cfg.difficulty, "seed": int(Time.get_unix_time_from_system() * 1000) % 2147483647, "days": Content.SCENARIOS_BY_ID[cfg.scenarioId].days})
 	ui.merge({"modal": "", "sel_loc": "", "sel_survivor": "", "queue": [], "draft": [], "item": "", "loc_info": false}, true)
+	sound.play("start")
+	sound.set_ambient(true)
 	_after_change(false)
 
 
@@ -161,6 +167,7 @@ func dispatch(action: Dictionary) -> bool:
 	if not res.ok:
 		var key = "err." + str(res.error)
 		toast(I18n.t(key) if I18n.has(key) else I18n.t("err.unknown"), "bad")
+		sound.play("error")
 		return false
 	var prev_log: Array = state.log
 	var pack_before: Array = state.survivors.get(action.get("survivorId", ""), {}).get("pack", []).duplicate() if action.has("survivorId") else []
@@ -190,12 +197,15 @@ func dispatch(action: Dictionary) -> bool:
 	if added.any(func(e): return e.k == "mapFound"):
 		toast(I18n.t("toast.mapFound"), "good")
 	for e in added:
+		sound.play(Sound.for_log(e))
 		if e.k == "mapGrown":
 			toast(I18n.t("toast.mapGrown", {"n": e.get("places", []).size()}), "good")
 		if e.k == "crisisResolved" and state.reports.colony != null:
 			ui.queue.append({"type": "colony", "report": state.reports.colony.duplicate(true), "morale": state.morale, "day": e.r})
 		if e.k == "crossroadsChoice":
 			ui.queue.append({"type": "cross", "cardId": e.cardId, "choice": e.choice, "focus": cross_focus})
+		if e.k == "roundStart" and e.day <= 3 and settings.hints:
+			ui.pending_tip = I18n.t("tut.day%d" % e.day)
 		if TOAST_KEYS.has(e.k) and e.k != "crisisResolved":
 			var text = I18n.format_log(e)
 			if text != "":
@@ -219,9 +229,14 @@ static func new_log_entries(prev: Array, next: Array) -> Array:
 
 
 func _after_change(animate: bool) -> void:
+	if ui.get("pending_tip", "") != "" and ui.queue.is_empty() and state.phase == "turn":
+		toast(ui.pending_tip, "tip")
+		ui.pending_tip = ""
 	if ui.sel_survivor != "" and not state.survivors.get(ui.sel_survivor, {}).get("alive", false):
 		ui.sel_survivor = ""
 	main.on_state(state, animate)
+	var a = Fx.atmosphere_for(state)
+	sound.set_weather(a.storm, a.fire)
 	_save()
 	render()
 
@@ -276,7 +291,7 @@ func board_tap(p: Vector3) -> void:
 
 
 func toast(text: String, kind := "") -> void:
-	toasts.append({"text": text, "kind": kind, "ttl": 3.6})
+	toasts.append({"text": text, "kind": kind, "ttl": 9.0 if kind == "tip" else 3.6})
 	if toasts.size() > 4:
 		toasts.pop_front()
 	_render_toasts()
@@ -284,6 +299,9 @@ func toast(text: String, kind := "") -> void:
 
 func _process(dt: float) -> void:
 	var changed = false
+	if ui.get("pending_tip", "") != "" and ui.queue.is_empty() and ui.modal == "" and not state.is_empty() and state.phase == "turn":
+		toast(ui.pending_tip, "tip")
+		ui.pending_tip = ""
 	for tt in toasts:
 		tt.ttl -= dt
 		if tt.ttl <= 0:
@@ -494,7 +512,7 @@ func _render_action_bar(vp: Vector2) -> void:
 	var people = Sel.survivors_at(state, at).size()
 	var head = Kit.hbox(10)
 	head.add_child(Kit.label(I18n.t("loc.lurePick") if ui.picking == "lure" else I18n.c("locations", at, "name"), 18))
-	head.add_child(Kit.label("☠ %d   👤 %d" % [loc.zombies, people], 14, Kit.RED if loc.zombies else Kit.DIM))
+	head.add_child(Kit.label("☠ %d   ♟ %d" % [loc.zombies, people], 14, Kit.RED if loc.zombies else Kit.DIM))
 	head.add_child(Kit.spacer())
 	head.add_child(Kit.button("i", func():
 		ui.loc_info = true
@@ -696,7 +714,7 @@ func _render_labels() -> void:
 		var loc: Dictionary = state.locations[id]
 		var n = Sel.survivors_at(state, id).size()
 		var spot = CityMap.is_spot(state, id)
-		labels[id].text = ("🔍" if spot else I18n.c("locations", id, "name")) + ("  ☠%d" % loc.zombies if loc.zombies else "") + ("  👤%d" % n if n else "")
+		labels[id].text = ("⌕" if spot else I18n.c("locations", id, "name")) + ("  ☠%d" % loc.zombies if loc.zombies else "") + ("  ♟%d" % n if n else "")
 		labels[id].modulate = Color(1, 0.85, 0.5) if id == ui.sel_loc else Color.WHITE
 	_place_labels()
 
@@ -723,7 +741,7 @@ func _render_toasts() -> void:
 	Kit.clear(toast_box)
 	for tt in toasts:
 		var p = Kit.panel(Color(0.35, 0.08, 0.08, 0.92) if tt.kind == "bad" else (Color(0.12, 0.3, 0.14, 0.92) if tt.kind == "good" else Kit.BG), 8, 8)
-		p.add_child(Kit.label(tt.text, 14))
+		p.add_child(Kit.label(tt.text, 14, Kit.WARM if tt.kind == "tip" else Kit.TEXT, true))
 		toast_box.add_child(p)
 	var vp = root.get_viewport_rect().size
 	toast_box.position = Vector2(vp.x / 2 - 220, 80)
