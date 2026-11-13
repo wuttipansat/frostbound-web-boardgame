@@ -13,11 +13,11 @@ var info: Label
 func _ready() -> void:
 	_environment()
 	_ground()
-	var colony := Models.instance(Data.model_file("lod1-colony-w1"))
+	var colony := ModelPack.instance("lod1-colony-w1", {"size": 0.3, "jitter": 0, "ao": true})
 	if colony:
 		add_child(colony)
 	for i in PLACES.size():
-		var m := Models.instance(Data.model_file("lod1-place-" + PLACES[i]))
+		var m := ModelPack.instance("lod1-place-" + PLACES[i], {"size": 0.3, "jitter": 0, "ao": true})
 		if m == null:
 			continue
 		var a := TAU * i / PLACES.size()
@@ -131,7 +131,7 @@ func _show() -> void:
 	if game.result != null:
 		res = "\n%s (%s)" % ["WON" if game.result.won else "lost", game.result.reason]
 	info.text = "FROSTBOUND — Godot port\n%d models · %s\nDay %d %s · %s · morale %d · food %d · stage %d · crawler %d\n%s%s" % [
-		Data.models.size(), _name("colony"), game.day, game.time, game.phase, game.morale, game.food,
+		ModelPack._entries.size(), _name("colony"), game.day, game.time, game.phase, game.morale, game.food,
 		game.map.stage, Sel.base_level(game, "crawler"), "\n".join(team), res]
 
 
