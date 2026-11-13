@@ -44,6 +44,7 @@ static func load_pack(path := FILE) -> bool:
 	glow_material.vertex_color_use_as_albedo = true
 	glow_material.vertex_color_is_srgb = true
 	glow_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow_material.albedo_color = Color(2.4, 2.4, 2.4) # (stage.js glowBoost: lit windows and fire go above 1 for the bloom)
 	_loaded = true
 	return true
 
@@ -69,6 +70,71 @@ static func bounds(full_key: String):
 	load_pack()
 	var e = _entries.get(full_key)
 	return {"min": e[2], "max": e[3]} if e != null else null
+
+
+static var _aabbs: Dictionary = {}
+
+
+## The bounding box [x0, y0, z0, x1, y1, z1] of a build's lit and glow quads (no mesh made: safe on a worker thread).
+static func aabb(full: String) -> Array:
+	load_pack()
+	if _aabbs.has(full):
+		return _aabbs[full]
+	var e = _entries.get(full)
+	var out := [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+	if e == null:
+		return out
+	var size := float(full.split("|")[1])
+	var off: Array = e[1]
+	var lo := [INF, INF, INF]
+	var hi := [-INF, -INF, -INF]
+	for rng in [e[6], e[7]]:
+		if rng == null:
+			continue
+		var start: int = _data_start + int(rng[0]) * 2
+		for k in int(rng[1]) / QUAD:
+			var b := start + k * QUAD * 2
+			var plane := _data.decode_s16(b)
+			var u0 := _data.decode_s16(b + 2)
+			var w0 := _data.decode_s16(b + 4)
+			var wu := _data.decode_s16(b + 6)
+			var ww := _data.decode_s16(b + 8)
+			var a: int = FACE_AXIS[_data.decode_s16(b + 10) & 7]
+			var u := (a + 1) % 3
+			var w := (a + 2) % 3
+			var q0 := [0, 0, 0]
+			var q1 := [0, 0, 0]
+			q0[a] = plane; q1[a] = plane
+			q0[u] = u0; q1[u] = u0 + wu
+			q0[w] = w0; q1[w] = w0 + ww
+			for c in 3:
+				lo[c] = minf(lo[c], (q0[c] + off[c]) * size)
+				hi[c] = maxf(hi[c], (q1[c] + off[c]) * size)
+	out = [lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]]
+	_aabbs[full] = out
+	return out
+
+
+## One mesh with the lit surface (0) and the glow surface (1) of a build, or null.
+static var _combined: Dictionary = {}
+static func combined(full: String):
+	if _combined.has(full):
+		return _combined[full]
+	var m = meshes_full(full)
+	if m == null:
+		_combined[full] = null
+		return null
+	var mesh := ArrayMesh.new()
+	var glow_at := -1
+	for s in ["lit", "glow"]:
+		if m[s] != null:
+			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, m[s].surface_get_arrays(0))
+			mesh.surface_set_material(mesh.get_surface_count() - 1, m[s].surface_get_material(0))
+			if s == "glow":
+				glow_at = mesh.get_surface_count() - 1
+	mesh.set_meta("glow_surface", glow_at)
+	_combined[full] = mesh
+	return mesh
 
 
 ## {lit: ArrayMesh, glow: ArrayMesh} for a build (either may be null), or null if it is not in the pack.

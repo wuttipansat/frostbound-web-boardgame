@@ -793,19 +793,7 @@ static var _aabbs := {}
 
 ## World box (x0, z0, x1, z1) of a build under a matrix (lit and glow parts).
 static func box_of(full: String, mat: Array) -> Array:
-	var bb = _aabbs.get(full)
-	if bb == null:
-		var ms = ModelPack.meshes_full(full)
-		var ab := AABB()
-		var first := true
-		if ms != null:
-			for s in ["lit", "glow"]:
-				if ms[s] != null:
-					var a: AABB = ms[s].get_aabb()
-					ab = a if first else ab.merge(a)
-					first = false
-		bb = [ab.position.x, ab.position.y, ab.position.z, ab.end.x, ab.end.y, ab.end.z]
-		_aabbs[full] = bb
+	var bb: Array = ModelPack.aabb(full)
 	var x0 := INF
 	var z0 := INF
 	var x1 := -INF

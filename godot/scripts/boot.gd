@@ -1,77 +1,27 @@
-# GODOT-0 boot scene: the colony and six places on a snowy plane, cold light, a warm campfire glow.
-# Proves the exported models, data and text load; the real board comes in GODOT-2.
+# GODOT-2 boot scene: the real board for the current game (the ported composition), the diorama camera, and the
+# ported rules engine driven by the bot. The city grows when a map is read; the board composes it on a thread.
 extends Node3D
 
-const PITCH := 30.0  # world units between block centres (as the web board)
-const PLACES := ["grocery", "police", "gas", "hospital", "school", "library"]
-
+var stage: Stage
+var board: Board
 var game: Dictionary
 var bot_opts: Dictionary
 var info: Label
+var last_stage := 0
 
 
 func _ready() -> void:
-	_environment()
-	_ground()
-	var colony := ModelPack.instance("lod1-colony-w1", {"size": 0.3, "jitter": 0, "ao": true})
-	if colony:
-		add_child(colony)
-	for i in PLACES.size():
-		var m := ModelPack.instance("lod1-place-" + PLACES[i], {"size": 0.3, "jitter": 0, "ao": true})
-		if m == null:
-			continue
-		var a := TAU * i / PLACES.size()
-		m.position = Vector3(cos(a), 0, sin(a)) * PITCH * 1.4
-		m.rotation.y = -a - PI / 2  # face the colony
-		add_child(m)
-	var rig: Node3D = preload("res://scripts/orbit_camera.gd").new()
-	rig.position = Vector3(0, 2, 0)
-	add_child(rig)
-	_label()
+	stage = Stage.new()
+	add_child(stage)
+	board = Board.new()
+	add_child(board)
+	board.built_board.connect(func(b): stage.fit(b, last_stage <= 1))
+	stage.zoom_changed.connect(func(z): board.set_zoom(z))
+	_ui()
+	_new_game()
 
 
-func _environment() -> void:
-	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("#2a3644")
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("#8fa6bf")
-	env.ambient_light_energy = 0.35
-	env.fog_enabled = true
-	env.fog_light_color = Color("#6f8296")
-	env.fog_density = 0.0025
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	var we := WorldEnvironment.new()
-	we.environment = env
-	add_child(we)
-	var sun := DirectionalLight3D.new()
-	sun.light_color = Color("#dfe9f5")
-	sun.light_energy = 0.75
-	sun.rotation_degrees = Vector3(-35, 40, 0)
-	sun.shadow_enabled = true
-	add_child(sun)
-	var fire := OmniLight3D.new()  # the campfire
-	fire.light_color = Color("#ffb347")
-	fire.light_energy = 3.0
-	fire.omni_range = 18.0
-	fire.position = Vector3(0, 2, 0)
-	add_child(fire)
-
-
-func _ground() -> void:
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(400, 400)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color("#aebdcc")
-	mat.roughness = 1.0
-	var g := MeshInstance3D.new()
-	g.mesh = plane
-	g.material_override = mat
-	g.position.y = -0.02
-	add_child(g)
-
-
-func _label() -> void:
+func _ui() -> void:
 	var ui := CanvasLayer.new()
 	var panel := PanelContainer.new()
 	panel.position = Vector2(12, 12)
@@ -94,15 +44,26 @@ func _label() -> void:
 	box.add_child(row)
 	ui.add_child(panel)
 	add_child(ui)
-	TranslationServer.set_locale("th" if OS.get_locale_language() == "th" else "en")
-	_new_game()
 
 
-## GODOT-1: the ported rules engine runs in the app; the bot plays the crawler scenario.
 func _new_game() -> void:
-	var seed := int(Time.get_unix_time_from_system())
+	var seed := int(Time.get_unix_time_from_system()) % 100000
+	var args := OS.get_cmdline_user_args()
+	for i in args.size():
+		if args[i] == "--seed":
+			seed = int(args[i + 1])
 	game = GameState.create_game({"scenarioId": "crawler", "seed": seed, "difficulty": "normal", "days": 40})
 	bot_opts = {"random": Bot.mulberry(seed * 7919 + 13), "chaos": 0}
+	last_stage = 0
+	_sync()
+
+
+func _sync() -> void:
+	if game.map.stage != last_stage or board.levels.hash() != game.base.hash():
+		var snap := last_stage == 0
+		last_stage = game.map.stage
+		board.set_map(game.map, game.base, snap)
+	board.set_fire(clampf(game.morale / 7.0, 0.1, 1.4))
 	_show()
 
 
@@ -112,7 +73,7 @@ func _bot_step() -> void:
 	var a = Bot.bot_action(game, bot_opts)
 	var r := Reducer.try_reduce(game, a if a != null else {"type": "END_TURN"})
 	game = r.state if r.ok else Reducer.try_reduce(game, {"type": "END_TURN"}).state
-	_show()
+	_sync()
 
 
 func _bot_day() -> void:
@@ -130,13 +91,5 @@ func _show() -> void:
 	var res := ""
 	if game.result != null:
 		res = "\n%s (%s)" % ["WON" if game.result.won else "lost", game.result.reason]
-	info.text = "FROSTBOUND — Godot port\n%d models · %s\nDay %d %s · %s · morale %d · food %d · stage %d · crawler %d\n%s%s" % [
-		ModelPack._entries.size(), _name("colony"), game.day, game.time, game.phase, game.morale, game.food,
-		game.map.stage, Sel.base_level(game, "crawler"), "\n".join(team), res]
-
-
-## A place's name in the current language (Thai content text, else the English name from the data).
-func _name(id: String) -> String:
-	var k := "content.locations.%s.name" % id
-	var t := tr(k)
-	return t if t != k else str(Content.LOCATIONS[id].name)
+	info.text = "FROSTBOUND — Godot port\nDay %d %s · %s · morale %d · food %d · stage %d · crawler %d\n%s%s" % [
+		game.day, game.time, game.phase, game.morale, game.food, game.map.stage, Sel.base_level(game, "crawler"), "\n".join(team), res]
